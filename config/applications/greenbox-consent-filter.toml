@@ -29,7 +29,7 @@ MITIGATION_STRATEGY = { type = "deployment-parameter", key = "mitigation-strateg
 PRODUCER_TOPIC = { type = "deployment-parameter", key = "sink-topic" }
 
 CONSUMER_GROUP_ID = { type = "template", value = "${TENANT}_grpid" }
-GREENBOX_BACKEND_HOST = { type = "template", value = "greenbox-${TENANT}.dsh-dev.dsh.np.aws.kpn.com" }
+GREENBOX_BACKEND_HOST = { type = "template", value = "greenbox-backend-dev.dsh-dev.dsh.np.aws.kpn.com" }
 GREENBOX_BACKEND_USERNAME = { type = "template", value = "${TENANT}" }
 GREENBOX_CONSUMER_CONTEXT_DOMAIN = { type = "value", value = "retail" }
 GREENBOX_CONSUMER_CONTEXT_LAWFUL_PURPOSE = { type = "value", value = "consent-given" }
@@ -39,6 +39,8 @@ LOG_LEVEL_BACKEND_CLIENT = { type = "value", value = "info" }
 LOG_LEVEL_COMPLIANCY = { type = "value", value = "info" }
 LOG_LEVEL_DSH = { type = "value", value = "info" }
 LOG_LEVEL_GREENBOX = { type = "value", value = "info" }
+CLASSIFICATION_IDENTIFIER = { type = "value", value = "org.kpn.greenbox.ri:ReferenceSchemaAvro:1.0.0" }
+GROUP_ID_PREFIX = { type = "template", value = "${TENANT}_" }
 
 [profiles.minimal]
 
