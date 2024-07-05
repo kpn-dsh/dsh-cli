@@ -6,7 +6,8 @@ use trifonius_engine::DEFAULT_TARGET_CLIENT_FACTOR;
 async fn main() {
   let resource_registry = ResourceRegistry::create(&DEFAULT_TARGET_CLIENT_FACTOR).unwrap();
   let topic_descriptors = resource_registry.resource_descriptors_by_type(ResourceType::Topic).unwrap();
-  for topic_descriptor in topic_descriptors {
-    println!("{}", topic_descriptor);
-  }
+  println!("{}", serde_json::to_string_pretty(&topic_descriptors).unwrap());
+  // for topic_descriptor in topic_descriptors {
+  //   println!("{}", topic_descriptor);
+  // }
 }

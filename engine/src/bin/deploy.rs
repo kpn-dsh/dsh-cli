@@ -15,7 +15,7 @@ async fn main() {
   deployment_config.insert("identifier-picker-source-system".to_string(), "boss".to_string());
   deployment_config.insert("enable-dsh-envelope".to_string(), "true".to_string());
   deployment_config.insert("source-topic".to_string(), "stream.reference-implementation.greenbox-dev".to_string());
-  deployment_config.insert("compliancy-agent".to_string(), "whitelist".to_string());
+  deployment_config.insert("compliancy-agent".to_string(), "classification".to_string());
   deployment_config.insert("mitigation-strategy".to_string(), "clip".to_string());
   let _ = application.deploy(APPLICATION_NAME, &deployment_config, Some("minimal"));
 }
