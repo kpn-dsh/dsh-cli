@@ -59,13 +59,13 @@ impl TryFrom<&str> for MessageTimestampType {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TopicDescriptor {
   pub topic_name: String,
-  #[serde(rename = "message-timestamp-type")]
+  #[serde(rename = "message-timestamp-type", skip_serializing_if = "Option::is_none")]
   pub message_timestamp_type: Option<MessageTimestampType>,
-  #[serde(rename = "cleanup-policy")]
+  #[serde(rename = "cleanup-policy", skip_serializing_if = "Option::is_none")]
   pub cleanup_policy: Option<CleanupPolicy>, // delete or
-  #[serde(rename = "max-message-bytes")]
+  #[serde(rename = "max-message-bytes", skip_serializing_if = "Option::is_none")]
   pub max_message_bytes: Option<u64>,
-  #[serde(rename = "segment-bytes")]
+  #[serde(rename = "segment-bytes", skip_serializing_if = "Option::is_none")]
   pub segment_bytes: Option<u64>,
   #[serde(rename = "number-of-partitions")]
   pub number_of_partitions: u64,

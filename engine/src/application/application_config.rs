@@ -15,13 +15,19 @@ pub enum PortMappingTls {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PortMapping {
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub auth: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub mode: Option<String>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
   pub paths: Vec<String>,
-  #[serde(rename = "service-group")]
+  #[serde(rename = "service-group", skip_serializing_if = "Option::is_none")]
   pub service_group: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub tls: Option<PortMappingTls>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub vhost: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub whitelist: Option<String>,
 }
 
@@ -37,6 +43,7 @@ pub enum HealthCheckProtocol {
 pub struct HealthCheck {
   pub path: String,
   pub port: u64,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub protocol: Option<HealthCheckProtocol>,
 }
 
@@ -61,7 +68,7 @@ pub struct Profile {
   pub cpus: f64,
   pub instances: u64,
   pub mem: u64,
-  #[serde(rename = "environment-variables")]
+  #[serde(rename = "environment-variables", skip_serializing_if = "Option::is_none")]
   pub environment_variables: Option<HashMap<String, Variable>>,
 }
 
@@ -93,7 +100,9 @@ pub enum VariableType {
 pub struct Variable {
   #[serde(rename = "type")]
   pub typ: VariableType,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub key: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub value: Option<String>,
 }
 
@@ -179,10 +188,13 @@ pub struct DeploymentParameter {
   #[serde(rename = "type")]
   typ: DeploymentParameterType,
   caption: String,
-  #[serde(rename = "initial-value")]
+  #[serde(rename = "initial-value", skip_serializing_if = "Option::is_none")]
   initial_value: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   options: Option<Vec<String>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   optional: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   default: Option<String>,
 }
 
@@ -240,25 +252,28 @@ pub struct ApplicationConfig {
   pub description: String,
   #[serde(rename = "application-version")]
   pub version: String,
-  #[serde(rename = "grafana-url")]
+  #[serde(rename = "grafana-url", skip_serializing_if = "Option::is_none")]
   pub grafana_url: Option<String>,
   pub image: String,
   #[serde(rename = "needs-token")]
   pub needs_token: bool,
   #[serde(rename = "single-instance")]
   pub single_instance: bool,
-  #[serde(rename = "exposed-ports")]
+  #[serde(rename = "exposed-ports", skip_serializing_if = "Option::is_none")]
   pub exposed_ports: Option<HashMap<String, PortMapping>>,
-  #[serde(rename = "health-check")]
+  #[serde(rename = "health-check", skip_serializing_if = "Option::is_none")]
   pub health_check: Option<HealthCheck>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub metrics: Option<Metrics>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub secrets: Option<Vec<ApplicationSecret>>,
-  #[serde(rename = "spread-group")]
+  #[serde(rename = "spread-group", skip_serializing_if = "Option::is_none")]
   pub spread_group: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub volumes: Option<HashMap<String, String>>,
-  #[serde(rename = "deployment-parameters")]
+  #[serde(rename = "deployment-parameters", skip_serializing_if = "Option::is_none")]
   pub deployment_parameters: Option<HashMap<String, DeploymentParameter>>,
-  #[serde(rename = "environment-variables")]
+  #[serde(rename = "environment-variables", skip_serializing_if = "Option::is_none")]
   pub environment_variables: Option<HashMap<String, Variable>>,
   pub profiles: HashMap<String, Profile>,
 }

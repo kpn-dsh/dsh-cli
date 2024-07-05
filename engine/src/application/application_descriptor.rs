@@ -13,9 +13,9 @@ pub struct ApplicationDescriptor {
   pub application_description: String,
   #[serde(rename = "application-version")]
   pub application_version: String,
-  #[serde(rename = "grafana-url")]
+  #[serde(rename = "grafana-url", skip_serializing_if = "Option::is_none")]
   pub grafana_url: Option<String>,
-  #[serde(rename = "deployment-parameters")]
+  #[serde(rename = "deployment-parameters", skip_serializing_if = "Option::is_none")]
   pub deployment_parameters: Option<HashMap<String, DeploymentParameter>>,
   pub deployment_profiles: Vec<(String, String)>,
 }
