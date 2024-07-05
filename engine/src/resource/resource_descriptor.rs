@@ -13,6 +13,7 @@ pub enum ResourceType {
 pub struct ResourceDescriptor {
   #[serde(rename = "type")]
   pub resource_type: ResourceType,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub topic: Option<TopicDescriptor>,
 }
 
