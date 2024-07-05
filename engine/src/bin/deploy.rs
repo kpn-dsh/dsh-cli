@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use trifonius_engine::application::application_registry::ApplicationRegistry;
+use trifonius_engine::processor::application::application_registry::ApplicationRegistry;
 use trifonius_engine::DEFAULT_TARGET_CLIENT_FACTOR;
 
 const APPLICATION_NAME: &str = "abcdefgh1";
@@ -8,7 +8,7 @@ const APPLICATION_NAME: &str = "abcdefgh1";
 #[tokio::main]
 async fn main() {
   let registry = ApplicationRegistry::create(&DEFAULT_TARGET_CLIENT_FACTOR).unwrap();
-  let application = registry.application("greenbox-consent-filter").unwrap();
+  let application = registry.application_by_name("greenbox-consent-filter").unwrap();
   let mut deployment_config: HashMap<String, String> = HashMap::new();
   deployment_config.insert("sink-topic".to_string(), "scratch.reference-implementation-compliant.greenbox-dev".to_string());
   deployment_config.insert("identifier-picker-regex".to_string(), "(?:cancelled|created|updated):([0-9]+)".to_string());

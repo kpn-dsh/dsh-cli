@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-use crate::application::application_config::DeploymentParameter;
+use crate::processor::application::application_config::DeploymentParameter;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApplicationDescriptor {

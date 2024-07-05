@@ -7,7 +7,7 @@ use dsh_rest_api_client::types::{
 use lazy_static::lazy_static;
 use regex::Regex;
 
-use crate::application::application_config::{
+use crate::processor::application::application_config::{
   ApplicationConfig, ApplicationSecret, HealthCheck, HealthCheckProtocol, Metrics, PlaceHolder, PortMapping, PortMappingTls, Profile, VariableType,
 };
 

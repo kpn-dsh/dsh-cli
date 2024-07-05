@@ -4,8 +4,8 @@ use dsh_rest_api_client::Client;
 use dsh_sdk::{Platform, RestTokenFetcher, RestTokenFetcherBuilder};
 use lazy_static::lazy_static;
 
-pub mod application;
 pub mod pipeline;
+pub mod processor;
 pub mod resource;
 
 const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
