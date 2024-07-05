@@ -1,0 +1,76 @@
+application-name = "test"
+application-description = "Test profiles"
+application-version = "0.1.2"
+
+grafana-url = "www.kpn.com"
+
+image = "test-image:0.1.2-SNAPSHOT"
+needs-token = true
+single-instance = false
+spread-group = "SPREAD_GROUP"
+topics = ["topic-name-one", "topic-name-two"]
+
+[metrics]
+port = 9095
+path = "/metrics"
+
+[exposed-ports.3000]
+vhost = "{ vhost('your-vhost-name','a-zone') }"
+auth = "app-realm:admin:$1$EZsDrd93$7g2osLFOay4.TzDgGo9bF/"
+mode = "http"
+whitelist = "0.0.0.0 127.0.0.1"
+paths = ["/abc"]
+service-group = "mygroup"
+
+[health-check]
+protocol = "http"
+port = 8080
+path = "/healthpath"
+
+[[secrets]]
+name = "secret_name"
+injections = [{ env = "SECRET" }]
+
+[volumes]
+"/volume_path" = "{ volume('correct_volume_name') }"
+
+[deployment-parameters]
+parameter-boolean = { type = "boolean", caption = "Boolean", optional = true, default = "false" }
+parameter-free-text = { type = "free-text", caption = "Free text" }
+parameter-selection = { type = "selection", caption = "Selection", options = ["option1", "option2"] }
+parameter-sink-topic = { type = "sink-topic", caption = "Sink topic" }
+parameter-source-topic = { type = "source-topic", caption = "Source topic" }
+
+[environment-variables]
+ENV_VAR_DEPLOYMENT_PARAMETER_BOOLEAN = { type = "deployment-parameter", key = "parameter-boolean" }
+ENV_VAR_DEPLOYMENT_PARAMETER_FREE_TEXT = { type = "deployment-parameter", key = "parameter-free-text" }
+ENV_VAR_DEPLOYMENT_PARAMETER_SELECTION = { type = "deployment-parameter", key = "parameter-selection" }
+ENV_VAR_DEPLOYMENT_PARAMETER_SINK_TOPIC = { type = "deployment-parameter", key = "parameter-sink-topic" }
+ENV_VAR_DEPLOYMENT_PARAMETER_SOURCE_TOPIC = { type = "deployment-parameter", key = "parameter-source-topic" }
+ENV_VAR_TEMPLATE_LITERAL = { type = "template", value = "abcdefghijkl" }
+ENV_VAR_TEMPLATE_TENANT_USER = { type = "template", value = "abcd${TENANT}efgh${USER}ijkl" }
+ENV_VAR_VALUE = { type = "value", value = "VALUE" }
+
+[profiles.profile-1]
+
+profile-name = "profile-1"
+profile-description = "Profile 1"
+cpus = 1
+instances = 1
+mem = 1
+
+[profiles.profile-1.environment-variables]
+PROFILE1_ENV_VAR1 = { type = "deployment-parameter", key = "parameter1" }
+PROFILE1_ENV_VAR2 = { type = "value", value = "value1" }
+
+[profiles.profile-2]
+
+profile-name = "profile-2"
+profile-description = "Profile 2"
+cpus = 2
+instances = 2
+mem = 2
+
+[profiles.profile-2.environment-variables]
+PROFILE2_ENV_VAR1 = { type = "deployment-parameter", key = "parameter2" }
+PROFILE2_ENV_VAR2 = { type = "value", value = "value2" }
