@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use trifonius_engine::application::application_registry::ApplicationRegistry;
 use trifonius_engine::DEFAULT_TARGET_CLIENT_FACTOR;
 
-const APPLICATION_NAME: &str = "abcdefgh1";
+const APPLICATION_NAME: &str = "test-0-0-2";
 
 #[tokio::main]
 async fn main() {
@@ -17,5 +17,5 @@ async fn main() {
   deployment_config.insert("source-topic".to_string(), "stream.reference-implementation.greenbox-dev".to_string());
   deployment_config.insert("compliancy-agent".to_string(), "classification".to_string());
   deployment_config.insert("mitigation-strategy".to_string(), "clip".to_string());
-  let _ = application.deploy(APPLICATION_NAME, &deployment_config, Some("minimal"));
+  let _ = application.deploy(APPLICATION_NAME, &deployment_config, Some("minimal")).await;
 }
