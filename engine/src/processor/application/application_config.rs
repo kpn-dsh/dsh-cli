@@ -347,7 +347,6 @@ pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConf
 #[test]
 fn read_application_config_proper_values() {
   let config = read_application_config("test-config/applications/application-config-test.toml").unwrap();
-  // let config = read_application_config("/Users/wilbert/Workspaces/trifonius/trifonius-engine/test-config/applications/application-config-test.toml").unwrap();
 
   println!("{:?}", config);
   assert_eq!(config.name, "test");
@@ -463,7 +462,6 @@ fn read_application_config_proper_values() {
 #[test]
 fn read_application_config_profile_proper_values() {
   let config = read_application_config("test-config/applications/application-config-test.toml").unwrap();
-  // let config = read_application_config("/Users/wilbert/Workspaces/trifonius/trifonius-engine/test-config/applications/application-config-test.toml").unwrap();
 
   let profile1 = config.profiles.clone().get("profile-1").unwrap().clone();
   println!("{:?}", profile1);

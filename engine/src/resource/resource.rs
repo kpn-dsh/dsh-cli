@@ -1,6 +1,7 @@
 #![allow(clippy::module_inception)]
 
 use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceType};
+use async_trait::async_trait;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct ResourceIdentifier {
@@ -8,6 +9,7 @@ pub struct ResourceIdentifier {
   pub name: String,
 }
 
+#[async_trait]
 pub trait Resource {
   fn descriptor(&self) -> &ResourceDescriptor;
 
@@ -15,5 +17,5 @@ pub trait Resource {
 
   fn resource_type(&self) -> ResourceType;
 
-  fn status(&self, resource_name: &str) -> Result<String, String>;
+  async fn status(&self, resource_name: &str) -> Result<String, String>;
 }

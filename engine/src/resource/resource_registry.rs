@@ -20,57 +20,57 @@ impl<'a> ResourceRegistry<'a> {
     Ok(ResourceRegistry { topic_registry: TopicRegistry::create(target_client_factory)? })
   }
 
-  pub fn resource(&self, resource_type: ResourceType, resource_name: &str) -> Result<Box<dyn Resource + 'a>, String> {
+  pub async fn resource(&self, resource_type: ResourceType, resource_name: &str) -> Result<Box<dyn Resource + 'a>, String> {
     match resource_type {
-      ResourceType::Topic => self.topic_registry.resource_by_name(resource_name),
+      ResourceType::Topic => self.topic_registry.resource_by_name(resource_name).await,
     }
   }
 
-  pub fn resource_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Result<Box<dyn Resource + 'a>, String> {
+  pub async fn resource_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Result<Box<dyn Resource + 'a>, String> {
     match resource_identifier.resource_type {
-      ResourceType::Topic => self.topic_registry.resource_by_name(resource_identifier.name.as_str()),
+      ResourceType::Topic => self.topic_registry.resource_by_name(resource_identifier.name.as_str()).await,
     }
   }
 
-  pub fn resource_identifiers(&self) -> Result<Vec<ResourceIdentifier>, String> {
-    self.topic_registry.resource_identifiers()
+  pub async fn resource_identifiers(&self) -> Result<Vec<ResourceIdentifier>, String> {
+    self.topic_registry.resource_identifiers().await
   }
 
-  pub fn resource_identifiers_by_type(&self, resource_type: ResourceType) -> Result<Vec<ResourceIdentifier>, String> {
+  pub async fn resource_identifiers_by_type(&self, resource_type: ResourceType) -> Result<Vec<ResourceIdentifier>, String> {
     match resource_type {
-      ResourceType::Topic => self.topic_registry.resource_identifiers(),
+      ResourceType::Topic => self.topic_registry.resource_identifiers().await,
     }
   }
 
-  pub fn resource_descriptor(&self, resource_type: ResourceType, resource_name: &str) -> Result<Option<ResourceDescriptor>, String> {
+  pub async fn resource_descriptor(&self, resource_type: ResourceType, resource_name: &str) -> Result<Option<ResourceDescriptor>, String> {
     match resource_type {
-      ResourceType::Topic => self.topic_registry.resource_descriptor_by_name(resource_name),
+      ResourceType::Topic => self.topic_registry.resource_descriptor_by_name(resource_name).await,
     }
   }
 
-  pub fn resource_descriptor_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Result<Option<ResourceDescriptor>, String> {
+  pub async fn resource_descriptor_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Result<Option<ResourceDescriptor>, String> {
     match resource_identifier.resource_type {
-      ResourceType::Topic => self.topic_registry.resource_descriptor_by_name(resource_identifier.name.as_str()),
+      ResourceType::Topic => self.topic_registry.resource_descriptor_by_name(resource_identifier.name.as_str()).await,
     }
   }
 
-  pub fn resource_descriptors(&self) -> Result<Vec<ResourceDescriptor>, String> {
-    self.topic_registry.resource_descriptors()
+  pub async fn resource_descriptors(&self) -> Result<Vec<ResourceDescriptor>, String> {
+    self.topic_registry.resource_descriptors().await
   }
 
-  pub fn resource_descriptors_by_type(&self, resource_type: ResourceType) -> Result<Vec<ResourceDescriptor>, String> {
+  pub async fn resource_descriptors_by_type(&self, resource_type: ResourceType) -> Result<Vec<ResourceDescriptor>, String> {
     match resource_type {
-      ResourceType::Topic => self.topic_registry.resource_descriptors(),
+      ResourceType::Topic => self.topic_registry.resource_descriptors().await,
     }
   }
 
-  pub fn resource_descriptors_with_status(&self) -> Result<Vec<(ResourceDescriptor, bool)>, String> {
-    self.topic_registry.resource_descriptors_with_status()
+  pub async fn resource_descriptors_with_status(&self) -> Result<Vec<(ResourceDescriptor, bool)>, String> {
+    self.topic_registry.resource_descriptors_with_status().await
   }
 
-  pub fn resource_descriptors_by_type_with_status(&self, resource_type: ResourceType) -> Result<Vec<(ResourceDescriptor, bool)>, String> {
+  pub async fn resource_descriptors_by_type_with_status(&self, resource_type: ResourceType) -> Result<Vec<(ResourceDescriptor, bool)>, String> {
     match resource_type {
-      ResourceType::Topic => self.topic_registry.resource_descriptors_with_status(),
+      ResourceType::Topic => self.topic_registry.resource_descriptors_with_status().await,
     }
   }
 }

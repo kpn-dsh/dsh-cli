@@ -3,6 +3,7 @@ use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceType};
 use crate::resource::topic::topic_descriptor::TopicDescriptor;
 use crate::resource::topic::topic_registry::get_topic_status;
 use crate::TargetClientFactory;
+use async_trait::async_trait;
 
 pub struct TopicResourceImpl<'a> {
   pub resource_identifier: ResourceIdentifier,
@@ -20,6 +21,7 @@ impl<'a> TopicResourceImpl<'a> {
   }
 }
 
+#[async_trait]
 impl Resource for TopicResourceImpl<'_> {
   fn descriptor(&self) -> &ResourceDescriptor {
     &self.resource_descriptor
@@ -33,8 +35,8 @@ impl Resource for TopicResourceImpl<'_> {
     ResourceType::Topic
   }
 
-  fn status(&self, resource_name: &str) -> Result<String, String> {
-    match get_topic_status(self.target_client_factory, resource_name)? {
+  async fn status(&self, resource_name: &str) -> Result<String, String> {
+    match get_topic_status(self.target_client_factory, resource_name).await? {
       Some(status) => {
         if status.provisioned {
           Ok("provisioned".to_string())
