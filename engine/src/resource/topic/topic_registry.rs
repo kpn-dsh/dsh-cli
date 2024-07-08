@@ -1,7 +1,6 @@
 use std::ops::Deref;
 use std::str::FromStr;
 
-use futures::executor;
 use num_traits::ToPrimitive;
 
 use crate::resource::resource::{Resource, ResourceIdentifier};
@@ -19,8 +18,8 @@ impl<'a> TopicRegistry<'a> {
     Ok(TopicRegistry { target_client_factory })
   }
 
-  pub fn resource_by_name(&self, resource_name: &str) -> Result<Box<dyn Resource + 'a>, String> {
-    match get_topic_descriptor(self.target_client_factory, resource_name)? {
+  pub async fn resource_by_name(&self, resource_name: &str) -> Result<Box<dyn Resource + 'a>, String> {
+    match get_topic_descriptor(self.target_client_factory, resource_name).await? {
       Some(topic_descriptor) => match TopicResourceImpl::create(topic_descriptor, self.target_client_factory) {
         Ok(topic_resource) => Ok(topic_resource),
         Err(e) => Err(format!("failed to create topic resource for topic {} ({})", resource_name, e)),
@@ -29,31 +28,34 @@ impl<'a> TopicRegistry<'a> {
     }
   }
 
-  pub fn resource_identifiers(&self) -> Result<Vec<ResourceIdentifier>, String> {
+  pub async fn resource_identifiers(&self) -> Result<Vec<ResourceIdentifier>, String> {
     Ok(
-      get_topic_descriptors(self.target_client_factory)?
+      get_topic_descriptors(self.target_client_factory)
+        .await?
         .iter()
         .map(|td| ResourceIdentifier { resource_type: ResourceType::Topic, name: td.topic_name.clone() })
         .collect(),
     )
   }
 
-  pub fn resource_descriptor_by_name(&self, resource_name: &str) -> Result<Option<ResourceDescriptor>, String> {
-    Ok(get_topic_descriptor(self.target_client_factory, resource_name)?.map(ResourceDescriptor::from))
+  pub async fn resource_descriptor_by_name(&self, resource_name: &str) -> Result<Option<ResourceDescriptor>, String> {
+    Ok(get_topic_descriptor(self.target_client_factory, resource_name).await?.map(ResourceDescriptor::from))
   }
 
-  pub fn resource_descriptors(&self) -> Result<Vec<ResourceDescriptor>, String> {
+  pub async fn resource_descriptors(&self) -> Result<Vec<ResourceDescriptor>, String> {
     Ok(
-      get_topic_descriptors(self.target_client_factory)?
+      get_topic_descriptors(self.target_client_factory)
+        .await?
         .iter()
         .map(|td| ResourceDescriptor::from(td.clone()))
         .collect(),
     )
   }
 
-  pub fn resource_descriptors_with_status(&self) -> Result<Vec<(ResourceDescriptor, bool)>, String> {
+  pub async fn resource_descriptors_with_status(&self) -> Result<Vec<(ResourceDescriptor, bool)>, String> {
     Ok(
-      get_topic_descriptors_with_status(self.target_client_factory)?
+      get_topic_descriptors_with_status(self.target_client_factory)
+        .await?
         .into_iter()
         .map(|(td, s)| (ResourceDescriptor::from(td.clone()), s))
         .collect::<Vec<(ResourceDescriptor, bool)>>(),
@@ -61,9 +63,13 @@ impl<'a> TopicRegistry<'a> {
   }
 }
 
-fn get_topic_names(target_client_factory: &TargetClientFactory) -> Result<Vec<String>, String> {
-  let target_client = executor::block_on(target_client_factory.get())?;
-  match executor::block_on(target_client.client.topic_get_by_tenant_topic(target_client.tenant, target_client.token.as_str())) {
+async fn get_topic_names(target_client_factory: &TargetClientFactory) -> Result<Vec<String>, String> {
+  let target_client = target_client_factory.get().await?;
+  match target_client
+    .client
+    .topic_get_by_tenant_topic(target_client.tenant, target_client.token.as_str())
+    .await
+  {
     Ok(response) => {
       let mut topic_names = response.deref().0.clone();
       topic_names.sort();
@@ -73,13 +79,13 @@ fn get_topic_names(target_client_factory: &TargetClientFactory) -> Result<Vec<St
   }
 }
 
-fn get_topic_descriptor(target_client_factory: &TargetClientFactory, topic_name: &str) -> Result<Option<TopicDescriptor>, String> {
-  let target_client = executor::block_on(target_client_factory.get())?;
-  match executor::block_on(
-    target_client
-      .client
-      .topic_get_by_tenant_topic_by_id_configuration(target_client.tenant, topic_name, target_client.token.as_str()),
-  ) {
+async fn get_topic_descriptor(target_client_factory: &TargetClientFactory, topic_name: &str) -> Result<Option<TopicDescriptor>, String> {
+  let target_client = target_client_factory.get().await?;
+  match target_client
+    .client
+    .topic_get_by_tenant_topic_by_id_configuration(target_client.tenant, topic_name, target_client.token.as_str())
+    .await
+  {
     Ok(response) => {
       if response.status() == 404 {
         Ok(None)
@@ -122,13 +128,13 @@ fn get_topic_descriptor(target_client_factory: &TargetClientFactory, topic_name:
   }
 }
 
-pub(crate) fn get_topic_status(target_client_factory: &TargetClientFactory, topic_name: &str) -> Result<Option<TopicStatus>, String> {
-  let target_client = executor::block_on(target_client_factory.get())?;
-  match executor::block_on(
-    target_client
-      .client
-      .topic_get_by_tenant_topic_by_id_status(target_client.tenant, topic_name, target_client.token.as_str()),
-  ) {
+pub(crate) async fn get_topic_status(target_client_factory: &TargetClientFactory, topic_name: &str) -> Result<Option<TopicStatus>, String> {
+  let target_client = target_client_factory.get().await?;
+  match target_client
+    .client
+    .topic_get_by_tenant_topic_by_id_status(target_client.tenant, topic_name, target_client.token.as_str())
+    .await
+  {
     Ok(response) => {
       if response.status() == 404 {
         Ok(None)
@@ -145,23 +151,23 @@ pub(crate) fn get_topic_status(target_client_factory: &TargetClientFactory, topi
   }
 }
 
-fn get_topic_descriptors(target_client_factory: &TargetClientFactory) -> Result<Vec<TopicDescriptor>, String> {
+async fn get_topic_descriptors(target_client_factory: &TargetClientFactory) -> Result<Vec<TopicDescriptor>, String> {
   let mut topic_descriptors = Vec::new();
-  let topic_names = get_topic_names(target_client_factory)?;
+  let topic_names = get_topic_names(target_client_factory).await?;
   for topic_name in topic_names {
-    let topic_descriptor = get_topic_descriptor(target_client_factory, topic_name.as_str())?.unwrap();
+    let topic_descriptor = get_topic_descriptor(target_client_factory, topic_name.as_str()).await?.unwrap();
     topic_descriptors.push(topic_descriptor);
   }
   Ok(topic_descriptors)
 }
 
-fn get_topic_descriptors_with_status(target_client_factory: &TargetClientFactory) -> Result<Vec<(TopicDescriptor, bool)>, String> {
+async fn get_topic_descriptors_with_status(target_client_factory: &TargetClientFactory) -> Result<Vec<(TopicDescriptor, bool)>, String> {
   let mut topic_descriptor_status_pairs = Vec::new();
-  let topic_names = get_topic_names(target_client_factory)?;
+  let topic_names = get_topic_names(target_client_factory).await?;
   for topic_name in topic_names {
     match (
-      get_topic_descriptor(target_client_factory, topic_name.as_str())?,
-      get_topic_status(target_client_factory, topic_name.as_str())?,
+      get_topic_descriptor(target_client_factory, topic_name.as_str()).await?,
+      get_topic_status(target_client_factory, topic_name.as_str()).await?,
     ) {
       (Some(topic_descriptor), Some(topic_status)) => topic_descriptor_status_pairs.push((topic_descriptor, topic_status.provisioned)),
       _ => return Err("could not retrieve topic information".to_string()),

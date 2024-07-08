@@ -9,14 +9,14 @@ version.workspace = true
 
 [dependencies]
 dsh_rest_api_client = "0.1.0"
-dsh_sdk = { version = "0.4.2", features = ["rest-token-fetcher"], default-features = false }
+dsh_sdk = { version = "0.4.3", features = ["rest-token-fetcher"], default-features = false }
 
-futures = "0.3.30"
+async-trait = "0.1.81"
 lazy_static = "1.5.0"
 num-traits = "0.2.19"
 regex = "1.10.5"
 reqwest = { version = "0.12.5", features = ["json"] }
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.120"
 tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "macros"] }
 toml = "0.8.14"
