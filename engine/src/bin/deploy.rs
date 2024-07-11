@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use trifonius_engine::processor::application::application_registry::ApplicationRegistry;
+use trifonius_engine::processor::processor::ProcessorDeployParameters;
 use trifonius_engine::DEFAULT_TARGET_CLIENT_FACTOR;
 
 const APPLICATION_NAME: &str = "test-0-0-2";
@@ -9,13 +10,20 @@ const APPLICATION_NAME: &str = "test-0-0-2";
 async fn main() {
   let registry = ApplicationRegistry::create(&DEFAULT_TARGET_CLIENT_FACTOR).unwrap();
   let application = registry.application_by_name("greenbox-consent-filter").unwrap();
-  let mut deployment_config: HashMap<String, String> = HashMap::new();
-  deployment_config.insert("sink-topic".to_string(), "scratch.reference-implementation-compliant.greenbox-dev".to_string());
-  deployment_config.insert("identifier-picker-regex".to_string(), "(?:cancelled|created|updated):([0-9]+)".to_string());
-  deployment_config.insert("identifier-picker-source-system".to_string(), "boss".to_string());
-  deployment_config.insert("enable-dsh-envelope".to_string(), "true".to_string());
-  deployment_config.insert("source-topic".to_string(), "stream.reference-implementation.greenbox-dev".to_string());
-  deployment_config.insert("compliancy-agent".to_string(), "classification".to_string());
-  deployment_config.insert("mitigation-strategy".to_string(), "clip".to_string());
-  let _ = application.deploy(APPLICATION_NAME, &deployment_config, Some("minimal")).await;
+  let deploy_parameters = ProcessorDeployParameters {
+    inbound_junctions: &HashMap::from([("inbound-kafka-topic".to_string(), "stream.reference-implementation-3p.greenbox-dev".to_string())]),
+    outbound_junctions: &HashMap::from([(
+      "outbound-kafka-topic".to_string(),
+      "scratch.reference-implementation-compliant.greenbox-dev".to_string(),
+    )]),
+    parameters: &HashMap::from([
+      ("identifier-picker-regex".to_string(), "(?:cancelled|created|updated):([0-9]+)".to_string()),
+      ("identifier-picker-source-system".to_string(), "boss".to_string()),
+      ("enable-dsh-envelope".to_string(), "true".to_string()),
+      ("compliancy-agent".to_string(), "classification".to_string()),
+      ("mitigation-strategy".to_string(), "block".to_string()),
+    ]),
+    profile_name: Some("minimal"),
+  };
+  let _ = application.deploy(APPLICATION_NAME, &deploy_parameters).await;
 }
