@@ -1,0 +1,100 @@
+type = "application"
+name = "test"
+description = "Test profiles"
+version = "0.1.2"
+
+more-info-url = "https://dsh.kpn.com"
+metrics-url = "https://grafana.com"
+viewer-url = "https://eavesdropper.kpn.com"
+
+metadata = [
+    ["metadata1", "METADATA1"],
+    ["metadata2", "METADATA2"]
+]
+
+[inbound-junctions]
+inbound-topic = { caption = "Test inbound topic", description = "Test inbound topic description", allowed-resource-types = ["dsh-topic"] }
+
+[outbound-junctions]
+outbound-topic = { caption = "Test outbound topic", description = "Test outbound topic description", allowed-resource-types = ["dsh-topic"] }
+
+[deploy]
+[deploy.parameters]
+bool1 = { type = "boolean", caption = "B1" }
+bool2 = { type = "boolean", caption = "B2", optional = true, default = "true" }
+bool3 = { type = "boolean", caption = "B3", initial-value = "true" }
+free1 = { type = "free-text", caption = "F1" }
+free2 = { type = "free-text", caption = "F2", initial-value = "I2" }
+free3 = { type = "free-text", caption = "F3", optional = true, default = "D3" }
+free4 = { type = "free-text", caption = "F4", initial-value = "I4", optional = true, default = "D4" }
+sel1 = { type = "selection", caption = "S1", options = ["s11"] }
+sel2 = { type = "selection", caption = "S2", options = ["s21", "s22"], optional = true, default = "s22" }
+sel3 = { type = "selection", caption = "S3", options = ["s31", "s32"], initial-value = "s32" }
+sel4 = { type = "selection", caption = "S4", options = ["s41", "s42"], initial-value = "s42", optional = true, default = "s41" }
+
+[application]
+
+image = "test-image:0.1.2-SNAPSHOT"
+needs-token = true
+single-instance = false
+spread-group = "SPREAD_GROUP"
+
+[application.exposed-ports.3000]
+vhost = "{ vhost('your-vhost-name','a-zone') }"
+auth = "app-realm:admin:$1$EZsDrd93$7g2osLFOay4.TzDgGo9bF/"
+mode = "http"
+whitelist = "0.0.0.0 127.0.0.1"
+paths = ["/abc"]
+service-group = "mygroup"
+
+[application.health-check]
+protocol = "http"
+port = 8080
+path = "/healthpath"
+
+[application.metrics]
+port = 9095
+path = "/metrics"
+
+[[application.secrets]]
+name = "secret_name"
+injections = [{ env = "SECRET" }]
+
+[application.volumes]
+"/volume_path" = "{ volume('correct_volume_name') }"
+
+[application.environment-variables]
+
+APPLICATION_ENV_VAR1 = { type = "deployment-parameter", key = "bool1" }
+APPLICATION_ENV_VAR2 = { type = "inbound-junction", key = "inbound-topic" }
+APPLICATION_ENV_VAR3 = { type = "outbound-junction", key = "outbound-topic" }
+APPLICATION_ENV_VAR4 = { type = "template", value = "value4${TENANT}" }
+APPLICATION_ENV_VAR5 = { type = "value", value = "value5" }
+
+[application.profiles.profile-1]
+
+profile-description = "Profile 1"
+cpus = 1
+instances = 1
+mem = 1
+
+[application.profiles.profile-1.environment-variables]
+PROFILE1_ENV_VAR1 = { type = "deployment-parameter", key = "free1" }
+PROFILE1_ENV_VAR2 = { type = "inbound-junction", key = "inbound-topic" }
+PROFILE1_ENV_VAR3 = { type = "outbound-junction", key = "outbound-topic" }
+PROFILE1_ENV_VAR4 = { type = "template", value = "value14${TENANT}" }
+PROFILE1_ENV_VAR5 = { type = "value", value = "value15" }
+
+[application.profiles.profile-2]
+
+profile-description = "Profile 2"
+cpus = 2
+instances = 2
+mem = 2
+
+[application.profiles.profile-2.environment-variables]
+PROFILE2_ENV_VAR1 = { type = "deployment-parameter", key = "sel1" }
+PROFILE2_ENV_VAR2 = { type = "inbound-junction", key = "inbound-topic" }
+PROFILE2_ENV_VAR3 = { type = "outbound-junction", key = "outbound-topic" }
+PROFILE2_ENV_VAR4 = { type = "template", value = "value24${TENANT}" }
+PROFILE2_ENV_VAR5 = { type = "value", value = "value25" }

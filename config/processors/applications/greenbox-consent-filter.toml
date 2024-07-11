@@ -1,33 +1,47 @@
-application-name = "greenbox-consent-filter"
-application-description = "Record processor filters records based on customer consent"
-application-version = "0.2.7"
+type = "application"
+name = "greenbox-consent-filter"
+description = "Record processor filters records based on customer consent"
+version = "0.2.7"
+
+metrics-url = "https://monitoring-${TENANT}.dsh-dev.dsh.np.aws.kpn.com"
+viewer-url = "https://console.dsh-dev.dsh.np.aws.kpn.com/#/profiles/${TENANT}/services"
+
+[inbound-junctions.inbound-kafka-topic]
+allowed-resource-types = ["dsh-topic"]
+caption = "Source topics"
+description = "Kafka topic that the consent filter application will consume from. This topic must have strings for its keys."
+
+[outbound-junctions.outbound-kafka-topic]
+allowed-resource-types = ["dsh-topic"]
+caption = "Sink topics"
+description = "Kafka topic that the consent filter application will produce to."
+
+[deploy]
+[deploy.parameters]
+compliancy-agent = { type = "selection", caption = "Consent type", options = ["blacklist", "classification", "whitelist"] }
+enable-dsh-envelope = { type = "boolean", caption = "Enable DSH envelope", optional = true, default = "false" }
+identifier-picker-regex = { type = "free-text", caption = "Regular expression" }
+identifier-picker-source-system = { type = "selection", caption = "Identifier source system", options = ["boss", "siebelcm"] }
+mitigation-strategy = { type = "selection", caption = "Mitigation strategy", options = ["anonymize", "block", "clip"] }
+
+[application]
 
 image = 'registry.cp.kpn-dsh.com/greenbox-dev/greenbox-consent-filter:0.2.7-SNAPSHOT'
 needs-token = true
 single-instance = false
 
-[[secrets]]
+[[application.secrets]]
 name = "greenbox_backend_password"
 injections = [{ env = "GREENBOX_BACKEND_PASSWORD" }]
 
-[deployment-parameters]
-compliancy-agent = { type = "selection", caption = "Consent type", options = ["blacklist", "whitelist"] }
-enable-dsh-envelope = { type = "boolean", caption = "Enable DSH envelope", optional = true, default = "false" }
-identifier-picker-regex = { type = "free-text", caption = "Regular expression" }
-identifier-picker-source-system = { type = "selection", caption = "Identifier source system", options = ["boss", "siebelcm"] }
-mitigation-strategy = { type = "selection", caption = "Mitigation strategy", options = ["anonymize", "block", "clip"] }
-sink-topic = { type = "sink-topic", caption = "Sink topics" }
-source-topic = { type = "source-topic", caption = "Source topics" }
-
-[environment-variables]
+[application.environment-variables]
 COMPLIANCY_AGENT = { type = "deployment-parameter", key = "compliancy-agent" }
-CONSUMER_TOPIC = { type = "deployment-parameter", key = "source-topic" }
+CONSUMER_TOPIC = { type = "inbound-junction", key = "inbound-kafka-topic" }
 GREENBOX_DSH_ENVELOPE_ENABLE = { type = "deployment-parameter", key = "enable-dsh-envelope" }
 KEY_IDENTIFIER_PICKER_REGEX = { type = "deployment-parameter", key = "identifier-picker-regex" }
 KEY_IDENTIFIER_PICKER_SOURCE_SYSTEM = { type = "deployment-parameter", key = "identifier-picker-source-system" }
 MITIGATION_STRATEGY = { type = "deployment-parameter", key = "mitigation-strategy" }
-PRODUCER_TOPIC = { type = "deployment-parameter", key = "sink-topic" }
-
+PRODUCER_TOPIC = { type = "outbound-junction", key = "outbound-kafka-topic" }
 CONSUMER_GROUP_ID = { type = "template", value = "${TENANT}_grpid" }
 GREENBOX_BACKEND_HOST = { type = "template", value = "greenbox-backend-dev.dsh-dev.dsh.np.aws.kpn.com" }
 GREENBOX_BACKEND_USERNAME = { type = "template", value = "${TENANT}" }
@@ -42,16 +56,14 @@ LOG_LEVEL_GREENBOX = { type = "value", value = "info" }
 CLASSIFICATION_IDENTIFIER = { type = "value", value = "org.kpn.greenbox.ri:ReferenceSchemaAvro:1.0.0" }
 GROUP_ID_PREFIX = { type = "template", value = "${TENANT}_" }
 
-[profiles.minimal]
-
+[application.profiles.minimal]
 cpus = 0.25
 instances = 1
 mem = 256
 profile-description = "Minimal profile for small amounts of data"
 profile-name = "minimal"
 
-[profiles.maximal]
-
+[application.profiles.maximal]
 cpus = 1
 instances = 2
 mem = 512

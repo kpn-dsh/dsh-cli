@@ -1,11 +1,94 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::fs;
-use std::io::ErrorKind::NotFound;
 
-use serde::{Deserialize, Serialize};
+use log::debug;
+use serde::Deserialize;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+use crate::processor::application::converters::{template_resolver, validate_template};
+use crate::processor::processor_config::{read_config, DeployConfig, JunctionConfig, PlaceHolder, VariableConfig, VariableType};
+use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
+use crate::processor::ProcessorType;
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ApplicationConfig {
+  #[serde(rename = "type")]
+  pub processor_type: ProcessorType,
+
+  #[serde(rename = "name")]
+  pub application_name: String,
+
+  #[serde(rename = "description")]
+  pub application_description: String,
+
+  #[serde(rename = "version")]
+  pub application_version: Option<String>,
+
+  pub metadata: Option<Vec<(String, String)>>,
+
+  #[serde(rename = "more-info-url")]
+  pub more_info_url: Option<String>,
+
+  #[serde(rename = "metrics-url")]
+  pub metrics_url: Option<String>,
+
+  #[serde(rename = "viewer-url")]
+  pub viewer_url: Option<String>,
+
+  #[serde(rename = "inbound-junctions")]
+  pub inbound_junctions: Option<HashMap<String, JunctionConfig>>,
+
+  #[serde(rename = "outbound-junctions")]
+  pub outbound_junctions: Option<HashMap<String, JunctionConfig>>,
+
+  pub deploy: Option<DeployConfig>,
+
+  pub application: ApplicationSpecificConfig,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ApplicationSpecificConfig {
+  pub image: String,
+
+  #[serde(rename = "needs-token")]
+  pub needs_token: bool,
+
+  #[serde(rename = "single-instance")]
+  pub single_instance: bool,
+
+  #[serde(rename = "spread-group")]
+  pub spread_group: Option<String>,
+
+  #[serde(rename = "exposed-ports")]
+  pub exposed_ports: Option<HashMap<String, PortMappingConfig>>,
+
+  #[serde(rename = "health-check")]
+  pub health_check: Option<HealthCheckConfig>,
+
+  pub metrics: Option<MetricsConfig>,
+
+  pub secrets: Option<Vec<SecretConfig>>,
+
+  pub volumes: Option<HashMap<String, String>>,
+
+  #[serde(rename = "environment-variables")]
+  pub environment_variables: Option<HashMap<String, VariableConfig>>,
+
+  pub profiles: HashMap<String, ProfileConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct PortMappingConfig {
+  pub auth: Option<String>,
+  pub mode: Option<String>,
+  pub paths: Vec<String>,
+  #[serde(rename = "service-group")]
+  pub service_group: Option<String>,
+  pub tls: Option<PortMappingTls>,
+  pub vhost: Option<String>,
+  pub whitelist: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub enum PortMappingTls {
   #[serde(rename = "auto")]
   Auto,
@@ -13,25 +96,14 @@ pub enum PortMappingTls {
   None,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct PortMapping {
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub auth: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub mode: Option<String>,
-  #[serde(skip_serializing_if = "Vec::is_empty")]
-  pub paths: Vec<String>,
-  #[serde(rename = "service-group", skip_serializing_if = "Option::is_none")]
-  pub service_group: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub tls: Option<PortMappingTls>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub vhost: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub whitelist: Option<String>,
+#[derive(Clone, Debug, Deserialize)]
+pub struct HealthCheckConfig {
+  pub path: String,
+  pub port: u64,
+  pub protocol: Option<HealthCheckProtocol>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum HealthCheckProtocol {
   #[serde(rename = "http")]
   Http,
@@ -39,45 +111,47 @@ pub enum HealthCheckProtocol {
   Https,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HealthCheck {
-  pub path: String,
-  pub port: u64,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub protocol: Option<HealthCheckProtocol>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Metrics {
+#[derive(Clone, Debug, Deserialize)]
+pub struct MetricsConfig {
   pub path: String,
   pub port: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ApplicationSecret {
+#[derive(Clone, Debug, Deserialize)]
+pub struct SecretConfig {
   pub injections: Vec<HashMap<String, String>>,
   pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Profile {
-  #[serde(rename = "profile-name")]
-  pub profile_name: String,
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProfileConfig {
   #[serde(rename = "profile-description")]
   pub profile_description: String,
   pub cpus: f64,
   pub instances: u64,
   pub mem: u64,
-  #[serde(rename = "environment-variables", skip_serializing_if = "Option::is_none")]
-  pub environment_variables: Option<HashMap<String, Variable>>,
+  #[serde(rename = "environment-variables")]
+  pub environment_variables: Option<HashMap<String, VariableConfig>>,
 }
 
-impl Display for Profile {
+impl ProfileConfig {
+  pub fn validate(&self, profile_name: &str) -> Result<(), String> {
+    if self.profile_description.is_empty() {
+      return Err(format!("profile '{}' has empty description", profile_name));
+    }
+    if self.cpus < 0.1_f64 {
+      return Err(format!("profile '{}' has number of cpus smaller than 0.1", profile_name));
+    }
+    Ok(())
+  }
+}
+
+impl Display for ProfileConfig {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
-      "{}, {}, cpus {}, instances {}, mem {}",
-      &self.profile_name, &self.profile_description, &self.cpus, &self.instances, &self.mem
+      "{}, cpus: {}, instances: {}, mem: {}",
+      &self.profile_description, &self.cpus, &self.instances, &self.mem
     )?;
     if let Some(evs) = &self.environment_variables {
       write!(f, ", [{}]", evs.iter().map(|p| p.0.to_string()).collect::<Vec<String>>().join(", "))?;
@@ -86,386 +160,349 @@ impl Display for Profile {
   }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-pub enum VariableType {
-  #[serde(rename = "deployment-parameter")]
-  DeploymentParameter,
-  #[serde(rename = "template")]
-  Template,
-  #[serde(rename = "value")]
-  Value,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Variable {
-  #[serde(rename = "type")]
-  pub typ: VariableType,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub key: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub value: Option<String>,
-}
-
-#[derive(Eq, Hash, PartialEq)]
-pub enum PlaceHolder {
-  TENANT,
-  USER,
-}
-
-impl Display for PlaceHolder {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match &self {
-      PlaceHolder::TENANT => write!(f, "TENANT"),
-      PlaceHolder::USER => write!(f, "USER"),
-    }
-  }
-}
-
-impl TryFrom<&str> for PlaceHolder {
-  type Error = String;
-
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
-    match value {
-      "TENANT" => Ok(PlaceHolder::TENANT),
-      "USER" => Ok(PlaceHolder::USER),
-      unrecognized => Err(format!("unrecognized placeholder '{}'", unrecognized)),
-    }
-  }
-}
-
-impl Variable {
-  fn validate(&self, attribute_name: &str) -> Result<(), String> {
-    match &self.typ {
-      VariableType::DeploymentParameter => match &self.key {
-        Some(key) => {
-          if key.is_empty() {
-            Err(format!(
-              "variable '{}' referencing deployment parameter requires a non-empty 'key' attribute",
-              attribute_name
-            ))
-          } else {
-            Ok(())
-          }
-        }
-        None => Err(format!("variable '{}' referencing deployment parameter requires a 'key' attribute", attribute_name)),
+impl From<(&ApplicationConfig, &HashMap<PlaceHolder, &str>)> for ProcessorDescriptor {
+  // TODO Resolve template for more attributes (check validation also)
+  fn from((config, mapping): (&ApplicationConfig, &HashMap<PlaceHolder, &str>)) -> Self {
+    ProcessorDescriptor {
+      processor_type: ProcessorType::Application,
+      name: config.application_name.clone(),
+      description: config.application_description.clone(),
+      version: config.application_version.clone(),
+      inbound_junctions: match &config.inbound_junctions {
+        Some(ijsm) => ijsm.iter().map(JunctionDescriptor::from).collect::<Vec<JunctionDescriptor>>(),
+        None => vec![],
       },
-      VariableType::Template | VariableType::Value => match &self.value {
-        Some(_) => Ok(()),
-        None => Err(format!("variable '{}' requires a 'value' attribute", attribute_name)),
+      outbound_junctions: match &config.outbound_junctions {
+        Some(ojsm) => ojsm.iter().map(JunctionDescriptor::from).collect::<Vec<JunctionDescriptor>>(),
+        None => vec![],
       },
-    }
-  }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum DeploymentParameterType {
-  #[serde(rename = "boolean")]
-  Boolean,
-  #[serde(rename = "free-text")]
-  FreeText,
-  #[serde(rename = "selection")]
-  Selection,
-  #[serde(rename = "sink-topic")]
-  SinkTopic,
-  #[serde(rename = "source-topic")]
-  SourceTopic,
-}
-
-impl Display for DeploymentParameterType {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match &self {
-      DeploymentParameterType::Boolean => write!(f, "boolean"),
-      DeploymentParameterType::FreeText => write!(f, "free-text"),
-      DeploymentParameterType::Selection => write!(f, "selection"),
-      DeploymentParameterType::SinkTopic => write!(f, "sink-topic"),
-      DeploymentParameterType::SourceTopic => write!(f, "source-topic"),
-    }
-  }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DeploymentParameter {
-  #[serde(rename = "type")]
-  typ: DeploymentParameterType,
-  caption: String,
-  #[serde(rename = "initial-value", skip_serializing_if = "Option::is_none")]
-  initial_value: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  options: Option<Vec<String>>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  optional: Option<bool>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  default: Option<String>,
-}
-
-impl DeploymentParameter {
-  fn validate(&self, parameter_name: &str) -> Result<(), String> {
-    if self.caption.is_empty() {
-      return Err(format!("empty caption for parameter '{}'", parameter_name));
-    }
-    if let Some(opt) = &self.optional {
-      if *opt && self.default.is_none() {
-        return Err(format!("optional parameter '{}' requires default value", parameter_name));
-      }
-    }
-    match self.typ {
-      DeploymentParameterType::Selection => match &self.options {
-        Some(opts) => {
-          if opts.is_empty() {
-            Err(format!("empty options list for parameter '{}'", parameter_name))
-          } else {
-            Ok(())
-          }
-        }
-        None => Err(format!("missing options attribute for parameter '{}'", parameter_name)),
+      deployment_parameters: match &config.deploy {
+        Some(deploy_config) => match &deploy_config.parameters {
+          Some(parameters) => parameters
+            .iter()
+            .map(|h| (h.0.to_string(), h.1.clone()))
+            .map(DeploymentParameterDescriptor::from)
+            .collect::<Vec<DeploymentParameterDescriptor>>(),
+          None => vec![],
+        },
+        None => vec![],
       },
-      _ => Ok(()),
+      profiles: config.application.profiles.iter().map(ProfileDescriptor::from).collect::<Vec<ProfileDescriptor>>(),
+      metadata: config.metadata.clone().unwrap_or_default(),
+      more_info_url: config.more_info_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      metrics_url: config.metrics_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      viewer_url: config.viewer_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
     }
   }
 }
 
-impl Display for DeploymentParameter {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}, {}", &self.caption, &self.typ)?;
-    match &self.typ {
-      DeploymentParameterType::Boolean => {}
-      DeploymentParameterType::FreeText => {}
-      DeploymentParameterType::Selection => write!(f, ", [{}]", &self.options.as_ref().unwrap().join(", "))?,
-      DeploymentParameterType::SinkTopic => {}
-      DeploymentParameterType::SourceTopic => {}
-    }
-    if self.optional.is_some_and(|o| o) {
-      match &self.default {
-        Some(dflt) => write!(f, ", optional, default is {}", dflt)?,
-        None => write!(f, ", optional, no default")?,
-      };
-    }
-    Ok(())
+fn validate_config_template(template: &str, template_name: &str) -> Result<(), String> {
+  static VALID_PLACEHOLDERS: [PlaceHolder; 2] = [PlaceHolder::TENANT, PlaceHolder::USER];
+  if template.is_empty() {
+    return Err(format!("{} cannot be empty", template_name));
   }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ApplicationConfig {
-  #[serde(rename = "application-name")]
-  pub name: String,
-  #[serde(rename = "application-description")]
-  pub description: String,
-  #[serde(rename = "application-version")]
-  pub version: String,
-  #[serde(rename = "grafana-url", skip_serializing_if = "Option::is_none")]
-  pub grafana_url: Option<String>,
-  pub image: String,
-  #[serde(rename = "needs-token")]
-  pub needs_token: bool,
-  #[serde(rename = "single-instance")]
-  pub single_instance: bool,
-  #[serde(rename = "exposed-ports", skip_serializing_if = "Option::is_none")]
-  pub exposed_ports: Option<HashMap<String, PortMapping>>,
-  #[serde(rename = "health-check", skip_serializing_if = "Option::is_none")]
-  pub health_check: Option<HealthCheck>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub metrics: Option<Metrics>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub secrets: Option<Vec<ApplicationSecret>>,
-  #[serde(rename = "spread-group", skip_serializing_if = "Option::is_none")]
-  pub spread_group: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub volumes: Option<HashMap<String, String>>,
-  #[serde(rename = "deployment-parameters", skip_serializing_if = "Option::is_none")]
-  pub deployment_parameters: Option<HashMap<String, DeploymentParameter>>,
-  #[serde(rename = "environment-variables", skip_serializing_if = "Option::is_none")]
-  pub environment_variables: Option<HashMap<String, Variable>>,
-  pub profiles: HashMap<String, Profile>,
-}
-
-fn read_config<C>(config_file_name: &str) -> Result<C, String>
-where
-  C: for<'de> toml::macros::Deserialize<'de>,
-{
-  match fs::read_to_string(config_file_name) {
-    Ok(config_string) => match toml::from_str::<C>(&config_string) {
-      Ok(config) => Ok(config),
-      Err(error) => Err(format!("could not parse config file '{}' ({})", config_file_name, error.message())),
-    },
-    Err(error) => match error.kind() {
-      NotFound => Err(format!("config file '{}' not found", config_file_name)),
-      _ => Err(format!("config file '{}' could not be read ({})", config_file_name, error)),
-    },
-  }
+  validate_template(template, &VALID_PLACEHOLDERS).map_err(|m| format!("{} has {}", template_name, m))
 }
 
 pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConfig, String> {
+  debug!("read application config file: {}", config_file_name);
   let config = read_config::<ApplicationConfig>(config_file_name)?;
-  if config.name.is_empty() {
+  debug!("successfully read and parsed application config file\n{:#?}", config);
+  if config.processor_type != ProcessorType::Application {
+    return Err(format!("processor type '{}' doesn't match file type ('application')", config.processor_type));
+  }
+  if config.application_name.is_empty() {
     return Err("application name cannot be empty".to_string());
   }
-  if config.description.is_empty() {
+  if config.application_description.is_empty() {
     return Err("application description cannot be empty".to_string());
   }
-  if config.version.is_empty() {
+  if config.application_version.clone().is_some_and(|ref version| version.is_empty()) {
     return Err("application version cannot be empty".to_string());
   }
-  if config.image.is_empty() {
-    return Err("application image cannot be empty".to_string());
+  if let Some(ref url) = config.more_info_url {
+    validate_config_template(url, "more-info-url template")?
   }
-  if config.profiles.is_empty() {
-    return Err("no profiles defined".to_string());
+  if let Some(ref url) = config.metrics_url {
+    validate_config_template(url, "metrics-url template")?
   }
-  if let Some(ref parameters) = config.deployment_parameters {
-    for (parameter_name, parameter) in parameters {
-      parameter.validate(parameter_name)?;
+  if let Some(ref url) = config.viewer_url {
+    validate_config_template(url, "viewer-url template")?
+  }
+  if let (Some(inbound), Some(outbound)) = (&config.inbound_junctions, &config.outbound_junctions) {
+    if let Some(ambiguous_key) = inbound.keys().find(|key| outbound.contains_key(*key)) {
+      return Err(format!("'{}' used as inbound as well as outbound key", ambiguous_key));
     }
   }
-  if let Some(ref variables) = config.environment_variables {
+  if let Some(deploy_config) = &config.deploy {
+    if let Some(ref parameters) = deploy_config.parameters {
+      for parameter in parameters {
+        parameter.1.validate(parameter.0.as_str())?
+      }
+    }
+  }
+  if config.application.image.is_empty() {
+    return Err("application image cannot be empty".to_string());
+  }
+  if config.application.spread_group.clone().is_some_and(|spread_group| spread_group.is_empty()) {
+    return Err("spread group cannot be empty".to_string());
+  }
+  if config.application.exposed_ports.clone().is_some_and(|exposed_ports| exposed_ports.is_empty()) {
+    return Err("exposed ports cannot be empty".to_string());
+  }
+  if config.application.secrets.clone().is_some_and(|secrets| secrets.is_empty()) {
+    return Err("secrets cannot be empty".to_string());
+  }
+  if config.application.volumes.clone().is_some_and(|volumes| volumes.is_empty()) {
+    return Err("volumes cannot be empty".to_string());
+  }
+  if let Some(ref variables) = &config.application.environment_variables {
     for (variable_name, variable) in variables {
       variable.validate(variable_name)?;
       if variable.typ == VariableType::DeploymentParameter {
-        match config.deployment_parameters {
-          Some(ref deployment_parameters) => {
-            if !deployment_parameters.contains_key(&variable.key.clone().unwrap()) {
+        if let Some(deploy_config) = &config.deploy {
+          if let Some(ref parameters) = deploy_config.parameters {
+            if !parameters.contains_key(&variable.key.clone().unwrap()) {
               return Err(format!(
                 "variable '{}' references unspecified deployment parameter '{}'",
                 variable_name,
                 variable.key.clone().unwrap()
               ));
             };
-          }
-          None => {
+          } else {
             return Err(format!(
               "variable '{}' references deployment parameter '{}' but none are specified",
               variable_name,
               variable.key.clone().unwrap()
-            ))
+            ));
           }
         }
       }
     }
   }
+  if config.application.profiles.is_empty() {
+    return Err("no profiles defined".to_string());
+  } else {
+    for (name, profile) in &config.application.profiles {
+      profile.validate(name)?
+    }
+  }
+  debug!("successfully validated config");
   Ok(config)
 }
 
 #[test]
 fn read_application_config_proper_values() {
-  let config = read_application_config("test-config/applications/application-config-test.toml").unwrap();
+  let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  path.push("tests/processors/applications/application-config-test.toml");
+  let config = &read_application_config(path.to_str().unwrap()).unwrap();
 
-  println!("{:?}", config);
-  assert_eq!(config.name, "test");
-  assert_eq!(config.description, "Test profiles");
-  assert_eq!(config.version, "0.1.2");
-  assert_eq!(config.grafana_url.unwrap(), "www.kpn.com");
-  assert_eq!(config.image, "test-image:0.1.2-SNAPSHOT");
-  assert_eq!(config.needs_token, true);
-  assert_eq!(config.single_instance, false);
-  let metrics = config.metrics.clone().unwrap();
+  assert_eq!(config.processor_type, ProcessorType::Application);
+  assert_eq!(config.application_name, "test");
+  assert_eq!(config.application_description, "Test profiles");
+  assert_eq!(config.application_version, Some("0.1.2".to_string()));
+  assert_eq!(config.more_info_url, Some("https://dsh.kpn.com".to_string()));
+  assert_eq!(config.metrics_url, Some("https://grafana.com".to_string()));
+  assert_eq!(config.viewer_url, Some("https://eavesdropper.kpn.com".to_string()));
+
+  let metadata = config.metadata.clone().unwrap();
+  assert_eq!(
+    metadata,
+    vec![("metadata1".to_string(), "METADATA1".to_string()), ("metadata2".to_string(), "METADATA2".to_string())]
+  );
+
+  let inbound_junctions = config.inbound_junctions.clone().unwrap();
+  assert_eq!(inbound_junctions.len(), 1);
+  assert_eq!(inbound_junctions.get("inbound-topic").unwrap().caption, "Test inbound topic");
+  assert_eq!(inbound_junctions.get("inbound-topic").unwrap().description, "Test inbound topic description");
+  assert_eq!(
+    inbound_junctions.get("inbound-topic").unwrap().allowed_resource_types,
+    vec![crate::resource::ResourceType::DshTopic]
+  );
+
+  let outbound_junctions = config.outbound_junctions.clone().unwrap();
+  assert_eq!(outbound_junctions.len(), 1);
+  assert_eq!(outbound_junctions.get("outbound-topic").unwrap().caption, "Test outbound topic");
+  assert_eq!(outbound_junctions.get("outbound-topic").unwrap().description, "Test outbound topic description");
+  assert_eq!(
+    outbound_junctions.get("outbound-topic").unwrap().allowed_resource_types,
+    vec![crate::resource::ResourceType::DshTopic]
+  );
+
+  let parameters: &HashMap<String, crate::processor::processor_config::DeploymentParameterConfig> = &config.deploy.clone().unwrap().parameters.unwrap();
+
+  fn test(
+    deploy_parameters: &HashMap<String, crate::processor::processor_config::DeploymentParameterConfig>,
+    key: &str,
+    caption: &str,
+    default: Option<&str>,
+    description: Option<&str>,
+    initial_value: Option<&str>,
+    optional: Option<bool>,
+    options: Option<Vec<&str>>,
+    typ: crate::processor::DeploymentParameterType,
+  ) {
+    let parameter = deploy_parameters.get(key).unwrap();
+    assert_eq!(parameter.caption, caption);
+    assert_eq!(parameter.default, default.map(|s| s.to_string()));
+    assert_eq!(parameter.description, description.map(|s| s.to_string()));
+    assert_eq!(parameter.initial_value, initial_value.map(|s| s.to_string()));
+    assert_eq!(parameter.optional, optional);
+    assert_eq!(parameter.options, options.map(|os| os.iter().map(|s| s.to_string()).collect()));
+    assert_eq!(parameter.typ, typ);
+  }
+
+  fn test_b(
+    deploy_parameters: &HashMap<String, crate::processor::processor_config::DeploymentParameterConfig>,
+    key: &str,
+    caption: &str,
+    default: Option<&str>,
+    description: Option<&str>,
+    initial_value: Option<&str>,
+    optional: Option<bool>,
+  ) {
+    test(
+      deploy_parameters,
+      key,
+      caption,
+      default,
+      description,
+      initial_value,
+      optional,
+      None,
+      crate::processor::DeploymentParameterType::Boolean,
+    )
+  }
+
+  fn test_f(
+    deploy_parameters: &HashMap<String, crate::processor::processor_config::DeploymentParameterConfig>,
+    key: &str,
+    caption: &str,
+    default: Option<&str>,
+    description: Option<&str>,
+    initial_value: Option<&str>,
+    optional: Option<bool>,
+  ) {
+    test(
+      deploy_parameters,
+      key,
+      caption,
+      default,
+      description,
+      initial_value,
+      optional,
+      None,
+      crate::processor::DeploymentParameterType::FreeText,
+    )
+  }
+
+  fn test_s(
+    deploy_parameters: &HashMap<String, crate::processor::processor_config::DeploymentParameterConfig>,
+    key: &str,
+    caption: &str,
+    default: Option<&str>,
+    description: Option<&str>,
+    initial_value: Option<&str>,
+    optional: Option<bool>,
+    options: Option<Vec<&str>>,
+  ) {
+    test(
+      deploy_parameters,
+      key,
+      caption,
+      default,
+      description,
+      initial_value,
+      optional,
+      options,
+      crate::processor::DeploymentParameterType::Selection,
+    )
+  }
+
+  assert_eq!(parameters.len(), 11);
+
+  test_b(parameters, "bool1", "B1", None, None, None, None);
+  test_b(parameters, "bool2", "B2", Some("true"), None, None, Some(true));
+  test_b(parameters, "bool3", "B3", None, None, Some("true"), None);
+
+  test_f(parameters, "free1", "F1", None, None, None, None);
+  test_f(parameters, "free2", "F2", None, None, Some("I2"), None);
+  test_f(parameters, "free3", "F3", Some("D3"), None, None, Some(true));
+  test_f(parameters, "free4", "F4", Some("D4"), None, Some("I4"), Some(true));
+
+  test_s(parameters, "sel1", "S1", None, None, None, None, Some(vec!["s11"]));
+  test_s(parameters, "sel2", "S2", Some("s22"), None, None, Some(true), Some(vec!["s21", "s22"]));
+  test_s(parameters, "sel3", "S3", None, None, Some("s32"), None, Some(vec!["s31", "s32"]));
+  test_s(parameters, "sel4", "S4", Some("s41"), None, Some("s42"), Some(true), Some(vec!["s41", "s42"]));
+
+  assert_eq!(config.application.image, "test-image:0.1.2-SNAPSHOT");
+  assert_eq!(config.application.needs_token, true);
+  assert_eq!(config.application.single_instance, false);
+
+  let metrics = config.application.metrics.clone().unwrap();
   assert_eq!(metrics.port, 9095);
   assert_eq!(metrics.path, "/metrics");
-  let exposed_ports = config.exposed_ports.clone().unwrap().get("3000").unwrap().clone();
+
+  let exposed_ports = config.application.exposed_ports.clone().unwrap().get("3000").unwrap().clone();
   assert_eq!(exposed_ports.vhost.unwrap(), "{ vhost('your-vhost-name','a-zone') }");
   assert_eq!(exposed_ports.auth.unwrap(), "app-realm:admin:$1$EZsDrd93$7g2osLFOay4.TzDgGo9bF/");
   assert_eq!(exposed_ports.mode.unwrap(), "http");
   assert_eq!(exposed_ports.whitelist.unwrap(), "0.0.0.0 127.0.0.1");
   assert_eq!(exposed_ports.paths, vec!("/abc"));
   assert_eq!(exposed_ports.service_group.unwrap(), "mygroup");
-  let health_check = config.health_check.clone().unwrap();
+
+  let health_check = config.application.health_check.clone().unwrap();
   assert_eq!(health_check.port, 8080);
   assert_eq!(health_check.protocol.unwrap(), HealthCheckProtocol::Http);
   assert_eq!(health_check.path, "/healthpath");
-  let secret = config.secrets.clone().unwrap().first().unwrap().clone();
+
+  let secret = config.application.secrets.clone().unwrap().first().unwrap().clone();
   assert_eq!(secret.name, "secret_name");
   assert_eq!(secret.injections.first().unwrap().get("env").unwrap(), "SECRET");
-  assert_eq!(config.spread_group.clone().unwrap(), "SPREAD_GROUP");
-  let volumes = config.volumes.clone().unwrap();
+  assert_eq!(config.application.spread_group.clone().unwrap(), "SPREAD_GROUP");
+
+  let volumes = config.application.volumes.clone().unwrap();
   assert_eq!(volumes.get("/volume_path").unwrap(), "{ volume('correct_volume_name') }");
 
-  let deployment_parameters = config.deployment_parameters.clone().unwrap();
-  assert_eq!(deployment_parameters.len(), 5);
+  let deployment_parameters = config.deploy.as_ref().unwrap().parameters.clone().unwrap();
+  assert_eq!(deployment_parameters.len(), 11);
 
-  let par = deployment_parameters.get("parameter-boolean").unwrap().clone();
-  assert_eq!(par.typ, DeploymentParameterType::Boolean);
-  assert_eq!(par.caption, "Boolean");
-  assert!(par.optional.unwrap());
-  assert_eq!(par.default.unwrap(), "false");
-  assert!(par.options.is_none());
+  let environment_variables = config.application.environment_variables.clone().unwrap();
+  assert_eq!(environment_variables.len(), 5);
 
-  let par = deployment_parameters.get("parameter-free-text").unwrap().clone();
-  assert_eq!(par.typ, DeploymentParameterType::FreeText);
-  assert_eq!(par.caption, "Free text");
-  assert!(par.optional.is_none());
-  assert!(par.default.is_none());
-  assert!(par.options.is_none());
-
-  let par = deployment_parameters.get("parameter-selection").unwrap().clone();
-  assert_eq!(par.typ, DeploymentParameterType::Selection);
-  assert_eq!(par.caption, "Selection");
-  assert!(par.optional.is_none());
-  assert!(par.default.is_none());
-  assert_eq!(par.options.unwrap(), vec!["option1".to_string(), "option2".to_string()]);
-
-  let par = deployment_parameters.get("parameter-sink-topic").unwrap().clone();
-  assert_eq!(par.typ, DeploymentParameterType::SinkTopic);
-  assert_eq!(par.caption, "Sink topic");
-  assert!(par.optional.is_none());
-  assert!(par.default.is_none());
-  assert!(par.options.is_none());
-
-  let par = deployment_parameters.get("parameter-source-topic").unwrap().clone();
-  assert_eq!(par.typ, DeploymentParameterType::SourceTopic);
-  assert_eq!(par.caption, "Source topic");
-  assert!(par.optional.is_none());
-  assert!(par.default.is_none());
-  assert!(par.options.is_none());
-
-  let environment_variables = config.environment_variables.clone().unwrap();
-  assert_eq!(environment_variables.len(), 8);
-
-  let env = environment_variables.get("ENV_VAR_DEPLOYMENT_PARAMETER_BOOLEAN").unwrap().clone();
+  let env = environment_variables.get("APPLICATION_ENV_VAR1").unwrap().clone();
   assert_eq!(env.typ, VariableType::DeploymentParameter);
-  assert_eq!(env.key.unwrap(), "parameter-boolean");
+  assert_eq!(env.key.unwrap(), "bool1");
   assert!(env.value.is_none());
 
-  let env = environment_variables.get("ENV_VAR_DEPLOYMENT_PARAMETER_FREE_TEXT").unwrap().clone();
-  assert_eq!(env.typ, VariableType::DeploymentParameter);
-  assert_eq!(env.key.unwrap(), "parameter-free-text");
+  let env = environment_variables.get("APPLICATION_ENV_VAR2").unwrap().clone();
+  assert_eq!(env.typ, VariableType::InboundJunction);
+  assert_eq!(env.key.unwrap(), "inbound-topic");
   assert!(env.value.is_none());
 
-  let env = environment_variables.get("ENV_VAR_DEPLOYMENT_PARAMETER_SELECTION").unwrap().clone();
-  assert_eq!(env.typ, VariableType::DeploymentParameter);
-  assert_eq!(env.key.unwrap(), "parameter-selection");
+  let env = environment_variables.get("APPLICATION_ENV_VAR3").unwrap().clone();
+  assert_eq!(env.typ, VariableType::OutboundJunction);
+  assert_eq!(env.key.unwrap(), "outbound-topic");
   assert!(env.value.is_none());
 
-  let env = environment_variables.get("ENV_VAR_DEPLOYMENT_PARAMETER_SINK_TOPIC").unwrap().clone();
-  assert_eq!(env.typ, VariableType::DeploymentParameter);
-  assert_eq!(env.key.unwrap(), "parameter-sink-topic");
-  assert!(env.value.is_none());
-
-  let env = environment_variables.get("ENV_VAR_DEPLOYMENT_PARAMETER_SOURCE_TOPIC").unwrap().clone();
-  assert_eq!(env.typ, VariableType::DeploymentParameter);
-  assert_eq!(env.key.unwrap(), "parameter-source-topic");
-  assert!(env.value.is_none());
-
-  let env = environment_variables.get("ENV_VAR_TEMPLATE_LITERAL").unwrap().clone();
+  let env = environment_variables.get("APPLICATION_ENV_VAR4").unwrap().clone();
   assert_eq!(env.typ, VariableType::Template);
   assert!(env.key.is_none());
-  assert_eq!(env.value.unwrap(), "abcdefghijkl");
+  assert_eq!(env.value.unwrap(), "value4${TENANT}");
 
-  let env = environment_variables.get("ENV_VAR_TEMPLATE_TENANT_USER").unwrap().clone();
-  assert_eq!(env.typ, VariableType::Template);
-  assert!(env.key.is_none());
-  assert_eq!(env.value.unwrap(), "abcd${TENANT}efgh${USER}ijkl");
-
-  let env = environment_variables.get("ENV_VAR_VALUE").unwrap().clone();
+  let env = environment_variables.get("APPLICATION_ENV_VAR5").unwrap().clone();
   assert_eq!(env.typ, VariableType::Value);
   assert!(env.key.is_none());
-  assert_eq!(env.value.unwrap(), "VALUE");
+  assert_eq!(env.value.unwrap(), "value5");
 }
 
 #[test]
 fn read_application_config_profile_proper_values() {
-  let config = read_application_config("test-config/applications/application-config-test.toml").unwrap();
+  let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  path.push("tests/processors/applications/application-config-test.toml");
+  let config = &read_application_config(path.to_str().unwrap()).unwrap();
 
-  let profile1 = config.profiles.clone().get("profile-1").unwrap().clone();
-  println!("{:?}", profile1);
-  assert_eq!(profile1.profile_name, "profile-1");
+  let profile1 = config.application.profiles.clone().get("profile-1").unwrap().clone();
   assert_eq!(profile1.profile_description, "Profile 1");
   assert_eq!(profile1.cpus, 1.0);
   assert_eq!(profile1.mem, 1);
@@ -473,37 +510,28 @@ fn read_application_config_profile_proper_values() {
 
   let env1 = profile1.environment_variables.unwrap().clone();
 
-  let env11 = env1.get("PROFILE1_ENV_VAR1").unwrap().clone();
-  println!("{:?}", env11);
-  assert_eq!(env11.typ, VariableType::DeploymentParameter);
-  assert_eq!(env11.key.unwrap(), "parameter1");
-  assert!(env11.value.is_none());
+  let env = env1.get("PROFILE1_ENV_VAR1").unwrap().clone();
+  assert_eq!(env.typ, VariableType::DeploymentParameter);
+  assert_eq!(env.key.unwrap(), "free1");
+  assert!(env.value.is_none());
 
-  let env12 = env1.get("PROFILE1_ENV_VAR2").unwrap().clone();
-  println!("{:?}", env12);
-  assert_eq!(env12.typ, VariableType::Value);
-  assert!(env12.key.is_none());
-  assert_eq!(env12.value.unwrap(), "value1");
+  let env = env1.get("PROFILE1_ENV_VAR2").unwrap().clone();
+  assert_eq!(env.typ, VariableType::InboundJunction);
+  assert_eq!(env.key.unwrap(), "inbound-topic");
+  assert!(env.value.is_none());
 
-  let profile2 = config.profiles.get("profile-2").unwrap().clone();
-  println!("{:?}", profile2);
-  assert_eq!(profile2.profile_name, "profile-2");
-  assert_eq!(profile2.profile_description, "Profile 2");
-  assert_eq!(profile2.cpus, 2.0);
-  assert_eq!(profile2.mem, 2);
-  assert_eq!(profile2.instances, 2);
+  let env = env1.get("PROFILE1_ENV_VAR3").unwrap().clone();
+  assert_eq!(env.typ, VariableType::OutboundJunction);
+  assert_eq!(env.key.unwrap(), "outbound-topic");
+  assert!(env.value.is_none());
 
-  let env2 = profile2.environment_variables.unwrap().clone();
+  let env = env1.get("PROFILE1_ENV_VAR4").unwrap().clone();
+  assert_eq!(env.typ, VariableType::Template);
+  assert!(env.key.is_none());
+  assert_eq!(env.value.unwrap(), "value14${TENANT}");
 
-  let env21 = env2.get("PROFILE2_ENV_VAR1").unwrap().clone();
-  println!("{:?}", env21);
-  assert_eq!(env21.typ, VariableType::DeploymentParameter);
-  assert_eq!(env21.key.unwrap(), "parameter2");
-  assert!(env21.value.is_none());
-
-  let env22 = env2.get("PROFILE2_ENV_VAR2").unwrap().clone();
-  println!("{:?}", env22);
-  assert_eq!(env22.typ, VariableType::Value);
-  assert!(env22.key.is_none());
-  assert_eq!(env22.value.unwrap(), "value2");
+  let env = env1.get("PROFILE1_ENV_VAR5").unwrap().clone();
+  assert_eq!(env.typ, VariableType::Value);
+  assert!(env.key.is_none());
+  assert_eq!(env.value.unwrap(), "value15");
 }

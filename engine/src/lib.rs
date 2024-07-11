@@ -4,9 +4,11 @@ use dsh_rest_api_client::Client;
 use dsh_sdk::{Platform, RestTokenFetcher, RestTokenFetcherBuilder};
 use lazy_static::lazy_static;
 
-pub mod pipeline;
 pub mod processor;
 pub mod resource;
+pub mod topology;
+
+const TRIFONIUS_CONFIG_DIR: &str = "TRIFONIUS_CONFIG_DIR";
 
 const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
 const TRIFONIUS_TARGET_TENANT_USER: &str = "TRIFONIUS_TARGET_TENANT_USER";

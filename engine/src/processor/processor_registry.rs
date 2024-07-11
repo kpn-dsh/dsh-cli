@@ -1,7 +1,8 @@
-use crate::{DEFAULT_TARGET_CLIENT_FACTOR, TargetClientFactory};
 use crate::processor::application::application_registry::ApplicationRegistry;
 use crate::processor::processor::{Processor, ProcessorIdentifier};
-use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorType};
+use crate::processor::processor_descriptor::ProcessorDescriptor;
+use crate::processor::ProcessorType;
+use crate::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTOR};
 
 pub struct ProcessorRegistry<'a> {
   application_registry: ApplicationRegistry<'a>,
@@ -34,13 +35,16 @@ impl<'a> ProcessorRegistry<'a> {
 
   pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_name: &str) -> Option<&ProcessorDescriptor> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_by_name(processor_name).map(|a| a.descriptor())
+      ProcessorType::Application => self.application_registry.application_by_name(processor_name).map(|a| a.descriptor()),
     }
   }
 
   pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&ProcessorDescriptor> {
     match processor_identifier.processor_type {
-      ProcessorType::Application => self.application_registry.application_by_name(processor_identifier.name.as_str()).map(|a| a.descriptor()),
+      ProcessorType::Application => self
+        .application_registry
+        .application_by_name(processor_identifier.name.as_str())
+        .map(|a| a.descriptor()),
     }
   }
 
@@ -50,7 +54,7 @@ impl<'a> ProcessorRegistry<'a> {
 
   pub fn processor_descriptors_by_type(&self, processor_type: ProcessorType) -> Vec<&ProcessorDescriptor> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_descriptors()
+      ProcessorType::Application => self.application_registry.application_descriptors(),
     }
   }
 
