@@ -3,11 +3,11 @@ use std::ops::Deref;
 use async_trait::async_trait;
 use dsh_sdk::dsh::datastream::Stream;
 
+use crate::processor::application::TargetClientFactory;
 use crate::resource::dsh_topic::topic_registry::resource_identifier;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
-use crate::resource::resource_descriptor::ResourceDescriptor;
+use crate::resource::resource_descriptor::{DshTopicDescriptor, ResourceDescriptor};
 use crate::resource::ResourceType;
-use crate::TargetClientFactory;
 
 pub struct TopicResourceImpl<'a> {
   pub resource_identifier: ResourceIdentifier,
@@ -19,19 +19,13 @@ impl<'a> TopicResourceImpl<'a> {
   pub fn create(stream: &Stream, target_client_factory: &'a TargetClientFactory) -> Result<Self, String> {
     let resource_descriptor = ResourceDescriptor {
       resource_type: ResourceType::DshTopic,
-      name: stream.name().to_string(),
-      description: "".to_string(),
+      id: stream.name().to_string(),
+      label: stream.name().to_string(),
+      description: "DSH Kafka topic".to_string(),
       version: None,
-      writable: !stream.write().is_empty(),
-      readable: !stream.read().is_empty(),
-      metadata: vec![
-        ("partitions".to_string(), stream.partitions().to_string()),
-        ("replication".to_string(), stream.replication().to_string()),
-        ("partitioner".to_string(), stream.partitioner().to_string()),
-        ("partitioning-depth".to_string(), stream.partitioning_depth().to_string()),
-        ("can-retain".to_string(), stream.can_retain().to_string()),
-        ("cluster".to_string(), stream.cluster().to_string()),
-      ],
+      writable: stream.write_access(),
+      readable: stream.read_access(),
+      metadata: Vec::default(),
       more_info_url: Some(format!(
         "https://console.dsh-dev.dsh.np.aws.kpn.com/#/profiles/{}/resources/streams",
         target_client_factory.tenant
@@ -42,6 +36,25 @@ impl<'a> TopicResourceImpl<'a> {
         target_client_factory.tenant,
         stream.name()
       )),
+      dsh_topic_descriptor: Some(DshTopicDescriptor {
+        id: stream.name().to_string(),
+        // TODO Check proper topic name
+        topic: match stream.write_pattern() {
+          Ok(wp) => wp.to_string(),
+          Err(_) => stream.name().to_string(),
+        },
+        partitions: u32::try_from(stream.partitions()).unwrap(),
+        replication: u32::try_from(stream.replication()).unwrap(),
+        dsh_envelope: false,
+        read: stream.read().to_string(),
+        write: stream.write().to_string(),
+        read_pattern: stream.read_pattern().ok().map(|p| p.to_string()),
+        write_pattern: stream.write_pattern().ok().map(|p| p.to_string()),
+        partitioner: stream.partitioner().to_string(),
+        partitioning_depth: u32::try_from(stream.partitioning_depth()).unwrap(),
+        can_retain: stream.can_retain(),
+        cluster: stream.cluster().to_string(),
+      }),
     };
     Ok(TopicResourceImpl { resource_identifier: resource_identifier(stream.name().to_string()), resource_descriptor, target_client_factory })
   }
@@ -57,8 +70,12 @@ impl Resource for TopicResourceImpl<'_> {
     &self.resource_identifier
   }
 
-  fn name(&self) -> &str {
-    &self.resource_identifier.name
+  fn id(&self) -> &str {
+    &self.resource_identifier.id
+  }
+
+  fn label(&self) -> &str {
+    &self.resource_descriptor.label
   }
 
   fn resource_type(&self) -> ResourceType {
@@ -66,9 +83,9 @@ impl Resource for TopicResourceImpl<'_> {
   }
 
   async fn status(&self) -> Result<ResourceStatus, String> {
-    match get_topic_status(self.target_client_factory, &self.resource_identifier.name).await? {
+    match get_topic_status(self.target_client_factory, &self.resource_identifier.id).await? {
       Some(status) => Ok(status),
-      None => Err(format!("could not get status for non-existent topic {}", &self.resource_identifier.name)),
+      None => Err(format!("could not get status for non-existent topic {}", &self.resource_identifier.id)),
     }
   }
 }
