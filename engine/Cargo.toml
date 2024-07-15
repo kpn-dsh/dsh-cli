@@ -25,3 +25,5 @@ urlencoding = "2.1.3"
 
 # Move dependency to dev-dependencies
 env_logger = "0.11.3"
+rand = "0.8.5"
+uuid = { version = "1.10.0", features = ["v4"] }
