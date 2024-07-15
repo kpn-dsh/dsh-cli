@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod topology;
 pub mod topology_descriptor;
 pub mod topology_layout;
