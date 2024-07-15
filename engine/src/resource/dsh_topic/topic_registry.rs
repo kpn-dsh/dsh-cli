@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use dsh_sdk::Properties;
 
+use crate::processor::application::TargetClientFactory;
 use crate::resource::dsh_topic::topic_resource::TopicResourceImpl;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::ResourceType;
-use crate::TargetClientFactory;
 
 pub struct TopicRegistry<'a> {
   resources: HashMap<ResourceIdentifier, TopicResourceImpl<'a>>,
@@ -23,8 +23,8 @@ impl<'a> TopicRegistry<'a> {
     Ok(TopicRegistry { resources })
   }
 
-  pub fn resource_by_name(&self, name: &str) -> Option<&dyn Resource> {
-    match self.resources.get(&resource_identifier(name.to_string())) {
+  pub fn resource_by_id(&self, id: &str) -> Option<&dyn Resource> {
+    match self.resources.get(&resource_identifier(id.to_string())) {
       Some(a) => Some(a),
       None => None,
     }
@@ -47,6 +47,6 @@ impl<'a> TopicRegistry<'a> {
   }
 }
 
-pub(crate) fn resource_identifier(name: String) -> ResourceIdentifier {
-  ResourceIdentifier { resource_type: ResourceType::DshTopic, name }
+pub(crate) fn resource_identifier(id: String) -> ResourceIdentifier {
+  ResourceIdentifier { resource_type: ResourceType::DshTopic, id }
 }

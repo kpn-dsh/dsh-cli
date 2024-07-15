@@ -11,33 +11,34 @@ use crate::processor::ProcessorType;
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct ProcessorIdentifier {
   pub processor_type: ProcessorType,
-  pub name: String,
+  pub id: String,
 }
 
 impl Display for ProcessorIdentifier {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}", &self.name, &self.processor_type)
+    write!(f, "{}:{}", &self.id, &self.processor_type)
   }
 }
 
 #[async_trait]
 pub trait Processor {
-  async fn deploy(&self, processor_instance_name: &str, parameters: &ProcessorDeployParameters) -> Result<(), String>;
+  async fn deploy(&self, instance_id: &str, parameters: &ProcessorDeployParameters) -> Result<(), String>;
   fn descriptor(&self) -> &ProcessorDescriptor;
+  fn id(&self) -> &str;
   fn identifier(&self) -> &ProcessorIdentifier;
-  fn name(&self) -> &str;
+  fn label(&self) -> &str;
   fn processor_type(&self) -> ProcessorType;
-  async fn start(&self, processor_instance_name: &str) -> Result<String, String>;
-  async fn status(&self, processor_instance_name: &str) -> Result<ProcessorStatus, String>;
-  async fn stop(&self, processor_instance_name: &str) -> Result<String, String>;
-  async fn undeploy(&self, processor_instance_name: &str) -> Result<(), String>;
+  async fn start(&self, instance_id: &str) -> Result<String, String>;
+  async fn status(&self, instance_id: &str) -> Result<ProcessorStatus, String>;
+  async fn stop(&self, instance_id: &str) -> Result<String, String>;
+  async fn undeploy(&self, instance_id: &str) -> Result<(), String>;
 }
 
 pub struct ProcessorDeployParameters<'a> {
   pub inbound_junctions: &'a HashMap<String, String>,
   pub outbound_junctions: &'a HashMap<String, String>,
   pub parameters: &'a HashMap<String, String>,
-  pub profile_name: Option<&'a str>,
+  pub profile_id: Option<&'a str>,
 }
 
 #[derive(Debug)]

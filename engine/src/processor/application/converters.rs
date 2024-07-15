@@ -118,49 +118,49 @@ pub fn into_api_application(
   deploy_parameters: &ProcessorDeployParameters,
   profile: &ProfileConfig,
   user: String,
-  template_mappings: &HashMap<PlaceHolder, &str>,
+  template_mapping: &TemplateMapping,
 ) -> Result<ApiApplication, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
   if let Some(ref envs) = application_config.application.environment_variables {
-    for (environment_variable_name, variable) in envs.clone() {
+    for (environment_variable, variable) in envs.clone() {
       match variable.typ {
-        VariableType::InboundJunction => match variable.key {
-          Some(ref junction_name) => match deploy_parameters.inbound_junctions.get(junction_name) {
+        VariableType::InboundJunction => match variable.id {
+          Some(ref junction_id) => match deploy_parameters.inbound_junctions.get(junction_id) {
             Some(parameter_value) => {
-              environment_variables.insert(environment_variable_name, parameter_value.to_string());
+              environment_variables.insert(environment_variable, parameter_value.to_string());
             }
             None => {
               return Err(format!(
                 "missing inbound junction setting '{}' for variable '{}'",
-                junction_name, environment_variable_name
+                junction_id, environment_variable
               ))
             }
           },
           None => unreachable!(),
         },
-        VariableType::OutboundJunction => match variable.key {
-          Some(ref junction_name) => match deploy_parameters.outbound_junctions.get(junction_name) {
+        VariableType::OutboundJunction => match variable.id {
+          Some(ref junction_id) => match deploy_parameters.outbound_junctions.get(junction_id) {
             Some(parameter_value) => {
-              environment_variables.insert(environment_variable_name, parameter_value.to_string());
+              environment_variables.insert(environment_variable, parameter_value.to_string());
             }
             None => {
               return Err(format!(
                 "missing outbound junction setting '{}' for variable '{}'",
-                junction_name, environment_variable_name
+                junction_id, environment_variable
               ))
             }
           },
           None => unreachable!(),
         },
-        VariableType::DeploymentParameter => match variable.key {
-          Some(ref deployment_parameter_key) => match deploy_parameters.parameters.get(deployment_parameter_key) {
+        VariableType::DeploymentParameter => match variable.id {
+          Some(ref deployment_parameter_id) => match deploy_parameters.parameters.get(deployment_parameter_id) {
             Some(parameter_value) => {
-              environment_variables.insert(environment_variable_name, parameter_value.clone());
+              environment_variables.insert(environment_variable, parameter_value.clone());
             }
             None => {
               return Err(format!(
                 "missing deployment parameter '{}' for variable '{}'",
-                deployment_parameter_key, environment_variable_name
+                deployment_parameter_id, environment_variable
               ))
             }
           },
@@ -168,14 +168,14 @@ pub fn into_api_application(
         },
         VariableType::Template => match variable.value {
           Some(template) => {
-            let resolved = template_resolver(template.as_str(), template_mappings)?;
-            environment_variables.insert(environment_variable_name, resolved);
+            let resolved = template_resolver(template.as_str(), template_mapping)?;
+            environment_variables.insert(environment_variable, resolved);
           }
           None => unreachable!(),
         },
         VariableType::Value => match variable.value {
           Some(parameter_value) => {
-            environment_variables.insert(environment_variable_name, parameter_value);
+            environment_variables.insert(environment_variable, parameter_value);
           }
           None => unreachable!(),
         },
@@ -220,11 +220,13 @@ pub fn into_api_application(
   Ok(api_application)
 }
 
+pub type TemplateMapping = HashMap<PlaceHolder, String>;
+
 lazy_static! {
   static ref TEMPLATE_REGEX: Regex = Regex::new("\\$\\{([A-Z][A-Z0-9_]*)\\}").unwrap();
 }
 
-pub(crate) fn template_resolver(template: &str, template_mapping: &HashMap<PlaceHolder, &str>) -> Result<String, String> {
+pub(crate) fn template_resolver(template: &str, template_mapping: &TemplateMapping) -> Result<String, String> {
   let mut new = String::with_capacity(template.len());
   let mut last_match = 0;
   for caps in TEMPLATE_REGEX.captures_iter(template) {
@@ -245,7 +247,6 @@ pub(crate) fn template_resolver(template: &str, template_mapping: &HashMap<Place
 
 pub(crate) fn validate_template(template: &str, template_mapping: &[PlaceHolder]) -> Result<(), String> {
   for caps in TEMPLATE_REGEX.captures_iter(template) {
-    // let m = caps.get(0).unwrap();
     let place_holder = PlaceHolder::try_from(caps.get(1).unwrap().as_str())?;
     if !template_mapping.contains(&place_holder) {
       return Err(format!("invalid template because placeholder '{}' is not allowed", place_holder));
@@ -259,15 +260,15 @@ fn resolve_template_successfully() {
   let template = "abcd${TENANT}def${USER}ghi";
   let tenant = "tenant";
   let user = "user";
-  let template_mapping = HashMap::from([(PlaceHolder::TENANT, tenant), (PlaceHolder::USER, user)]);
+  let template_mapping: TemplateMapping = HashMap::from([(PlaceHolder::Tenant, tenant.to_string()), (PlaceHolder::User, user.to_string())]);
   assert_eq!(template_resolver(template, &template_mapping).unwrap(), "abcdtenantdefuserghi");
 }
 
 #[test]
 fn validate_template_succesfully() {
-  assert!(validate_template("abcd${TENANT}def${USER}ghi", &[PlaceHolder::TENANT, PlaceHolder::USER]).is_ok());
-  assert!(validate_template("abcd${TENANT}def${USER}ghi", &[PlaceHolder::TENANT]).is_err());
-  assert!(validate_template("abcd{TENANT}def{USER}ghi", &[PlaceHolder::TENANT]).is_ok());
-  assert!(validate_template("abcdefghijkl", &[PlaceHolder::TENANT]).is_ok());
-  assert!(validate_template("", &[PlaceHolder::TENANT]).is_ok());
+  assert!(validate_template("abcd${TENANT}def${USER}ghi", &[PlaceHolder::Tenant, PlaceHolder::User]).is_ok());
+  assert!(validate_template("abcd${TENANT}def${USER}ghi", &[PlaceHolder::Tenant]).is_err());
+  assert!(validate_template("abcd{TENANT}def{USER}ghi", &[PlaceHolder::Tenant]).is_ok());
+  assert!(validate_template("abcdefghijkl", &[PlaceHolder::Tenant]).is_ok());
+  assert!(validate_template("", &[PlaceHolder::Tenant]).is_ok());
 }

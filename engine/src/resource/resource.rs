@@ -10,12 +10,12 @@ use crate::resource::ResourceType;
 #[derive(Eq, Hash, PartialEq)]
 pub struct ResourceIdentifier {
   pub resource_type: ResourceType,
-  pub name: String,
+  pub id: String,
 }
 
 impl Display for ResourceIdentifier {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}", &self.name, &self.resource_type)
+    write!(f, "{}:{}", &self.id, &self.resource_type)
   }
 }
 
@@ -23,7 +23,8 @@ impl Display for ResourceIdentifier {
 pub trait Resource {
   fn descriptor(&self) -> &ResourceDescriptor;
   fn identifier(&self) -> &ResourceIdentifier;
-  fn name(&self) -> &str;
+  fn id(&self) -> &str;
+  fn label(&self) -> &str;
   fn resource_type(&self) -> ResourceType;
   async fn status(&self) -> Result<ResourceStatus, String>;
 }

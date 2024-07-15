@@ -1,8 +1,8 @@
+use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTOR};
 use crate::resource::dsh_topic::topic_registry::TopicRegistry;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::ResourceType;
-use crate::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTOR};
 
 pub struct ResourceRegistry<'a> {
   topic_registry: TopicRegistry<'a>,
@@ -21,27 +21,27 @@ impl<'a> ResourceRegistry<'a> {
     Ok(ResourceRegistry { topic_registry: TopicRegistry::create(target_client_factory)? })
   }
 
-  pub fn resource(&self, resource_type: ResourceType, resource_name: &str) -> Option<&(dyn Resource)> {
+  pub fn resource(&self, resource_type: ResourceType, resource_id: &str) -> Option<&(dyn Resource)> {
     match resource_type {
-      ResourceType::DshTopic => self.topic_registry.resource_by_name(resource_name),
+      ResourceType::DshTopic => self.topic_registry.resource_by_id(resource_id),
     }
   }
 
   pub fn resource_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Option<&(dyn Resource)> {
     match resource_identifier.resource_type {
-      ResourceType::DshTopic => self.topic_registry.resource_by_name(resource_identifier.name.as_str()),
+      ResourceType::DshTopic => self.topic_registry.resource_by_id(resource_identifier.id.as_str()),
     }
   }
 
-  pub fn resource_descriptor(&self, resource_type: ResourceType, resource_name: &str) -> Option<&ResourceDescriptor> {
+  pub fn resource_descriptor(&self, resource_type: ResourceType, resource_id: &str) -> Option<&ResourceDescriptor> {
     match resource_type {
-      ResourceType::DshTopic => self.topic_registry.resource_by_name(resource_name).map(|r| r.descriptor()),
+      ResourceType::DshTopic => self.topic_registry.resource_by_id(resource_id).map(|r| r.descriptor()),
     }
   }
 
   pub fn resource_descriptor_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Option<&ResourceDescriptor> {
     match resource_identifier.resource_type {
-      ResourceType::DshTopic => self.topic_registry.resource_by_name(resource_identifier.name.as_str()).map(|r| r.descriptor()),
+      ResourceType::DshTopic => self.topic_registry.resource_by_id(resource_identifier.id.as_str()).map(|r| r.descriptor()),
     }
   }
 
