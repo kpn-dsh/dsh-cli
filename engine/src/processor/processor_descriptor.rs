@@ -3,14 +3,14 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 
 use crate::processor::application::application_config::ProfileConfig;
-use crate::processor::processor_config::{DeploymentParameterConfig, JunctionConfig};
+use crate::processor::processor_config::{DeploymentParameterConfig, DeploymentParameterConfigOption, JunctionConfig};
 use crate::processor::{DeploymentParameterType, ProcessorType};
 use crate::resource::ResourceType;
 
 /// Describes a `Processor`
 ///
 /// A `ProcessorDescriptor` describes some generic details of a concrete `Processor`, e.g. the
-/// `Processor`s name, description and version, a list of required junctions and some generic
+/// `Processor`s id, label, description and version, a list of required junctions and some generic
 /// parameters. A `ProcessorDescriptor` can be seen as the abstract _super type_ of all concrete
 /// `Processor`s descriptors. A `Processor` can be used by a control application (cli or gui) to
 /// present the `Processor` to the user and to determine which parameters the user needs to provide
@@ -19,7 +19,8 @@ use crate::resource::ResourceType;
 pub struct ProcessorDescriptor {
   #[serde(rename = "type")]
   pub processor_type: ProcessorType,
-  pub name: String,
+  pub id: String,
+  pub label: String,
   pub description: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub version: Option<String>,
@@ -43,23 +44,23 @@ pub struct ProcessorDescriptor {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct JunctionDescriptor {
-  pub name: String,
-  pub caption: String,
-  pub description: Option<String>,
+  pub id: String,
+  pub label: String,
+  pub description: String,
   pub allowed_resource_types: Vec<ResourceType>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct DeploymentParameterDescriptor {
   #[serde(rename = "type")]
-  pub parameter_typ: DeploymentParameterType,
-  pub name: String,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub description: Option<String>,
+  pub parameter_type: DeploymentParameterType,
+  pub id: String,
+  pub label: String,
+  pub description: String,
   #[serde(rename = "initial-value", skip_serializing_if = "Option::is_none")]
   pub initial_value: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub options: Option<Vec<String>>,
+  pub options: Option<Vec<DeploymentParameterOptionDescriptor>>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub optional: Option<bool>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -67,60 +68,100 @@ pub struct DeploymentParameterDescriptor {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct DeploymentParameterOptionDescriptor {
+  id: String,
+  label: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  description: Option<String>,
+}
+
+impl Display for DeploymentParameterOptionDescriptor {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self.description {
+      Some(ref description) => write!(f, "{} ({}, {})", self.id, self.label, description),
+      None => write!(f, "{} ({})", self.id, self.label),
+    }
+  }
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct ProfileDescriptor {
-  pub name: String,
-  pub description: Option<String>,
+  pub id: String,
+  pub label: String,
+  pub description: String,
   pub instances: Option<u64>,
   pub cpus: Option<f64>,
   pub mem: Option<u64>,
 }
 
 impl From<(String, JunctionConfig)> for JunctionDescriptor {
-  fn from((name, config): (String, JunctionConfig)) -> Self {
-    JunctionDescriptor { name, caption: config.caption, description: Some(config.description), allowed_resource_types: config.allowed_resource_types }
+  fn from((id, config): (String, JunctionConfig)) -> Self {
+    JunctionDescriptor { id, label: config.label, description: config.description, allowed_resource_types: config.allowed_resource_types }
   }
 }
 
 impl From<(&String, &JunctionConfig)> for JunctionDescriptor {
-  fn from((name, config): (&String, &JunctionConfig)) -> Self {
+  fn from((id, config): (&String, &JunctionConfig)) -> Self {
     let c = config.clone();
-    JunctionDescriptor { name: name.to_owned(), caption: c.caption, description: Some(c.description), allowed_resource_types: c.allowed_resource_types }
+    JunctionDescriptor { id: id.to_owned(), label: c.label, description: c.description, allowed_resource_types: c.allowed_resource_types }
   }
 }
 
-impl From<(String, DeploymentParameterConfig)> for DeploymentParameterDescriptor {
-  fn from((name, config): (String, DeploymentParameterConfig)) -> Self {
-    DeploymentParameterDescriptor {
-      parameter_typ: config.typ,
-      name,
-      description: config.description,
-      initial_value: config.initial_value,
-      options: config.options,
-      optional: config.optional,
-      default: config.default,
+impl From<&DeploymentParameterConfigOption> for DeploymentParameterOptionDescriptor {
+  fn from(option_config: &DeploymentParameterConfigOption) -> Self {
+    match option_config {
+      DeploymentParameterConfigOption::Label(label) => {
+        DeploymentParameterOptionDescriptor { id: label.id.clone(), label: label.label.clone(), description: label.description.clone() }
+      }
+      DeploymentParameterConfigOption::Id(id) => DeploymentParameterOptionDescriptor { id: id.clone(), label: id.clone(), description: None },
     }
   }
 }
 
-impl From<(String, ProfileConfig)> for ProfileDescriptor {
-  fn from((name, config): (String, ProfileConfig)) -> Self {
-    ProfileDescriptor { name, description: Some(config.profile_description), instances: Some(config.instances), cpus: Some(config.cpus), mem: Some(config.mem) }
+impl From<(String, &DeploymentParameterConfig)> for DeploymentParameterDescriptor {
+  fn from((id, config): (String, &DeploymentParameterConfig)) -> Self {
+    DeploymentParameterDescriptor {
+      parameter_type: config.typ.clone(),
+      id,
+      label: config.label.to_string(),
+      description: config.description.to_string(),
+      initial_value: config.initial_value.clone(),
+      options: config
+        .options
+        .as_ref()
+        .map(|opts| opts.iter().map(DeploymentParameterOptionDescriptor::from).collect()),
+      optional: config.optional,
+      default: config.default.clone(),
+    }
+  }
+}
+
+impl From<&ProfileConfig> for ProfileDescriptor {
+  fn from(config: &ProfileConfig) -> Self {
+    ProfileDescriptor {
+      id: config.id.clone(),
+      label: config.label.clone(),
+      description: config.description.clone(),
+      instances: Some(config.instances),
+      cpus: Some(config.cpus),
+      mem: Some(config.mem),
+    }
   }
 }
 
 impl From<(&String, &ProfileConfig)> for ProfileDescriptor {
-  fn from((name, config): (&String, &ProfileConfig)) -> Self {
+  fn from((id, config): (&String, &ProfileConfig)) -> Self {
     let c = config.clone();
-    ProfileDescriptor { name: name.to_owned(), description: Some(c.profile_description), instances: Some(c.instances), cpus: Some(c.cpus), mem: Some(c.mem) }
+    ProfileDescriptor { id: id.to_owned(), label: c.label, description: c.description, instances: Some(c.instances), cpus: Some(c.cpus), mem: Some(c.mem) }
   }
 }
 
 impl Display for ProcessorDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     if let Some(ref version) = self.version {
-      write!(f, "{}:{}", self.name, version)?;
+      write!(f, "{}:{}", self.id, version)?;
     } else {
-      write!(f, "{}", self.name)?;
+      write!(f, "{}", self.id)?;
     }
     write!(f, "\n  {}", self.processor_type)?;
     write!(f, "\n  {}", self.description)?;
@@ -169,15 +210,14 @@ impl Display for ProcessorDescriptor {
 
 impl Display for DeploymentParameterDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}: {}", &self.name, &self.parameter_typ)?;
-    if let Some(description) = &self.description {
-      write!(f, " ({})", description)?;
-    }
+    write!(f, "{}: {}", &self.id, &self.parameter_type)?;
+    write!(f, ", {}", &self.label)?;
+    write!(f, " ({})", &self.description)?;
     if let Some(initial_value) = &self.initial_value {
       write!(f, ", initial value: {}", initial_value)?;
     }
     if let Some(options) = &self.options {
-      write!(f, ", options: [{}]", options.join(","))?;
+      write!(f, ", options: [{}]", options.iter().map(|opt| opt.to_string()).collect::<Vec<String>>().join(","))?;
     }
     if let Some(optional) = &self.optional {
       write!(f, ", optional: {}", optional)?;
@@ -191,10 +231,9 @@ impl Display for DeploymentParameterDescriptor {
 
 impl Display for JunctionDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", &self.name)?;
-    if let Some(description) = &self.description {
-      write!(f, " ({})", description)?;
-    }
+    write!(f, "{}", &self.id)?;
+    write!(f, ", {}", &self.label)?;
+    write!(f, " ({})", &self.description)?;
     write!(
       f,
       ", allowed resource types: {}",
@@ -206,10 +245,9 @@ impl Display for JunctionDescriptor {
 
 impl Display for ProfileDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", &self.name)?;
-    if let Some(description) = &self.description {
-      write!(f, " ({})", description)?;
-    }
+    write!(f, "{}", &self.id)?;
+    write!(f, ", {}", &self.label)?;
+    write!(f, " ({})", &self.description)?;
     if let Some(instances) = &self.instances {
       write!(f, ", instances: {}", instances)?;
     }

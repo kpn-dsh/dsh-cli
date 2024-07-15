@@ -1,5 +1,6 @@
 type = "application"
-name = "test"
+id = "test"
+label = "Test application"
 description = "Test profiles"
 version = "0.1.2"
 
@@ -12,25 +13,32 @@ metadata = [
     ["metadata2", "METADATA2"]
 ]
 
-[inbound-junctions]
-inbound-topic = { caption = "Test inbound topic", description = "Test inbound topic description", allowed-resource-types = ["dsh-topic"] }
+[inbound-junctions.inbound-topic]
+label = "Test inbound topic"
+description = "Test inbound topic description"
+number-of-resources = { fixed = 1 }
+allowed-resource-types = ["dsh-topic"]
 
-[outbound-junctions]
-outbound-topic = { caption = "Test outbound topic", description = "Test outbound topic description", allowed-resource-types = ["dsh-topic"] }
+[outbound-junctions.outbound-topic]
+label = "Test outbound topic"
+description = "Test outbound topic description"
+number-of-resources = { min = 1, max = 2 }
+allowed-resource-types = ["dsh-topic"]
 
 [deploy]
-[deploy.parameters]
-bool1 = { type = "boolean", caption = "B1" }
-bool2 = { type = "boolean", caption = "B2", optional = true, default = "true" }
-bool3 = { type = "boolean", caption = "B3", initial-value = "true" }
-free1 = { type = "free-text", caption = "F1" }
-free2 = { type = "free-text", caption = "F2", initial-value = "I2" }
-free3 = { type = "free-text", caption = "F3", optional = true, default = "D3" }
-free4 = { type = "free-text", caption = "F4", initial-value = "I4", optional = true, default = "D4" }
-sel1 = { type = "selection", caption = "S1", options = ["s11"] }
-sel2 = { type = "selection", caption = "S2", options = ["s21", "s22"], optional = true, default = "s22" }
-sel3 = { type = "selection", caption = "S3", options = ["s31", "s32"], initial-value = "s32" }
-sel4 = { type = "selection", caption = "S4", options = ["s41", "s42"], initial-value = "s42", optional = true, default = "s41" }
+parameters = [
+    { type = "boolean", id = "bool1", label = "B1", description = "DB1" },
+    { type = "boolean", id = "bool2", label = "B2", description = "DB2", optional = true, default = "true" },
+    { type = "boolean", id = "bool3", label = "B3", description = "DB3", initial-value = "true" },
+    { type = "free-text", id = "free1", label = "F1", description = "DF1" },
+    { type = "free-text", id = "free2", label = "F2", description = "DF2", initial-value = "I2" },
+    { type = "free-text", id = "free3", label = "F3", description = "DF3", optional = true, default = "D3" },
+    { type = "free-text", id = "free4", label = "F4", description = "DF4", initial-value = "I4", optional = true, default = "D4" },
+    { type = "selection", id = "sel1", label = "S1", description = "DS1", options = ["s11"] },
+    { type = "selection", id = "sel2", label = "S2", description = "DS2", options = [{ id = "sx1", label = "SX1" }, { id = "sx2", label = "SX2", description = "D2" }], optional = true, default = "sx2" },
+    { type = "selection", id = "sel3", label = "S3", description = "DS3", options = [{ id = "sx1", label = "SX1" }, "s11"], initial-value = "s11" },
+    { type = "selection", id = "sel4", label = "S4", description = "DS4", options = ["s11"], initial-value = "s11", optional = true, default = "s11" }
+]
 
 [application]
 
@@ -65,36 +73,36 @@ injections = [{ env = "SECRET" }]
 
 [application.environment-variables]
 
-APPLICATION_ENV_VAR1 = { type = "deployment-parameter", key = "bool1" }
-APPLICATION_ENV_VAR2 = { type = "inbound-junction", key = "inbound-topic" }
-APPLICATION_ENV_VAR3 = { type = "outbound-junction", key = "outbound-topic" }
+APPLICATION_ENV_VAR1 = { type = "deployment-parameter", id = "bool1" }
+APPLICATION_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
+APPLICATION_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
 APPLICATION_ENV_VAR4 = { type = "template", value = "value4${TENANT}" }
 APPLICATION_ENV_VAR5 = { type = "value", value = "value5" }
 
-[application.profiles.profile-1]
-
-profile-description = "Profile 1"
+[[application.profiles]]
+id = "profile-1"
+label = "Profile 1"
+description = "Profile 1"
 cpus = 1
 instances = 1
 mem = 1
-
-[application.profiles.profile-1.environment-variables]
-PROFILE1_ENV_VAR1 = { type = "deployment-parameter", key = "free1" }
-PROFILE1_ENV_VAR2 = { type = "inbound-junction", key = "inbound-topic" }
-PROFILE1_ENV_VAR3 = { type = "outbound-junction", key = "outbound-topic" }
+[application.profiles.environment-variables]
+PROFILE1_ENV_VAR1 = { type = "deployment-parameter", id = "free1" }
+PROFILE1_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
+PROFILE1_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
 PROFILE1_ENV_VAR4 = { type = "template", value = "value14${TENANT}" }
 PROFILE1_ENV_VAR5 = { type = "value", value = "value15" }
 
-[application.profiles.profile-2]
-
-profile-description = "Profile 2"
+[[application.profiles]]
+id = "profile-1"
+label = "Profile 1"
+description = "Profile 2"
 cpus = 2
 instances = 2
 mem = 2
-
 [application.profiles.profile-2.environment-variables]
-PROFILE2_ENV_VAR1 = { type = "deployment-parameter", key = "sel1" }
-PROFILE2_ENV_VAR2 = { type = "inbound-junction", key = "inbound-topic" }
-PROFILE2_ENV_VAR3 = { type = "outbound-junction", key = "outbound-topic" }
+PROFILE2_ENV_VAR1 = { type = "deployment-parameter", id = "sel1" }
+PROFILE2_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
+PROFILE2_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
 PROFILE2_ENV_VAR4 = { type = "template", value = "value24${TENANT}" }
 PROFILE2_ENV_VAR5 = { type = "value", value = "value25" }

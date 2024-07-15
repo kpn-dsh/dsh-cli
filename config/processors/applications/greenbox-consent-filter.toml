@@ -1,28 +1,58 @@
 type = "application"
-name = "greenbox-consent-filter"
+id = "greenbox-consent-filter"
+label = "Greenbox ConsentFilter"
 description = "Record processor filters records based on customer consent"
 version = "0.2.7"
 
-metrics-url = "https://monitoring-${TENANT}.dsh-dev.dsh.np.aws.kpn.com"
-viewer-url = "https://console.dsh-dev.dsh.np.aws.kpn.com/#/profiles/${TENANT}/services"
+metrics-url = "${MONITORING_URL}"
+viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
 
 [inbound-junctions.inbound-kafka-topic]
+label = "Source topics"
+description = "Kafka topic that the consent filter application will consume from. This topic must use strings for its record keys."
+number-of-resources = { fixed = 1 }
 allowed-resource-types = ["dsh-topic"]
-caption = "Source topics"
-description = "Kafka topic that the consent filter application will consume from. This topic must have strings for its keys."
 
 [outbound-junctions.outbound-kafka-topic]
-allowed-resource-types = ["dsh-topic"]
-caption = "Sink topics"
+label = "Sink topics"
 description = "Kafka topic that the consent filter application will produce to."
+number-of-resources = { fixed = 1 }
+allowed-resource-types = ["dsh-topic"]
 
-[deploy]
-[deploy.parameters]
-compliancy-agent = { type = "selection", caption = "Consent type", options = ["blacklist", "classification", "whitelist"] }
-enable-dsh-envelope = { type = "boolean", caption = "Enable DSH envelope", optional = true, default = "false" }
-identifier-picker-regex = { type = "free-text", caption = "Regular expression" }
-identifier-picker-source-system = { type = "selection", caption = "Identifier source system", options = ["boss", "siebelcm"] }
-mitigation-strategy = { type = "selection", caption = "Mitigation strategy", options = ["anonymize", "block", "clip"] }
+[[deploy.parameters]]
+type = "selection"
+id = "compliancy-agent"
+label = "Consent type"
+description = "Selects the consent filtering rules that will be applied."
+options = [{ id = "blacklist", label = "Not on blacklist", description = "Pass record when customer id is not on the blacklist" }, { id = "classification", label = "Classification engine", description = "Apply Greenbox classification engine" }, { id = "whitelist", label = "On whitelist", description = "Pass record when customer id on the whitelist with consent" }]
+
+[[deploy.parameters]]
+type = "boolean"
+id = "enable-dsh-envelope"
+label = "Enable DSH envelope"
+description = "Must be enabled when the topic records are wrapped in a DSH envelope (stream topics). Else, this must be disabled."
+optional = true
+default = "false"
+
+[[deploy.parameters]]
+type = "free-text"
+id = "identifier-picker-regex"
+label = "Regular expression"
+description = "Regular expression used to pick the customer identifier from the record key string."
+
+[[deploy.parameters]]
+type = "selection"
+id = "identifier-picker-source-system"
+label = "Identifier source system"
+description = "Source system for the customer identifiers."
+options = [{ id = "boss", label = "Boss", description = "BSS system for Mobile" }, { id = "siebelcm", label = "Siebel CM", description = "BSS system for Fixed" }]
+
+[[deploy.parameters]]
+type = "selection"
+id = "mitigation-strategy"
+label = "Mitigation strategy"
+description = "Mitigation strategy to be applied to records for customers that gave no consent."
+options = ["anonymize", "block", "clip"]
 
 [application]
 
@@ -34,15 +64,17 @@ single-instance = false
 name = "greenbox_backend_password"
 injections = [{ env = "GREENBOX_BACKEND_PASSWORD" }]
 
+# TODO Solution for group id
+
 [application.environment-variables]
-COMPLIANCY_AGENT = { type = "deployment-parameter", key = "compliancy-agent" }
-CONSUMER_TOPIC = { type = "inbound-junction", key = "inbound-kafka-topic" }
-GREENBOX_DSH_ENVELOPE_ENABLE = { type = "deployment-parameter", key = "enable-dsh-envelope" }
-KEY_IDENTIFIER_PICKER_REGEX = { type = "deployment-parameter", key = "identifier-picker-regex" }
-KEY_IDENTIFIER_PICKER_SOURCE_SYSTEM = { type = "deployment-parameter", key = "identifier-picker-source-system" }
-MITIGATION_STRATEGY = { type = "deployment-parameter", key = "mitigation-strategy" }
-PRODUCER_TOPIC = { type = "outbound-junction", key = "outbound-kafka-topic" }
-CONSUMER_GROUP_ID = { type = "template", value = "${TENANT}_grpid" }
+COMPLIANCY_AGENT = { type = "deployment-parameter", id = "compliancy-agent" }
+CONSUMER_TOPIC = { type = "inbound-junction", id = "inbound-kafka-topic" }
+GREENBOX_DSH_ENVELOPE_ENABLE = { type = "deployment-parameter", id = "enable-dsh-envelope" }
+KEY_IDENTIFIER_PICKER_REGEX = { type = "deployment-parameter", id = "identifier-picker-regex" }
+KEY_IDENTIFIER_PICKER_SOURCE_SYSTEM = { type = "deployment-parameter", id = "identifier-picker-source-system" }
+MITIGATION_STRATEGY = { type = "deployment-parameter", id = "mitigation-strategy" }
+PRODUCER_TOPIC = { type = "outbound-junction", id = "outbound-kafka-topic" }
+CONSUMER_GROUP_ID = { type = "template", value = "${TENANT}_${RANDOM}_grpid" }
 GREENBOX_BACKEND_HOST = { type = "template", value = "greenbox-backend-dev.dsh-dev.dsh.np.aws.kpn.com" }
 GREENBOX_BACKEND_USERNAME = { type = "template", value = "${TENANT}" }
 GREENBOX_CONSUMER_CONTEXT_DOMAIN = { type = "value", value = "retail" }
@@ -56,16 +88,18 @@ LOG_LEVEL_GREENBOX = { type = "value", value = "info" }
 CLASSIFICATION_IDENTIFIER = { type = "value", value = "org.kpn.greenbox.ri:ReferenceSchemaAvro:1.0.0" }
 GROUP_ID_PREFIX = { type = "template", value = "${TENANT}_" }
 
-[application.profiles.minimal]
+[[application.profiles]]
+id = "minimal"
+label = "Minimal"
+description = "Minimal profile for small amounts of data"
 cpus = 0.25
 instances = 1
 mem = 256
-profile-description = "Minimal profile for small amounts of data"
-profile-name = "minimal"
 
-[application.profiles.maximal]
+[[application.profiles]]
+id = "maximal"
+label = "Maximal"
+description = "Maximal profile for large amounts of data"
 cpus = 1
 instances = 2
 mem = 512
-profile-description = "Maximal profile for large amounts of data"
-profile-name = "maximal"

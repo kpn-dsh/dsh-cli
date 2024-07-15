@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::ErrorKind::NotFound;
@@ -10,15 +9,24 @@ use crate::resource::ResourceType;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct JunctionConfig {
-  pub caption: String,
+  pub label: String,
   pub description: String,
+  #[serde(rename = "number-of-resources")]
+  pub number_of_resources: NumberOfResources,
   #[serde(rename = "allowed-resource-types")]
   pub allowed_resource_types: Vec<ResourceType>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct NumberOfResources {
+  pub fixed: Option<u32>,
+  pub min: Option<u32>,
+  pub max: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct DeployConfig {
-  pub parameters: Option<HashMap<String, DeploymentParameterConfig>>,
+  pub parameters: Option<Vec<DeploymentParameterConfig>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -39,23 +47,60 @@ pub enum VariableType {
 pub struct VariableConfig {
   #[serde(rename = "type")]
   pub typ: VariableType,
-  pub key: Option<String>,
+  pub id: Option<String>,
   pub value: Option<String>,
 }
 
+const APP_DOMAIN: &str = "APP_DOMAIN";
+const CONSOLE_URL: &str = "CONSOLE_URL";
+const DSH_INTERNAL_DOMAIN: &str = "DSH_INTERNAL_DOMAIN";
+const INSTANCE: &str = "INSTANCE";
+const MONITORING_URL: &str = "MONITORING_URL";
+const PLATFORM: &str = "PLATFORM";
+const PUBLIC_VHOSTS_DOMAIN: &str = "PUBLIC_VHOSTS_DOMAIN";
+const RANDOM: &str = "RANDOM";
+const RANDOM_UUID: &str = "RANDOM_UUID";
+const REALM: &str = "REALM";
+const REST_ACCESS_TOKEN_URL: &str = "REST_ACCESS_TOKEN_URL";
+const REST_API_URL: &str = "REST_API_URL";
+const TENANT: &str = "TENANT";
+const USER: &str = "USER";
+
 #[derive(Eq, Hash, PartialEq)]
 pub enum PlaceHolder {
-  INSTANCE,
-  TENANT,
-  USER,
+  AppDomain,
+  ConsoleUrl,
+  DshInternalDomain,
+  Instance,
+  MonitoringUrl,
+  Platform,
+  PublicVhostsDomain,
+  Random,
+  RandomUuid,
+  Realm,
+  RestAccessTokenUrl,
+  RestApiUrl,
+  Tenant,
+  User,
 }
 
 impl Display for PlaceHolder {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
-      PlaceHolder::INSTANCE => write!(f, "INSTANCE"),
-      PlaceHolder::TENANT => write!(f, "TENANT"),
-      PlaceHolder::USER => write!(f, "USER"),
+      PlaceHolder::AppDomain => write!(f, "{}", APP_DOMAIN),
+      PlaceHolder::ConsoleUrl => write!(f, "{}", CONSOLE_URL),
+      PlaceHolder::DshInternalDomain => write!(f, "{}", DSH_INTERNAL_DOMAIN),
+      PlaceHolder::Instance => write!(f, "{}", INSTANCE),
+      PlaceHolder::MonitoringUrl => write!(f, "{}", MONITORING_URL),
+      PlaceHolder::Platform => write!(f, "{}", PLATFORM),
+      PlaceHolder::PublicVhostsDomain => write!(f, "{}", PUBLIC_VHOSTS_DOMAIN),
+      PlaceHolder::Random => write!(f, "{}", RANDOM),
+      PlaceHolder::RandomUuid => write!(f, "{}", RANDOM_UUID),
+      PlaceHolder::Realm => write!(f, "{}", REALM),
+      PlaceHolder::RestAccessTokenUrl => write!(f, "{}", REST_ACCESS_TOKEN_URL),
+      PlaceHolder::RestApiUrl => write!(f, "{}", REST_API_URL),
+      PlaceHolder::Tenant => write!(f, "{}", TENANT),
+      PlaceHolder::User => write!(f, "{}", USER),
     }
   }
 }
@@ -65,58 +110,67 @@ impl TryFrom<&str> for PlaceHolder {
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
-      "TENANT" => Ok(PlaceHolder::TENANT),
-      "USER" => Ok(PlaceHolder::USER),
+      APP_DOMAIN => Ok(PlaceHolder::AppDomain),
+      CONSOLE_URL => Ok(PlaceHolder::ConsoleUrl),
+      DSH_INTERNAL_DOMAIN => Ok(PlaceHolder::DshInternalDomain),
+      INSTANCE => Ok(PlaceHolder::Instance),
+      MONITORING_URL => Ok(PlaceHolder::MonitoringUrl),
+      PLATFORM => Ok(PlaceHolder::Platform),
+      PUBLIC_VHOSTS_DOMAIN => Ok(PlaceHolder::PublicVhostsDomain),
+      RANDOM => Ok(PlaceHolder::Random),
+      RANDOM_UUID => Ok(PlaceHolder::RandomUuid),
+      REALM => Ok(PlaceHolder::Realm),
+      REST_ACCESS_TOKEN_URL => Ok(PlaceHolder::RestAccessTokenUrl),
+      REST_API_URL => Ok(PlaceHolder::RestApiUrl),
+      TENANT => Ok(PlaceHolder::Tenant),
+      USER => Ok(PlaceHolder::User),
       unrecognized => Err(format!("unrecognized placeholder '{}'", unrecognized)),
     }
   }
 }
 
 impl VariableConfig {
-  pub fn validate(&self, attribute_name: &str) -> Result<(), String> {
+  pub fn validate(&self, attribute: &str) -> Result<(), String> {
     match &self.typ {
-      VariableType::InboundJunction => match &self.key {
-        Some(key) => {
-          if key.is_empty() {
-            Err(format!(
-              "variable '{}' referencing inbound junction requires a non-empty 'key' attribute",
-              attribute_name
-            ))
+      VariableType::InboundJunction => match &self.id {
+        Some(id) => {
+          if id.is_empty() {
+            Err(format!("variable '{}' referencing inbound junction requires a non-empty 'id' attribute", attribute))
           } else {
             Ok(())
           }
         }
-        None => Err(format!("variable '{}' referencing inbound junction requires a 'key' attribute", attribute_name)),
+        None => Err(format!("variable '{}' referencing inbound junction requires a 'id' attribute", attribute)),
       },
-      VariableType::OutboundJunction => match &self.key {
-        Some(key) => {
-          if key.is_empty() {
+      VariableType::OutboundJunction => match &self.id {
+        Some(id) => {
+          if id.is_empty() {
             Err(format!(
-              "variable '{}' referencing outbound junction requires a non-empty 'key' attribute",
-              attribute_name
+              "variable '{}' referencing outbound junction requires a non-empty 'id' attribute",
+              attribute
             ))
           } else {
             Ok(())
           }
         }
-        None => Err(format!("variable '{}' referencing outbound junction requires a 'key' attribute", attribute_name)),
+        None => Err(format!("variable '{}' referencing outbound junction requires a 'id' attribute", attribute)),
       },
-      VariableType::DeploymentParameter => match &self.key {
-        Some(key) => {
-          if key.is_empty() {
+      VariableType::DeploymentParameter => match &self.id {
+        Some(id) => {
+          if id.is_empty() {
             Err(format!(
-              "variable '{}' referencing deployment parameter requires a non-empty 'key' attribute",
-              attribute_name
+              "variable '{}' referencing deployment parameter requires a non-empty 'id' attribute",
+              attribute
             ))
           } else {
             Ok(())
           }
         }
-        None => Err(format!("variable '{}' referencing deployment parameter requires a 'key' attribute", attribute_name)),
+        None => Err(format!("variable '{}' referencing deployment parameter requires a 'id' attribute", attribute)),
       },
       VariableType::Template | VariableType::Value => match &self.value {
         Some(_) => Ok(()),
-        None => Err(format!("variable '{}' requires a 'value' attribute", attribute_name)),
+        None => Err(format!("variable '{}' requires a 'value' attribute", attribute)),
       },
     }
   }
@@ -126,36 +180,83 @@ impl VariableConfig {
 pub struct DeploymentParameterConfig {
   #[serde(rename = "type")]
   pub typ: DeploymentParameterType,
-  pub description: Option<String>,
-  pub caption: String,
+  pub id: String,
+  pub label: String,
+  pub description: String,
   #[serde(rename = "initial-value")]
   pub initial_value: Option<String>,
-  pub options: Option<Vec<String>>,
+  pub options: Option<Vec<DeploymentParameterConfigOption>>,
   pub optional: Option<bool>,
   pub default: Option<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum DeploymentParameterConfigOption {
+  Label(DeploymentParameterConfigOptionLabel),
+  Id(String),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct DeploymentParameterConfigOptionLabel {
+  pub id: String,
+  pub label: String,
+  pub description: Option<String>,
+}
+
+impl Display for &DeploymentParameterConfigOption {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      DeploymentParameterConfigOption::Label(label) => match label.description {
+        Some(ref description) => write!(f, "{}, {} ({})", label.id, label.label, description),
+        None => write!(f, "{}, {}", label.id, label.label),
+      },
+      DeploymentParameterConfigOption::Id(id) => write!(f, "{}", id),
+    }
+  }
+}
+
 impl DeploymentParameterConfig {
   // TODO More validation?
-  pub fn validate(&self, parameter_name: &str) -> Result<(), String> {
-    if self.caption.is_empty() {
-      return Err(format!("empty caption for parameter '{}'", parameter_name));
+  pub fn validate(&self, parameter: &str) -> Result<(), String> {
+    if self.label.is_empty() {
+      return Err(format!("empty label for parameter '{}'", parameter));
     }
     if let Some(opt) = &self.optional {
       if *opt && self.default.is_none() {
-        return Err(format!("optional parameter '{}' requires default value", parameter_name));
+        return Err(format!("optional parameter '{}' requires default value", parameter));
       }
     }
     match self.typ {
       DeploymentParameterType::Selection => match &self.options {
         Some(opts) => {
           if opts.is_empty() {
-            Err(format!("empty options list for parameter '{}'", parameter_name))
+            Err(format!("empty options list for parameter '{}'", parameter))
           } else {
+            for opt in opts {
+              match opt {
+                DeploymentParameterConfigOption::Label(ref label) => {
+                  if label.id.is_empty() {
+                    return Err(format!("empty id for parameter '{}'", parameter));
+                  }
+                  if label.label.is_empty() {
+                    return Err(format!("empty label for parameter '{}.{}'", parameter, label.id));
+                  }
+                  if label.description.clone().is_some_and(|description| description.is_empty()) {
+                    return Err(format!("empty description for parameter '{}.{}'", parameter, label.id));
+                  }
+                }
+                DeploymentParameterConfigOption::Id(id) => {
+                  if id.is_empty() {
+                    return Err(format!("empty id for parameter '{}'", parameter));
+                  }
+                }
+              }
+            }
             Ok(())
           }
         }
-        None => Err(format!("missing options attribute for parameter '{}'", parameter_name)),
+        None => Err(format!("missing options attribute for parameter '{}'", parameter)),
       },
       _ => Ok(()),
     }
@@ -164,11 +265,17 @@ impl DeploymentParameterConfig {
 
 impl Display for DeploymentParameterConfig {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}, {}", &self.caption, &self.typ)?;
+    write!(f, "{}, {}", &self.label, &self.typ)?;
     match &self.typ {
       DeploymentParameterType::Boolean => {}
       DeploymentParameterType::FreeText => {}
-      DeploymentParameterType::Selection => write!(f, ", [{}]", &self.options.as_ref().unwrap().join(", "))?,
+      DeploymentParameterType::Selection => {
+        let s = match self.options {
+          Some(ref opts) => opts.iter().map(|o| o.to_string()).collect::<Vec<String>>().join(", "),
+          None => unreachable!(),
+        };
+        write!(f, ", [{}]", s)?
+      }
     }
     if self.optional.is_some_and(|o| o) {
       match &self.default {
