@@ -2,9 +2,6 @@
 
 ### Environment variables
 
-In order to use the default token fetcher (which is also used in the examples in the
-`engine/src/bin` directory), some environment variables must be set:
-
 <table>
     <tr align="top">
         <th align="left">variable</th>
@@ -12,8 +9,16 @@ In order to use the default token fetcher (which is also used in the examples in
         <th align="left">example</th>
     </tr>
     <tr align="top">
+        <td align="top"><code>TRIFONIUS_CONFIG_DIR</code></td>
+        <td>Set the location of the configuration files directory. Defaults to the current working 
+            directory.
+        </td>
+        <td align="top">empty</td>
+    </tr>
+    <tr align="top">
         <td align="top"><code>TRIFONIUS_TARGET_PLATFORM</code></td>
         <td>
+            Target platform on which the tenant's environment lives.
             <ul>
                 <li><code>nplz</code>Non production landing zone</li>
                 <li><code>poc</code>Proof of concept platform</li>
@@ -26,7 +31,7 @@ In order to use the default token fetcher (which is also used in the examples in
     </tr>
     <tr align="top">
         <td><code>TRIFONIUS_TARGET_TENANT</code></td>
-        <td>Tenant name for the target tenant. The target tenant is the tenant whose resources 
+        <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
             will be managed by Trifonius.</td>
         <td><code>greenbox-dev</code></td>
     </tr>
