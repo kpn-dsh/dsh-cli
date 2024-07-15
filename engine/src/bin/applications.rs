@@ -1,5 +1,5 @@
-use trifonius_engine::application::application_registry::ApplicationRegistry;
-use trifonius_engine::DEFAULT_TARGET_CLIENT_FACTOR;
+use trifonius_engine::processor::application::application_registry::ApplicationRegistry;
+use trifonius_engine::processor::application::DEFAULT_TARGET_CLIENT_FACTOR;
 
 #[tokio::main]
 async fn main() {

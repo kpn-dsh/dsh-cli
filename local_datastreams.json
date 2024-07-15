@@ -1,0 +1,45 @@
+{
+  "brokers": [
+    "broker-0.tt.kafka.mesos:9091",
+    "broker-1.tt.kafka.mesos:9091",
+    "broker-2.tt.kafka.mesos:9091"
+  ],
+  "streams": {
+    "scratch.pinto-502-onboarding": {
+      "name": "scratch.pinto-502-onboarding",
+      "cluster": "/tt",
+      "read": "scratch.pinto-502-onboarding.greenbox-dev",
+      "write": "scratch.pinto-502-onboarding.greenbox-dev",
+      "partitions": 3,
+      "replication": 1,
+      "partitioner": "default-partitioner",
+      "partitioningDepth": 0,
+      "canRetain": false
+    },
+    "stream.reference-implementation": {
+      "name": "stream.reference-implementation",
+      "cluster": "/tt",
+      "read": "stream\\.reference-implementation\\.[^.]*",
+      "write": "stream.reference-implementation.greenbox-dev",
+      "partitions": 1,
+      "replication": 1,
+      "partitioner": "default-partitioner",
+      "partitioningDepth": 0,
+      "canRetain": false
+    }
+  },
+  "private_consumer_groups": [
+    "greenbox-dev_wilbert-producer.7e93a513-6556-11eb-841e-f6ab8576620c_1",
+    "greenbox-dev_wilbert-producer.7e93a513-6556-11eb-841e-f6ab8576620c_2",
+    "greenbox-dev_wilbert-producer.7e93a513-6556-11eb-841e-f6ab8576620c_3",
+    "greenbox-dev_wilbert-producer.7e93a513-6556-11eb-841e-f6ab8576620c_4"
+  ],
+  "shared_consumer_groups": [
+    "greenbox-dev_wilbert-producer_1",
+    "greenbox-dev_wilbert-producer_2",
+    "greenbox-dev_wilbert-producer_3",
+    "greenbox-dev_wilbert-producer_4"
+  ],
+  "non_enveloped_streams": [],
+  "schema_store": "SCHEMA_STORE"
+}
