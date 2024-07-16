@@ -222,11 +222,6 @@ impl DeploymentParameterConfig {
     if self.label.is_empty() {
       return Err(format!("empty label for parameter '{}'", parameter));
     }
-    if let Some(opt) = &self.optional {
-      if *opt && self.default.is_none() {
-        return Err(format!("optional parameter '{}' requires default value", parameter));
-      }
-    }
     match self.typ {
       DeploymentParameterType::Selection => match &self.options {
         Some(opts) => {

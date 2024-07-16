@@ -57,12 +57,11 @@ pub struct DeploymentParameterDescriptor {
   pub id: String,
   pub label: String,
   pub description: String,
+  pub optional: bool,
   #[serde(rename = "initial-value", skip_serializing_if = "Option::is_none")]
   pub initial_value: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub options: Option<Vec<DeploymentParameterOptionDescriptor>>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub optional: Option<bool>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default: Option<String>,
 }
@@ -130,7 +129,7 @@ impl From<(String, &DeploymentParameterConfig)> for DeploymentParameterDescripto
         .options
         .as_ref()
         .map(|opts| opts.iter().map(DeploymentParameterOptionDescriptor::from).collect()),
-      optional: config.optional,
+      optional: config.optional.unwrap_or(false),
       default: config.default.clone(),
     }
   }
@@ -219,9 +218,7 @@ impl Display for DeploymentParameterDescriptor {
     if let Some(options) = &self.options {
       write!(f, ", options: [{}]", options.iter().map(|opt| opt.to_string()).collect::<Vec<String>>().join(","))?;
     }
-    if let Some(optional) = &self.optional {
-      write!(f, ", optional: {}", optional)?;
-    }
+    write!(f, ", optional: {}", &self.optional)?;
     if let Some(default) = &self.default {
       write!(f, ", default: {}", default)?;
     }
