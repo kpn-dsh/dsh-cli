@@ -4,14 +4,13 @@ use dsh_rest_api_client::types::{
   Application as ApiApplication, ApplicationSecret as ApiApplicationSecret, ApplicationVolumes as ApiApplicationVolumes, HealthCheck as ApiHealthCheck,
   HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
 };
-use lazy_static::lazy_static;
-use regex::Regex;
 
 use crate::processor::application::application_config::{
   ApplicationConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
+use crate::processor::application::{template_resolver, TemplateMapping};
 use crate::processor::processor::ProcessorDeployParameters;
-use crate::processor::processor_config::{PlaceHolder, VariableType};
+use crate::processor::processor_config::VariableType;
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
   fn from(value: ApiHealthCheck) -> Self {
@@ -218,57 +217,4 @@ pub fn into_api_application(
     writable_streams: vec![],
   };
   Ok(api_application)
-}
-
-pub type TemplateMapping = HashMap<PlaceHolder, String>;
-
-lazy_static! {
-  static ref TEMPLATE_REGEX: Regex = Regex::new("\\$\\{([A-Z][A-Z0-9_]*)\\}").unwrap();
-}
-
-pub(crate) fn template_resolver(template: &str, template_mapping: &TemplateMapping) -> Result<String, String> {
-  let mut new = String::with_capacity(template.len());
-  let mut last_match = 0;
-  for caps in TEMPLATE_REGEX.captures_iter(template) {
-    let m = caps.get(0).unwrap();
-    new.push_str(&template[last_match..m.start()]);
-    let place_holder = PlaceHolder::try_from(caps.get(1).unwrap().as_str())?;
-    match template_mapping.get(&place_holder) {
-      Some(value) => {
-        new.push_str(value);
-      }
-      None => return Err(format!("template resolution failed because placeholder '{}' has no value", place_holder)),
-    }
-    last_match = m.end();
-  }
-  new.push_str(&template[last_match..]);
-  Ok(new)
-}
-
-pub(crate) fn validate_template(template: &str, template_mapping: &[PlaceHolder]) -> Result<(), String> {
-  for caps in TEMPLATE_REGEX.captures_iter(template) {
-    let place_holder = PlaceHolder::try_from(caps.get(1).unwrap().as_str())?;
-    if !template_mapping.contains(&place_holder) {
-      return Err(format!("invalid template because placeholder '{}' is not allowed", place_holder));
-    }
-  }
-  Ok(())
-}
-
-#[test]
-fn resolve_template_successfully() {
-  let template = "abcd${TENANT}def${USER}ghi";
-  let tenant = "tenant";
-  let user = "user";
-  let template_mapping: TemplateMapping = HashMap::from([(PlaceHolder::Tenant, tenant.to_string()), (PlaceHolder::User, user.to_string())]);
-  assert_eq!(template_resolver(template, &template_mapping).unwrap(), "abcdtenantdefuserghi");
-}
-
-#[test]
-fn validate_template_succesfully() {
-  assert!(validate_template("abcd${TENANT}def${USER}ghi", &[PlaceHolder::Tenant, PlaceHolder::User]).is_ok());
-  assert!(validate_template("abcd${TENANT}def${USER}ghi", &[PlaceHolder::Tenant]).is_err());
-  assert!(validate_template("abcd{TENANT}def{USER}ghi", &[PlaceHolder::Tenant]).is_ok());
-  assert!(validate_template("abcdefghijkl", &[PlaceHolder::Tenant]).is_ok());
-  assert!(validate_template("", &[PlaceHolder::Tenant]).is_ok());
 }

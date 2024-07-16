@@ -5,8 +5,8 @@ use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::error;
 
 use crate::processor::application::application_config::{ApplicationConfig, ProfileConfig};
-use crate::processor::application::dsh_api::{into_api_application, TemplateMapping};
-use crate::processor::application::TargetClientFactory;
+use crate::processor::application::dsh_api::into_api_application;
+use crate::processor::application::{TargetClientFactory, TemplateMapping};
 use crate::processor::processor::{Processor, ProcessorDeployParameters, ProcessorIdentifier, ProcessorStatus};
 use crate::processor::processor_config::PlaceHolder;
 use crate::processor::processor_descriptor::ProcessorDescriptor;

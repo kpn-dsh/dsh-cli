@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use log::debug;
 use serde::Deserialize;
 
-use crate::processor::application::dsh_api::{template_resolver, validate_template, TemplateMapping};
+use crate::processor::application::{template_resolver, validate_template, TemplateMapping};
 use crate::processor::processor_config::{read_config, DeployConfig, JunctionConfig, PlaceHolder, VariableConfig, VariableType};
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::ProcessorType;
