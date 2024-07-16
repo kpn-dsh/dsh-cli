@@ -22,16 +22,16 @@ impl Display for ProcessorIdentifier {
 
 #[async_trait]
 pub trait Processor {
-  async fn deploy(&self, instance_id: &str, parameters: &ProcessorDeployParameters) -> Result<(), String>;
+  async fn deploy(&self, service_id: &str, parameters: &ProcessorDeployParameters) -> Result<(), String>;
   fn descriptor(&self) -> &ProcessorDescriptor;
   fn id(&self) -> &str;
   fn identifier(&self) -> &ProcessorIdentifier;
   fn label(&self) -> &str;
   fn processor_type(&self) -> ProcessorType;
-  async fn start(&self, instance_id: &str) -> Result<String, String>;
-  async fn status(&self, instance_id: &str) -> Result<ProcessorStatus, String>;
-  async fn stop(&self, instance_id: &str) -> Result<String, String>;
-  async fn undeploy(&self, instance_id: &str) -> Result<(), String>;
+  async fn start(&self, service_id: &str) -> Result<String, String>;
+  async fn status(&self, service_id: &str) -> Result<ProcessorStatus, String>;
+  async fn stop(&self, service_id: &str) -> Result<String, String>;
+  async fn undeploy(&self, service_id: &str) -> Result<(), String>;
 }
 
 pub struct ProcessorDeployParameters<'a> {

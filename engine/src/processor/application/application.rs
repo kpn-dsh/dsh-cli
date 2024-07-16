@@ -33,7 +33,7 @@ impl<'a> ApplicationImpl<'a> {
 
 #[async_trait]
 impl Processor for ApplicationImpl<'_> {
-  async fn deploy(&self, instance_id: &str, parameters: &ProcessorDeployParameters) -> Result<(), String> {
+  async fn deploy(&self, service_id: &str, parameters: &ProcessorDeployParameters) -> Result<(), String> {
     let profile: ProfileConfig = match parameters.profile_id {
       Some(pn) => match self.config.application.profiles.iter().find(|p| p.id == pn) {
         Some(p) => p.clone(),
@@ -51,11 +51,11 @@ impl Processor for ApplicationImpl<'_> {
     };
     let target_client = self.target_client_factory.get().await?;
     let mut template_mapping: TemplateMapping = TemplateMapping::from(self.target_client_factory);
-    template_mapping.insert(PlaceHolder::Instance, instance_id.to_string());
+    template_mapping.insert(PlaceHolder::ServiceId, service_id.to_string());
     let api_application = into_api_application(&self.config, parameters, &profile, target_client.user.clone(), &template_mapping)?;
     match target_client
       .client
-      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, instance_id, &target_client.token, &api_application)
+      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_id, &target_client.token, &api_application)
       .await
     {
       Ok(_) => Ok(()),
@@ -83,15 +83,15 @@ impl Processor for ApplicationImpl<'_> {
     ProcessorType::Application
   }
 
-  async fn start(&self, _instance_id: &str) -> Result<String, String> {
+  async fn start(&self, _service_id: &str) -> Result<String, String> {
     Err("start method not yet implemented".to_string())
   }
 
-  async fn status(&self, instance_id: &str) -> Result<ProcessorStatus, String> {
+  async fn status(&self, service_id: &str) -> Result<ProcessorStatus, String> {
     let target_client = self.target_client_factory.get().await?;
     match target_client
       .client
-      .application_get_by_tenant_application_by_appid_status(target_client.tenant, instance_id, &target_client.token)
+      .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_id, &target_client.token)
       .await
     {
       Ok(r) => {
@@ -116,15 +116,15 @@ impl Processor for ApplicationImpl<'_> {
     }
   }
 
-  async fn stop(&self, _instance_id: &str) -> Result<String, String> {
+  async fn stop(&self, _service_id: &str) -> Result<String, String> {
     Err("stop method not yet implemented".to_string())
   }
 
-  async fn undeploy(&self, instance_id: &str) -> Result<(), String> {
+  async fn undeploy(&self, service_id: &str) -> Result<(), String> {
     let target_client = self.target_client_factory.get().await?;
     match target_client
       .client
-      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, instance_id, &target_client.token)
+      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_id, &target_client.token)
       .await
     {
       Ok(_) => Ok(()),

@@ -4,7 +4,7 @@ use trifonius_engine::processor::application::application_registry::ApplicationR
 use trifonius_engine::processor::application::DEFAULT_TARGET_CLIENT_FACTOR;
 use trifonius_engine::processor::processor::ProcessorDeployParameters;
 
-const INSTANCE_ID: &str = "test-0-0-2";
+const SERVICE_ID: &str = "test-0-0-2";
 
 #[tokio::main]
 async fn main() {
@@ -25,5 +25,5 @@ async fn main() {
     ]),
     profile_id: Some("minimal"),
   };
-  let _ = application.deploy(INSTANCE_ID, &deploy_parameters).await;
+  let _ = application.deploy(SERVICE_ID, &deploy_parameters).await;
 }
