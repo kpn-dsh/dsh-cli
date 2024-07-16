@@ -7,6 +7,7 @@ use async_trait::async_trait;
 
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::ProcessorType;
+use crate::resource::resource::Resource;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct ProcessorIdentifier {
@@ -22,7 +23,14 @@ impl Display for ProcessorIdentifier {
 
 #[async_trait]
 pub trait Processor {
-  async fn deploy(&self, service_id: &str, parameters: &ProcessorDeployParameters) -> Result<(), String>;
+  async fn deploy(
+    &self,
+    service_id: &str,
+    inbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
+    outbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
+    parameters: &HashMap<String, String>,
+    profile_id: Option<&str>,
+  ) -> Result<(), String>;
   fn descriptor(&self) -> &ProcessorDescriptor;
   fn id(&self) -> &str;
   fn identifier(&self) -> &ProcessorIdentifier;
@@ -32,13 +40,6 @@ pub trait Processor {
   async fn status(&self, service_id: &str) -> Result<ProcessorStatus, String>;
   async fn stop(&self, service_id: &str) -> Result<String, String>;
   async fn undeploy(&self, service_id: &str) -> Result<(), String>;
-}
-
-pub struct ProcessorDeployParameters<'a> {
-  pub inbound_junctions: &'a HashMap<String, String>,
-  pub outbound_junctions: &'a HashMap<String, String>,
-  pub parameters: &'a HashMap<String, String>,
-  pub profile_id: Option<&'a str>,
 }
 
 #[derive(Debug)]

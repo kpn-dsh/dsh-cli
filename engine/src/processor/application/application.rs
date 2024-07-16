@@ -3,14 +3,17 @@
 use async_trait::async_trait;
 use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::error;
+use std::collections::HashMap;
 
 use crate::processor::application::application_config::{ApplicationConfig, ProfileConfig};
 use crate::processor::application::dsh_api::into_api_application;
 use crate::processor::application::{TargetClientFactory, TemplateMapping};
-use crate::processor::processor::{Processor, ProcessorDeployParameters, ProcessorIdentifier, ProcessorStatus};
+use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
 use crate::processor::processor_config::PlaceHolder;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::ProcessorType;
+use crate::resource::resource::Resource;
+use crate::resource::ResourceType;
 
 pub struct ApplicationImpl<'a> {
   processor_identifier: ProcessorIdentifier,
@@ -33,11 +36,75 @@ impl<'a> ApplicationImpl<'a> {
 
 #[async_trait]
 impl Processor for ApplicationImpl<'_> {
-  async fn deploy(&self, service_id: &str, parameters: &ProcessorDeployParameters) -> Result<(), String> {
-    let profile: ProfileConfig = match parameters.profile_id {
+  async fn deploy(
+    &self,
+    service_id: &str,
+    inbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
+    outbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
+    deploy_parameters: &HashMap<String, String>,
+    profile_id: Option<&str>,
+  ) -> Result<(), String> {
+    let mut inbound_junction_topics = HashMap::<String, String>::new();
+    for junction_descriptor in &self.processor_descriptor.inbound_junctions {
+      match inbound_junctions.get(&junction_descriptor.id) {
+        Some(resource) => {
+          if resource.resource_type() != ResourceType::DshTopic {
+            return Err(format!(
+              "provided inbound junction resource '{}' has incorrect type '{}', expected '{}'",
+              junction_descriptor.id,
+              resource.resource_type(),
+              ResourceType::DshTopic
+            ));
+          }
+          match resource.descriptor().dsh_topic_descriptor {
+            Some(ref dsh_topic_descriptor) => _ = inbound_junction_topics.insert(junction_descriptor.id.to_string(), dsh_topic_descriptor.topic.to_string()),
+            None => unreachable!(),
+          }
+        }
+        None => return Err(format!("required inbound junction resource '{}' is not provided", junction_descriptor.id)),
+      }
+    }
+
+    let mut outbound_junction_topics = HashMap::<String, String>::new();
+    for junction_descriptor in &self.processor_descriptor.outbound_junctions {
+      match outbound_junctions.get(&junction_descriptor.id) {
+        Some(resource) => {
+          if resource.resource_type() != ResourceType::DshTopic {
+            return Err(format!(
+              "provided outbound junction resource '{}' has incorrect type '{}', expected '{}'",
+              junction_descriptor.id,
+              resource.resource_type(),
+              ResourceType::DshTopic
+            ));
+          }
+          match resource.descriptor().dsh_topic_descriptor {
+            Some(ref dsh_topic_descriptor) => _ = outbound_junction_topics.insert(junction_descriptor.id.to_string(), dsh_topic_descriptor.topic.to_string()),
+            None => unreachable!(),
+          }
+        }
+        None => return Err(format!("required outbound junction resource '{}' is not provided", junction_descriptor.id)),
+      }
+    }
+
+    let mut validated_parameters = HashMap::<String, String>::new();
+    for parameter_descriptor in &self.processor_descriptor.deployment_parameters {
+      match deploy_parameters.get(&parameter_descriptor.id) {
+        Some(deploy_parameter) => _ = validated_parameters.insert(parameter_descriptor.id.to_string(), deploy_parameter.to_string()),
+        None => match &parameter_descriptor.default {
+          Some(default) => _ = validated_parameters.insert(parameter_descriptor.id.to_string(), default.clone()),
+          None => {
+            if !parameter_descriptor.optional {
+              return Err(format!("required deployment parameter '{}' is not provided", parameter_descriptor.id));
+            }
+          }
+        },
+      }
+    }
+
+    let profile: ProfileConfig = match profile_id {
       Some(pn) => match self.config.application.profiles.iter().find(|p| p.id == pn) {
         Some(p) => p.clone(),
-        None => return Err(format!("profile {} is not defined", pn)),
+        None => return Err(format!("profile '{}' is not defined", pn)),
       },
       None => {
         if self.config.application.profiles.is_empty() {
@@ -52,7 +119,15 @@ impl Processor for ApplicationImpl<'_> {
     let target_client = self.target_client_factory.get().await?;
     let mut template_mapping: TemplateMapping = TemplateMapping::from(self.target_client_factory);
     template_mapping.insert(PlaceHolder::ServiceId, service_id.to_string());
-    let api_application = into_api_application(&self.config, parameters, &profile, target_client.user.clone(), &template_mapping)?;
+    let api_application = into_api_application(
+      &self.config,
+      &inbound_junction_topics,
+      &outbound_junction_topics,
+      &validated_parameters,
+      &profile,
+      target_client.user.clone(),
+      &template_mapping,
+    )?;
     match target_client
       .client
       .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_id, &target_client.token, &api_application)

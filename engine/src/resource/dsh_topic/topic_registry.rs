@@ -23,7 +23,7 @@ impl<'a> TopicRegistry<'a> {
     Ok(TopicRegistry { resources })
   }
 
-  pub fn resource_by_id(&self, id: &str) -> Option<&dyn Resource> {
+  pub fn resource_by_id(&self, id: &str) -> Option<&(dyn Resource + Sync)> {
     match self.resources.get(&resource_identifier(id.to_string())) {
       Some(a) => Some(a),
       None => None,

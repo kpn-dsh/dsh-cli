@@ -21,13 +21,13 @@ impl<'a> ResourceRegistry<'a> {
     Ok(ResourceRegistry { topic_registry: TopicRegistry::create(target_client_factory)? })
   }
 
-  pub fn resource(&self, resource_type: ResourceType, resource_id: &str) -> Option<&(dyn Resource)> {
+  pub fn resource(&self, resource_type: ResourceType, resource_id: &str) -> Option<&(dyn Resource + Sync)> {
     match resource_type {
       ResourceType::DshTopic => self.topic_registry.resource_by_id(resource_id),
     }
   }
 
-  pub fn resource_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Option<&(dyn Resource)> {
+  pub fn resource_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Option<&(dyn Resource + Sync)> {
     match resource_identifier.resource_type {
       ResourceType::DshTopic => self.topic_registry.resource_by_id(resource_identifier.id.as_str()),
     }
