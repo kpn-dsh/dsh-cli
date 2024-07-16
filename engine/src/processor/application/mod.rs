@@ -6,14 +6,14 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use uuid::Uuid;
 
-use crate::processor::application::converters::TemplateMapping;
+use crate::processor::application::dsh_api::TemplateMapping;
 use crate::processor::application::platform::DshPlatform;
 use crate::processor::processor_config::PlaceHolder;
 
 pub mod application;
 pub mod application_config;
 pub mod application_registry;
-pub mod converters;
+pub mod dsh_api;
 pub mod platform;
 
 const TRIFONIUS_CONFIG_DIR: &str = "TRIFONIUS_CONFIG_DIR";
