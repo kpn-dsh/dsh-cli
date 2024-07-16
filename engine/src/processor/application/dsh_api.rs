@@ -194,7 +194,7 @@ pub fn into_api_application(
       None => HashMap::new(),
     },
     health_check: application_config.application.health_check.as_ref().map(|hc| ApiHealthCheck::from(hc.clone())),
-    image: application_config.application.image.clone(),
+    image: template_resolver(application_config.application.image.as_str(), template_mapping)?,
     instances: profile.instances,
     mem: profile.mem,
     metrics: application_config.application.metrics.clone().map(|m| m.into()),
