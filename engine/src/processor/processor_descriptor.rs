@@ -69,10 +69,10 @@ pub struct DeploymentParameterDescriptor {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct DeploymentParameterOptionDescriptor {
-  id: String,
-  label: String,
+  pub id: String,
+  pub label: String,
   #[serde(skip_serializing_if = "Option::is_none")]
-  description: Option<String>,
+  pub description: Option<String>,
 }
 
 impl Display for DeploymentParameterOptionDescriptor {
