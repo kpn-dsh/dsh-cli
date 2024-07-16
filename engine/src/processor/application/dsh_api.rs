@@ -2,14 +2,13 @@ use std::collections::HashMap;
 
 use dsh_rest_api_client::types::{
   Application as ApiApplication, ApplicationSecret as ApiApplicationSecret, ApplicationVolumes as ApiApplicationVolumes, HealthCheck as ApiHealthCheck,
-  HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
+  HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec as ApiPathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
 };
 
 use crate::processor::application::application_config::{
   ApplicationConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
 use crate::processor::application::{template_resolver, TemplateMapping};
-use crate::processor::processor::ProcessorDeployParameters;
 use crate::processor::processor_config::VariableType;
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
@@ -88,7 +87,7 @@ impl From<PortMappingConfig> for ApiPortMapping {
     ApiPortMapping {
       auth: value.auth,
       mode: value.mode,
-      paths: value.paths.iter().map(|p| PathSpec { prefix: p.to_string() }).collect(),
+      paths: value.paths.iter().map(|p| ApiPathSpec { prefix: p.to_string() }).collect(),
       service_group: value.service_group,
       tls: value.tls.map(|t| t.into()),
       vhost: value.vhost,
@@ -114,7 +113,9 @@ impl From<SecretConfig> for ApiApplicationSecret {
 
 pub fn into_api_application(
   application_config: &ApplicationConfig,
-  deploy_parameters: &ProcessorDeployParameters,
+  inbound_junctions: &HashMap<String, String>,
+  outbound_junctions: &HashMap<String, String>,
+  parameters: &HashMap<String, String>,
   profile: &ProfileConfig,
   user: String,
   template_mapping: &TemplateMapping,
@@ -124,7 +125,7 @@ pub fn into_api_application(
     for (environment_variable, variable) in envs.clone() {
       match variable.typ {
         VariableType::InboundJunction => match variable.id {
-          Some(ref junction_id) => match deploy_parameters.inbound_junctions.get(junction_id) {
+          Some(ref junction_id) => match inbound_junctions.get(junction_id) {
             Some(parameter_value) => {
               environment_variables.insert(environment_variable, parameter_value.to_string());
             }
@@ -138,7 +139,7 @@ pub fn into_api_application(
           None => unreachable!(),
         },
         VariableType::OutboundJunction => match variable.id {
-          Some(ref junction_id) => match deploy_parameters.outbound_junctions.get(junction_id) {
+          Some(ref junction_id) => match outbound_junctions.get(junction_id) {
             Some(parameter_value) => {
               environment_variables.insert(environment_variable, parameter_value.to_string());
             }
@@ -152,7 +153,7 @@ pub fn into_api_application(
           None => unreachable!(),
         },
         VariableType::DeploymentParameter => match variable.id {
-          Some(ref deployment_parameter_id) => match deploy_parameters.parameters.get(deployment_parameter_id) {
+          Some(ref deployment_parameter_id) => match parameters.get(deployment_parameter_id) {
             Some(parameter_value) => {
               environment_variables.insert(environment_variable, parameter_value.clone());
             }
