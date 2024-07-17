@@ -1,0 +1,6 @@
+[registry]
+default = "artifactory"
+
+[registries.artifactory]
+index = "sparse+https://artifacts.kpn.org/artifactory/api/cargo/cargo-dsh-iuc-local/index/"
+

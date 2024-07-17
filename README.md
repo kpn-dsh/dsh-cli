@@ -64,3 +64,27 @@ async fn main() {
 }
 
 ```
+
+## How to publish to Artifactory
+
+On the KPN Artifactory we have a Cargo repository dedicated for [DSH-IUC](https://artifacts.kpn.org/ui/repos/tree/General/cargo-dsh-iuc-local).
+LDAP Group `dig_dsh_iuc` has write access to this repository and is allowed to publish artifacts.
+
+As in .cargo/config.toml, the default registry points towards [DSH-IUC](https://artifacts.kpn.org/ui/repos/tree/General/cargo-dsh-iuc-local), you can publish your crate by running:
+
+Login to Artifactory (one time):
+```bash
+make login
+```
+
+To publish all crates, run:
+
+```bash
+make publish
+```
+
+See make help for more options:
+
+```bash
+make help
+```
