@@ -16,13 +16,13 @@ metadata = [
 [inbound-junctions.inbound-topic]
 label = "Test inbound topic"
 description = "Test inbound topic description"
-number-of-resources = { fixed = 1 }
 allowed-resource-types = ["dsh-topic"]
 
 [outbound-junctions.outbound-topic]
 label = "Test outbound topic"
 description = "Test outbound topic description"
-number-of-resources = { min = 1, max = 2 }
+minimum-number-of-resources = 1
+maximum-number-of-resources = 2
 allowed-resource-types = ["dsh-topic"]
 
 [deploy]

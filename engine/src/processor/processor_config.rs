@@ -4,6 +4,7 @@ use std::io::ErrorKind::NotFound;
 
 use serde::Deserialize;
 
+use crate::is_valid_id;
 use crate::processor::DeploymentParameterType;
 use crate::resource::ResourceType;
 
@@ -11,17 +12,40 @@ use crate::resource::ResourceType;
 pub struct JunctionConfig {
   pub label: String,
   pub description: String,
-  #[serde(rename = "number-of-resources")]
-  pub number_of_resources: NumberOfResources,
+  #[serde(rename = "minimum-number-of-resources")]
+  pub minimum_number_of_resources: Option<u32>,
+  #[serde(rename = "maximum-number-of-resources")]
+  pub maximum_number_of_resources: Option<u32>,
   #[serde(rename = "allowed-resource-types")]
   pub allowed_resource_types: Vec<ResourceType>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct NumberOfResources {
-  pub fixed: Option<u32>,
-  pub min: Option<u32>,
-  pub max: Option<u32>,
+impl JunctionConfig {
+  pub fn validate(&self, id: &str) -> Result<(), String> {
+    if !is_valid_id(id) {
+      return Err(format!("junction '{}' has invalid identifier", id));
+    }
+    if self.label.is_empty() {
+      return Err(format!("junction '{}' has empty label", id));
+    }
+    if self.description.is_empty() {
+      return Err(format!("junction '{}' has empty description", id));
+    }
+    match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
+      (None, Some(max)) if max < 1 => return Err(format!("junction '{}' maximum number of resources must be 1 or greater", id)),
+      (Some(min), Some(max)) if min > max => {
+        return Err(format!(
+          "junction '{}' maximum number of resources must be greater or equal to the minimum number of resources ",
+          id
+        ))
+      }
+      _ => (),
+    }
+    if self.allowed_resource_types.is_empty() {
+      return Err(format!("junction '{}' has no allowed resource types", id));
+    }
+    Ok(())
+  }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -60,6 +84,7 @@ const PUBLIC_VHOSTS_DOMAIN: &str = "PUBLIC_VHOSTS_DOMAIN";
 const RANDOM: &str = "RANDOM";
 const RANDOM_UUID: &str = "RANDOM_UUID";
 const REALM: &str = "REALM";
+const _REGISTRY: &str = "REGISTRY"; // TODO
 const REST_ACCESS_TOKEN_URL: &str = "REST_ACCESS_TOKEN_URL";
 const REST_API_URL: &str = "REST_API_URL";
 const SERVICE_ID: &str = "SERVICE_ID";
@@ -219,6 +244,9 @@ impl Display for &DeploymentParameterConfigOption {
 impl DeploymentParameterConfig {
   // TODO More validation?
   pub fn validate(&self, parameter: &str) -> Result<(), String> {
+    if !is_valid_id(&self.id) {
+      return Err(format!("illegal parameter identifier '{}'", parameter));
+    }
     if self.label.is_empty() {
       return Err(format!("empty label for parameter '{}'", parameter));
     }

@@ -47,6 +47,11 @@ pub struct JunctionDescriptor {
   pub id: String,
   pub label: String,
   pub description: String,
+  #[serde(rename = "minimum_number-of-resources")]
+  pub minimum_number_of_resources: u32,
+  #[serde(rename = "maximum_number-of-resources")]
+  pub maximum_number_of_resources: u32,
+  #[serde(rename = "allowed_resource_types")]
   pub allowed_resource_types: Vec<ResourceType>,
 }
 
@@ -95,14 +100,27 @@ pub struct ProfileDescriptor {
 
 impl From<(String, JunctionConfig)> for JunctionDescriptor {
   fn from((id, config): (String, JunctionConfig)) -> Self {
-    JunctionDescriptor { id, label: config.label, description: config.description, allowed_resource_types: config.allowed_resource_types }
+    JunctionDescriptor::from((&id, &config))
   }
 }
 
 impl From<(&String, &JunctionConfig)> for JunctionDescriptor {
   fn from((id, config): (&String, &JunctionConfig)) -> Self {
     let c = config.clone();
-    JunctionDescriptor { id: id.to_owned(), label: c.label, description: c.description, allowed_resource_types: c.allowed_resource_types }
+    let (min, max) = match (config.minimum_number_of_resources, config.maximum_number_of_resources) {
+      (None, None) => (1, 1),
+      (None, Some(max)) => (1, max),
+      (Some(min), None) => (min, u32::MAX),
+      (Some(min), Some(max)) => (min, max),
+    };
+    JunctionDescriptor {
+      id: id.to_owned(),
+      label: c.label,
+      description: c.description,
+      minimum_number_of_resources: min,
+      maximum_number_of_resources: max,
+      allowed_resource_types: c.allowed_resource_types,
+    }
   }
 }
 
