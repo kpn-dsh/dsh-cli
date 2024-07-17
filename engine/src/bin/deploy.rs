@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use trifonius_engine::processor::application::DEFAULT_TARGET_CLIENT_FACTOR;
 use trifonius_engine::processor::processor_registry::ProcessorRegistry;
 use trifonius_engine::processor::ProcessorType;
@@ -10,7 +11,7 @@ const SERVICE_ID: &str = "test-0-0-2";
 #[tokio::main]
 async fn main() {
   let processor_registry = ProcessorRegistry::create(&DEFAULT_TARGET_CLIENT_FACTOR).unwrap();
-  let application = processor_registry.processor(ProcessorType::Application, "greenbox-consent-filter").unwrap();
+  let application = processor_registry.processor(ProcessorType::Application, "consentfilter").unwrap();
 
   let resource_registry = ResourceRegistry::create(&DEFAULT_TARGET_CLIENT_FACTOR).unwrap();
   let inbound_resource = resource_registry.resource(ResourceType::DshTopic, "stream.reference-implementation-3p").unwrap();
@@ -30,11 +31,11 @@ async fn main() {
   ]);
   let profile_id = Some("minimal");
 
-  for (_id, resource) in &inbound_junctions {
+  for resource in inbound_junctions.values() {
     println!("{}", resource.descriptor());
   }
 
-  for (_id, resource) in &outbound_junctions {
+  for resource in outbound_junctions.values() {
     println!("{}", resource.descriptor());
   }
 

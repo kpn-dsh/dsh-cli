@@ -7,7 +7,7 @@ const SERVICE_ID: &str = "test-0-0-2";
 async fn main() {
   env_logger::init();
   let registry = ApplicationRegistry::create(&DEFAULT_TARGET_CLIENT_FACTOR).unwrap();
-  let application = registry.application_by_id("greenbox-consent-filter").unwrap();
+  let application = registry.application_by_id("consentfilter").unwrap();
   let response = application.status(SERVICE_ID).await.unwrap();
   println!("response: {:#?}", response);
 }

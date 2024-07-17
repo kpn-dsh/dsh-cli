@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
+use lazy_static::lazy_static;
 use log::debug;
+use regex::Regex;
 use serde::Deserialize;
 
 use crate::processor::application::{template_resolver, validate_template, TemplateMapping};
@@ -225,6 +227,10 @@ fn validate_config_template(template: &str, template_id: &str) -> Result<(), Str
   validate_template(template, &VALID_PLACEHOLDERS).map_err(|m| format!("{} has {}", template_id, m))
 }
 
+lazy_static! {
+  static ref APPLICATION_ID_REGEX: Regex = Regex::new("^[a-z0-9]{1,20}$").unwrap();
+}
+
 pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConfig, String> {
   debug!("read application config file: {}", config_file_name);
   let config = read_config::<ApplicationConfig>(config_file_name)?;
@@ -232,8 +238,8 @@ pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConf
   if config.processor_type != ProcessorType::Application {
     return Err(format!("processor type '{}' doesn't match file type ('application')", config.processor_type));
   }
-  if config.application_id.is_empty() {
-    return Err("application name cannot be empty".to_string());
+  if !APPLICATION_ID_REGEX.is_match(&config.application_id) {
+    return Err("illegal application name (must be between 1 and 20 characters long and may contain only lowercase alphabetical characters and digits)".to_string());
   }
   if config.application_description.is_empty() {
     return Err("application description cannot be empty".to_string());

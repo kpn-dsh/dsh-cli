@@ -1,5 +1,5 @@
 type = "application"
-id = "greenbox-consent-filter"
+id = "consentfilter"
 label = "Greenbox ConsentFilter"
 description = "Record processor filters records based on customer consent"
 version = "0.2.7"
