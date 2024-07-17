@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
+use crate::is_valid_id;
 use lazy_static::lazy_static;
 use log::debug;
 use regex::Regex;
@@ -15,69 +16,47 @@ use crate::processor::ProcessorType;
 pub struct ApplicationConfig {
   #[serde(rename = "type")]
   pub processor_type: ProcessorType,
-
   #[serde(rename = "id")]
   pub application_id: String,
-
   #[serde(rename = "label")]
   pub application_label: String,
-
   #[serde(rename = "description")]
   pub application_description: String,
-
   #[serde(rename = "version")]
   pub application_version: Option<String>,
-
   pub metadata: Option<Vec<(String, String)>>,
-
   #[serde(rename = "more-info-url")]
   pub more_info_url: Option<String>,
-
   #[serde(rename = "metrics-url")]
   pub metrics_url: Option<String>,
-
   #[serde(rename = "viewer-url")]
   pub viewer_url: Option<String>,
-
   #[serde(rename = "inbound-junctions")]
   pub inbound_junctions: Option<HashMap<String, JunctionConfig>>,
-
   #[serde(rename = "outbound-junctions")]
   pub outbound_junctions: Option<HashMap<String, JunctionConfig>>,
-
   pub deploy: Option<DeployConfig>,
-
   pub application: ApplicationSpecificConfig,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ApplicationSpecificConfig {
   pub image: String,
-
   #[serde(rename = "needs-token")]
   pub needs_token: bool,
-
   #[serde(rename = "single-instance")]
   pub single_instance: bool,
-
   #[serde(rename = "spread-group")]
   pub spread_group: Option<String>,
-
   #[serde(rename = "exposed-ports")]
   pub exposed_ports: Option<HashMap<String, PortMappingConfig>>,
-
   #[serde(rename = "health-check")]
   pub health_check: Option<HealthCheckConfig>,
-
   pub metrics: Option<MetricsConfig>,
-
   pub secrets: Option<Vec<SecretConfig>>,
-
   pub volumes: Option<HashMap<String, String>>,
-
   #[serde(rename = "environment-variables")]
   pub environment_variables: Option<HashMap<String, VariableConfig>>,
-
   pub profiles: Vec<ProfileConfig>,
 }
 
@@ -142,8 +121,8 @@ pub struct ProfileConfig {
 
 impl ProfileConfig {
   pub fn validate(&self, id: &str) -> Result<(), String> {
-    if self.id.is_empty() {
-      return Err(format!("profile '{}' has empty id", id));
+    if !is_valid_id(&self.id) {
+      return Err(format!("profile has invalid identifier '{}'", id));
     }
     if self.label.is_empty() {
       return Err(format!("profile '{}' has empty label", id));
@@ -259,6 +238,16 @@ pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConf
   if let (Some(inbound), Some(outbound)) = (&config.inbound_junctions, &config.outbound_junctions) {
     if let Some(ambiguous_id) = inbound.keys().find(|id| outbound.contains_key(*id)) {
       return Err(format!("'{}' used as inbound as well as outbound id", ambiguous_id));
+    }
+  }
+  if let Some(inbound_junctions) = &config.inbound_junctions {
+    for (id, inbound_junction) in inbound_junctions {
+      inbound_junction.validate(id)?
+    }
+  }
+  if let Some(outbound_junctions) = &config.outbound_junctions {
+    for (id, outbound_junction) in outbound_junctions {
+      outbound_junction.validate(id)?
     }
   }
   if let Some(deploy_config) = &config.deploy {
