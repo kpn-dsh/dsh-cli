@@ -1,3 +1,6 @@
+//! # Defines the behavior of a Trifonius `Processor`
+//!
+
 #![allow(clippy::module_inception)]
 
 use std::collections::HashMap;
@@ -21,8 +24,21 @@ impl Display for ProcessorIdentifier {
   }
 }
 
+/// Defines the behavior of a Trifonius `Processor`
 #[async_trait]
 pub trait Processor {
+  /// # Deploy this `Processor`
+  ///
+  /// ## Parameters
+  /// * `service_id`         - Service id (name) of the deployed processor.
+  /// * `inbound_junctions`  - Map containing the inbound resources.
+  /// * `outbound_junctions` - Map containing the outbound resources.
+  /// * `parameters`         - Map containing the deployment parameters.
+  /// * `profile_id`         - Profile id.
+  ///
+  /// ## Returns
+  /// * `Ok<()>`   - when the deployment request was successfully sent.
+  /// * `Err(msg)` - when the deployment request could not be sent.
   async fn deploy(
     &self,
     service_id: &str,
@@ -31,14 +47,78 @@ pub trait Processor {
     parameters: &HashMap<String, String>,
     profile_id: Option<&str>,
   ) -> Result<(), String>;
+
+  /// # Get this `Processor`s descriptor
+  ///
+  /// ## Returns
+  /// * This `Processor`s descriptor.
   fn descriptor(&self) -> &ProcessorDescriptor;
+
+  /// # Get this `Processor`s id (name)
+  ///
+  /// ## Returns
+  /// * This `Processor`s id.
   fn id(&self) -> &str;
+
+  /// # Get this `Processor`s `ProcessorIdentifier`
+  ///
+  /// ## Returns
+  /// * This `Processor`s identifier.
   fn identifier(&self) -> &ProcessorIdentifier;
+
+  /// # Get this `Processor`s label
+  ///
+  /// A `Processor`s label should be used to present it to a user.
+  ///
+  /// ## Returns
+  /// * This `Processor`s label.
   fn label(&self) -> &str;
+
+  /// # Get this `Processor`s type
+  ///
+  /// ## Returns
+  /// * This `Processor`s type.
   fn processor_type(&self) -> ProcessorType;
+
+  /// # Start this `Processor`
+  ///
+  /// ## Parameters
+  /// * `service_id` - Service id (name) of the processor that should be undeployed.
+  ///
+  /// ## Returns
+  /// * `Ok<()>`   - when the start request was successfully sent.
+  /// * `Err(msg)` - when the start request could not be sent.
   async fn start(&self, service_id: &str) -> Result<String, String>;
+
+  /// # Get this `Processor`s status
+  ///
+  /// ## Parameters
+  /// * `service_id` - Service id (name) of the processor that should be stopped.
+  ///
+  /// ## Returns
+  /// * `Ok<ProcessorStatus>` - signals whether the processor with the given `service_id` is active
+  ///                           or not.
+  /// * `Err(msg)`            - when the status request could not be sent.
   async fn status(&self, service_id: &str) -> Result<ProcessorStatus, String>;
+
+  /// # Stop this `Processor`
+  ///
+  /// ## Parameters
+  /// * `service_id` - Service id (name) of the processor that should be stopped.
+  ///
+  /// ## Returns
+  /// * `Ok<()>`   - when the stop request was successfully sent.
+  /// * `Err(msg)` - when the stop request could not be sent.
   async fn stop(&self, service_id: &str) -> Result<String, String>;
+
+  /// # Undeploy this `Processor`
+  ///
+  /// ## Parameters
+  /// * `service_id` - Service id (name) of the processor that should be undeployed.
+  ///
+  /// ## Returns
+  /// * `Ok<()>`   - when the undeployment request was successfully sent.
+  /// * `Err(msg)` - when the undeployment request could not be sent.
   async fn undeploy(&self, service_id: &str) -> Result<(), String>;
 }
 
