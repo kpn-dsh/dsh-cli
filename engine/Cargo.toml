@@ -6,6 +6,8 @@ description.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 version.workspace = true
+publish.workspace = true
+
 
 [dependencies]
 dsh_rest_api_client = "0.1.0"

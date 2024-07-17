@@ -10,3 +10,4 @@ description = "Business logic for Trifonius project"
 edition = "2021"
 rust-version = "1.77"
 version = "0.0.4"
+publish = ["artifactory"]
