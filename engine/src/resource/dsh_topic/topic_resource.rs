@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use dsh_sdk::dsh::datastream::Stream;
 
 use crate::processor::application::TargetClientFactory;
-use crate::resource::dsh_topic::topic_registry::resource_identifier;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::{DshTopicDescriptor, ResourceDescriptor};
 use crate::resource::ResourceType;
@@ -56,7 +55,7 @@ impl<'a> TopicResourceImpl<'a> {
         cluster: stream.cluster().to_string(),
       }),
     };
-    Ok(TopicResourceImpl { resource_identifier: resource_identifier(stream.name().to_string()), resource_descriptor, target_client_factory })
+    Ok(TopicResourceImpl { resource_identifier: topic_resource_identifier(stream.name().to_string()), resource_descriptor, target_client_factory })
   }
 }
 
@@ -107,4 +106,8 @@ async fn get_topic_status(target_client_factory: &TargetClientFactory, topic_nam
     }
     Err(e) => Err(format!("dsh api error ({})", e)),
   }
+}
+
+pub fn topic_resource_identifier(id: String) -> ResourceIdentifier {
+  ResourceIdentifier { resource_type: ResourceType::DshTopic, id }
 }
