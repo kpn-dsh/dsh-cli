@@ -33,7 +33,7 @@ pub struct TargetClientFactory {
 }
 
 lazy_static! {
-  pub static ref DEFAULT_TARGET_CLIENT_FACTOR: TargetClientFactory = {
+  pub static ref DEFAULT_TARGET_CLIENT_FACTORY: TargetClientFactory = {
     let tenant_name = get_env(TRIFONIUS_TARGET_TENANT);
     let tenant_user = get_env(TRIFONIUS_TARGET_TENANT_USER);
     let client_secret = get_env(TRIFONIUS_TARGET_TENANT_SECRET);
