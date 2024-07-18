@@ -10,7 +10,7 @@ use async_trait::async_trait;
 
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::ProcessorType;
-use crate::resource::resource::Resource;
+use crate::resource::resource::ResourceIdentifier;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct ProcessorIdentifier {
@@ -42,8 +42,8 @@ pub trait Processor {
   async fn deploy(
     &self,
     service_id: &str,
-    inbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
-    outbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
+    inbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
+    outbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
     parameters: &HashMap<String, String>,
     profile_id: Option<&str>,
   ) -> Result<(), String>;
@@ -86,9 +86,10 @@ pub trait Processor {
   /// * `service_id` - Service id (name) of the processor that should be undeployed.
   ///
   /// ## Returns
-  /// * `Ok<()>`   - when the start request was successfully sent.
-  /// * `Err(msg)` - when the start request could not be sent.
-  async fn start(&self, service_id: &str) -> Result<String, String>;
+  /// * `Ok<true>`  - when the start request was successfully sent.
+  /// * `Ok<false>` - when no processor with `service_id` exists.
+  /// * `Err(msg)`  - when the start request could not be sent.
+  async fn start(&self, service_id: &str) -> Result<bool, String>;
 
   /// # Get this `Processor`s status
   ///
@@ -107,9 +108,10 @@ pub trait Processor {
   /// * `service_id` - Service id (name) of the processor that should be stopped.
   ///
   /// ## Returns
-  /// * `Ok<()>`   - when the stop request was successfully sent.
-  /// * `Err(msg)` - when the stop request could not be sent.
-  async fn stop(&self, service_id: &str) -> Result<String, String>;
+  /// * `Ok<true>`  - when the stop request was successfully sent.
+  /// * `Ok<false>` - when no processor with `service_id` exists.
+  /// * `Err(msg)`  - when the stop request could not be sent.
+  async fn stop(&self, service_id: &str) -> Result<bool, String>;
 
   /// # Undeploy this `Processor`
   ///
@@ -117,9 +119,10 @@ pub trait Processor {
   /// * `service_id` - Service id (name) of the processor that should be undeployed.
   ///
   /// ## Returns
-  /// * `Ok<()>`   - when the undeployment request was successfully sent.
-  /// * `Err(msg)` - when the undeployment request could not be sent.
-  async fn undeploy(&self, service_id: &str) -> Result<(), String>;
+  /// * `Ok<true>`  - when the undeployment request was successfully sent.
+  /// * `Ok<false>` - when no processor with `service_id` exists.
+  /// * `Err(msg)`  - when the undeployment request could not be sent.
+  async fn undeploy(&self, service_id: &str) -> Result<bool, String>;
 }
 
 #[derive(Debug)]

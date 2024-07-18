@@ -34,8 +34,10 @@ Initial release.
 
 #### New Features
 
+* Added validation to the config files.
 * Added validation to the deploy method.
 
 #### Bugfixes and Improvements
 
 * Updated some dependency versions.
+* Improved and refactored registries.
