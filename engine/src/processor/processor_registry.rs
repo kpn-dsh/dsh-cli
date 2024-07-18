@@ -1,24 +1,38 @@
+use lazy_static::lazy_static;
+
 use crate::processor::application::application_registry::ApplicationRegistry;
-use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTOR};
+use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 use crate::processor::processor::{Processor, ProcessorIdentifier};
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::ProcessorType;
+use crate::resource::resource_registry::{ResourceRegistry, DEFAULT_RESOURCE_REGISTRY};
+
+lazy_static! {
+  pub static ref DEFAULT_PROCESSOR_REGISTRY: ProcessorRegistry<'static> = ProcessorRegistry::default();
+}
 
 pub struct ProcessorRegistry<'a> {
   application_registry: ApplicationRegistry<'a>,
+  resource_registry: &'a ResourceRegistry<'a>,
 }
 
 impl Default for ProcessorRegistry<'_> {
   fn default() -> Self {
-    let target_client_factory = &DEFAULT_TARGET_CLIENT_FACTOR;
-    let application_registry = ApplicationRegistry::create(target_client_factory).expect("unable to create default application registry");
-    ProcessorRegistry { application_registry }
+    ProcessorRegistry::create(&DEFAULT_TARGET_CLIENT_FACTORY, &DEFAULT_RESOURCE_REGISTRY).expect("unable to create default processor registry")
   }
 }
 
 impl<'a> ProcessorRegistry<'a> {
-  pub fn create(target_client_factory: &'a TargetClientFactory) -> Result<ProcessorRegistry<'a>, String> {
-    Ok(ProcessorRegistry { application_registry: ApplicationRegistry::create(target_client_factory)? })
+  pub fn new() -> Self {
+    ProcessorRegistry::default()
+  }
+
+  pub fn create(target_client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<ProcessorRegistry<'a>, String> {
+    Ok(ProcessorRegistry { application_registry: ApplicationRegistry::create(target_client_factory, resource_registry)?, resource_registry })
+  }
+
+  pub fn resource_registry(&self) -> &ResourceRegistry {
+    self.resource_registry
   }
 
   pub fn processor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<&(dyn Processor)> {

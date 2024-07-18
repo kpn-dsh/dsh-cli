@@ -1,12 +1,9 @@
-use trifonius_engine::processor::application::application_registry::ApplicationRegistry;
-use trifonius_engine::processor::application::DEFAULT_TARGET_CLIENT_FACTOR;
+use trifonius_engine::processor::processor_registry::ProcessorRegistry;
+use trifonius_engine::processor::ProcessorType;
 
 #[tokio::main]
 async fn main() {
-  let registry = ApplicationRegistry::create(&DEFAULT_TARGET_CLIENT_FACTOR).unwrap();
-  let descriptors = registry.application_descriptors();
-  for descriptor in descriptors {
-    println!("{}", serde_json::to_string_pretty(&descriptor).unwrap());
-    // println!("{}", &descriptor);
-  }
+  let processor_registry = ProcessorRegistry::default();
+  let application_descriptors = processor_registry.processor_descriptors_by_type(ProcessorType::Application);
+  println!("{}", serde_json::to_string_pretty(&application_descriptors).unwrap());
 }
