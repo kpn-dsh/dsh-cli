@@ -1,18 +1,21 @@
 #![allow(clippy::module_inception)]
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::error;
-use std::collections::HashMap;
+use reqwest::StatusCode;
 
 use crate::processor::application::application_config::{ApplicationConfig, ProfileConfig};
 use crate::processor::application::dsh_api::into_api_application;
 use crate::processor::application::{TargetClientFactory, TemplateMapping};
 use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
 use crate::processor::processor_config::PlaceHolder;
-use crate::processor::processor_descriptor::ProcessorDescriptor;
+use crate::processor::processor_descriptor::{JunctionDescriptor, ProcessorDescriptor};
 use crate::processor::ProcessorType;
-use crate::resource::resource::Resource;
+use crate::resource::resource::ResourceIdentifier;
+use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::ResourceType;
 
 pub struct ApplicationImpl<'a> {
@@ -20,16 +23,18 @@ pub struct ApplicationImpl<'a> {
   processor_descriptor: ProcessorDescriptor,
   config: ApplicationConfig,
   target_client_factory: &'a TargetClientFactory,
+  resource_registry: &'a ResourceRegistry<'a>,
 }
 
 impl<'a> ApplicationImpl<'a> {
-  pub fn create(application_config: ApplicationConfig, client_factory: &'a TargetClientFactory) -> Result<Self, String> {
+  pub fn create(application_config: ApplicationConfig, client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
     let template_mapping = TemplateMapping::from(client_factory);
     Ok(ApplicationImpl {
       processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::Application, id: application_config.application_id.clone() },
       processor_descriptor: ProcessorDescriptor::from((&application_config, &template_mapping)),
       config: application_config,
       target_client_factory: client_factory,
+      resource_registry,
     })
   }
 }
@@ -39,53 +44,13 @@ impl Processor for ApplicationImpl<'_> {
   async fn deploy(
     &self,
     service_id: &str,
-    inbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
-    outbound_junctions: &HashMap<String, &(dyn Resource + Sync)>,
+    inbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
+    outbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<String, String>,
     profile_id: Option<&str>,
   ) -> Result<(), String> {
-    let mut inbound_junction_topics = HashMap::<String, String>::new();
-    for junction_descriptor in &self.processor_descriptor.inbound_junctions {
-      match inbound_junctions.get(&junction_descriptor.id) {
-        Some(resource) => {
-          if resource.resource_type() != ResourceType::DshTopic {
-            return Err(format!(
-              "provided inbound junction resource '{}' has incorrect type '{}', expected '{}'",
-              junction_descriptor.id,
-              resource.resource_type(),
-              ResourceType::DshTopic
-            ));
-          }
-          match resource.descriptor().dsh_topic_descriptor {
-            Some(ref dsh_topic_descriptor) => _ = inbound_junction_topics.insert(junction_descriptor.id.to_string(), dsh_topic_descriptor.topic.to_string()),
-            None => unreachable!(),
-          }
-        }
-        None => return Err(format!("required inbound junction resource '{}' is not provided", junction_descriptor.id)),
-      }
-    }
-
-    let mut outbound_junction_topics = HashMap::<String, String>::new();
-    for junction_descriptor in &self.processor_descriptor.outbound_junctions {
-      match outbound_junctions.get(&junction_descriptor.id) {
-        Some(resource) => {
-          if resource.resource_type() != ResourceType::DshTopic {
-            return Err(format!(
-              "provided outbound junction resource '{}' has incorrect type '{}', expected '{}'",
-              junction_descriptor.id,
-              resource.resource_type(),
-              ResourceType::DshTopic
-            ));
-          }
-          match resource.descriptor().dsh_topic_descriptor {
-            Some(ref dsh_topic_descriptor) => _ = outbound_junction_topics.insert(junction_descriptor.id.to_string(), dsh_topic_descriptor.topic.to_string()),
-            None => unreachable!(),
-          }
-        }
-        None => return Err(format!("required outbound junction resource '{}' is not provided", junction_descriptor.id)),
-      }
-    }
-
+    let inbound_junction_topics = self.junctions("in", inbound_junctions, &self.processor_descriptor.inbound_junctions)?;
+    let outbound_junction_topics = self.junctions("out", outbound_junctions, &self.processor_descriptor.outbound_junctions)?;
     let mut validated_parameters = HashMap::<String, String>::new();
     for parameter_descriptor in &self.processor_descriptor.deployment_parameters {
       match deploy_parameters.get(&parameter_descriptor.id) {
@@ -100,7 +65,6 @@ impl Processor for ApplicationImpl<'_> {
         },
       }
     }
-
     let profile: ProfileConfig = match profile_id {
       Some(pn) => match self.config.application.profiles.iter().find(|p| p.id == pn) {
         Some(p) => p.clone(),
@@ -133,8 +97,24 @@ impl Processor for ApplicationImpl<'_> {
       .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_id, &target_client.token, &api_application)
       .await
     {
-      Ok(_) => Ok(()),
-      Err(e) => Err(e.to_string()),
+      Ok(response) => {
+        response.status();
+        match response.status() {
+          StatusCode::ACCEPTED => Ok(()),
+          unexpected => {
+            error!("unexpected response code {}: {:?}", unexpected, response);
+            Ok(())
+          }
+        }
+      }
+      Err(UnexpectedResponse(response)) => {
+        error!("unexpected response on get status request: {:?}", response);
+        Err("unexpected response on status request".to_string())
+      }
+      Err(error) => {
+        error!("unexpected error on get status request: {:?}", error);
+        Err("unexpected error on get status request".to_string())
+      }
     }
   }
 
@@ -158,7 +138,7 @@ impl Processor for ApplicationImpl<'_> {
     ProcessorType::Application
   }
 
-  async fn start(&self, _service_id: &str) -> Result<String, String> {
+  async fn start(&self, _service_id: &str) -> Result<bool, String> {
     Err("start method not yet implemented".to_string())
   }
 
@@ -169,41 +149,96 @@ impl Processor for ApplicationImpl<'_> {
       .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_id, &target_client.token)
       .await
     {
-      Ok(r) => {
-        if r.status() == 200 {
-          Ok(ProcessorStatus { up: true })
-        } else {
-          Ok(ProcessorStatus { up: false })
+      Ok(response) => match response.status() {
+        StatusCode::OK => Ok(ProcessorStatus { up: true }),
+        _ => Ok(ProcessorStatus { up: false }),
+      },
+      Err(UnexpectedResponse(response)) => match response.status() {
+        StatusCode::NOT_FOUND => Ok(ProcessorStatus { up: false }),
+        _ => {
+          error!("unexpected response on get status request: {:?}", response);
+          Err("unexpected response on status request".to_string())
         }
-      }
-      Err(UnexpectedResponse(e)) => {
-        if e.status() == 404 {
-          Ok(ProcessorStatus { up: false })
-        } else {
-          error!("unexpected response on get status request: {:?}", e);
-          Err("unexpected response on get status request".to_string())
-        }
-      }
-      Err(e) => {
-        error!("unexpected error on get status request: {:?}", e);
+      },
+      Err(error) => {
+        error!("unexpected error on get status request: {:?}", error);
         Err("unexpected error on get status request".to_string())
       }
     }
   }
 
-  async fn stop(&self, _service_id: &str) -> Result<String, String> {
+  async fn stop(&self, _service_id: &str) -> Result<bool, String> {
     Err("stop method not yet implemented".to_string())
   }
 
-  async fn undeploy(&self, service_id: &str) -> Result<(), String> {
+  async fn undeploy(&self, service_id: &str) -> Result<bool, String> {
     let target_client = self.target_client_factory.get().await?;
     match target_client
       .client
       .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_id, &target_client.token)
       .await
     {
-      Ok(_) => Ok(()),
-      Err(e) => Err(e.to_string()),
+      Ok(response) => match response.status() {
+        StatusCode::ACCEPTED => Ok(true),
+        StatusCode::NO_CONTENT => Ok(true),
+        StatusCode::OK => Ok(true),
+        _ => Ok(false),
+      },
+      Err(UnexpectedResponse(response)) => match response.status() {
+        StatusCode::NOT_FOUND => Ok(false),
+        _ => {
+          error!("unexpected response on undeploy request: {:?}", response);
+          Err("unexpected response on undeploy request".to_string())
+        }
+      },
+      Err(error) => {
+        error!("unexpected error on undeploy request: {:?}", error);
+        Err("unexpected error on undeploy request".to_string())
+      }
     }
+  }
+}
+
+impl ApplicationImpl<'_> {
+  fn junctions(
+    &self,
+    in_out: &str,
+    junctions: &HashMap<String, Vec<ResourceIdentifier>>,
+    junction_descriptors: &Vec<JunctionDescriptor>,
+  ) -> Result<HashMap<String, String>, String> {
+    let mut junction_topics = HashMap::<String, String>::new();
+    for junction_descriptor in junction_descriptors {
+      match junctions.get(&junction_descriptor.id) {
+        Some(resource_ids) => {
+          if let Some(illegal_resource) = resource_ids.iter().find(|ri| ri.resource_type != ResourceType::DshTopic) {
+            return Err(format!(
+              "resource '{}' connected to {}bound junction '{}' has wrong type, '{}' expected",
+              illegal_resource,
+              in_out,
+              junction_descriptor.id,
+              ResourceType::DshTopic
+            ));
+          }
+          let mut topics = Vec::<String>::new();
+          for resource_id in resource_ids {
+            match self.resource_registry.resource_by_identifier(resource_id) {
+              Some(resource) => match &resource.descriptor().dsh_topic_descriptor {
+                Some(dsh_topic_descriptor) => topics.push(dsh_topic_descriptor.topic.to_string()),
+                None => unreachable!(),
+              },
+              None => {
+                return Err(format!(
+                  "resource '{}' connected to {}bound junction '{}' does not exist",
+                  resource_id, in_out, junction_descriptor.id
+                ))
+              }
+            }
+          }
+          junction_topics.insert(junction_descriptor.id.to_string(), topics.join(","));
+        }
+        None => return Err(format!("required {}bound junction resource '{}' is not provided", in_out, junction_descriptor.id)),
+      }
+    }
+    Ok(junction_topics)
   }
 }
