@@ -11,8 +11,8 @@ use crate::processor::application::application_config::{ApplicationConfig, Profi
 use crate::processor::application::dsh_api::into_api_application;
 use crate::processor::application::{TargetClientFactory, TemplateMapping};
 use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
-use crate::processor::processor_config::PlaceHolder;
-use crate::processor::processor_descriptor::{JunctionDescriptor, ProcessorDescriptor};
+use crate::processor::processor_config::{JunctionConfig, PlaceHolder};
+use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::ProcessorType;
 use crate::resource::resource::ResourceIdentifier;
 use crate::resource::resource_descriptor::ResourceDirection;
@@ -21,7 +21,6 @@ use crate::resource::ResourceType;
 
 pub struct ApplicationImpl<'a> {
   processor_identifier: ProcessorIdentifier,
-  processor_descriptor: ProcessorDescriptor,
   config: ApplicationConfig,
   target_client_factory: &'a TargetClientFactory,
   resource_registry: &'a ResourceRegistry<'a>,
@@ -29,10 +28,8 @@ pub struct ApplicationImpl<'a> {
 
 impl<'a> ApplicationImpl<'a> {
   pub fn create(application_config: ApplicationConfig, client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
-    let template_mapping = TemplateMapping::from(client_factory);
     Ok(ApplicationImpl {
       processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::Application, id: application_config.application_id.clone() },
-      processor_descriptor: application_config.convert_to_descriptor(&template_mapping),
       config: application_config,
       target_client_factory: client_factory,
       resource_registry,
@@ -58,7 +55,7 @@ impl Processor for ApplicationImpl<'_> {
     {
       let mut compatible_resources = Vec::<ResourceIdentifier>::new();
       for allowed_resource_type in &junction_config.allowed_resource_types {
-        for resource_descriptor in &self.resource_registry.resource_descriptors_by_type(&allowed_resource_type) {
+        for resource_descriptor in self.resource_registry.resource_descriptors_by_type(allowed_resource_type) {
           match direction {
             ResourceDirection::Inbound => {
               if resource_descriptor.readable {
@@ -87,22 +84,38 @@ impl Processor for ApplicationImpl<'_> {
     deploy_parameters: &HashMap<String, String>,
     profile_id: Option<&str>,
   ) -> Result<(), String> {
-    let inbound_junction_topics = self.junctions("in", inbound_junctions, &self.processor_descriptor.inbound_junctions)?;
-    let outbound_junction_topics = self.junctions("out", outbound_junctions, &self.processor_descriptor.outbound_junctions)?;
+    let inbound_junction_topics: HashMap<String, String> = match &self.config.inbound_junctions {
+      Some(inbound_junction_configs) => self.junctions(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
+      None => HashMap::new(),
+    };
+    let outbound_junction_topics: HashMap<String, String> = match &self.config.outbound_junctions {
+      Some(outbound_junction_configs) => self.junctions(ResourceDirection::Outbound, outbound_junctions, outbound_junction_configs)?,
+      None => HashMap::new(),
+    };
+
     let mut validated_parameters = HashMap::<String, String>::new();
-    for parameter_descriptor in &self.processor_descriptor.deployment_parameters {
-      match deploy_parameters.get(&parameter_descriptor.id) {
-        Some(deploy_parameter) => _ = validated_parameters.insert(parameter_descriptor.id.to_string(), deploy_parameter.to_string()),
-        None => match &parameter_descriptor.default {
-          Some(default) => _ = validated_parameters.insert(parameter_descriptor.id.to_string(), default.clone()),
-          None => {
-            if !parameter_descriptor.optional {
-              return Err(format!("required deployment parameter '{}' is not provided", parameter_descriptor.id));
+    match &self.config.deploy {
+      Some(deploy) => match &deploy.parameters {
+        Some(parameters) => {
+          for parameter_config in parameters {
+            match deploy_parameters.get(&parameter_config.id) {
+              Some(deploy_parameter) => _ = validated_parameters.insert(parameter_config.id.to_string(), deploy_parameter.to_string()),
+              None => match &parameter_config.default {
+                Some(default) => _ = validated_parameters.insert(parameter_config.id.to_string(), default.clone()),
+                None => {
+                  if !parameter_config.optional.is_some_and(|b| b) {
+                    return Err(format!("mandatory deployment parameter '{}' is not provided", parameter_config.id));
+                  }
+                }
+              },
             }
           }
-        },
-      }
+        }
+        None => {}
+      },
+      None => {}
     }
+
     let profile: ProfileConfig = match profile_id {
       Some(pn) => match self.config.application.profiles.iter().find(|p| p.id == pn) {
         Some(p) => p.clone(),
@@ -156,8 +169,8 @@ impl Processor for ApplicationImpl<'_> {
     }
   }
 
-  fn descriptor(&self) -> &ProcessorDescriptor {
-    &self.processor_descriptor
+  fn descriptor(&self) -> ProcessorDescriptor {
+    self.config.convert_to_descriptor(&TemplateMapping::from(self.target_client_factory))
   }
 
   fn identifier(&self) -> &ProcessorIdentifier {
@@ -169,7 +182,7 @@ impl Processor for ApplicationImpl<'_> {
   }
 
   fn label(&self) -> &str {
-    &self.processor_descriptor.label
+    &self.config.application_label
   }
 
   fn processor_type(&self) -> ProcessorType {
@@ -240,21 +253,34 @@ impl Processor for ApplicationImpl<'_> {
 impl ApplicationImpl<'_> {
   fn junctions(
     &self,
-    in_out: &str,
+    in_out: ResourceDirection,
     junctions: &HashMap<String, Vec<ResourceIdentifier>>,
-    junction_descriptors: &Vec<JunctionDescriptor>,
+    junction_configs: &HashMap<String, JunctionConfig>,
   ) -> Result<HashMap<String, String>, String> {
     let mut junction_topics = HashMap::<String, String>::new();
-    for junction_descriptor in junction_descriptors {
-      match junctions.get(&junction_descriptor.id) {
+    for (id, junction_config) in junction_configs {
+      match junctions.get(id) {
         Some(resource_ids) => {
           if let Some(illegal_resource) = resource_ids.iter().find(|ri| ri.resource_type != ResourceType::DshTopic) {
             return Err(format!(
-              "resource '{}' connected to {}bound junction '{}' has wrong type, '{}' expected",
+              "resource '{}' connected to {} junction '{}' has wrong type, '{}' expected",
               illegal_resource,
               in_out,
-              junction_descriptor.id,
+              id,
               ResourceType::DshTopic
+            ));
+          }
+          let (min, max) = junction_config.number_of_resources_range();
+          if resource_ids.len() < min as usize {
+            return Err(format!(
+              "there should be at least {} resource instance(s) connected to {} junction '{}'",
+              min, in_out, id
+            ));
+          }
+          if resource_ids.len() > max as usize {
+            return Err(format!(
+              "there can be at most {} resource instance(s) connected to {} junction '{}'",
+              min, in_out, id
             ));
           }
           let mut topics = Vec::<String>::new();
@@ -264,17 +290,17 @@ impl ApplicationImpl<'_> {
                 Some(dsh_topic_descriptor) => topics.push(dsh_topic_descriptor.topic.to_string()),
                 None => unreachable!(),
               },
-              None => {
-                return Err(format!(
-                  "resource '{}' connected to {}bound junction '{}' does not exist",
-                  resource_id, in_out, junction_descriptor.id
-                ))
-              }
+              None => return Err(format!("resource '{}' connected to {} junction '{}' does not exist", resource_id, in_out, id)),
             }
           }
-          junction_topics.insert(junction_descriptor.id.to_string(), topics.join(","));
+          junction_topics.insert(id.to_string(), topics.join(","));
         }
-        None => return Err(format!("required {}bound junction resource '{}' is not provided", in_out, junction_descriptor.id)),
+        None => {
+          let (min, max) = junction_config.number_of_resources_range();
+          if min != 0 || max != 0 {
+            return Err(format!("required {} junction resources '{}' are not provided", in_out, id));
+          }
+        }
       }
     }
     Ok(junction_topics)

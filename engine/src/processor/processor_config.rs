@@ -46,6 +46,15 @@ impl JunctionConfig {
     }
     Ok(())
   }
+
+  pub(crate) fn number_of_resources_range(&self) -> (u32, u32) {
+    match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
+      (None, None) => (1, 1),
+      (None, Some(max)) => (0, max),
+      (Some(min), None) => (min, u32::MAX),
+      (Some(min), Some(max)) => (min, max),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Deserialize)]

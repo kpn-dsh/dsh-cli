@@ -41,7 +41,7 @@ impl<'a> ApplicationRegistry<'a> {
     self.applications.values().map(|app| app.identifier()).collect()
   }
 
-  pub(crate) fn application_descriptors(&self) -> Vec<&ProcessorDescriptor> {
+  pub(crate) fn application_descriptors(&self) -> Vec<ProcessorDescriptor> {
     self.applications.values().map(|app| app.descriptor()).collect()
   }
 }

@@ -14,6 +14,15 @@ pub enum ResourceDirection {
   Outbound,
 }
 
+impl Display for ResourceDirection {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ResourceDirection::Inbound => write!(f, "inbound"),
+      ResourceDirection::Outbound => write!(f, "outbound"),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResourceDescriptor {
   #[serde(rename = "type")]

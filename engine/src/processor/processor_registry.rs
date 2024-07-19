@@ -47,13 +47,13 @@ impl<'a> ProcessorRegistry<'a> {
     }
   }
 
-  pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<&ProcessorDescriptor> {
+  pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<ProcessorDescriptor> {
     match processor_type {
       ProcessorType::Application => self.application_registry.application_by_id(processor_id).map(|a| a.descriptor()),
     }
   }
 
-  pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&ProcessorDescriptor> {
+  pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<ProcessorDescriptor> {
     match processor_identifier.processor_type {
       ProcessorType::Application => self
         .application_registry
@@ -62,11 +62,11 @@ impl<'a> ProcessorRegistry<'a> {
     }
   }
 
-  pub fn processor_descriptors(&self) -> Vec<&ProcessorDescriptor> {
+  pub fn processor_descriptors(&self) -> Vec<ProcessorDescriptor> {
     self.application_registry.application_descriptors()
   }
 
-  pub fn processor_descriptors_by_type(&self, processor_type: ProcessorType) -> Vec<&ProcessorDescriptor> {
+  pub fn processor_descriptors_by_type(&self, processor_type: ProcessorType) -> Vec<ProcessorDescriptor> {
     match processor_type {
       ProcessorType::Application => self.application_registry.application_descriptors(),
     }

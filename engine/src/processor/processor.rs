@@ -63,7 +63,7 @@ pub trait Processor {
   ///
   /// ## Returns
   /// * This `Processor`s descriptor.
-  fn descriptor(&self) -> &ProcessorDescriptor;
+  fn descriptor(&self) -> ProcessorDescriptor;
 
   /// # Get this `Processor`s id (name)
   ///
