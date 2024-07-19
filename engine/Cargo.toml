@@ -11,7 +11,7 @@ publish.workspace = true
 
 [dependencies]
 dsh_rest_api_client = "0.1.0"
-dsh_sdk = { version = "0.4.3", features = ["bootstrap", "rdkafka", "rest-token-fetcher"], default-features = false }
+dsh_sdk = { version = "0.4.4", features = ["bootstrap", "rdkafka", "rest-token-fetcher"], default-features = false }
 
 async-trait = "0.1.81"
 lazy_static = "1.5.0"
