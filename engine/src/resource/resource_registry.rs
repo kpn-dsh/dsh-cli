@@ -57,7 +57,7 @@ impl<'a> ResourceRegistry<'a> {
     self.dsh_topic_registry.resource_descriptors()
   }
 
-  pub fn resource_descriptors_by_type(&self, resource_type: ResourceType) -> Vec<&ResourceDescriptor> {
+  pub fn resource_descriptors_by_type(&self, resource_type: &ResourceType) -> Vec<&ResourceDescriptor> {
     match resource_type {
       ResourceType::DshTopic => self.dsh_topic_registry.resource_descriptors(),
     }

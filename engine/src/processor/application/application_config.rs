@@ -1,12 +1,11 @@
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 
-use crate::is_valid_id;
 use lazy_static::lazy_static;
 use log::debug;
 use regex::Regex;
 use serde::Deserialize;
 
+use crate::is_valid_id;
 use crate::processor::application::{template_resolver, validate_template, TemplateMapping};
 use crate::processor::processor_config::{read_config, DeployConfig, JunctionConfig, PlaceHolder, VariableConfig, VariableType};
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
@@ -137,56 +136,6 @@ impl ProfileConfig {
   }
 }
 
-impl Display for ProfileConfig {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "{}, {}, {}, cpus: {}, instances: {}, mem: {}",
-      &self.id, &self.label, &self.description, &self.cpus, &self.instances, &self.mem
-    )?;
-    if let Some(evs) = &self.environment_variables {
-      write!(f, ", [{}]", evs.iter().map(|p| p.0.to_string()).collect::<Vec<String>>().join(", "))?;
-    }
-    Ok(())
-  }
-}
-
-impl From<(&ApplicationConfig, &TemplateMapping)> for ProcessorDescriptor {
-  fn from((config, mapping): (&ApplicationConfig, &TemplateMapping)) -> Self {
-    ProcessorDescriptor {
-      processor_type: ProcessorType::Application,
-      id: config.application_id.clone(),
-      label: config.application_label.clone(),
-      description: config.application_description.clone(),
-      version: config.application_version.clone(),
-      inbound_junctions: match &config.inbound_junctions {
-        Some(ijsm) => ijsm.iter().map(JunctionDescriptor::from).collect::<Vec<JunctionDescriptor>>(),
-        None => vec![],
-      },
-      outbound_junctions: match &config.outbound_junctions {
-        Some(ojsm) => ojsm.iter().map(JunctionDescriptor::from).collect::<Vec<JunctionDescriptor>>(),
-        None => vec![],
-      },
-      deployment_parameters: match &config.deploy {
-        Some(deploy_config) => match &deploy_config.parameters {
-          Some(parameters) => parameters
-            .iter()
-            .map(|h| (h.id.clone(), h))
-            .map(DeploymentParameterDescriptor::from)
-            .collect::<Vec<DeploymentParameterDescriptor>>(),
-          None => vec![],
-        },
-        None => vec![],
-      },
-      profiles: config.application.profiles.iter().map(ProfileDescriptor::from).collect::<Vec<ProfileDescriptor>>(),
-      metadata: config.metadata.clone().unwrap_or_default(),
-      more_info_url: config.more_info_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-      metrics_url: config.metrics_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-      viewer_url: config.viewer_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-    }
-  }
-}
-
 fn validate_config_template(template: &str, template_id: &str) -> Result<(), String> {
   static VALID_PLACEHOLDERS: [PlaceHolder; 10] = [
     PlaceHolder::AppDomain,
@@ -305,6 +254,85 @@ pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConf
   }
   debug!("successfully validated config");
   Ok(config)
+}
+
+impl ApplicationConfig {
+  pub(crate) fn convert_to_descriptor(&self, mapping: &TemplateMapping) -> ProcessorDescriptor {
+    ProcessorDescriptor {
+      processor_type: ProcessorType::Application,
+      id: self.application_id.clone(),
+      label: self.application_label.clone(),
+      description: self.application_description.clone(),
+      version: self.application_version.clone(),
+      inbound_junctions: match &self.inbound_junctions {
+        Some(inbound_junctions) => inbound_junctions
+          .iter()
+          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
+          .collect::<Vec<JunctionDescriptor>>(),
+        None => vec![],
+      },
+      outbound_junctions: match &self.outbound_junctions {
+        Some(outbound_junctions) => outbound_junctions
+          .iter()
+          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
+          .collect::<Vec<JunctionDescriptor>>(),
+        None => vec![],
+      },
+      deployment_parameters: match &self.deploy {
+        Some(deploy_config) => match &deploy_config.parameters {
+          Some(parameters) => parameters
+            .iter()
+            .map(|h| (h.id.clone(), h))
+            .map(DeploymentParameterDescriptor::from)
+            .collect::<Vec<DeploymentParameterDescriptor>>(),
+          None => vec![],
+        },
+        None => vec![],
+      },
+      profiles: self
+        .application
+        .profiles
+        .iter()
+        .map(|p| p.convert_to_descriptor())
+        .collect::<Vec<ProfileDescriptor>>(),
+      metadata: self.metadata.clone().unwrap_or_default(),
+      more_info_url: self.more_info_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      metrics_url: self.metrics_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      viewer_url: self.viewer_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+    }
+  }
+}
+
+impl JunctionConfig {
+  fn convert_to_descriptor(&self, id: &String) -> JunctionDescriptor {
+    let (min, max) = match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
+      (None, None) => (1, 1),
+      (None, Some(max)) => (1, max),
+      (Some(min), None) => (min, u32::MAX),
+      (Some(min), Some(max)) => (min, max),
+    };
+    JunctionDescriptor {
+      id: id.to_owned(),
+      label: self.label.clone(),
+      description: self.description.clone(),
+      minimum_number_of_resources: min,
+      maximum_number_of_resources: max,
+      allowed_resource_types: self.allowed_resource_types.clone(),
+    }
+  }
+}
+
+impl ProfileConfig {
+  fn convert_to_descriptor(self: &ProfileConfig) -> ProfileDescriptor {
+    ProfileDescriptor {
+      id: self.id.clone(),
+      label: self.label.clone(),
+      description: self.description.clone(),
+      instances: Some(self.instances),
+      cpus: Some(self.cpus),
+      mem: Some(self.mem),
+    }
+  }
 }
 
 #[test]

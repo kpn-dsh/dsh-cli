@@ -4,8 +4,9 @@ use async_trait::async_trait;
 use dsh_sdk::dsh::datastream::Stream;
 
 use crate::processor::application::TargetClientFactory;
+use crate::resource::dsh_topic::topic_descriptor::DshTopicDescriptor;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
-use crate::resource::resource_descriptor::{DshTopicDescriptor, ResourceDescriptor};
+use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::ResourceType;
 
 pub struct TopicResourceImpl<'a> {
@@ -35,7 +36,6 @@ impl<'a> TopicResourceImpl<'a> {
         .app_domain(target_client_factory.tenant.as_str())
         .map(|domain| format!("https://eavesdropper.{}.{}?topics={}", target_client_factory.tenant, domain, stream.name())),
       dsh_topic_descriptor: Some(DshTopicDescriptor {
-        id: stream.name().to_string(),
         // TODO Check proper topic name
         topic: match stream.write_pattern() {
           Ok(write_pattern) => write_pattern.to_string(),

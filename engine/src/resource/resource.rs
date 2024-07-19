@@ -3,11 +3,12 @@
 use std::fmt::{Display, Formatter};
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::ResourceType;
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
 pub struct ResourceIdentifier {
   pub resource_type: ResourceType,
   pub id: String,

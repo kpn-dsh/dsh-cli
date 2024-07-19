@@ -1,8 +1,18 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
+use crate::resource::dsh_topic::topic_descriptor::DshTopicDescriptor;
+use crate::resource::resource::ResourceIdentifier;
 use serde::{Deserialize, Serialize};
 
 use crate::resource::ResourceType;
+
+#[derive(Deserialize, Serialize)]
+pub enum ResourceDirection {
+  #[serde(rename = "inbound")]
+  Inbound,
+  #[serde(rename = "outbound")]
+  Outbound,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResourceDescriptor {
@@ -27,33 +37,12 @@ pub struct ResourceDescriptor {
   pub dsh_topic_descriptor: Option<DshTopicDescriptor>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DshTopicDescriptor {
-  pub id: String,
-  pub topic: String,
-  pub partitions: u32,
-  pub replication: u32,
-  pub dsh_envelope: bool,
-  pub read: String,
-  pub write: String,
-  pub read_pattern: Option<String>,
-  pub write_pattern: Option<String>,
-  pub partitioner: String,
-  #[serde(rename = "partitioning-depth")]
-  pub partitioning_depth: u32,
-  #[serde(rename = "can-retain")]
-  pub can_retain: bool,
-  pub cluster: String,
-}
-
 impl Display for ResourceDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}:{} ({})", self.id, self.resource_type, self.label)?;
     if let Some(ref version) = self.version {
-      write!(f, "{}:{}", self.id, version)?;
-    } else {
-      write!(f, "{}", self.id)?;
+      write!(f, "\n  version: {}", version)?;
     }
-    write!(f, "\n  {}", self.resource_type)?;
     write!(f, "\n  {}", self.description)?;
     if self.writable {
       write!(f, "\n  writable resource")?;
@@ -64,7 +53,7 @@ impl Display for ResourceDescriptor {
     if !&self.metadata.is_empty() {
       write!(f, "\n  metadata")?;
       for (key, value) in &self.metadata {
-        write!(f, "\n    {}: {}", key, value)?
+        write!(f, "\n    {}: {}", key, value)?;
       }
     }
     if let Some(ref url) = self.more_info_url {
@@ -76,6 +65,15 @@ impl Display for ResourceDescriptor {
     if let Some(ref url) = self.viewer_url {
       write!(f, "\n  viewer url: {}", url)?
     }
+    if let Some(ref dsh_topic_descriptor) = self.dsh_topic_descriptor {
+      std::fmt::Display::fmt(&dsh_topic_descriptor, f)?
+    }
     Ok(())
+  }
+}
+
+impl ResourceDescriptor {
+  pub fn resource_identifier(&self) -> ResourceIdentifier {
+    ResourceIdentifier { resource_type: self.resource_type.clone(), id: self.id.clone() }
   }
 }

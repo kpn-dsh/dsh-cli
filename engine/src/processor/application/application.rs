@@ -15,6 +15,7 @@ use crate::processor::processor_config::PlaceHolder;
 use crate::processor::processor_descriptor::{JunctionDescriptor, ProcessorDescriptor};
 use crate::processor::ProcessorType;
 use crate::resource::resource::ResourceIdentifier;
+use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::ResourceType;
 
@@ -31,7 +32,7 @@ impl<'a> ApplicationImpl<'a> {
     let template_mapping = TemplateMapping::from(client_factory);
     Ok(ApplicationImpl {
       processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::Application, id: application_config.application_id.clone() },
-      processor_descriptor: ProcessorDescriptor::from((&application_config, &template_mapping)),
+      processor_descriptor: application_config.convert_to_descriptor(&template_mapping),
       config: application_config,
       target_client_factory: client_factory,
       resource_registry,
@@ -41,6 +42,43 @@ impl<'a> ApplicationImpl<'a> {
 
 #[async_trait]
 impl Processor for ApplicationImpl<'_> {
+  async fn compatible_resources(&self, junction_id: &str) -> Result<Vec<ResourceIdentifier>, String> {
+    if let Some((direction, junction_config)) = self
+      .config
+      .inbound_junctions
+      .as_ref()
+      .and_then(|m| m.get(junction_id).map(|config| (ResourceDirection::Inbound, config)))
+      .or_else(|| {
+        self
+          .config
+          .outbound_junctions
+          .as_ref()
+          .and_then(|m| m.get(junction_id).map(|config| (ResourceDirection::Outbound, config)))
+      })
+    {
+      let mut compatible_resources = Vec::<ResourceIdentifier>::new();
+      for allowed_resource_type in &junction_config.allowed_resource_types {
+        for resource_descriptor in &self.resource_registry.resource_descriptors_by_type(&allowed_resource_type) {
+          match direction {
+            ResourceDirection::Inbound => {
+              if resource_descriptor.readable {
+                compatible_resources.push(resource_descriptor.resource_identifier())
+              }
+            }
+            ResourceDirection::Outbound => {
+              if resource_descriptor.writable {
+                compatible_resources.push(resource_descriptor.resource_identifier())
+              }
+            }
+          }
+        }
+      }
+      Ok(compatible_resources)
+    } else {
+      Ok(vec![])
+    }
+  }
+
   async fn deploy(
     &self,
     service_id: &str,

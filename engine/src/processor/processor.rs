@@ -48,6 +48,17 @@ pub trait Processor {
     profile_id: Option<&str>,
   ) -> Result<(), String>;
 
+  /// # Get the resources compatible with this `Processor`
+  ///
+  /// ## Parameters
+  /// * `junction_id` - identifies the junction for which the compatible resources need to be
+  ///                   retrieved.
+  ///
+  /// ## Returns
+  /// * `Ok<Vec<ResourceIdentifier>` - list of identifiers of compatible resources.
+  /// * `Err(msg)`                   - when the list could not be composed.
+  async fn compatible_resources(&self, junction_id: &str) -> Result<Vec<ResourceIdentifier>, String>;
+
   /// # Get this `Processor`s descriptor
   ///
   /// ## Returns
