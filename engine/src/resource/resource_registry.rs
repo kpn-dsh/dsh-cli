@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 use crate::resource::dsh_topic::topic_registry::TopicRegistry;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
-use crate::resource::resource_descriptor::ResourceDescriptor;
+use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceTypeDescriptor};
 use crate::resource::ResourceType;
 
 lazy_static! {
@@ -27,6 +27,10 @@ impl<'a> ResourceRegistry<'a> {
 
   pub fn create(target_client_factory: &'a TargetClientFactory) -> Result<ResourceRegistry<'a>, String> {
     Ok(ResourceRegistry { dsh_topic_registry: TopicRegistry::create(target_client_factory)? })
+  }
+
+  pub fn resource_types(&self) -> Vec<ResourceTypeDescriptor> {
+    vec![ResourceTypeDescriptor::from(&ResourceType::DshTopic)]
   }
 
   pub fn resource(&self, resource_type: ResourceType, resource_id: &str) -> Option<&(dyn Resource + Sync)> {

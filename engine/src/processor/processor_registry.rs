@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use crate::processor::application::application_registry::ApplicationRegistry;
 use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 use crate::processor::processor::{Processor, ProcessorIdentifier};
-use crate::processor::processor_descriptor::ProcessorDescriptor;
+use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
 use crate::processor::ProcessorType;
 use crate::resource::resource_registry::{ResourceRegistry, DEFAULT_RESOURCE_REGISTRY};
 
@@ -33,6 +33,10 @@ impl<'a> ProcessorRegistry<'a> {
 
   pub fn resource_registry(&self) -> &ResourceRegistry {
     self.resource_registry
+  }
+
+  pub fn processor_types(&self) -> Vec<ProcessorTypeDescriptor> {
+    vec![ProcessorTypeDescriptor::from(&ProcessorType::Application)]
   }
 
   pub fn processor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<&(dyn Processor)> {

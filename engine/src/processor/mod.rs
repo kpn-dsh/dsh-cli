@@ -22,6 +22,20 @@ impl Display for ProcessorType {
   }
 }
 
+impl ProcessorType {
+  fn description(&self) -> &str {
+    match self {
+      ProcessorType::Application => "DSH service managed by the DSH platform",
+    }
+  }
+
+  fn label(&self) -> &str {
+    match self {
+      ProcessorType::Application => "DSH Service",
+    }
+  }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum DeploymentParameterType {
   #[serde(rename = "boolean")]
@@ -30,6 +44,13 @@ pub enum DeploymentParameterType {
   FreeText,
   #[serde(rename = "selection")]
   Selection,
+  // TODO Json,
+  // TODO Multiline,
+  // TODO Number,
+  // TODO RegularExpression,
+  // TODO Sql,
+  // TODO Toml,
+  // TODO Yaml,
 }
 
 impl Display for DeploymentParameterType {

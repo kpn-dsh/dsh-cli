@@ -11,12 +11,27 @@ pub mod resource_registry;
 pub enum ResourceType {
   #[serde(rename = "dsh-topic")]
   DshTopic,
+  // DshGateway,
 }
 
 impl Display for ResourceType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
       ResourceType::DshTopic => write!(f, "dsh-topic"),
+    }
+  }
+}
+
+impl ResourceType {
+  fn description(&self) -> &str {
+    match self {
+      ResourceType::DshTopic => "Kafka topic managed by the DSH platform",
+    }
+  }
+
+  fn label(&self) -> &str {
+    match self {
+      ResourceType::DshTopic => "Dsh Topic",
     }
   }
 }

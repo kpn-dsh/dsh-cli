@@ -24,6 +24,20 @@ impl Display for ResourceDirection {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ResourceTypeDescriptor {
+  #[serde(rename = "type")]
+  pub resource_type: ResourceType,
+  pub label: String,
+  pub description: String,
+}
+
+impl From<&ResourceType> for ResourceTypeDescriptor {
+  fn from(value: &ResourceType) -> Self {
+    ResourceTypeDescriptor { resource_type: value.clone(), label: value.label().to_owned(), description: value.description().to_owned() }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResourceDescriptor {
   #[serde(rename = "type")]
   pub resource_type: ResourceType,

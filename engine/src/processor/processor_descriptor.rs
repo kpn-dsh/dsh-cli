@@ -88,6 +88,20 @@ pub struct ProfileDescriptor {
   pub mem: Option<u64>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ProcessorTypeDescriptor {
+  #[serde(rename = "type")]
+  pub processor_type: ProcessorType,
+  pub label: String,
+  pub description: String,
+}
+
+impl From<&ProcessorType> for ProcessorTypeDescriptor {
+  fn from(value: &ProcessorType) -> Self {
+    ProcessorTypeDescriptor { processor_type: value.clone(), label: value.label().to_owned(), description: value.description().to_owned() }
+  }
+}
+
 impl Display for ProcessorDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}:{} ({})", self.id, self.processor_type, self.label)?;
