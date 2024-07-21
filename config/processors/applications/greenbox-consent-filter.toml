@@ -11,6 +11,7 @@ viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
 label = "Source topics"
 description = "Kafka topic that the consent filter application will consume from. This topic must use strings for its record keys."
 allowed-resource-types = ["dsh-topic"]
+# TODO Filters: schema available, whitelist in config, blacklist in config, mqtt/http gateway
 
 [outbound-junctions.outbound-kafka-topic]
 label = "Sink topics"
