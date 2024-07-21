@@ -98,7 +98,7 @@ pub struct ProcessorTypeDescriptor {
 
 impl From<&ProcessorType> for ProcessorTypeDescriptor {
   fn from(value: &ProcessorType) -> Self {
-    ProcessorTypeDescriptor { processor_type: value.clone(), label: value.label().to_owned(), description: value.description().to_owned() }
+    ProcessorTypeDescriptor { processor_type: value.clone(), label: value.label().to_string(), description: value.description().to_string() }
   }
 }
 

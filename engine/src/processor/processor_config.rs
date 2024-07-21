@@ -20,6 +20,33 @@ pub struct JunctionConfig {
   pub allowed_resource_types: Vec<ResourceType>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeployConfig {
+  pub parameters: Option<Vec<DeploymentParameterConfig>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub enum VariableType {
+  #[serde(rename = "deployment-parameter")]
+  DeploymentParameter,
+  #[serde(rename = "inbound-junction")]
+  InboundJunction,
+  #[serde(rename = "outbound-junction")]
+  OutboundJunction,
+  #[serde(rename = "template")]
+  Template,
+  #[serde(rename = "value")]
+  Value,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct VariableConfig {
+  #[serde(rename = "type")]
+  pub typ: VariableType,
+  pub id: Option<String>,
+  pub value: Option<String>,
+}
+
 impl JunctionConfig {
   pub fn validate(&self, id: &str) -> Result<(), String> {
     if !is_valid_id(id) {
@@ -55,33 +82,6 @@ impl JunctionConfig {
       (Some(min), Some(max)) => (min, max),
     }
   }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct DeployConfig {
-  pub parameters: Option<Vec<DeploymentParameterConfig>>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-pub enum VariableType {
-  #[serde(rename = "deployment-parameter")]
-  DeploymentParameter,
-  #[serde(rename = "inbound-junction")]
-  InboundJunction,
-  #[serde(rename = "outbound-junction")]
-  OutboundJunction,
-  #[serde(rename = "template")]
-  Template,
-  #[serde(rename = "value")]
-  Value,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct VariableConfig {
-  #[serde(rename = "type")]
-  pub typ: VariableType,
-  pub id: Option<String>,
-  pub value: Option<String>,
 }
 
 const APP_DOMAIN: &str = "APP_DOMAIN";
