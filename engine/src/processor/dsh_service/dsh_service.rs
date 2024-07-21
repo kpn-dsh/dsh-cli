@@ -7,30 +7,30 @@ use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::error;
 use reqwest::StatusCode;
 
-use crate::processor::application::application_config::{ApplicationConfig, ProfileConfig};
-use crate::processor::application::dsh_api::into_api_application;
-use crate::processor::application::{TargetClientFactory, TemplateMapping};
+use crate::processor::dsh_service::dsh_service_api::into_api_application;
+use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
+use crate::processor::dsh_service::{TargetClientFactory, TemplateMapping};
 use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
-use crate::processor::processor_config::{JunctionConfig, PlaceHolder};
-use crate::processor::processor_descriptor::ProcessorDescriptor;
+use crate::processor::processor_config::{JunctionConfig, PlaceHolder, ProcessorConfig};
+use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::ProcessorType;
 use crate::resource::resource::ResourceIdentifier;
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::ResourceType;
 
-pub struct ApplicationImpl<'a> {
+pub struct DshService<'a> {
   processor_identifier: ProcessorIdentifier,
-  config: ApplicationConfig,
+  processor_config: ProcessorConfig,
   target_client_factory: &'a TargetClientFactory,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
-impl<'a> ApplicationImpl<'a> {
-  pub fn create(application_config: ApplicationConfig, client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
-    Ok(ApplicationImpl {
-      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::Application, id: application_config.application_id.clone() },
-      config: application_config,
+impl<'a> DshService<'a> {
+  pub fn create(processor_config: ProcessorConfig, client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
+    Ok(DshService {
+      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: processor_config.id.clone() },
+      processor_config,
       target_client_factory: client_factory,
       resource_registry,
     })
@@ -38,16 +38,16 @@ impl<'a> ApplicationImpl<'a> {
 }
 
 #[async_trait]
-impl Processor for ApplicationImpl<'_> {
+impl Processor for DshService<'_> {
   async fn compatible_resources(&self, junction_id: &str) -> Result<Vec<ResourceIdentifier>, String> {
     if let Some((direction, junction_config)) = self
-      .config
+      .processor_config
       .inbound_junctions
       .as_ref()
       .and_then(|m| m.get(junction_id).map(|config| (ResourceDirection::Inbound, config)))
       .or_else(|| {
         self
-          .config
+          .processor_config
           .outbound_junctions
           .as_ref()
           .and_then(|m| m.get(junction_id).map(|config| (ResourceDirection::Outbound, config)))
@@ -84,17 +84,17 @@ impl Processor for ApplicationImpl<'_> {
     deploy_parameters: &HashMap<String, String>,
     profile_id: Option<&str>,
   ) -> Result<(), String> {
-    let inbound_junction_topics: HashMap<String, String> = match &self.config.inbound_junctions {
+    let inbound_junction_topics: HashMap<String, String> = match &self.processor_config.inbound_junctions {
       Some(inbound_junction_configs) => self.junctions(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
       None => HashMap::new(),
     };
-    let outbound_junction_topics: HashMap<String, String> = match &self.config.outbound_junctions {
+    let outbound_junction_topics: HashMap<String, String> = match &self.processor_config.outbound_junctions {
       Some(outbound_junction_configs) => self.junctions(ResourceDirection::Outbound, outbound_junctions, outbound_junction_configs)?,
       None => HashMap::new(),
     };
 
     let mut validated_parameters = HashMap::<String, String>::new();
-    match &self.config.deploy {
+    match &self.processor_config.deploy {
       Some(deploy) => match &deploy.parameters {
         Some(parameters) => {
           for parameter_config in parameters {
@@ -116,16 +116,17 @@ impl Processor for ApplicationImpl<'_> {
       None => {}
     }
 
+    let dsh_service_specific_config = self.processor_config.dsh_service_specific_config.as_ref().unwrap();
     let profile: ProfileConfig = match profile_id {
-      Some(pn) => match self.config.application.profiles.iter().find(|p| p.id == pn) {
+      Some(pn) => match dsh_service_specific_config.profiles.iter().find(|p| p.id == pn) {
         Some(p) => p.clone(),
         None => return Err(format!("profile '{}' is not defined", pn)),
       },
       None => {
-        if self.config.application.profiles.is_empty() {
+        if dsh_service_specific_config.profiles.is_empty() {
           return Err("no default profile defined".to_string());
-        } else if self.config.application.profiles.len() == 1 {
-          self.config.application.profiles.get(1).cloned().unwrap()
+        } else if dsh_service_specific_config.profiles.len() == 1 {
+          dsh_service_specific_config.profiles.get(1).cloned().unwrap()
         } else {
           return Err("unable to select profile".to_string());
         }
@@ -135,7 +136,7 @@ impl Processor for ApplicationImpl<'_> {
     let mut template_mapping: TemplateMapping = TemplateMapping::from(self.target_client_factory);
     template_mapping.insert(PlaceHolder::ServiceId, service_id.to_string());
     let api_application = into_api_application(
-      &self.config,
+      &dsh_service_specific_config,
       &inbound_junction_topics,
       &outbound_junction_topics,
       &validated_parameters,
@@ -170,7 +171,18 @@ impl Processor for ApplicationImpl<'_> {
   }
 
   fn descriptor(&self) -> ProcessorDescriptor {
-    self.config.convert_to_descriptor(&TemplateMapping::from(self.target_client_factory))
+    let profiles = self
+      .processor_config
+      .dsh_service_specific_config
+      .as_ref()
+      .unwrap()
+      .profiles
+      .iter()
+      .map(|p| p.convert_to_descriptor())
+      .collect::<Vec<ProfileDescriptor>>();
+    self
+      .processor_config
+      .convert_to_descriptor(profiles, &TemplateMapping::from(self.target_client_factory))
   }
 
   fn identifier(&self) -> &ProcessorIdentifier {
@@ -182,11 +194,11 @@ impl Processor for ApplicationImpl<'_> {
   }
 
   fn label(&self) -> &str {
-    &self.config.application_label
+    &self.processor_config.label
   }
 
   fn processor_type(&self) -> ProcessorType {
-    ProcessorType::Application
+    ProcessorType::DshService
   }
 
   async fn start(&self, _service_id: &str) -> Result<bool, String> {
@@ -250,7 +262,7 @@ impl Processor for ApplicationImpl<'_> {
   }
 }
 
-impl ApplicationImpl<'_> {
+impl DshService<'_> {
   fn junctions(
     &self,
     in_out: ResourceDirection,

@@ -1,12 +1,43 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::ErrorKind::NotFound;
 
-use serde::Deserialize;
+use lazy_static::lazy_static;
+use log::debug;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 use crate::is_valid_id;
-use crate::processor::DeploymentParameterType;
+use crate::processor::dsh_service::dsh_service_config::DshServiceSpecificConfig;
+use crate::processor::dsh_service::{template_resolver, validate_template, TemplateMapping};
+use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
+use crate::processor::ProcessorType;
 use crate::resource::ResourceType;
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProcessorConfig {
+  #[serde(rename = "type")]
+  pub processor_type: ProcessorType,
+  pub id: String,
+  pub label: String,
+  pub description: String,
+  pub version: Option<String>,
+  pub metadata: Option<Vec<(String, String)>>,
+  #[serde(rename = "more-info-url")]
+  pub more_info_url: Option<String>,
+  #[serde(rename = "metrics-url")]
+  pub metrics_url: Option<String>,
+  #[serde(rename = "viewer-url")]
+  pub viewer_url: Option<String>,
+  #[serde(rename = "inbound-junctions")]
+  pub inbound_junctions: Option<HashMap<String, JunctionConfig>>,
+  #[serde(rename = "outbound-junctions")]
+  pub outbound_junctions: Option<HashMap<String, JunctionConfig>>,
+  pub deploy: Option<DeployConfig>,
+  #[serde(rename = "dsh-service")]
+  pub dsh_service_specific_config: Option<DshServiceSpecificConfig>,
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct JunctionConfig {
@@ -45,6 +76,61 @@ pub struct VariableConfig {
   pub typ: VariableType,
   pub id: Option<String>,
   pub value: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeploymentParameterConfig {
+  #[serde(rename = "type")]
+  pub typ: DeploymentParameterType,
+  pub id: String,
+  pub label: String,
+  pub description: String,
+  #[serde(rename = "initial-value")]
+  pub initial_value: Option<String>,
+  pub options: Option<Vec<DeploymentParameterConfigOption>>,
+  pub optional: Option<bool>,
+  pub default: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum DeploymentParameterType {
+  #[serde(rename = "boolean")]
+  Boolean,
+  #[serde(rename = "free-text")]
+  FreeText,
+  #[serde(rename = "selection")]
+  Selection,
+  // TODO Json,
+  // TODO Multiline,
+  // TODO Number,
+  // TODO RegularExpression,
+  // TODO Sql,
+  // TODO Toml,
+  // TODO Yaml,
+}
+
+impl Display for DeploymentParameterType {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match &self {
+      DeploymentParameterType::Boolean => write!(f, "boolean"),
+      DeploymentParameterType::FreeText => write!(f, "free-text"),
+      DeploymentParameterType::Selection => write!(f, "selection"),
+    }
+  }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum DeploymentParameterConfigOption {
+  Label(DeploymentParameterConfigOptionLabel),
+  Id(String),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct DeploymentParameterConfigOptionLabel {
+  pub id: String,
+  pub label: String,
+  pub description: Option<String>,
 }
 
 impl JunctionConfig {
@@ -210,34 +296,6 @@ impl VariableConfig {
   }
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct DeploymentParameterConfig {
-  #[serde(rename = "type")]
-  pub typ: DeploymentParameterType,
-  pub id: String,
-  pub label: String,
-  pub description: String,
-  #[serde(rename = "initial-value")]
-  pub initial_value: Option<String>,
-  pub options: Option<Vec<DeploymentParameterConfigOption>>,
-  pub optional: Option<bool>,
-  pub default: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(untagged)]
-pub enum DeploymentParameterConfigOption {
-  Label(DeploymentParameterConfigOptionLabel),
-  Id(String),
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-pub struct DeploymentParameterConfigOptionLabel {
-  pub id: String,
-  pub label: String,
-  pub description: Option<String>,
-}
-
 impl Display for &DeploymentParameterConfigOption {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
@@ -319,6 +377,67 @@ impl Display for DeploymentParameterConfig {
   }
 }
 
+lazy_static! {
+  static ref PROCESSOR_ID_REGEX: Regex = Regex::new("^[a-z0-9]{1,20}$").unwrap();
+}
+
+pub fn read_processor_config(config_file_name: &str, processor_type: ProcessorType) -> Result<ProcessorConfig, String> {
+  debug!("read {} config file: {}", processor_type, config_file_name);
+  let processor_config = read_config::<ProcessorConfig>(config_file_name)?;
+  debug!("successfully read and parsed {} config file\n{:#?}", processor_type, processor_config);
+  if processor_config.processor_type != processor_type {
+    return Err(format!(
+      "processor type '{}' doesn't match expected type '{}'",
+      processor_config.processor_type, processor_type
+    ));
+  }
+  if !PROCESSOR_ID_REGEX.is_match(&processor_config.id) {
+    return Err(format!(
+      "illegal {} name (must be between 1 and 20 characters long and may contain only lowercase alphabetical characters and digits)",
+      processor_type
+    ));
+  }
+  if processor_config.description.is_empty() {
+    return Err(format!("{} description cannot be empty", processor_type));
+  }
+  if processor_config.version.clone().is_some_and(|ref version| version.is_empty()) {
+    return Err(format!("{} version cannot be empty", processor_type));
+  }
+  if let Some(ref url) = processor_config.more_info_url {
+    validate_config_template(url, "more-info-url template")?
+  }
+  if let Some(ref url) = processor_config.metrics_url {
+    validate_config_template(url, "metrics-url template")?
+  }
+  if let Some(ref url) = processor_config.viewer_url {
+    validate_config_template(url, "viewer-url template")?
+  }
+  if let (Some(inbound), Some(outbound)) = (&processor_config.inbound_junctions, &processor_config.outbound_junctions) {
+    if let Some(ambiguous_id) = inbound.keys().find(|id| outbound.contains_key(*id)) {
+      return Err(format!("'{}' used as inbound as well as outbound id", ambiguous_id));
+    }
+  }
+  if let Some(inbound_junctions) = &processor_config.inbound_junctions {
+    for (id, inbound_junction) in inbound_junctions {
+      inbound_junction.validate(id)?
+    }
+  }
+  if let Some(outbound_junctions) = &processor_config.outbound_junctions {
+    for (id, outbound_junction) in outbound_junctions {
+      outbound_junction.validate(id)?
+    }
+  }
+  if let Some(deploy_config) = &processor_config.deploy {
+    if let Some(ref parameters) = deploy_config.parameters {
+      for parameter in parameters {
+        parameter.validate(parameter.id.as_str())?
+      }
+    }
+  }
+  debug!("successfully validated config");
+  Ok(processor_config)
+}
+
 pub fn read_config<C>(config_file_name: &str) -> Result<C, String>
 where
   C: for<'de> toml::macros::Deserialize<'de>,
@@ -333,4 +452,84 @@ where
       _ => Err(format!("config file '{}' could not be read ({})", config_file_name, error)),
     },
   }
+}
+
+impl ProcessorConfig {
+  pub(crate) fn convert_to_descriptor(&self, profiles: Vec<ProfileDescriptor>, mapping: &TemplateMapping) -> ProcessorDescriptor {
+    ProcessorDescriptor {
+      processor_type: ProcessorType::DshService,
+      id: self.id.clone(),
+      label: self.label.clone(),
+      description: self.description.clone(),
+      version: self.version.clone(),
+      inbound_junctions: match &self.inbound_junctions {
+        Some(inbound_junctions) => inbound_junctions
+          .iter()
+          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
+          .collect::<Vec<JunctionDescriptor>>(),
+        None => vec![],
+      },
+      outbound_junctions: match &self.outbound_junctions {
+        Some(outbound_junctions) => outbound_junctions
+          .iter()
+          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
+          .collect::<Vec<JunctionDescriptor>>(),
+        None => vec![],
+      },
+      deployment_parameters: match &self.deploy {
+        Some(deploy_config) => match &deploy_config.parameters {
+          Some(parameters) => parameters
+            .iter()
+            .map(|h| (h.id.clone(), h))
+            .map(DeploymentParameterDescriptor::from)
+            .collect::<Vec<DeploymentParameterDescriptor>>(),
+          None => vec![],
+        },
+        None => vec![],
+      },
+      profiles,
+      metadata: self.metadata.clone().unwrap_or_default(),
+      more_info_url: self.more_info_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      metrics_url: self.metrics_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      viewer_url: self.viewer_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+    }
+  }
+}
+
+impl JunctionConfig {
+  fn convert_to_descriptor(&self, id: &String) -> JunctionDescriptor {
+    let (min, max) = match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
+      (None, None) => (1, 1),
+      (None, Some(max)) => (1, max),
+      (Some(min), None) => (min, u32::MAX),
+      (Some(min), Some(max)) => (min, max),
+    };
+    JunctionDescriptor {
+      id: id.to_owned(),
+      label: self.label.clone(),
+      description: self.description.clone(),
+      minimum_number_of_resources: min,
+      maximum_number_of_resources: max,
+      allowed_resource_types: self.allowed_resource_types.clone(),
+    }
+  }
+}
+
+fn validate_config_template(template: &str, template_id: &str) -> Result<(), String> {
+  static VALID_PLACEHOLDERS: [PlaceHolder; 10] = [
+    PlaceHolder::AppDomain,
+    PlaceHolder::ConsoleUrl,
+    PlaceHolder::MonitoringUrl,
+    PlaceHolder::Platform,
+    PlaceHolder::Realm,
+    PlaceHolder::RestAccessTokenUrl,
+    PlaceHolder::RestApiUrl,
+    PlaceHolder::Tenant,
+    PlaceHolder::User,
+    PlaceHolder::PublicVhostsDomain,
+  ];
+  if template.is_empty() {
+    return Err(format!("{} cannot be empty", template_id));
+  }
+  validate_template(template, &VALID_PLACEHOLDERS).map_err(|message| format!("{} has {}", template_id, message))
 }

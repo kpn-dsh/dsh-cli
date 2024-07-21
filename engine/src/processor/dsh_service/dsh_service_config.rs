@@ -1,45 +1,15 @@
 use std::collections::HashMap;
 
-use lazy_static::lazy_static;
 use log::debug;
-use regex::Regex;
 use serde::Deserialize;
 
 use crate::is_valid_id;
-use crate::processor::application::{template_resolver, validate_template, TemplateMapping};
-use crate::processor::processor_config::{read_config, DeployConfig, JunctionConfig, PlaceHolder, VariableConfig, VariableType};
-use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
+use crate::processor::processor_config::{read_processor_config, ProcessorConfig, VariableConfig, VariableType};
+use crate::processor::processor_descriptor::ProfileDescriptor;
 use crate::processor::ProcessorType;
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct ApplicationConfig {
-  #[serde(rename = "type")]
-  pub processor_type: ProcessorType,
-  #[serde(rename = "id")]
-  pub application_id: String,
-  #[serde(rename = "label")]
-  pub application_label: String,
-  #[serde(rename = "description")]
-  pub application_description: String,
-  #[serde(rename = "version")]
-  pub application_version: Option<String>,
-  pub metadata: Option<Vec<(String, String)>>,
-  #[serde(rename = "more-info-url")]
-  pub more_info_url: Option<String>,
-  #[serde(rename = "metrics-url")]
-  pub metrics_url: Option<String>,
-  #[serde(rename = "viewer-url")]
-  pub viewer_url: Option<String>,
-  #[serde(rename = "inbound-junctions")]
-  pub inbound_junctions: Option<HashMap<String, JunctionConfig>>,
-  #[serde(rename = "outbound-junctions")]
-  pub outbound_junctions: Option<HashMap<String, JunctionConfig>>,
-  pub deploy: Option<DeployConfig>,
-  pub application: ApplicationSpecificConfig,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct ApplicationSpecificConfig {
+pub struct DshServiceSpecificConfig {
   pub image: String,
   #[serde(rename = "needs-token")]
   pub needs_token: bool,
@@ -136,96 +106,30 @@ impl ProfileConfig {
   }
 }
 
-fn validate_config_template(template: &str, template_id: &str) -> Result<(), String> {
-  static VALID_PLACEHOLDERS: [PlaceHolder; 10] = [
-    PlaceHolder::AppDomain,
-    PlaceHolder::ConsoleUrl,
-    PlaceHolder::MonitoringUrl,
-    PlaceHolder::Platform,
-    PlaceHolder::Realm,
-    PlaceHolder::RestAccessTokenUrl,
-    PlaceHolder::RestApiUrl,
-    PlaceHolder::Tenant,
-    PlaceHolder::User,
-    PlaceHolder::PublicVhostsDomain,
-  ];
-  if template.is_empty() {
-    return Err(format!("{} cannot be empty", template_id));
+pub fn read_dsh_service_config(config_file_name: &str) -> Result<ProcessorConfig, String> {
+  let processor_config = read_processor_config(config_file_name, ProcessorType::DshService)?;
+  let dsh_service_specific_config = match processor_config.dsh_service_specific_config {
+    Some(ref config) => config,
+    None => return Err("dsh service configuration missing".to_string()),
+  };
+  if dsh_service_specific_config.image.is_empty() {
+    return Err("dsh service image cannot be empty".to_string());
   }
-  validate_template(template, &VALID_PLACEHOLDERS).map_err(|m| format!("{} has {}", template_id, m))
-}
-
-lazy_static! {
-  static ref APPLICATION_ID_REGEX: Regex = Regex::new("^[a-z0-9]{1,20}$").unwrap();
-}
-
-pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConfig, String> {
-  debug!("read application config file: {}", config_file_name);
-  let config = read_config::<ApplicationConfig>(config_file_name)?;
-  debug!("successfully read and parsed application config file\n{:#?}", config);
-  if config.processor_type != ProcessorType::Application {
-    return Err(format!("processor type '{}' doesn't match file type ('application')", config.processor_type));
-  }
-  if !APPLICATION_ID_REGEX.is_match(&config.application_id) {
-    return Err("illegal application name (must be between 1 and 20 characters long and may contain only lowercase alphabetical characters and digits)".to_string());
-  }
-  if config.application_description.is_empty() {
-    return Err("application description cannot be empty".to_string());
-  }
-  if config.application_version.clone().is_some_and(|ref version| version.is_empty()) {
-    return Err("application version cannot be empty".to_string());
-  }
-  if let Some(ref url) = config.more_info_url {
-    validate_config_template(url, "more-info-url template")?
-  }
-  if let Some(ref url) = config.metrics_url {
-    validate_config_template(url, "metrics-url template")?
-  }
-  if let Some(ref url) = config.viewer_url {
-    validate_config_template(url, "viewer-url template")?
-  }
-  if let (Some(inbound), Some(outbound)) = (&config.inbound_junctions, &config.outbound_junctions) {
-    if let Some(ambiguous_id) = inbound.keys().find(|id| outbound.contains_key(*id)) {
-      return Err(format!("'{}' used as inbound as well as outbound id", ambiguous_id));
-    }
-  }
-  if let Some(inbound_junctions) = &config.inbound_junctions {
-    for (id, inbound_junction) in inbound_junctions {
-      inbound_junction.validate(id)?
-    }
-  }
-  if let Some(outbound_junctions) = &config.outbound_junctions {
-    for (id, outbound_junction) in outbound_junctions {
-      outbound_junction.validate(id)?
-    }
-  }
-  if let Some(deploy_config) = &config.deploy {
-    if let Some(ref parameters) = deploy_config.parameters {
-      for parameter in parameters {
-        parameter.validate(parameter.id.as_str())?
-      }
-    }
-  }
-  if config.application.image.is_empty() {
-    return Err("application image cannot be empty".to_string());
-  }
-  if config.application.spread_group.clone().is_some_and(|spread_group| spread_group.is_empty()) {
+  if dsh_service_specific_config.spread_group.clone().is_some_and(|spread_group| spread_group.is_empty()) {
     return Err("spread group cannot be empty".to_string());
   }
-  if config.application.exposed_ports.clone().is_some_and(|exposed_ports| exposed_ports.is_empty()) {
+  if dsh_service_specific_config
+    .exposed_ports
+    .clone()
+    .is_some_and(|exposed_ports| exposed_ports.is_empty())
+  {
     return Err("exposed ports cannot be empty".to_string());
   }
-  if config.application.secrets.clone().is_some_and(|secrets| secrets.is_empty()) {
-    return Err("secrets cannot be empty".to_string());
-  }
-  if config.application.volumes.clone().is_some_and(|volumes| volumes.is_empty()) {
-    return Err("volumes cannot be empty".to_string());
-  }
-  if let Some(ref variables) = &config.application.environment_variables {
+  if let Some(ref variables) = &dsh_service_specific_config.environment_variables {
     for (variable_name, variable) in variables {
       variable.validate(variable_name)?;
       if variable.typ == VariableType::DeploymentParameter {
-        if let Some(deploy_config) = &config.deploy {
+        if let Some(deploy_config) = &processor_config.deploy {
           if let Some(ref parameters) = deploy_config.parameters {
             if !parameters.iter().any(|p| p.id == variable.id.clone().unwrap()) {
               return Err(format!(
@@ -245,85 +149,19 @@ pub fn read_application_config(config_file_name: &str) -> Result<ApplicationConf
       }
     }
   }
-  if config.application.profiles.is_empty() {
+  if dsh_service_specific_config.profiles.is_empty() {
     return Err("no profiles defined".to_string());
   } else {
-    for profile in &config.application.profiles {
+    for profile in &dsh_service_specific_config.profiles {
       profile.validate(&profile.id)?
     }
   }
   debug!("successfully validated config");
-  Ok(config)
-}
-
-impl ApplicationConfig {
-  pub(crate) fn convert_to_descriptor(&self, mapping: &TemplateMapping) -> ProcessorDescriptor {
-    ProcessorDescriptor {
-      processor_type: ProcessorType::Application,
-      id: self.application_id.clone(),
-      label: self.application_label.clone(),
-      description: self.application_description.clone(),
-      version: self.application_version.clone(),
-      inbound_junctions: match &self.inbound_junctions {
-        Some(inbound_junctions) => inbound_junctions
-          .iter()
-          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
-          .collect::<Vec<JunctionDescriptor>>(),
-        None => vec![],
-      },
-      outbound_junctions: match &self.outbound_junctions {
-        Some(outbound_junctions) => outbound_junctions
-          .iter()
-          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
-          .collect::<Vec<JunctionDescriptor>>(),
-        None => vec![],
-      },
-      deployment_parameters: match &self.deploy {
-        Some(deploy_config) => match &deploy_config.parameters {
-          Some(parameters) => parameters
-            .iter()
-            .map(|h| (h.id.clone(), h))
-            .map(DeploymentParameterDescriptor::from)
-            .collect::<Vec<DeploymentParameterDescriptor>>(),
-          None => vec![],
-        },
-        None => vec![],
-      },
-      profiles: self
-        .application
-        .profiles
-        .iter()
-        .map(|p| p.convert_to_descriptor())
-        .collect::<Vec<ProfileDescriptor>>(),
-      metadata: self.metadata.clone().unwrap_or_default(),
-      more_info_url: self.more_info_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-      metrics_url: self.metrics_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-      viewer_url: self.viewer_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-    }
-  }
-}
-
-impl JunctionConfig {
-  fn convert_to_descriptor(&self, id: &String) -> JunctionDescriptor {
-    let (min, max) = match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
-      (None, None) => (1, 1),
-      (None, Some(max)) => (1, max),
-      (Some(min), None) => (min, u32::MAX),
-      (Some(min), Some(max)) => (min, max),
-    };
-    JunctionDescriptor {
-      id: id.to_owned(),
-      label: self.label.clone(),
-      description: self.description.clone(),
-      minimum_number_of_resources: min,
-      maximum_number_of_resources: max,
-      allowed_resource_types: self.allowed_resource_types.clone(),
-    }
-  }
+  Ok(processor_config)
 }
 
 impl ProfileConfig {
-  fn convert_to_descriptor(self: &ProfileConfig) -> ProfileDescriptor {
+  pub(crate) fn convert_to_descriptor(self: &ProfileConfig) -> ProfileDescriptor {
     ProfileDescriptor {
       id: self.id.clone(),
       label: self.label.clone(),
@@ -336,17 +174,17 @@ impl ProfileConfig {
 }
 
 #[test]
-fn read_application_config_proper_values() {
+fn read_dsh_service_config_proper_values() {
   use crate::processor::processor_config::{DeploymentParameterConfigOption, DeploymentParameterConfigOptionLabel};
 
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  path.push("tests/processors/applications/application-config-test.toml");
-  let config = &read_application_config(path.to_str().unwrap()).unwrap();
+  path.push("tests/processors/dsh-services/dsh-service-config-test.toml");
+  let config = &read_processor_config(path.to_str().unwrap(), ProcessorType::DshService).unwrap();
 
-  assert_eq!(config.processor_type, ProcessorType::Application);
-  assert_eq!(config.application_id, "test");
-  assert_eq!(config.application_description, "Test profiles");
-  assert_eq!(config.application_version, Some("0.1.2".to_string()));
+  assert_eq!(config.processor_type, ProcessorType::DshService);
+  assert_eq!(config.id, "test");
+  assert_eq!(config.description, "Test profiles");
+  assert_eq!(config.version, Some("0.1.2".to_string()));
   assert_eq!(config.more_info_url, Some("https://dsh.kpn.com".to_string()));
   assert_eq!(config.metrics_url, Some("https://grafana.com".to_string()));
   assert_eq!(config.viewer_url, Some("https://eavesdropper.kpn.com".to_string()));
@@ -386,7 +224,7 @@ fn read_application_config_proper_values() {
     initial_value: Option<&str>,
     optional: Option<bool>,
     options: Option<Vec<DeploymentParameterConfigOption>>,
-    typ: crate::processor::DeploymentParameterType,
+    typ: crate::processor::processor_config::DeploymentParameterType,
   ) {
     let parameter = deploy_parameters.iter().find(|p| p.id == id).unwrap();
     assert_eq!(parameter.label, label);
@@ -416,7 +254,7 @@ fn read_application_config_proper_values() {
       initial_value,
       optional,
       None,
-      crate::processor::DeploymentParameterType::Boolean,
+      crate::processor::processor_config::DeploymentParameterType::Boolean,
     )
   }
 
@@ -438,7 +276,7 @@ fn read_application_config_proper_values() {
       initial_value,
       optional,
       None,
-      crate::processor::DeploymentParameterType::FreeText,
+      crate::processor::processor_config::DeploymentParameterType::FreeText,
     )
   }
 
@@ -461,7 +299,7 @@ fn read_application_config_proper_values() {
       initial_value,
       optional,
       options,
-      crate::processor::DeploymentParameterType::Selection,
+      crate::processor::processor_config::DeploymentParameterType::Selection,
     )
   }
 
@@ -504,15 +342,17 @@ fn read_application_config_proper_values() {
   );
   test_s(parameters, "sel4", "S4", Some("s11"), "DS4", Some("s11"), Some(true), Some(vec![option_id]));
 
-  assert_eq!(config.application.image, "test-image:0.1.2-SNAPSHOT");
-  assert_eq!(config.application.needs_token, true);
-  assert_eq!(config.application.single_instance, false);
+  let dsh_service_specific_config = config.dsh_service_specific_config.as_ref().unwrap();
 
-  let metrics = config.application.metrics.clone().unwrap();
+  assert_eq!(dsh_service_specific_config.image, "test-image:0.1.2-SNAPSHOT");
+  assert_eq!(dsh_service_specific_config.needs_token, true);
+  assert_eq!(dsh_service_specific_config.single_instance, false);
+
+  let metrics = dsh_service_specific_config.metrics.clone().unwrap();
   assert_eq!(metrics.port, 9095);
   assert_eq!(metrics.path, "/metrics");
 
-  let exposed_ports = config.application.exposed_ports.clone().unwrap().get("3000").unwrap().clone();
+  let exposed_ports = dsh_service_specific_config.exposed_ports.clone().unwrap().get("3000").unwrap().clone();
   assert_eq!(exposed_ports.vhost.unwrap(), "{ vhost('your-vhost-name','a-zone') }");
   assert_eq!(exposed_ports.auth.unwrap(), "app-realm:admin:$1$EZsDrd93$7g2osLFOay4.TzDgGo9bF/");
   assert_eq!(exposed_ports.mode.unwrap(), "http");
@@ -520,57 +360,59 @@ fn read_application_config_proper_values() {
   assert_eq!(exposed_ports.paths, vec!("/abc"));
   assert_eq!(exposed_ports.service_group.unwrap(), "mygroup");
 
-  let health_check = config.application.health_check.clone().unwrap();
+  let health_check = dsh_service_specific_config.health_check.clone().unwrap();
   assert_eq!(health_check.port, 8080);
   assert_eq!(health_check.protocol.unwrap(), HealthCheckProtocol::Http);
   assert_eq!(health_check.path, "/healthpath");
 
-  let secret = config.application.secrets.clone().unwrap().first().unwrap().clone();
+  let secret = dsh_service_specific_config.secrets.clone().unwrap().first().unwrap().clone();
   assert_eq!(secret.name, "secret_name");
   assert_eq!(secret.injections.first().unwrap().get("env").unwrap(), "SECRET");
-  assert_eq!(config.application.spread_group.clone().unwrap(), "SPREAD_GROUP");
+  assert_eq!(dsh_service_specific_config.spread_group.clone().unwrap(), "SPREAD_GROUP");
 
-  let volumes = config.application.volumes.clone().unwrap();
+  let volumes = dsh_service_specific_config.volumes.clone().unwrap();
   assert_eq!(volumes.get("/volume_path").unwrap(), "{ volume('correct_volume_name') }");
 
   let deployment_parameters = config.deploy.as_ref().unwrap().parameters.clone().unwrap();
   assert_eq!(deployment_parameters.len(), 11);
 
-  let environment_variables = config.application.environment_variables.clone().unwrap();
+  let environment_variables = dsh_service_specific_config.environment_variables.clone().unwrap();
   assert_eq!(environment_variables.len(), 5);
 
-  let env = environment_variables.get("APPLICATION_ENV_VAR1").unwrap().clone();
+  let env = environment_variables.get("DSH_SERVICE_ENV_VAR1").unwrap().clone();
   assert_eq!(env.typ, VariableType::DeploymentParameter);
   assert_eq!(env.id.unwrap(), "bool1");
   assert!(env.value.is_none());
 
-  let env = environment_variables.get("APPLICATION_ENV_VAR2").unwrap().clone();
+  let env = environment_variables.get("DSH_SERVICE_ENV_VAR2").unwrap().clone();
   assert_eq!(env.typ, VariableType::InboundJunction);
   assert_eq!(env.id.unwrap(), "inbound-topic");
   assert!(env.value.is_none());
 
-  let env = environment_variables.get("APPLICATION_ENV_VAR3").unwrap().clone();
+  let env = environment_variables.get("DSH_SERVICE_ENV_VAR3").unwrap().clone();
   assert_eq!(env.typ, VariableType::OutboundJunction);
   assert_eq!(env.id.unwrap(), "outbound-topic");
   assert!(env.value.is_none());
 
-  let env = environment_variables.get("APPLICATION_ENV_VAR4").unwrap().clone();
+  let env = environment_variables.get("DSH_SERVICE_ENV_VAR4").unwrap().clone();
   assert_eq!(env.typ, VariableType::Template);
   assert!(env.id.is_none());
   assert_eq!(env.value.unwrap(), "value4${TENANT}");
 
-  let env = environment_variables.get("APPLICATION_ENV_VAR5").unwrap().clone();
+  let env = environment_variables.get("DSH_SERVICE_ENV_VAR5").unwrap().clone();
   assert_eq!(env.typ, VariableType::Value);
   assert!(env.id.is_none());
   assert_eq!(env.value.unwrap(), "value5");
 }
 
 #[test]
-fn read_application_config_profile_proper_values() {
+fn read_dsh_service_config_profile_proper_values() {
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  path.push("tests/processors/applications/application-config-test.toml");
-  let config = &read_application_config(path.to_str().unwrap()).unwrap();
-  let profile1 = config.application.profiles.iter().find(|p| p.id == "profile-1").unwrap().clone();
+  path.push("tests/processors/dsh-services/dsh-service-config-test.toml");
+  let config = &read_processor_config(path.to_str().unwrap(), ProcessorType::DshService).unwrap();
+  let dsh_service_specific_config = config.dsh_service_specific_config.as_ref().unwrap();
+
+  let profile1 = dsh_service_specific_config.profiles.iter().find(|p| p.id == "profile-1").unwrap().clone();
   assert_eq!(profile1.description, "Profile 1");
   assert_eq!(profile1.cpus, 1.0);
   assert_eq!(profile1.mem, 1);

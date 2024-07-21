@@ -2,8 +2,8 @@ use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-use crate::processor::processor_config::{DeploymentParameterConfig, DeploymentParameterConfigOption, JunctionConfig};
-use crate::processor::{DeploymentParameterType, ProcessorType};
+use crate::processor::processor_config::{DeploymentParameterConfig, DeploymentParameterConfigOption, DeploymentParameterType, JunctionConfig};
+use crate::processor::ProcessorType;
 use crate::resource::ResourceType;
 
 /// Describes a `Processor`

@@ -5,10 +5,10 @@ use dsh_rest_api_client::types::{
   HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec as ApiPathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
 };
 
-use crate::processor::application::application_config::{
-  ApplicationConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
+use crate::processor::dsh_service::dsh_service_config::{
+  DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
-use crate::processor::application::{template_resolver, TemplateMapping};
+use crate::processor::dsh_service::{template_resolver, TemplateMapping};
 use crate::processor::processor_config::VariableType;
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
@@ -112,7 +112,7 @@ impl From<SecretConfig> for ApiApplicationSecret {
 }
 
 pub fn into_api_application(
-  application_config: &ApplicationConfig,
+  dsh_service_specific_config: &DshServiceSpecificConfig,
   inbound_junctions: &HashMap<String, String>,
   outbound_junctions: &HashMap<String, String>,
   parameters: &HashMap<String, String>,
@@ -121,7 +121,7 @@ pub fn into_api_application(
   template_mapping: &TemplateMapping,
 ) -> Result<ApiApplication, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
-  if let Some(ref envs) = application_config.application.environment_variables {
+  if let Some(ref envs) = dsh_service_specific_config.environment_variables {
     for (environment_variable, variable) in envs.clone() {
       match variable.typ {
         VariableType::InboundJunction => match variable.id {
@@ -186,29 +186,29 @@ pub fn into_api_application(
   let api_application = ApiApplication {
     cpus: profile.cpus,
     env: environment_variables,
-    exposed_ports: match application_config.application.exposed_ports {
+    exposed_ports: match dsh_service_specific_config.exposed_ports {
       Some(ref m) => m
         .iter()
         .map(|e| (e.0.clone(), Into::<ApiPortMapping>::into(e.1.clone())))
         .collect::<HashMap<String, ApiPortMapping>>(),
       None => HashMap::new(),
     },
-    health_check: application_config.application.health_check.as_ref().map(|hc| ApiHealthCheck::from(hc.clone())),
-    image: template_resolver(application_config.application.image.as_str(), template_mapping)?,
+    health_check: dsh_service_specific_config.health_check.as_ref().map(|hc| ApiHealthCheck::from(hc.clone())),
+    image: template_resolver(dsh_service_specific_config.image.as_str(), template_mapping)?,
     instances: profile.instances,
     mem: profile.mem,
-    metrics: application_config.application.metrics.clone().map(|m| m.into()),
-    needs_token: application_config.application.needs_token,
+    metrics: dsh_service_specific_config.metrics.clone().map(|m| m.into()),
+    needs_token: dsh_service_specific_config.needs_token,
     readable_streams: vec![],
-    secrets: match application_config.application.secrets {
+    secrets: match dsh_service_specific_config.secrets {
       Some(ref ss) => ss.iter().map(|s| Into::<ApiApplicationSecret>::into(s.clone())).collect(),
       None => vec![],
     },
-    single_instance: application_config.application.single_instance,
-    spread_group: application_config.application.spread_group.clone(),
+    single_instance: dsh_service_specific_config.single_instance,
+    spread_group: dsh_service_specific_config.spread_group.clone(),
     topics: vec![],
     user,
-    volumes: match application_config.application.volumes {
+    volumes: match dsh_service_specific_config.volumes {
       Some(ref vs) => vs
         .iter()
         .map(|e| (e.0.clone(), ApiApplicationVolumes { name: e.1.clone() }))
