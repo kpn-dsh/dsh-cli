@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 use serde::{Deserialize, Serialize};
 
 pub mod dsh_service;
-pub mod platform;
 pub mod processor;
 pub mod processor_config;
 pub mod processor_descriptor;
