@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
+use crate::processor::dsh_service::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 use crate::resource::dsh_topic::topic_registry::TopicRegistry;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceTypeDescriptor};

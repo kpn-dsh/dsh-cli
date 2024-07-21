@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
+use crate::processor::platform::DshPlatform;
 use dsh_rest_api_client::Client;
 use dsh_sdk::{RestTokenFetcher, RestTokenFetcherBuilder};
 use lazy_static::lazy_static;
@@ -8,14 +9,12 @@ use rand::Rng;
 use regex::Regex;
 use uuid::Uuid;
 
-use crate::processor::application::platform::DshPlatform;
 use crate::processor::processor_config::PlaceHolder;
 
-pub mod application;
-pub mod application_config;
-pub mod application_registry;
-pub mod dsh_api;
-pub mod platform;
+pub mod dsh_service;
+pub mod dsh_service_api;
+pub mod dsh_service_config;
+pub mod dsh_service_registry;
 
 const TRIFONIUS_CONFIG_DIR: &str = "TRIFONIUS_CONFIG_DIR";
 

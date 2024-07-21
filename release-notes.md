@@ -36,8 +36,11 @@ Initial release.
 
 * Added validation to the config files.
 * Added validation to the deploy method.
+* Added methods to get lists of processor types and resource types.
 
 #### Bugfixes and Improvements
 
 * Updated some dependency versions.
 * Improved and refactored registries.
+* Renamed 'application' processor to 'dsh service'.
+* 

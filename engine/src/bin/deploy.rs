@@ -9,7 +9,7 @@ const SERVICE_ID: &str = "test-0-0-2";
 #[tokio::main]
 async fn main() {
   let processor_registry = ProcessorRegistry::default();
-  let application = processor_registry.processor(ProcessorType::Application, "consentfilter").unwrap();
+  let dsh_service = processor_registry.processor(ProcessorType::DshService, "consentfilter").unwrap();
 
   let inbound_junctions = HashMap::from([(
     "inbound-kafka-topic".to_string(),
@@ -29,7 +29,7 @@ async fn main() {
   ]);
   let profile_id = Some("minimal");
 
-  let r = application
+  let r = dsh_service
     .deploy(SERVICE_ID, &inbound_junctions, &outbound_junctions, &parameters, profile_id)
     .await;
 

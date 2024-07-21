@@ -1,6 +1,6 @@
-type = "application"
+type = "dsh-service"
 id = "test"
-label = "Test application"
+label = "Test DSH Service"
 description = "Test profiles"
 version = "0.1.2"
 
@@ -40,14 +40,14 @@ parameters = [
     { type = "selection", id = "sel4", label = "S4", description = "DS4", options = ["s11"], initial-value = "s11", optional = true, default = "s11" }
 ]
 
-[application]
+[dsh-service]
 
 image = "test-image:0.1.2-SNAPSHOT"
 needs-token = true
 single-instance = false
 spread-group = "SPREAD_GROUP"
 
-[application.exposed-ports.3000]
+[dsh-service.exposed-ports.3000]
 vhost = "{ vhost('your-vhost-name','a-zone') }"
 auth = "app-realm:admin:$1$EZsDrd93$7g2osLFOay4.TzDgGo9bF/"
 mode = "http"
@@ -55,52 +55,52 @@ whitelist = "0.0.0.0 127.0.0.1"
 paths = ["/abc"]
 service-group = "mygroup"
 
-[application.health-check]
+[dsh-service.health-check]
 protocol = "http"
 port = 8080
 path = "/healthpath"
 
-[application.metrics]
+[dsh-service.metrics]
 port = 9095
 path = "/metrics"
 
-[[application.secrets]]
+[[dsh-service.secrets]]
 name = "secret_name"
 injections = [{ env = "SECRET" }]
 
-[application.volumes]
+[dsh-service.volumes]
 "/volume_path" = "{ volume('correct_volume_name') }"
 
-[application.environment-variables]
+[dsh-service.environment-variables]
 
-APPLICATION_ENV_VAR1 = { type = "deployment-parameter", id = "bool1" }
-APPLICATION_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
-APPLICATION_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
-APPLICATION_ENV_VAR4 = { type = "template", value = "value4${TENANT}" }
-APPLICATION_ENV_VAR5 = { type = "value", value = "value5" }
+DSH_SERVICE_ENV_VAR1 = { type = "deployment-parameter", id = "bool1" }
+DSH_SERVICE_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
+DSH_SERVICE_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
+DSH_SERVICE_ENV_VAR4 = { type = "template", value = "value4${TENANT}" }
+DSH_SERVICE_ENV_VAR5 = { type = "value", value = "value5" }
 
-[[application.profiles]]
+[[dsh-service.profiles]]
 id = "profile-1"
 label = "Profile 1"
 description = "Profile 1"
 cpus = 1
 instances = 1
 mem = 1
-[application.profiles.environment-variables]
+[dsh-service.profiles.environment-variables]
 PROFILE1_ENV_VAR1 = { type = "deployment-parameter", id = "free1" }
 PROFILE1_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
 PROFILE1_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
 PROFILE1_ENV_VAR4 = { type = "template", value = "value14${TENANT}" }
 PROFILE1_ENV_VAR5 = { type = "value", value = "value15" }
 
-[[application.profiles]]
+[[dsh-service.profiles]]
 id = "profile-1"
 label = "Profile 1"
 description = "Profile 2"
 cpus = 2
 instances = 2
 mem = 2
-[application.profiles.profile-2.environment-variables]
+[dsh-service.profiles.profile-2.environment-variables]
 PROFILE2_ENV_VAR1 = { type = "deployment-parameter", id = "sel1" }
 PROFILE2_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
 PROFILE2_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }

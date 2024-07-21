@@ -7,7 +7,7 @@ const SERVICE_ID: &str = "test-0-0-2";
 async fn main() -> Result<(), String> {
   env_logger::init();
   let processor_registry = ProcessorRegistry::default();
-  let application = processor_registry.processor(ProcessorType::Application, "consentfilter").ok_or("")?;
-  println!("{}", application.undeploy(SERVICE_ID).await?);
+  let dsh_service = processor_registry.processor(ProcessorType::DshService, "consentfilter").ok_or("")?;
+  println!("{}", dsh_service.undeploy(SERVICE_ID).await?);
   Ok(())
 }

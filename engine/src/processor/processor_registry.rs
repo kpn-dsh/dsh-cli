@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 
-use crate::processor::application::application_registry::ApplicationRegistry;
-use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
+use crate::processor::dsh_service::dsh_service_registry::DshServiceRegistry;
+use crate::processor::dsh_service::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 use crate::processor::processor::{Processor, ProcessorIdentifier};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
 use crate::processor::ProcessorType;
@@ -12,7 +12,7 @@ lazy_static! {
 }
 
 pub struct ProcessorRegistry<'a> {
-  application_registry: ApplicationRegistry<'a>,
+  dsh_service_registry: DshServiceRegistry<'a>,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
@@ -28,7 +28,7 @@ impl<'a> ProcessorRegistry<'a> {
   }
 
   pub fn create(target_client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<ProcessorRegistry<'a>, String> {
-    Ok(ProcessorRegistry { application_registry: ApplicationRegistry::create(target_client_factory, resource_registry)?, resource_registry })
+    Ok(ProcessorRegistry { dsh_service_registry: DshServiceRegistry::create(target_client_factory, resource_registry)?, resource_registry })
   }
 
   pub fn resource_registry(&self) -> &ResourceRegistry {
@@ -36,53 +36,53 @@ impl<'a> ProcessorRegistry<'a> {
   }
 
   pub fn processor_types(&self) -> Vec<ProcessorTypeDescriptor> {
-    vec![ProcessorTypeDescriptor::from(&ProcessorType::Application)]
+    vec![ProcessorTypeDescriptor::from(&ProcessorType::DshService)]
   }
 
   pub fn processor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<&(dyn Processor)> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_by_id(processor_id),
+      ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(processor_id),
     }
   }
 
   pub fn processor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&(dyn Processor)> {
     match processor_identifier.processor_type {
-      ProcessorType::Application => self.application_registry.application_by_id(processor_identifier.id.as_str()),
+      ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(processor_identifier.id.as_str()),
     }
   }
 
   pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<ProcessorDescriptor> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_by_id(processor_id).map(|a| a.descriptor()),
+      ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(processor_id).map(|a| a.descriptor()),
     }
   }
 
   pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<ProcessorDescriptor> {
     match processor_identifier.processor_type {
-      ProcessorType::Application => self
-        .application_registry
-        .application_by_id(processor_identifier.id.as_str())
+      ProcessorType::DshService => self
+        .dsh_service_registry
+        .dsh_service_by_id(processor_identifier.id.as_str())
         .map(|a| a.descriptor()),
     }
   }
 
   pub fn processor_descriptors(&self) -> Vec<ProcessorDescriptor> {
-    self.application_registry.application_descriptors()
+    self.dsh_service_registry.dsh_service_descriptors()
   }
 
   pub fn processor_descriptors_by_type(&self, processor_type: ProcessorType) -> Vec<ProcessorDescriptor> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_descriptors(),
+      ProcessorType::DshService => self.dsh_service_registry.dsh_service_descriptors(),
     }
   }
 
   pub fn processor_identifiers(&self) -> Vec<&ProcessorIdentifier> {
-    self.application_registry.processor_identifiers()
+    self.dsh_service_registry.processor_identifiers()
   }
 
   pub fn processor_identifiers_by_type(&self, processor_type: ProcessorType) -> Vec<&ProcessorIdentifier> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.processor_identifiers(),
+      ProcessorType::DshService => self.dsh_service_registry.processor_identifiers(),
     }
   }
 }
