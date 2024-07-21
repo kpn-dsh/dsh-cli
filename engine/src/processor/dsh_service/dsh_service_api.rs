@@ -8,8 +8,8 @@ use dsh_rest_api_client::types::{
 use crate::processor::dsh_service::dsh_service_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
-use crate::processor::dsh_service::{template_resolver, TemplateMapping};
 use crate::processor::processor_config::VariableType;
+use crate::target_client::{template_resolver, TemplateMapping};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
   fn from(value: ApiHealthCheck) -> Self {

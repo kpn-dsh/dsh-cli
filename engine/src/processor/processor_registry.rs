@@ -1,11 +1,11 @@
 use lazy_static::lazy_static;
 
 use crate::processor::dsh_service::dsh_service_registry::DshServiceRegistry;
-use crate::processor::dsh_service::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 use crate::processor::processor::{Processor, ProcessorIdentifier};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
 use crate::processor::ProcessorType;
 use crate::resource::resource_registry::{ResourceRegistry, DEFAULT_RESOURCE_REGISTRY};
+use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
 lazy_static! {
   pub static ref DEFAULT_PROCESSOR_REGISTRY: ProcessorRegistry<'static> = ProcessorRegistry::default();

@@ -9,7 +9,6 @@ use reqwest::StatusCode;
 
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
-use crate::processor::dsh_service::{TargetClientFactory, TemplateMapping};
 use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
 use crate::processor::processor_config::{JunctionConfig, PlaceHolder, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
@@ -18,6 +17,7 @@ use crate::resource::resource::ResourceIdentifier;
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::ResourceType;
+use crate::target_client::{TargetClientFactory, TemplateMapping};
 
 pub struct DshService<'a> {
   processor_identifier: ProcessorIdentifier,

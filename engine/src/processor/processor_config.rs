@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::is_valid_id;
 use crate::processor::dsh_service::dsh_service_config::DshServiceSpecificConfig;
-use crate::processor::dsh_service::{template_resolver, validate_template, TemplateMapping};
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::ProcessorType;
 use crate::resource::ResourceType;
+use crate::target_client::{template_resolver, validate_template, TemplateMapping};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorConfig {

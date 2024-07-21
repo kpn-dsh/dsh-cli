@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use dsh_sdk::Properties;
 
-use crate::processor::dsh_service::TargetClientFactory;
 use crate::resource::dsh_topic::topic_resource::{topic_resource_identifier, TopicResourceImpl};
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
+use crate::target_client::TargetClientFactory;
 
 pub(crate) struct TopicRegistry<'a> {
   resources: HashMap<ResourceIdentifier, TopicResourceImpl<'a>>,
