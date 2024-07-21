@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
+use crate::placeholder::PlaceHolder;
 use crate::processor::platform::DshPlatform;
 use dsh_rest_api_client::Client;
 use dsh_sdk::{RestTokenFetcher, RestTokenFetcherBuilder};
@@ -8,8 +9,6 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use regex::Regex;
 use uuid::Uuid;
-
-use crate::processor::processor_config::PlaceHolder;
 
 const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
 const TRIFONIUS_TARGET_TENANT_USER: &str = "TRIFONIUS_TARGET_TENANT_USER";

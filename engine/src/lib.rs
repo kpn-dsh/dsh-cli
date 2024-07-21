@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 
+pub mod placeholder;
 pub mod processor;
 pub mod resource;
 pub mod target_client;

@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use crate::placeholder::PlaceHolder;
 use async_trait::async_trait;
 use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::error;
@@ -10,7 +11,7 @@ use reqwest::StatusCode;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
 use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
-use crate::processor::processor_config::{JunctionConfig, PlaceHolder, ProcessorConfig};
+use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::ProcessorType;
 use crate::resource::resource::ResourceIdentifier;
