@@ -2,6 +2,8 @@ use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
+use crate::config_dir_name;
+
 pub mod dsh_service;
 pub mod processor;
 pub mod processor_config;
@@ -34,4 +36,8 @@ impl ProcessorType {
       ProcessorType::DshService => "DSH Service",
     }
   }
+}
+
+pub(crate) fn processor_config_dir_name() -> String {
+  format!("{}/processors", config_dir_name())
 }
