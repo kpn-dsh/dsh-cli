@@ -108,10 +108,10 @@ impl ProfileConfig {
 
 pub fn read_dsh_service_config(config_file_name: &str) -> Result<ProcessorConfig, String> {
   let processor_config = read_processor_config(config_file_name, ProcessorType::DshService)?;
-  let dsh_service_specific_config = match processor_config.dsh_service_specific_config {
-    Some(ref config) => config,
-    None => return Err("dsh service configuration missing".to_string()),
-  };
+  let dsh_service_specific_config = processor_config
+    .dsh_service_specific_config
+    .as_ref()
+    .ok_or("dsh service specific configuration missing".to_string())?;
   if dsh_service_specific_config.image.is_empty() {
     return Err("dsh service image cannot be empty".to_string());
   }
@@ -131,7 +131,7 @@ pub fn read_dsh_service_config(config_file_name: &str) -> Result<ProcessorConfig
       if variable.typ == VariableType::DeploymentParameter {
         if let Some(deploy_config) = &processor_config.deploy {
           if let Some(ref parameters) = deploy_config.parameters {
-            if !parameters.iter().any(|p| p.id == variable.id.clone().unwrap()) {
+            if !parameters.iter().any(|parameter| parameter.id == variable.id.clone().unwrap()) {
               return Err(format!(
                 "variable '{}' references unspecified deployment parameter '{}'",
                 variable_name,

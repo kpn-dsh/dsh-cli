@@ -2,12 +2,12 @@
 
 use std::collections::HashMap;
 
-use crate::placeholder::PlaceHolder;
 use async_trait::async_trait;
 use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::error;
 use reqwest::StatusCode;
 
+use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
 use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
@@ -28,11 +28,11 @@ pub struct DshService<'a> {
 }
 
 impl<'a> DshService<'a> {
-  pub fn create(processor_config: ProcessorConfig, client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
+  pub fn create(processor_config: ProcessorConfig, target_client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
     Ok(DshService {
       processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: processor_config.id.clone() },
       processor_config,
-      target_client_factory: client_factory,
+      target_client_factory,
       resource_registry,
     })
   }
@@ -137,7 +137,7 @@ impl Processor for DshService<'_> {
     let mut template_mapping: TemplateMapping = TemplateMapping::from(self.target_client_factory);
     template_mapping.insert(PlaceHolder::ServiceId, service_id.to_string());
     let api_application = into_api_application(
-      &dsh_service_specific_config,
+      dsh_service_specific_config,
       &inbound_junction_topics,
       &outbound_junction_topics,
       &validated_parameters,
@@ -271,15 +271,15 @@ impl DshService<'_> {
     junction_configs: &HashMap<String, JunctionConfig>,
   ) -> Result<HashMap<String, String>, String> {
     let mut junction_topics = HashMap::<String, String>::new();
-    for (id, junction_config) in junction_configs {
-      match junctions.get(id) {
+    for (junction_id, junction_config) in junction_configs {
+      match junctions.get(junction_id) {
         Some(resource_ids) => {
           if let Some(illegal_resource) = resource_ids.iter().find(|ri| ri.resource_type != ResourceType::DshTopic) {
             return Err(format!(
               "resource '{}' connected to {} junction '{}' has wrong type, '{}' expected",
               illegal_resource,
               in_out,
-              id,
+              junction_id,
               ResourceType::DshTopic
             ));
           }
@@ -287,13 +287,13 @@ impl DshService<'_> {
           if resource_ids.len() < min as usize {
             return Err(format!(
               "there should be at least {} resource instance(s) connected to {} junction '{}'",
-              min, in_out, id
+              min, in_out, junction_id
             ));
           }
           if resource_ids.len() > max as usize {
             return Err(format!(
               "there can be at most {} resource instance(s) connected to {} junction '{}'",
-              min, in_out, id
+              min, in_out, junction_id
             ));
           }
           let mut topics = Vec::<String>::new();
@@ -303,15 +303,20 @@ impl DshService<'_> {
                 Some(dsh_topic_descriptor) => topics.push(dsh_topic_descriptor.topic.to_string()),
                 None => unreachable!(),
               },
-              None => return Err(format!("resource '{}' connected to {} junction '{}' does not exist", resource_id, in_out, id)),
+              None => {
+                return Err(format!(
+                  "resource '{}' connected to {} junction '{}' does not exist",
+                  resource_id, in_out, junction_id
+                ))
+              }
             }
           }
-          junction_topics.insert(id.to_string(), topics.join(","));
+          junction_topics.insert(junction_id.to_string(), topics.join(","));
         }
         None => {
           let (min, max) = junction_config.number_of_resources_range();
           if min != 0 || max != 0 {
-            return Err(format!("required {} junction resources '{}' are not provided", in_out, id));
+            return Err(format!("required {} junction resources '{}' are not provided", in_out, junction_id));
           }
         }
       }
