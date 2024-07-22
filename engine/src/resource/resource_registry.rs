@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::resource::dsh_topic::topic_registry::TopicRegistry;
+use crate::resource::dsh_topic::dsh_topic_registry::TopicRegistry;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceTypeDescriptor};
 use crate::resource::ResourceType;

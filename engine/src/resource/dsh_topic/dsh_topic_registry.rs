@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use dsh_sdk::Properties;
 
-use crate::resource::dsh_topic::topic_resource::TopicResourceImpl;
+use crate::resource::dsh_topic::dsh_topic_resource::TopicResourceImpl;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::ResourceType;

@@ -3,7 +3,7 @@ use std::ops::Deref;
 use async_trait::async_trait;
 use dsh_sdk::dsh::datastream::Stream;
 
-use crate::resource::dsh_topic::topic_descriptor::DshTopicDescriptor;
+use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::ResourceType;

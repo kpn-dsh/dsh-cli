@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::resource::dsh_topic::topic_descriptor::DshTopicDescriptor;
+use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
 use crate::resource::resource::ResourceIdentifier;
 use serde::{Deserialize, Serialize};
 
