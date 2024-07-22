@@ -19,7 +19,7 @@ impl<'a> TopicResourceImpl<'a> {
   pub fn create(stream: &Stream, target_client_factory: &'a TargetClientFactory) -> Result<Self, String> {
     let resource_descriptor = ResourceDescriptor {
       resource_type: ResourceType::DshTopic,
-      id: stream.name().to_string(),
+      id: stream.name().replace('.', "-"),
       label: stream.name().to_string(),
       description: "DSH Kafka topic".to_string(),
       version: None,
@@ -55,7 +55,8 @@ impl<'a> TopicResourceImpl<'a> {
         cluster: stream.cluster().to_string(),
       }),
     };
-    Ok(TopicResourceImpl { resource_identifier: topic_resource_identifier(stream.name().to_string()), resource_descriptor, target_client_factory })
+    let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: resource_descriptor.id.clone() };
+    Ok(TopicResourceImpl { resource_identifier, resource_descriptor, target_client_factory })
   }
 }
 
@@ -106,8 +107,4 @@ async fn get_topic_status(target_client_factory: &TargetClientFactory, topic_nam
     }
     Err(e) => Err(format!("dsh api error ({})", e)),
   }
-}
-
-pub fn topic_resource_identifier(id: String) -> ResourceIdentifier {
-  ResourceIdentifier { resource_type: ResourceType::DshTopic, id }
 }

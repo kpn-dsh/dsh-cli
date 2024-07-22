@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use trifonius_engine::processor::processor_registry::ProcessorRegistry;
 use trifonius_engine::processor::ProcessorType;
-use trifonius_engine::resource::dsh_topic::topic_resource::topic_resource_identifier;
+use trifonius_engine::resource::resource::ResourceIdentifier;
+use trifonius_engine::resource::ResourceType;
 
 const SERVICE_ID: &str = "test-0-0-2";
 
@@ -13,11 +14,11 @@ async fn main() {
 
   let inbound_junctions = HashMap::from([(
     "inbound-kafka-topic".to_string(),
-    vec![topic_resource_identifier("stream.reference-implementation-3p".to_string())],
+    vec![ResourceIdentifier { resource_type: ResourceType::DshTopic, id: "stream-reference-implementation-3p".to_string() }],
   )]);
   let outbound_junctions = HashMap::from([(
     "outbound-kafka-topic".to_string(),
-    vec![topic_resource_identifier("scratch.reference-implementation-compliant".to_string())],
+    vec![ResourceIdentifier { resource_type: ResourceType::DshTopic, id: "scratch-reference-implementation-compliant".to_string() }],
   )]);
 
   let parameters = HashMap::from([

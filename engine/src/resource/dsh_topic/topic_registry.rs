@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use dsh_sdk::Properties;
 
-use crate::resource::dsh_topic::topic_resource::{topic_resource_identifier, TopicResourceImpl};
+use crate::resource::dsh_topic::topic_resource::TopicResourceImpl;
 use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
+use crate::resource::ResourceType;
 use crate::target_client::TargetClientFactory;
 
 pub(crate) struct TopicRegistry<'a> {
@@ -17,13 +18,16 @@ impl<'a> TopicRegistry<'a> {
     let dsh_properties: &Properties = Properties::get();
     for stream in dsh_properties.datastream().streams().values() {
       let resource = TopicResourceImpl::create(stream, target_client_factory).unwrap();
-      resources.insert(topic_resource_identifier(stream.name().to_owned()), resource);
+      resources.insert(resource.resource_identifier.clone(), resource);
     }
     Ok(TopicRegistry { resources })
   }
 
   pub(crate) fn resource_by_id(&self, id: &str) -> Option<&(dyn Resource + Sync)> {
-    match self.resources.get(&topic_resource_identifier(id.to_string())) {
+    match self
+      .resources
+      .get(&ResourceIdentifier { resource_type: ResourceType::DshTopic, id: id.to_string() })
+    {
       Some(a) => Some(a),
       None => None,
     }
