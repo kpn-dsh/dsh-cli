@@ -1,9 +1,8 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
-use crate::resource::resource::ResourceIdentifier;
 use serde::{Deserialize, Serialize};
 
+use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
 use crate::resource::ResourceType;
 
 #[derive(Deserialize, Serialize)]
@@ -92,11 +91,5 @@ impl Display for ResourceDescriptor {
       std::fmt::Display::fmt(&dsh_topic_descriptor, f)?
     }
     Ok(())
-  }
-}
-
-impl ResourceDescriptor {
-  pub fn resource_identifier(&self) -> ResourceIdentifier {
-    ResourceIdentifier { resource_type: self.resource_type.clone(), id: self.id.clone() }
   }
 }
