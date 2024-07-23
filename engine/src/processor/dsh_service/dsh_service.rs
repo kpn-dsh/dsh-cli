@@ -10,7 +10,7 @@ use reqwest::StatusCode;
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
-use crate::processor::processor::{Processor, ProcessorStatus};
+use crate::processor::processor::{service_name, Processor, ProcessorStatus};
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorType, ProfileId, ServiceId};
@@ -133,8 +133,11 @@ impl Processor for DshService<'_> {
       }
     };
     let target_client = self.target_client_factory.get().await?;
+    let service_name = service_name(&self.processor_identifier.id, service_id);
     let mut template_mapping: TemplateMapping = TemplateMapping::from(self.target_client_factory);
+    template_mapping.insert(PlaceHolder::ProcessorId, self.processor_identifier.id.0.clone());
     template_mapping.insert(PlaceHolder::ServiceId, service_id.to_string());
+    template_mapping.insert(PlaceHolder::ServiceName, service_name.to_string());
     let api_application = into_api_application(
       dsh_service_specific_config,
       &inbound_junction_topics,
@@ -146,7 +149,7 @@ impl Processor for DshService<'_> {
     )?;
     match target_client
       .client
-      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_id.0.as_str(), &target_client.token, &api_application)
+      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_name.as_str(), &target_client.token, &api_application)
       .await
     {
       Ok(response) => {
@@ -207,9 +210,10 @@ impl Processor for DshService<'_> {
 
   async fn status(&self, service_id: &ServiceId) -> Result<ProcessorStatus, String> {
     let target_client = self.target_client_factory.get().await?;
+    let service_name = service_name(&self.processor_identifier.id, service_id);
     match target_client
       .client
-      .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_id.0.as_str(), &target_client.token)
+      .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_name.as_str(), &target_client.token)
       .await
     {
       Ok(response) => match response.status() {
@@ -236,9 +240,10 @@ impl Processor for DshService<'_> {
 
   async fn undeploy(&self, service_id: &ServiceId) -> Result<bool, String> {
     let target_client = self.target_client_factory.get().await?;
+    let service_name = service_name(&self.processor_identifier.id, service_id);
     match target_client
       .client
-      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_id.0.as_str(), &target_client.token)
+      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_name.as_str(), &target_client.token)
       .await
     {
       Ok(response) => match response.status() {

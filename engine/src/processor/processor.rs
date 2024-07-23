@@ -138,3 +138,7 @@ impl Display for ProcessorStatus {
     }
   }
 }
+
+pub fn service_name(processor_id: &ProcessorId, service_id: &ServiceId) -> String {
+  format!("{}-{}", processor_id, service_id)
+}
