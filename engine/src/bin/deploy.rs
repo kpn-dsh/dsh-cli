@@ -5,12 +5,13 @@ use trifonius_engine::processor::{JunctionId, ParameterId, ProcessorId, Processo
 use trifonius_engine::resource::ResourceType;
 use trifonius_engine::resource::{ResourceId, ResourceIdentifier};
 
-const SERVICE_ID: &str = "test-0-0-2";
+const PROCESSOR_ID: &str = "consentfilter";
+const SERVICE_ID: &str = "test002";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
   let processor_registry = ProcessorRegistry::default();
-  let processor_id = ProcessorId::new("consentfilter");
+  let processor_id = ProcessorId::new(PROCESSOR_ID);
   let dsh_service = processor_registry.processor(ProcessorType::DshService, &processor_id).unwrap();
 
   let inbound_junction = JunctionId::new("inbound-kafka-topic");
