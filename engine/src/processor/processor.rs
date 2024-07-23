@@ -9,20 +9,8 @@ use std::fmt::{Display, Formatter};
 use async_trait::async_trait;
 
 use crate::processor::processor_descriptor::ProcessorDescriptor;
-use crate::processor::ProcessorType;
-use crate::resource::resource::ResourceIdentifier;
-
-#[derive(Clone, Eq, Hash, PartialEq)]
-pub struct ProcessorIdentifier {
-  pub processor_type: ProcessorType,
-  pub id: String,
-}
-
-impl Display for ProcessorIdentifier {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}", &self.id, &self.processor_type)
-  }
-}
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorType, ProfileId, ServiceId};
+use crate::resource::ResourceIdentifier;
 
 /// Defines the behavior of a Trifonius `Processor`
 #[async_trait]
@@ -41,11 +29,11 @@ pub trait Processor {
   /// * `Err(msg)` - when the deployment request could not be sent.
   async fn deploy(
     &self,
-    service_id: &str,
-    inbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
-    parameters: &HashMap<String, String>,
-    profile_id: Option<&str>,
+    service_id: &ServiceId,
+    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    parameters: &HashMap<ParameterId, String>,
+    profile_id: &Option<ProfileId>,
   ) -> Result<(), String>;
 
   /// # Get the resources compatible with this `Processor`
@@ -57,7 +45,7 @@ pub trait Processor {
   /// ## Returns
   /// * `Ok<Vec<ResourceIdentifier>` - list of identifiers of compatible resources.
   /// * `Err(msg)`                   - when the list could not be composed.
-  async fn compatible_resources(&self, junction_id: &str) -> Result<Vec<ResourceIdentifier>, String>;
+  async fn compatible_resources(&self, junction_id: &JunctionId) -> Result<Vec<ResourceIdentifier>, String>;
 
   /// # Get this `Processor`s descriptor
   ///
@@ -69,7 +57,7 @@ pub trait Processor {
   ///
   /// ## Returns
   /// * This `Processor`s id.
-  fn id(&self) -> &str;
+  fn id(&self) -> &ProcessorId;
 
   /// # Get this `Processor`s `ProcessorIdentifier`
   ///
@@ -100,7 +88,7 @@ pub trait Processor {
   /// * `Ok<true>`  - when the start request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the start request could not be sent.
-  async fn start(&self, service_id: &str) -> Result<bool, String>;
+  async fn start(&self, service_id: &ServiceId) -> Result<bool, String>;
 
   /// # Get this `Processor`s status
   ///
@@ -111,7 +99,7 @@ pub trait Processor {
   /// * `Ok<ProcessorStatus>` - signals whether the processor with the given `service_id` is active
   ///                           or not.
   /// * `Err(msg)`            - when the status request could not be sent.
-  async fn status(&self, service_id: &str) -> Result<ProcessorStatus, String>;
+  async fn status(&self, service_id: &ServiceId) -> Result<ProcessorStatus, String>;
 
   /// # Stop this `Processor`
   ///
@@ -122,7 +110,7 @@ pub trait Processor {
   /// * `Ok<true>`  - when the stop request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the stop request could not be sent.
-  async fn stop(&self, service_id: &str) -> Result<bool, String>;
+  async fn stop(&self, service_id: &ServiceId) -> Result<bool, String>;
 
   /// # Undeploy this `Processor`
   ///
@@ -133,7 +121,7 @@ pub trait Processor {
   /// * `Ok<true>`  - when the undeployment request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the undeployment request could not be sent.
-  async fn undeploy(&self, service_id: &str) -> Result<bool, String>;
+  async fn undeploy(&self, service_id: &ServiceId) -> Result<bool, String>;
 }
 
 #[derive(Debug)]

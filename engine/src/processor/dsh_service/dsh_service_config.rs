@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use log::debug;
 use serde::Deserialize;
 
-use crate::is_valid_id;
-use crate::processor::processor_config::{read_processor_config, ProcessorConfig, VariableConfig, VariableType};
+use crate::processor::processor_config::{read_processor_config, DeployConfig, ProcessorConfig, VariableConfig, VariableType};
 use crate::processor::processor_descriptor::ProfileDescriptor;
-use crate::processor::ProcessorType;
+use crate::processor::{ProcessorType, ProfileId};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DshServiceSpecificConfig {
@@ -88,9 +87,109 @@ pub struct ProfileConfig {
   pub environment_variables: Option<HashMap<String, VariableConfig>>,
 }
 
+impl DshServiceSpecificConfig {
+  pub fn validate(&self, deploy_config: &Option<DeployConfig>) -> Result<(), String> {
+    if self.image.is_empty() {
+      return Err("dsh service image cannot be empty".to_string());
+    }
+    if self.spread_group.clone().is_some_and(|spread_group| spread_group.is_empty()) {
+      return Err("spread group cannot be empty".to_string());
+    }
+    if let Some(ref exposed_ports) = self.exposed_ports {
+      if exposed_ports.is_empty() {
+        return Err("exposed ports cannot be empty".to_string());
+      } else {
+        for (port, port_mapping) in exposed_ports {
+          match port.parse::<u32>() {
+            Ok(port_number) => {
+              if port_number > 65535 {
+                return Err(format!("exposed port '{}' is invalid", port));
+              }
+            }
+            Err(_) => return Err(format!("exposed port '{}' is invalid", port)),
+          }
+          port_mapping.validate(port)?
+        }
+      }
+    }
+    if let Some(ref health_check) = self.health_check {
+      health_check.validate()?
+    };
+    if let Some(ref metrics) = self.metrics {
+      metrics.validate()?
+    };
+    if let Some(ref secrets) = self.secrets {
+      for secret in secrets {
+        secret.validate()?
+      }
+    };
+    // TODO Validate volumes?
+    if let Some(ref environment_variables) = &self.environment_variables {
+      for (variable_name, variable_config) in environment_variables {
+        variable_config.validate(variable_name)?;
+        if variable_config.typ == VariableType::DeploymentParameter {
+          if let Some(deploy_config) = &deploy_config {
+            if let Some(ref parameters) = deploy_config.parameters {
+              if !parameters.iter().any(|parameter| parameter.id == variable_config.id.clone().unwrap()) {
+                return Err(format!(
+                  "variable '{}' references unspecified deployment parameter '{}'",
+                  variable_name,
+                  variable_config.id.clone().unwrap()
+                ));
+              };
+            } else {
+              return Err(format!(
+                "variable '{}' references deployment parameter '{}' but none are specified",
+                variable_name,
+                variable_config.id.clone().unwrap()
+              ));
+            }
+          }
+        }
+      }
+    }
+    if self.profiles.is_empty() {
+      return Err("no profiles defined".to_string());
+    } else {
+      for profile in &self.profiles {
+        profile.validate(&profile.id)?
+      }
+    }
+    Ok(())
+  }
+}
+
+impl PortMappingConfig {
+  pub fn validate(&self, _port: &str) -> Result<(), String> {
+    // TODO
+    Ok(())
+  }
+}
+
+impl HealthCheckConfig {
+  pub fn validate(&self) -> Result<(), String> {
+    // TODO
+    Ok(())
+  }
+}
+
+impl MetricsConfig {
+  pub fn validate(&self) -> Result<(), String> {
+    // TODO
+    Ok(())
+  }
+}
+
+impl SecretConfig {
+  pub fn validate(&self) -> Result<(), String> {
+    // TODO
+    Ok(())
+  }
+}
+
 impl ProfileConfig {
   pub fn validate(&self, id: &str) -> Result<(), String> {
-    if !is_valid_id(&self.id) {
+    if !ProfileId::is_valid(&self.id) {
       return Err(format!("profile has invalid identifier '{}'", id));
     }
     if self.label.is_empty() {
@@ -112,50 +211,7 @@ pub fn read_dsh_service_config(config_file_name: &str) -> Result<ProcessorConfig
     .dsh_service_specific_config
     .as_ref()
     .ok_or("dsh service specific configuration missing".to_string())?;
-  if dsh_service_specific_config.image.is_empty() {
-    return Err("dsh service image cannot be empty".to_string());
-  }
-  if dsh_service_specific_config.spread_group.clone().is_some_and(|spread_group| spread_group.is_empty()) {
-    return Err("spread group cannot be empty".to_string());
-  }
-  if dsh_service_specific_config
-    .exposed_ports
-    .clone()
-    .is_some_and(|exposed_ports| exposed_ports.is_empty())
-  {
-    return Err("exposed ports cannot be empty".to_string());
-  }
-  if let Some(ref variables) = &dsh_service_specific_config.environment_variables {
-    for (variable_name, variable) in variables {
-      variable.validate(variable_name)?;
-      if variable.typ == VariableType::DeploymentParameter {
-        if let Some(deploy_config) = &processor_config.deploy {
-          if let Some(ref parameters) = deploy_config.parameters {
-            if !parameters.iter().any(|parameter| parameter.id == variable.id.clone().unwrap()) {
-              return Err(format!(
-                "variable '{}' references unspecified deployment parameter '{}'",
-                variable_name,
-                variable.id.clone().unwrap()
-              ));
-            };
-          } else {
-            return Err(format!(
-              "variable '{}' references deployment parameter '{}' but none are specified",
-              variable_name,
-              variable.id.clone().unwrap()
-            ));
-          }
-        }
-      }
-    }
-  }
-  if dsh_service_specific_config.profiles.is_empty() {
-    return Err("no profiles defined".to_string());
-  } else {
-    for profile in &dsh_service_specific_config.profiles {
-      profile.validate(&profile.id)?
-    }
-  }
+  dsh_service_specific_config.validate(&processor_config.deploy)?;
   debug!("successfully validated config");
   Ok(processor_config)
 }
@@ -195,21 +251,26 @@ fn read_dsh_service_config_proper_values() {
     vec![("metadata1".to_string(), "METADATA1".to_string()), ("metadata2".to_string(), "METADATA2".to_string())]
   );
 
+  let inbound_junction_id = crate::processor::JunctionId::try_from("inbound-topic").unwrap();
   let inbound_junctions = config.inbound_junctions.clone().unwrap();
   assert_eq!(inbound_junctions.len(), 1);
-  assert_eq!(inbound_junctions.get("inbound-topic").unwrap().label, "Test inbound topic");
-  assert_eq!(inbound_junctions.get("inbound-topic").unwrap().description, "Test inbound topic description");
+  assert_eq!(inbound_junctions.get(&inbound_junction_id).unwrap().label, "Test inbound topic");
+  assert_eq!(inbound_junctions.get(&inbound_junction_id).unwrap().description, "Test inbound topic description");
   assert_eq!(
-    inbound_junctions.get("inbound-topic").unwrap().allowed_resource_types,
+    inbound_junctions.get(&inbound_junction_id).unwrap().allowed_resource_types,
     vec![crate::resource::ResourceType::DshTopic]
   );
 
+  let outbound_junction_id = crate::processor::JunctionId::try_from("outbound-topic").unwrap();
   let outbound_junctions = config.outbound_junctions.clone().unwrap();
   assert_eq!(outbound_junctions.len(), 1);
-  assert_eq!(outbound_junctions.get("outbound-topic").unwrap().label, "Test outbound topic");
-  assert_eq!(outbound_junctions.get("outbound-topic").unwrap().description, "Test outbound topic description");
+  assert_eq!(outbound_junctions.get(&outbound_junction_id).unwrap().label, "Test outbound topic");
   assert_eq!(
-    outbound_junctions.get("outbound-topic").unwrap().allowed_resource_types,
+    outbound_junctions.get(&outbound_junction_id).unwrap().description,
+    "Test outbound topic description"
+  );
+  assert_eq!(
+    outbound_junctions.get(&outbound_junction_id).unwrap().allowed_resource_types,
     vec![crate::resource::ResourceType::DshTopic]
   );
 

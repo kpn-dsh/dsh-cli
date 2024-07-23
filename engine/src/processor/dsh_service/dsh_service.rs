@@ -10,14 +10,13 @@ use reqwest::StatusCode;
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
-use crate::processor::processor::{Processor, ProcessorIdentifier, ProcessorStatus};
+use crate::processor::processor::{Processor, ProcessorStatus};
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
-use crate::processor::ProcessorType;
-use crate::resource::resource::ResourceIdentifier;
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorType, ProfileId, ServiceId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
-use crate::resource::ResourceType;
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
 use crate::target_client::{TargetClientFactory, TemplateMapping};
 
 pub struct DshService<'a> {
@@ -30,7 +29,7 @@ pub struct DshService<'a> {
 impl<'a> DshService<'a> {
   pub fn create(processor_config: ProcessorConfig, target_client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
     Ok(DshService {
-      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: processor_config.id.clone() },
+      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: ProcessorId::try_from(processor_config.id.as_str())? },
       processor_config,
       target_client_factory,
       resource_registry,
@@ -40,7 +39,7 @@ impl<'a> DshService<'a> {
 
 #[async_trait]
 impl Processor for DshService<'_> {
-  async fn compatible_resources(&self, junction_id: &str) -> Result<Vec<ResourceIdentifier>, String> {
+  async fn compatible_resources(&self, junction_id: &JunctionId) -> Result<Vec<ResourceIdentifier>, String> {
     if let Some((direction, junction_config)) = self
       .processor_config
       .inbound_junctions
@@ -60,12 +59,12 @@ impl Processor for DshService<'_> {
           match direction {
             ResourceDirection::Inbound => {
               if resource_descriptor.readable {
-                compatible_resources.push(resource_descriptor.resource_identifier())
+                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? })
               }
             }
             ResourceDirection::Outbound => {
               if resource_descriptor.writable {
-                compatible_resources.push(resource_descriptor.resource_identifier())
+                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? })
               }
             }
           }
@@ -79,11 +78,11 @@ impl Processor for DshService<'_> {
 
   async fn deploy(
     &self,
-    service_id: &str,
-    inbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<String, Vec<ResourceIdentifier>>,
-    deploy_parameters: &HashMap<String, String>,
-    profile_id: Option<&str>,
+    service_id: &ServiceId,
+    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    deploy_parameters: &HashMap<ParameterId, String>,
+    profile_id: &Option<ProfileId>,
   ) -> Result<(), String> {
     let inbound_junction_topics: HashMap<String, String> = match &self.processor_config.inbound_junctions {
       Some(inbound_junction_configs) => self.junctions(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
@@ -99,7 +98,7 @@ impl Processor for DshService<'_> {
       Some(deploy) => match &deploy.parameters {
         Some(parameters) => {
           for parameter_config in parameters {
-            match deploy_parameters.get(&parameter_config.id) {
+            match deploy_parameters.get(&ParameterId::new(parameter_config.id.as_str())) {
               Some(deploy_parameter) => _ = validated_parameters.insert(parameter_config.id.to_string(), deploy_parameter.to_string()),
               None => match &parameter_config.default {
                 Some(default) => _ = validated_parameters.insert(parameter_config.id.to_string(), default.clone()),
@@ -119,7 +118,7 @@ impl Processor for DshService<'_> {
 
     let dsh_service_specific_config = self.processor_config.dsh_service_specific_config.as_ref().unwrap();
     let profile: ProfileConfig = match profile_id {
-      Some(pn) => match dsh_service_specific_config.profiles.iter().find(|p| p.id == pn) {
+      Some(pn) => match dsh_service_specific_config.profiles.iter().find(|p| p.id == pn.0) {
         Some(p) => p.clone(),
         None => return Err(format!("profile '{}' is not defined", pn)),
       },
@@ -147,7 +146,7 @@ impl Processor for DshService<'_> {
     )?;
     match target_client
       .client
-      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_id, &target_client.token, &api_application)
+      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_id.0.as_str(), &target_client.token, &api_application)
       .await
     {
       Ok(response) => {
@@ -190,7 +189,7 @@ impl Processor for DshService<'_> {
     &self.processor_identifier
   }
 
-  fn id(&self) -> &str {
+  fn id(&self) -> &ProcessorId {
     &self.processor_identifier.id
   }
 
@@ -202,15 +201,15 @@ impl Processor for DshService<'_> {
     ProcessorType::DshService
   }
 
-  async fn start(&self, _service_id: &str) -> Result<bool, String> {
+  async fn start(&self, _service_id: &ServiceId) -> Result<bool, String> {
     Err("start method not yet implemented".to_string())
   }
 
-  async fn status(&self, service_id: &str) -> Result<ProcessorStatus, String> {
+  async fn status(&self, service_id: &ServiceId) -> Result<ProcessorStatus, String> {
     let target_client = self.target_client_factory.get().await?;
     match target_client
       .client
-      .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_id, &target_client.token)
+      .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_id.0.as_str(), &target_client.token)
       .await
     {
       Ok(response) => match response.status() {
@@ -231,15 +230,15 @@ impl Processor for DshService<'_> {
     }
   }
 
-  async fn stop(&self, _service_id: &str) -> Result<bool, String> {
+  async fn stop(&self, _service_id: &ServiceId) -> Result<bool, String> {
     Err("stop method not yet implemented".to_string())
   }
 
-  async fn undeploy(&self, service_id: &str) -> Result<bool, String> {
+  async fn undeploy(&self, service_id: &ServiceId) -> Result<bool, String> {
     let target_client = self.target_client_factory.get().await?;
     match target_client
       .client
-      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_id, &target_client.token)
+      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_id.0.as_str(), &target_client.token)
       .await
     {
       Ok(response) => match response.status() {
@@ -267,8 +266,8 @@ impl DshService<'_> {
   fn junctions(
     &self,
     in_out: ResourceDirection,
-    junctions: &HashMap<String, Vec<ResourceIdentifier>>,
-    junction_configs: &HashMap<String, JunctionConfig>,
+    junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    junction_configs: &HashMap<JunctionId, JunctionConfig>,
   ) -> Result<HashMap<String, String>, String> {
     let mut junction_topics = HashMap::<String, String>::new();
     for (junction_id, junction_config) in junction_configs {

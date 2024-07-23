@@ -1,9 +1,9 @@
 use lazy_static::lazy_static;
 
 use crate::processor::dsh_service::dsh_service_registry::DshServiceRegistry;
-use crate::processor::processor::{Processor, ProcessorIdentifier};
+use crate::processor::processor::Processor;
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
-use crate::processor::ProcessorType;
+use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorType};
 use crate::resource::resource_registry::{ResourceRegistry, DEFAULT_RESOURCE_REGISTRY};
 use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
@@ -39,7 +39,7 @@ impl<'a> ProcessorRegistry<'a> {
     vec![ProcessorTypeDescriptor::from(&ProcessorType::DshService)]
   }
 
-  pub fn processor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<&(dyn Processor)> {
+  pub fn processor(&self, processor_type: ProcessorType, processor_id: &ProcessorId) -> Option<&(dyn Processor)> {
     match processor_type {
       ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(processor_id),
     }
@@ -47,11 +47,11 @@ impl<'a> ProcessorRegistry<'a> {
 
   pub fn processor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&(dyn Processor)> {
     match processor_identifier.processor_type {
-      ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(processor_identifier.id.as_str()),
+      ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(&processor_identifier.id),
     }
   }
 
-  pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<ProcessorDescriptor> {
+  pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &ProcessorId) -> Option<ProcessorDescriptor> {
     match processor_type {
       ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(processor_id).map(|a| a.descriptor()),
     }
@@ -59,10 +59,7 @@ impl<'a> ProcessorRegistry<'a> {
 
   pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<ProcessorDescriptor> {
     match processor_identifier.processor_type {
-      ProcessorType::DshService => self
-        .dsh_service_registry
-        .dsh_service_by_id(processor_identifier.id.as_str())
-        .map(|a| a.descriptor()),
+      ProcessorType::DshService => self.dsh_service_registry.dsh_service_by_id(&processor_identifier.id).map(|a| a.descriptor()),
     }
   }
 

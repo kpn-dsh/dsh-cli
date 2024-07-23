@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use dsh_sdk::dsh::datastream::Stream;
 
 use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
-use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
+use crate::resource::resource::{Resource, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
-use crate::resource::ResourceType;
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
 use crate::target_client::TargetClientFactory;
 
 pub struct TopicResourceImpl<'a> {
@@ -55,7 +55,7 @@ impl<'a> TopicResourceImpl<'a> {
         cluster: stream.cluster().to_string(),
       }),
     };
-    let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: resource_descriptor.id.clone() };
+    let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? };
     Ok(TopicResourceImpl { resource_identifier, resource_descriptor, target_client_factory })
   }
 }
@@ -70,7 +70,7 @@ impl Resource for TopicResourceImpl<'_> {
     &self.resource_identifier
   }
 
-  fn id(&self) -> &str {
+  fn id(&self) -> &ResourceId {
     &self.resource_identifier.id
   }
 
@@ -83,9 +83,9 @@ impl Resource for TopicResourceImpl<'_> {
   }
 
   async fn status(&self) -> Result<ResourceStatus, String> {
-    match get_topic_status(self.target_client_factory, &self.resource_identifier.id).await? {
+    match get_topic_status(self.target_client_factory, &self.resource_descriptor.dsh_topic_descriptor.as_ref().unwrap().topic).await? {
       Some(status) => Ok(status),
-      None => Err(format!("could not get status for non-existent topic {}", &self.resource_identifier.id)),
+      None => Err(format!("could not get status for non-existent topic '{}'", &self.resource_identifier.id)),
     }
   }
 }

@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use dsh_sdk::Properties;
 
 use crate::resource::dsh_topic::dsh_topic_resource::TopicResourceImpl;
-use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
+use crate::resource::resource::{Resource, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
-use crate::resource::ResourceType;
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
 use crate::target_client::TargetClientFactory;
 
 pub(crate) struct TopicRegistry<'a> {
@@ -23,11 +23,8 @@ impl<'a> TopicRegistry<'a> {
     Ok(TopicRegistry { resources })
   }
 
-  pub(crate) fn resource_by_id(&self, id: &str) -> Option<&(dyn Resource + Sync)> {
-    match self
-      .resources
-      .get(&ResourceIdentifier { resource_type: ResourceType::DshTopic, id: id.to_string() })
-    {
+  pub(crate) fn resource_by_id(&self, id: &ResourceId) -> Option<&(dyn Resource + Sync)> {
+    match self.resources.get(&ResourceIdentifier { resource_type: ResourceType::DshTopic, id: id.clone() }) {
       Some(a) => Some(a),
       None => None,
     }

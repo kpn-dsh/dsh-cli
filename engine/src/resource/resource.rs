@@ -3,28 +3,15 @@
 use std::fmt::{Display, Formatter};
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
 use crate::resource::resource_descriptor::ResourceDescriptor;
-use crate::resource::ResourceType;
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
-pub struct ResourceIdentifier {
-  pub resource_type: ResourceType,
-  pub id: String,
-}
-
-impl Display for ResourceIdentifier {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}", &self.id, &self.resource_type)
-  }
-}
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
 
 #[async_trait]
 pub trait Resource {
   fn descriptor(&self) -> &ResourceDescriptor;
   fn identifier(&self) -> &ResourceIdentifier;
-  fn id(&self) -> &str;
+  fn id(&self) -> &ResourceId;
   fn label(&self) -> &str;
   fn resource_type(&self) -> ResourceType;
   async fn status(&self) -> Result<ResourceStatus, String>;

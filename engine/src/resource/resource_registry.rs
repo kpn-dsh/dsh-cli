@@ -1,9 +1,9 @@
 use lazy_static::lazy_static;
 
 use crate::resource::dsh_topic::dsh_topic_registry::TopicRegistry;
-use crate::resource::resource::{Resource, ResourceIdentifier, ResourceStatus};
+use crate::resource::resource::{Resource, ResourceStatus};
 use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceTypeDescriptor};
-use crate::resource::ResourceType;
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
 use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
 lazy_static! {
@@ -33,7 +33,7 @@ impl<'a> ResourceRegistry<'a> {
     vec![ResourceTypeDescriptor::from(&ResourceType::DshTopic)]
   }
 
-  pub fn resource(&self, resource_type: ResourceType, resource_id: &str) -> Option<&(dyn Resource + Sync)> {
+  pub fn resource(&self, resource_type: ResourceType, resource_id: &ResourceId) -> Option<&(dyn Resource + Sync)> {
     match resource_type {
       ResourceType::DshTopic => self.dsh_topic_registry.resource_by_id(resource_id),
     }
@@ -41,11 +41,11 @@ impl<'a> ResourceRegistry<'a> {
 
   pub fn resource_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Option<&(dyn Resource + Sync)> {
     match resource_identifier.resource_type {
-      ResourceType::DshTopic => self.dsh_topic_registry.resource_by_id(resource_identifier.id.as_str()),
+      ResourceType::DshTopic => self.dsh_topic_registry.resource_by_id(&resource_identifier.id),
     }
   }
 
-  pub fn resource_descriptor(&self, resource_type: ResourceType, resource_id: &str) -> Option<&ResourceDescriptor> {
+  pub fn resource_descriptor(&self, resource_type: ResourceType, resource_id: &ResourceId) -> Option<&ResourceDescriptor> {
     match resource_type {
       ResourceType::DshTopic => self.dsh_topic_registry.resource_by_id(resource_id).map(|r| r.descriptor()),
     }
@@ -53,7 +53,7 @@ impl<'a> ResourceRegistry<'a> {
 
   pub fn resource_descriptor_by_identifier(&self, resource_identifier: &ResourceIdentifier) -> Option<&ResourceDescriptor> {
     match resource_identifier.resource_type {
-      ResourceType::DshTopic => self.dsh_topic_registry.resource_by_id(resource_identifier.id.as_str()).map(|r| r.descriptor()),
+      ResourceType::DshTopic => self.dsh_topic_registry.resource_by_id(&resource_identifier.id).map(|r| r.descriptor()),
     }
   }
 
