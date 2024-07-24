@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 
 use lazy_static::lazy_static;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::config_dir_name;
+use crate::{config_dir_name, identifier};
 
 pub mod dsh_service;
 pub mod processor;
@@ -24,20 +24,13 @@ pub struct ProcessorIdentifier {
   pub id: ProcessorId,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct ProcessorId(pub String);
-
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct JunctionId(pub String);
-
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct ServiceId(pub String);
-
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct ProfileId(pub String);
-
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct ParameterId(pub String);
+identifier!(JunctionId, "junction identifier", "^[a-z][a-z0-9_-]{1,50}$");
+identifier!(ParameterId, "parameter identifier", "^[a-z][a-z0-9_-]{1,30}$");
+identifier!(ProcessorId, "processor identifier", "^[a-z][a-z0-9]{0,19}$");
+identifier!(ProfileId, "profile identifier", "^[a-z0-9]{1,20}$");
+identifier!(ServiceId, "service identifier", "^[a-z][a-z0-9]{0,19}$");
+identifier!(ServiceName, "service name", "^[a-z][a-z0-9]{0,19}-[a-z][a-z0-9]{0,19}$");
+identifier!(TaskId, "task identifier", "^.*$");
 
 impl Display for ProcessorType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -64,241 +57,6 @@ impl ProcessorType {
 impl Display for ProcessorIdentifier {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}:{}", &self.id, &self.processor_type)
-  }
-}
-
-impl ProcessorId {
-  pub fn new(id: &str) -> Self {
-    if Self::is_valid(id) {
-      ProcessorId(id.to_string())
-    } else {
-      panic!("invalid processor id '{}'", id)
-    }
-  }
-
-  pub fn is_valid(id: &str) -> bool {
-    lazy_static! {
-      static ref PROCESSOR_ID_REGEX: Regex = Regex::new("^[a-z][a-z0-9_-]{1,50}$").unwrap();
-    }
-    PROCESSOR_ID_REGEX.is_match(id)
-  }
-}
-
-impl TryFrom<&str> for ProcessorId {
-  type Error = String;
-
-  fn try_from(id: &str) -> Result<Self, Self::Error> {
-    if Self::is_valid(id) {
-      Ok(ProcessorId(id.to_string()))
-    } else {
-      Err(format!("invalid processor id '{}'", id))
-    }
-  }
-}
-
-impl TryFrom<String> for ProcessorId {
-  type Error = String;
-
-  fn try_from(id: String) -> Result<Self, Self::Error> {
-    if Self::is_valid(id.as_str()) {
-      Ok(ProcessorId(id))
-    } else {
-      Err(format!("invalid processor id '{}'", id))
-    }
-  }
-}
-
-impl Display for ProcessorId {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.0)
-  }
-}
-
-impl JunctionId {
-  pub fn new(id: &str) -> Self {
-    if Self::is_valid(id) {
-      JunctionId(id.to_string())
-    } else {
-      panic!("invalid junction id '{}'", id)
-    }
-  }
-
-  pub fn is_valid(id: &str) -> bool {
-    lazy_static! {
-      static ref JUNCTION_ID_REGEX: Regex = Regex::new("^[a-z][a-z0-9_-]{1,50}$").unwrap();
-    }
-    JUNCTION_ID_REGEX.is_match(id)
-  }
-}
-
-impl TryFrom<&str> for JunctionId {
-  type Error = String;
-
-  fn try_from(id: &str) -> Result<Self, Self::Error> {
-    if Self::is_valid(id) {
-      Ok(JunctionId(id.to_string()))
-    } else {
-      Err(format!("invalid junction id '{}'", id))
-    }
-  }
-}
-
-impl TryFrom<String> for JunctionId {
-  type Error = String;
-
-  fn try_from(id: String) -> Result<Self, Self::Error> {
-    if Self::is_valid(&id) {
-      Ok(JunctionId(id))
-    } else {
-      Err(format!("invalid junction id '{}'", id))
-    }
-  }
-}
-
-impl Display for JunctionId {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.0)
-  }
-}
-
-impl ServiceId {
-  pub fn new(id: &str) -> Self {
-    if Self::is_valid(id) {
-      ServiceId(id.to_string())
-    } else {
-      panic!("invalid service id '{}'", id)
-    }
-  }
-
-  pub fn is_valid(id: &str) -> bool {
-    lazy_static! {
-      static ref SERVICE_ID_REGEX: Regex = Regex::new("^[a-z0-9]{1,20}$").unwrap();
-    }
-    SERVICE_ID_REGEX.is_match(id)
-  }
-}
-
-impl TryFrom<&str> for ServiceId {
-  type Error = String;
-
-  fn try_from(id: &str) -> Result<Self, Self::Error> {
-    if Self::is_valid(id) {
-      Ok(ServiceId(id.to_string()))
-    } else {
-      Err(format!("invalid service id '{}'", id))
-    }
-  }
-}
-
-impl TryFrom<String> for ServiceId {
-  type Error = String;
-
-  fn try_from(id: String) -> Result<Self, Self::Error> {
-    if Self::is_valid(id.as_str()) {
-      Ok(ServiceId(id))
-    } else {
-      Err(format!("invalid service id '{}'", id))
-    }
-  }
-}
-
-impl Display for ServiceId {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.0)
-  }
-}
-
-impl ProfileId {
-  pub fn new(id: &str) -> Self {
-    if Self::is_valid(id) {
-      ProfileId(id.to_string())
-    } else {
-      panic!("invalid profile id '{}'", id)
-    }
-  }
-
-  pub fn is_valid(id: &str) -> bool {
-    lazy_static! {
-      static ref PROFILE_ID_REGEX: Regex = Regex::new("^[a-z0-9]{1,20}$").unwrap();
-    }
-    PROFILE_ID_REGEX.is_match(id)
-  }
-}
-
-impl TryFrom<&str> for ProfileId {
-  type Error = String;
-
-  fn try_from(id: &str) -> Result<Self, Self::Error> {
-    if Self::is_valid(id) {
-      Ok(ProfileId(id.to_string()))
-    } else {
-      Err(format!("invalid profile id '{}'", id))
-    }
-  }
-}
-
-impl TryFrom<String> for ProfileId {
-  type Error = String;
-
-  fn try_from(id: String) -> Result<Self, Self::Error> {
-    if Self::is_valid(id.as_str()) {
-      Ok(ProfileId(id))
-    } else {
-      Err(format!("invalid profile id '{}'", id))
-    }
-  }
-}
-
-impl Display for ProfileId {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.0)
-  }
-}
-
-impl ParameterId {
-  pub fn new(id: &str) -> Self {
-    if Self::is_valid(id) {
-      ParameterId(id.to_string())
-    } else {
-      panic!("invalid parameter id '{}'", id)
-    }
-  }
-
-  pub fn is_valid(id: &str) -> bool {
-    lazy_static! {
-      static ref PARAMETER_ID_REGEX: Regex = Regex::new("^[a-z][a-z0-9_-]{1,30}$").unwrap();
-    }
-    PARAMETER_ID_REGEX.is_match(id)
-  }
-}
-
-impl TryFrom<&str> for ParameterId {
-  type Error = String;
-
-  fn try_from(id: &str) -> Result<Self, Self::Error> {
-    if Self::is_valid(id) {
-      Ok(ParameterId(id.to_string()))
-    } else {
-      Err(format!("invalid parameter id '{}'", id))
-    }
-  }
-}
-
-impl TryFrom<String> for ParameterId {
-  type Error = String;
-
-  fn try_from(id: String) -> Result<Self, Self::Error> {
-    if Self::is_valid(id.as_str()) {
-      Ok(ParameterId(id))
-    } else {
-      Err(format!("invalid parameter id '{}'", id))
-    }
-  }
-}
-
-impl Display for ParameterId {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.0)
   }
 }
 
