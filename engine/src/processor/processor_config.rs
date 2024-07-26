@@ -3,8 +3,9 @@ use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::ErrorKind::NotFound;
 
-use log::debug;
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
+use toml::de::Error;
 
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_config::DshServiceSpecificConfig;
@@ -12,6 +13,8 @@ use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, Junc
 use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType};
 use crate::resource::ResourceType;
 use crate::target_client::{template_resolver, validate_template, TemplateMapping};
+
+// TODO Add [processor] table to config format, containing all processor wide settings (id, label, etc)
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorConfig {
@@ -21,6 +24,7 @@ pub struct ProcessorConfig {
   pub label: String,
   pub description: String,
   pub version: Option<String>,
+  // TODO pub icon: Option<String>,
   pub metadata: Option<Vec<(String, String)>>,
   #[serde(rename = "more-info-url")]
   pub more_info_url: Option<String>,
@@ -47,6 +51,8 @@ pub struct JunctionConfig {
   pub maximum_number_of_resources: Option<u32>,
   #[serde(rename = "allowed-resource-types")]
   pub allowed_resource_types: Vec<ResourceType>,
+  #[serde(rename = "multiple-resources-separator")]
+  pub multiple_resources_separator: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -424,11 +430,11 @@ where
   match fs::read_to_string(config_file_name) {
     Ok(config_string) => match toml::from_str::<C>(&config_string) {
       Ok(config) => Ok(config),
-      Err(error) => Err(format!("could not parse config file '{}' ({})", config_file_name, error.message())),
+      Err(error) => Err(format!("error reading config file '{}', {}", config_file_name, parse_error_message(error))),
     },
     Err(error) => match error.kind() {
-      NotFound => Err(format!("config file '{}' not found", config_file_name)),
-      _ => Err(format!("config file '{}' could not be read ({})", config_file_name, error)),
+      NotFound => Err(format!("could not find config file '{}'", config_file_name)),
+      _ => Err(format!("error reading config file '{}', {}", config_file_name, error)),
     },
   }
 }
@@ -450,4 +456,24 @@ fn validate_config_template(template: &str, template_id: &str) -> Result<(), Str
     return Err(format!("{} cannot be empty", template_id));
   }
   validate_template(template, &VALID_PLACEHOLDERS).map_err(|message| format!("{} has {}", template_id, message))
+}
+
+fn parse_error_message(parse_error: Error) -> String {
+  const TOML_PARSE_ERROR_PREFIX: &str = "TOML parse error at ";
+  let description = parse_error.message().lines().collect::<Vec<&str>>().join(", ");
+  let binding = parse_error.to_string();
+  match binding.lines().collect::<Vec<_>>().get(0) {
+    Some(first_line_column) => {
+      if first_line_column.starts_with(TOML_PARSE_ERROR_PREFIX) {
+        format!("parse error at {} ({})", &first_line_column[TOML_PARSE_ERROR_PREFIX.len()..], description)
+      } else {
+        error!("{}", parse_error);
+        description
+      }
+    }
+    None => {
+      error!("{}", parse_error);
+      description
+    }
+  }
 }
