@@ -17,7 +17,7 @@ impl<'a> TopicRegistry<'a> {
     let mut resources: HashMap<ResourceIdentifier, TopicResourceImpl<'a>> = HashMap::new();
     let dsh_properties: &Properties = Properties::get();
     for stream in dsh_properties.datastream().streams().values() {
-      let resource = TopicResourceImpl::create(stream, target_client_factory).unwrap();
+      let resource = TopicResourceImpl::create(stream, target_client_factory)?;
       resources.insert(resource.resource_identifier.clone(), resource);
     }
     Ok(TopicRegistry { resources })
