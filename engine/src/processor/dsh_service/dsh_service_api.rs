@@ -9,6 +9,7 @@ use crate::processor::dsh_service::dsh_service_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
 use crate::processor::processor_config::VariableType;
+use crate::processor::JunctionId;
 use crate::target_client::{template_resolver, TemplateMapping};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
@@ -113,9 +114,9 @@ impl From<SecretConfig> for ApiApplicationSecret {
 
 pub fn into_api_application(
   dsh_service_specific_config: &DshServiceSpecificConfig,
-  inbound_junctions: &HashMap<String, String>,
-  outbound_junctions: &HashMap<String, String>,
-  parameters: &HashMap<String, String>,
+  inbound_junctions: &HashMap<JunctionId, String>,
+  outbound_junctions: &HashMap<JunctionId, String>,
+  parameters: &HashMap<String, String>, // TODO ParameterId?
   profile: &ProfileConfig,
   user: String,
   template_mapping: &TemplateMapping,
@@ -125,7 +126,7 @@ pub fn into_api_application(
     for (environment_variable, variable) in envs.clone() {
       match variable.typ {
         VariableType::InboundJunction => match variable.id {
-          Some(ref junction_id) => match inbound_junctions.get(junction_id) {
+          Some(ref junction_id) => match inbound_junctions.get(&JunctionId::try_from(junction_id.as_str())?) {
             Some(parameter_value) => {
               environment_variables.insert(environment_variable, parameter_value.to_string());
             }
@@ -139,7 +140,7 @@ pub fn into_api_application(
           None => unreachable!(),
         },
         VariableType::OutboundJunction => match variable.id {
-          Some(ref junction_id) => match outbound_junctions.get(junction_id) {
+          Some(ref junction_id) => match outbound_junctions.get(&JunctionId::try_from(junction_id.as_str())?) {
             Some(parameter_value) => {
               environment_variables.insert(environment_variable, parameter_value.to_string());
             }

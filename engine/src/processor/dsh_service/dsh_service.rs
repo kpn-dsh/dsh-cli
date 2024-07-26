@@ -82,14 +82,14 @@ impl Processor for DshService<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: &Option<ProfileId>,
+    profile_id: Option<&ProfileId>,
   ) -> Result<(), String> {
-    let inbound_junction_topics: HashMap<String, String> = match &self.processor_config.inbound_junctions {
-      Some(inbound_junction_configs) => self.junctions(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
+    let inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
+      Some(inbound_junction_configs) => self.junction_topics(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
       None => HashMap::new(),
     };
-    let outbound_junction_topics: HashMap<String, String> = match &self.processor_config.outbound_junctions {
-      Some(outbound_junction_configs) => self.junctions(ResourceDirection::Outbound, outbound_junctions, outbound_junction_configs)?,
+    let outbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.outbound_junctions {
+      Some(outbound_junction_configs) => self.junction_topics(ResourceDirection::Outbound, outbound_junctions, outbound_junction_configs)?,
       None => HashMap::new(),
     };
 
@@ -126,9 +126,9 @@ impl Processor for DshService<'_> {
         if dsh_service_specific_config.profiles.is_empty() {
           return Err("no default profile defined".to_string());
         } else if dsh_service_specific_config.profiles.len() == 1 {
-          dsh_service_specific_config.profiles.get(1).cloned().unwrap()
+          dsh_service_specific_config.profiles.get(0).cloned().unwrap()
         } else {
-          return Err("unable to select profile".to_string());
+          return Err("unable to select default profile".to_string());
         }
       }
     };
@@ -268,17 +268,18 @@ impl Processor for DshService<'_> {
 }
 
 impl DshService<'_> {
-  fn junctions(
+  fn junction_topics(
     &self,
     in_out: ResourceDirection,
-    junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    junction_configs: &HashMap<JunctionId, JunctionConfig>,
-  ) -> Result<HashMap<String, String>, String> {
-    let mut junction_topics = HashMap::<String, String>::new();
-    for (junction_id, junction_config) in junction_configs {
-      match junctions.get(junction_id) {
-        Some(resource_ids) => {
-          if let Some(illegal_resource) = resource_ids.iter().find(|ri| ri.resource_type != ResourceType::DshTopic) {
+    junctions_resources: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    junctions_configs: &HashMap<JunctionId, JunctionConfig>,
+  ) -> Result<HashMap<JunctionId, String>, String> {
+    let mut junction_topics = HashMap::<JunctionId, String>::new();
+    for (junction_id, junction_config) in junctions_configs {
+      let multiple_resources_separator = junction_config.multiple_resources_separator.clone().unwrap_or(",".to_string());
+      match junctions_resources.get(junction_id) {
+        Some(junction_resource_ids) => {
+          if let Some(illegal_resource) = junction_resource_ids.iter().find(|ri| ri.resource_type != ResourceType::DshTopic) {
             return Err(format!(
               "resource '{}' connected to {} junction '{}' has wrong type, '{}' expected",
               illegal_resource,
@@ -288,20 +289,20 @@ impl DshService<'_> {
             ));
           }
           let (min, max) = junction_config.number_of_resources_range();
-          if resource_ids.len() < min as usize {
+          if junction_resource_ids.len() < min as usize {
             return Err(format!(
               "there should be at least {} resource instance(s) connected to {} junction '{}'",
               min, in_out, junction_id
             ));
           }
-          if resource_ids.len() > max as usize {
+          if junction_resource_ids.len() > max as usize {
             return Err(format!(
               "there can be at most {} resource instance(s) connected to {} junction '{}'",
               min, in_out, junction_id
             ));
           }
           let mut topics = Vec::<String>::new();
-          for resource_id in resource_ids {
+          for resource_id in junction_resource_ids {
             match self.resource_registry.resource_by_identifier(resource_id) {
               Some(resource) => match &resource.descriptor().dsh_topic_descriptor {
                 Some(dsh_topic_descriptor) => topics.push(dsh_topic_descriptor.topic.to_string()),
@@ -315,7 +316,7 @@ impl DshService<'_> {
               }
             }
           }
-          junction_topics.insert(junction_id.to_string(), topics.join(","));
+          junction_topics.insert(junction_id.clone(), topics.join(multiple_resources_separator.as_str()));
         }
         None => {
           let (min, max) = junction_config.number_of_resources_range();
