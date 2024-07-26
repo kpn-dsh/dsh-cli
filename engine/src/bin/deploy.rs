@@ -10,6 +10,7 @@ const SERVICE_ID: &str = "test002";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+  env_logger::init();
   let processor_registry = ProcessorRegistry::default();
   let processor_id = ProcessorId::new(PROCESSOR_ID);
   let dsh_service = processor_registry.processor(ProcessorType::DshService, &processor_id).unwrap();
@@ -31,10 +32,11 @@ async fn main() -> Result<(), String> {
     (ParameterId::new("compliancy-agent"), "whitelist".to_string()),
     (ParameterId::new("mitigation-strategy"), "block".to_string()),
   ]);
-  let profile_id = Some(ProfileId::new("minimal"));
+  let binding = Some(ProfileId::new("minimal"));
+  let profile_id = binding.as_ref();
 
   let r = dsh_service
-    .deploy(&ServiceId::new(SERVICE_ID), &inbound_junctions, &outbound_junctions, &parameters, &profile_id)
+    .deploy(&ServiceId::new(SERVICE_ID), &inbound_junctions, &outbound_junctions, &parameters, profile_id)
     .await;
   println!("{:?}", r);
 

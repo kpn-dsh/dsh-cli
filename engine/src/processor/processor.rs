@@ -33,7 +33,7 @@ pub trait Processor {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     parameters: &HashMap<ParameterId, String>,
-    profile_id: &Option<ProfileId>,
+    profile_id: Option<&ProfileId>,
   ) -> Result<(), String>;
 
   /// # Get the resources compatible with this `Processor`
