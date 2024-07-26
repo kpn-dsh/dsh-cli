@@ -1,11 +1,11 @@
 {
   "brokers": [],
   "streams": {
-    "stream.reference-implementation-3p": {
-      "name": "stream.reference-implementation-3p",
+    "internal.keyring-codomain-values-boss": {
+      "name": "internal.keyring-codomain-values-boss",
       "cluster": "/tt",
-      "read": "stream.reference-implementation-3p.greenbox-dev",
-      "write": "stream.reference-implementation-3p.greenbox-dev",
+      "read": "internal.keyring-codomain-values-boss.greenbox-dev",
+      "write": "internal.keyring-codomain-values-boss.greenbox-dev",
       "partitions": 3,
       "replication": 1,
       "partitioner": "default-partitioner",
@@ -18,6 +18,17 @@
       "read": "scratch.reference-implementation-compliant.greenbox-dev",
       "write": "scratch.reference-implementation-compliant.greenbox-dev",
       "partitions": 1,
+      "replication": 3,
+      "partitioner": "default-partitioner",
+      "partitioningDepth": 0,
+      "canRetain": false
+    },
+    "stream.reference-implementation-3p": {
+      "name": "stream.reference-implementation-3p",
+      "cluster": "/tt",
+      "read": "stream.reference-implementation-3p.greenbox-dev",
+      "write": "stream.reference-implementation-3p.greenbox-dev",
+      "partitions": 3,
       "replication": 1,
       "partitioner": "default-partitioner",
       "partitioningDepth": 0,

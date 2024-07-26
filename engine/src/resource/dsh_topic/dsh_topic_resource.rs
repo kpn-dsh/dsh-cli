@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use dsh_sdk::dsh::datastream::Stream;
 
 use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
+use crate::resource::dsh_topic::DshTopicType;
 use crate::resource::resource::{Resource, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
@@ -17,6 +18,17 @@ pub struct TopicResourceImpl<'a> {
 
 impl<'a> TopicResourceImpl<'a> {
   pub fn create(stream: &Stream, target_client_factory: &'a TargetClientFactory) -> Result<Self, String> {
+    // TODO Check proper topic name
+    let topic_name = match stream.write_pattern() {
+      Ok(write_pattern) => write_pattern.to_string(),
+      Err(_) => stream.name().to_string(),
+    };
+    let topic_type = DshTopicType::try_from_topic_name(topic_name.as_str())?;
+    let gateway_topic_name = match topic_type {
+      DshTopicType::Internal => None,
+      DshTopicType::Scratch => None,
+      DshTopicType::Stream => Some(format!("{}.dsh", stream.name())),
+    };
     let resource_descriptor = ResourceDescriptor {
       resource_type: ResourceType::DshTopic,
       id: stream.name().replace('.', "-"),
@@ -26,25 +38,30 @@ impl<'a> TopicResourceImpl<'a> {
       writable: stream.write_access(),
       readable: stream.read_access(),
       metadata: Vec::default(),
-      more_info_url: target_client_factory
-        .dsh_platform
-        .console_url()
-        .map(|url| format!("{}/#/profiles/{}/resources/streams", url, target_client_factory.tenant)),
+      more_info_url: match topic_type {
+        DshTopicType::Internal | DshTopicType::Stream => target_client_factory
+          .dsh_platform
+          .console_url()
+          .map(|url| format!("{}/#/profiles/{}/resources/streams", url, target_client_factory.tenant)),
+        DshTopicType::Scratch => target_client_factory
+          .dsh_platform
+          .console_url()
+          .map(|url| format!("{}/#/profiles/{}/resources/topics", url, target_client_factory.tenant)),
+      },
       metrics_url: None,
       viewer_url: target_client_factory
         .dsh_platform
         .app_domain(target_client_factory.tenant.as_str())
-        .map(|domain| format!("https://eavesdropper.{}.{}?topics={}", target_client_factory.tenant, domain, stream.name())),
+        .map(|domain| format!("https://eavesdropper.{}?topics={}", domain, topic_name)),
       dsh_topic_descriptor: Some(DshTopicDescriptor {
-        // TODO Check proper topic name
-        topic: match stream.write_pattern() {
-          Ok(write_pattern) => write_pattern.to_string(),
-          Err(_) => stream.name().to_string(),
-        },
+        name: stream.name().to_string(),
+        topic: topic_name,
+        gateway_topic: gateway_topic_name,
+        topic_type: topic_type.clone(),
         partitions: u32::try_from(stream.partitions()).unwrap(),
         replication: u32::try_from(stream.replication()).unwrap(),
         // TODO Is dsh_envelope ok like this?
-        dsh_envelope: stream.name().starts_with("stream."),
+        dsh_envelope: topic_type == DshTopicType::Stream,
         read: stream.read().to_string(),
         write: stream.write().to_string(),
         read_pattern: stream.read_pattern().ok().map(|p| p.to_string()),
