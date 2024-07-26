@@ -1,3 +1,6 @@
+#![doc(html_favicon_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+#![doc(html_logo_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+
 pub mod macros;
 pub mod placeholder;
 pub mod platform;
