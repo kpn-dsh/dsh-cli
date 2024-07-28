@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use trifonius_engine::processor::dsh_service::dsh_api_client::ServiceClient;
-use trifonius_engine::processor::{ProcessorId, ServiceId, ServiceName, TaskId};
+use trifonius_engine::processor::{DshServiceName, ProcessorId, ServiceId, TaskId};
 
 const PROCESSOR_ID: &str = "consentfilter";
 const SERVICE_ID: &str = "test002";
@@ -16,7 +16,7 @@ async fn main() -> Result<(), String> {
   ProcessorId::regex();
   let _processor_id = ProcessorId::new(PROCESSOR_ID);
   let _service_id = ServiceId::new(SERVICE_ID);
-  let service_name = ServiceName::new(SERVICE_NAME);
+  let service_name = DshServiceName::new(SERVICE_NAME);
   let task_id = TaskId::new(TASK_ID);
   let client = ServiceClient::new();
 
