@@ -12,6 +12,56 @@ pub mod processor_config;
 pub mod processor_descriptor;
 pub mod processor_registry;
 
+identifier!(
+  "processor",
+  JunctionId,
+  "junction identifier",
+  "^[a-z][a-z0-9_-]{1,50}$",
+  "valid_junction_id",
+  "invalid.junction.id"
+);
+identifier!(
+  "processor",
+  ParameterId,
+  "parameter identifier",
+  "^[a-z][a-z0-9_-]{1,30}$",
+  "valid_parameter_id",
+  "invalid.parameter.id"
+);
+identifier!(
+  "processor",
+  ProcessorId,
+  "processor identifier",
+  "^[a-z][a-z0-9]{0,19}$",
+  "validprocessorid",
+  "invalid_processor_id"
+);
+identifier!(
+  "processor",
+  ProfileId,
+  "profile identifier",
+  "^[a-z0-9]{1,20}$",
+  "validprofileid",
+  "invalid_profile_id"
+);
+identifier!(
+  "processor",
+  ServiceId,
+  "service identifier",
+  "^[a-z][a-z0-9]{0,19}$",
+  "valid_service_id",
+  "invalid.service.id"
+);
+identifier!(
+  "processor",
+  DshServiceName,
+  "service name",
+  "^[a-z][a-z0-9]{0,19}-[a-z][a-z0-9]{0,19}$",
+  "validprofileid-validprocessorid",
+  "validprofileid_validprocessorid"
+);
+identifier!("processor", TaskId, "task identifier", "^.*$", "valid_task_id", "invalid.task.id");
+
 #[derive(Clone, Debug, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub enum ProcessorType {
   #[serde(rename = "dsh-service")]
@@ -24,13 +74,33 @@ pub struct ProcessorIdentifier {
   pub id: ProcessorId,
 }
 
-identifier!(JunctionId, "junction identifier", "^[a-z][a-z0-9_-]{1,50}$");
-identifier!(ParameterId, "parameter identifier", "^[a-z][a-z0-9_-]{1,30}$");
-identifier!(ProcessorId, "processor identifier", "^[a-z][a-z0-9]{0,19}$");
-identifier!(ProfileId, "profile identifier", "^[a-z0-9]{1,20}$");
-identifier!(ServiceId, "service identifier", "^[a-z][a-z0-9]{0,19}$");
-identifier!(ServiceName, "service name", "^[a-z][a-z0-9]{0,19}-[a-z][a-z0-9]{0,19}$");
-identifier!(TaskId, "task identifier", "^.*$");
+// impl From<ServiceName> for (ProcessorId, ServiceId) {
+
+// fn from(id: ServiceName) -> Self {
+//   lazy_static! {
+//         static ref SERVICE_NAME_REGEX: regex::Regex = regex::Regex::new("^([a-z][a-z0-9]{0,19})-([a-z][a-z0-9]{0,19})$").unwrap();
+//       }
+//
+//   for caps in SERVICE_NAME_REGEX.captures_iter(id.to_string().as_str()) {
+//     let m = caps.get(0).unwrap();
+//     new.push_str(&template[last_match..m.start()]);
+//     let place_holder = PlaceHolder::try_from(caps.get(1).unwrap().as_str())?;
+//     match template_mapping.get(&place_holder) {
+//       Some(value) => {
+//         new.push_str(value);
+//       }
+//       None => return Err(format!("template resolution failed because placeholder '{}' has no value", place_holder)),
+//     }
+//     last_match = m.end();
+//   }
+//
+//
+//
+//
+//   (ProcessorId::new(), ServiceId::new())
+//   todo!()
+// }
+// }
 
 impl Display for ProcessorType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
