@@ -1,6 +1,6 @@
 type = "dsh-service"
 id = "consentfilter"
-label = "Greenbox ConsentFilter"
+label = "Greenbox Consent Filter"
 description = "Record processor filters records based on customer consent"
 version = "0.2.7"
 
