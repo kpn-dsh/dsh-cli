@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
+use crate::pipeline::PipelineId;
 use async_trait::async_trait;
 
 use crate::processor::processor_descriptor::ProcessorDescriptor;
@@ -29,6 +30,7 @@ pub trait Processor {
   /// * `Err(msg)` - when the deployment request could not be sent.
   async fn deploy(
     &self,
+    pipeline_id: &PipelineId,
     service_id: &ServiceId,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
@@ -88,7 +90,7 @@ pub trait Processor {
   /// * `Ok<true>`  - when the start request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the start request could not be sent.
-  async fn start(&self, service_id: &ServiceId) -> Result<bool, String>;
+  async fn start(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String>;
 
   /// # Get this `Processor`s status
   ///
@@ -99,7 +101,7 @@ pub trait Processor {
   /// * `Ok<ProcessorStatus>` - signals whether the processor with the given `service_id` is active
   ///                           or not.
   /// * `Err(msg)`            - when the status request could not be sent.
-  async fn status(&self, service_id: &ServiceId) -> Result<ProcessorStatus, String>;
+  async fn status(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<ProcessorStatus, String>;
 
   /// # Stop this `Processor`
   ///
@@ -110,7 +112,7 @@ pub trait Processor {
   /// * `Ok<true>`  - when the stop request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the stop request could not be sent.
-  async fn stop(&self, service_id: &ServiceId) -> Result<bool, String>;
+  async fn stop(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String>;
 
   /// # Undeploy this `Processor`
   ///
@@ -121,7 +123,7 @@ pub trait Processor {
   /// * `Ok<true>`  - when the undeployment request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the undeployment request could not be sent.
-  async fn undeploy(&self, service_id: &ServiceId) -> Result<bool, String>;
+  async fn undeploy(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String>;
 }
 
 #[derive(Debug)]
@@ -139,6 +141,6 @@ impl Display for ProcessorStatus {
   }
 }
 
-pub fn service_name(processor_id: &ProcessorId, service_id: &ServiceId) -> String {
-  format!("{}-{}", processor_id, service_id)
+pub fn service_name(pipeline_id: &PipelineId, processor_id: &ProcessorId, service_id: &ServiceId) -> String {
+  format!("{}-{}-{}", pipeline_id, processor_id, service_id)
 }

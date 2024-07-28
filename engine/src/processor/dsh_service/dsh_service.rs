@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use crate::pipeline::PipelineId;
 use async_trait::async_trait;
 use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::error;
@@ -18,6 +19,8 @@ use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
 use crate::target_client::{TargetClientFactory, TemplateMapping};
+
+// TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
 pub struct DshService<'a> {
   processor_identifier: ProcessorIdentifier,
@@ -78,6 +81,7 @@ impl Processor for DshService<'_> {
 
   async fn deploy(
     &self,
+    pipeline_id: &PipelineId,
     service_id: &ServiceId,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
@@ -133,12 +137,14 @@ impl Processor for DshService<'_> {
       }
     };
     let target_client = self.target_client_factory.get().await?;
-    let service_name = service_name(&self.processor_identifier.id, service_id);
+    let service_name = service_name(pipeline_id, &self.processor_identifier.id, service_id);
     let mut template_mapping: TemplateMapping = TemplateMapping::from(self.target_client_factory);
     template_mapping.insert(PlaceHolder::ProcessorId, self.processor_identifier.id.0.clone());
     template_mapping.insert(PlaceHolder::ServiceId, service_id.to_string());
-    template_mapping.insert(PlaceHolder::ServiceName, service_name.to_string());
+    template_mapping.insert(PlaceHolder::DshServiceName, service_name.to_string());
     let api_application = into_api_application(
+      pipeline_id,
+      service_id,
       dsh_service_specific_config,
       &inbound_junction_topics,
       &outbound_junction_topics,
@@ -204,13 +210,13 @@ impl Processor for DshService<'_> {
     ProcessorType::DshService
   }
 
-  async fn start(&self, _service_id: &ServiceId) -> Result<bool, String> {
+  async fn start(&self, _pipeline_id: &PipelineId, _service_id: &ServiceId) -> Result<bool, String> {
     Err("start method not yet implemented".to_string())
   }
 
-  async fn status(&self, service_id: &ServiceId) -> Result<ProcessorStatus, String> {
+  async fn status(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<ProcessorStatus, String> {
     let target_client = self.target_client_factory.get().await?;
-    let service_name = service_name(&self.processor_identifier.id, service_id);
+    let service_name = service_name(pipeline_id, &self.processor_identifier.id, service_id);
     match target_client
       .client
       .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_name.as_str(), &target_client.token)
@@ -234,13 +240,13 @@ impl Processor for DshService<'_> {
     }
   }
 
-  async fn stop(&self, _service_id: &ServiceId) -> Result<bool, String> {
+  async fn stop(&self, _pipeline_id: &PipelineId, _service_id: &ServiceId) -> Result<bool, String> {
     Err("stop method not yet implemented".to_string())
   }
 
-  async fn undeploy(&self, service_id: &ServiceId) -> Result<bool, String> {
+  async fn undeploy(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String> {
     let target_client = self.target_client_factory.get().await?;
-    let service_name = service_name(&self.processor_identifier.id, service_id);
+    let service_name = service_name(pipeline_id, &self.processor_identifier.id, service_id);
     match target_client
       .client
       .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_name.as_str(), &target_client.token)

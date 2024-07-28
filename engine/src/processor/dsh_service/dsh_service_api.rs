@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::pipeline::PipelineId;
 use dsh_rest_api_client::types::{
   Application as ApiApplication, ApplicationSecret as ApiApplicationSecret, ApplicationVolumes as ApiApplicationVolumes, HealthCheck as ApiHealthCheck,
   HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec as ApiPathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
@@ -9,7 +10,7 @@ use crate::processor::dsh_service::dsh_service_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
 use crate::processor::processor_config::VariableType;
-use crate::processor::JunctionId;
+use crate::processor::{JunctionId, ServiceId};
 use crate::target_client::{template_resolver, TemplateMapping};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
@@ -112,7 +113,11 @@ impl From<SecretConfig> for ApiApplicationSecret {
   }
 }
 
+const TRIFONIUS_CONTEXT_PREFIX: &str = "TRIFONIUS_CONTEXT";
+
 pub fn into_api_application(
+  pipeline_id: &PipelineId,
+  service_id: &ServiceId,
   dsh_service_specific_config: &DshServiceSpecificConfig,
   inbound_junctions: &HashMap<JunctionId, String>,
   outbound_junctions: &HashMap<JunctionId, String>,
@@ -122,18 +127,20 @@ pub fn into_api_application(
   template_mapping: &TemplateMapping,
 ) -> Result<ApiApplication, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
-  if let Some(ref envs) = dsh_service_specific_config.environment_variables {
-    for (environment_variable, variable) in envs.clone() {
+  environment_variables.insert(format!("{}_PIPELINE", TRIFONIUS_CONTEXT_PREFIX), pipeline_id.to_string());
+  environment_variables.insert(format!("{}_SERVICE", TRIFONIUS_CONTEXT_PREFIX), service_id.to_string());
+  if let Some(ref configured_environment_variables) = dsh_service_specific_config.environment_variables {
+    for (configured_environment_variable, variable) in configured_environment_variables.clone() {
       match variable.typ {
         VariableType::InboundJunction => match variable.id {
           Some(ref junction_id) => match inbound_junctions.get(&JunctionId::try_from(junction_id.as_str())?) {
             Some(parameter_value) => {
-              environment_variables.insert(environment_variable, parameter_value.to_string());
+              environment_variables.insert(configured_environment_variable, parameter_value.to_string());
             }
             None => {
               return Err(format!(
                 "missing inbound junction setting '{}' for variable '{}'",
-                junction_id, environment_variable
+                junction_id, configured_environment_variable
               ))
             }
           },
@@ -142,12 +149,12 @@ pub fn into_api_application(
         VariableType::OutboundJunction => match variable.id {
           Some(ref junction_id) => match outbound_junctions.get(&JunctionId::try_from(junction_id.as_str())?) {
             Some(parameter_value) => {
-              environment_variables.insert(environment_variable, parameter_value.to_string());
+              environment_variables.insert(configured_environment_variable, parameter_value.to_string());
             }
             None => {
               return Err(format!(
                 "missing outbound junction setting '{}' for variable '{}'",
-                junction_id, environment_variable
+                junction_id, configured_environment_variable
               ))
             }
           },
@@ -156,12 +163,12 @@ pub fn into_api_application(
         VariableType::DeploymentParameter => match variable.id {
           Some(ref deployment_parameter_id) => match parameters.get(deployment_parameter_id) {
             Some(parameter_value) => {
-              environment_variables.insert(environment_variable, parameter_value.clone());
+              environment_variables.insert(configured_environment_variable, parameter_value.clone());
             }
             None => {
               return Err(format!(
                 "missing deployment parameter '{}' for variable '{}'",
-                deployment_parameter_id, environment_variable
+                deployment_parameter_id, configured_environment_variable
               ))
             }
           },
@@ -170,13 +177,13 @@ pub fn into_api_application(
         VariableType::Template => match variable.value {
           Some(template) => {
             let resolved = template_resolver(template.as_str(), template_mapping)?;
-            environment_variables.insert(environment_variable, resolved);
+            environment_variables.insert(configured_environment_variable, resolved);
           }
           None => unreachable!(),
         },
         VariableType::Value => match variable.value {
           Some(parameter_value) => {
-            environment_variables.insert(environment_variable, parameter_value);
+            environment_variables.insert(configured_environment_variable, parameter_value);
           }
           None => unreachable!(),
         },
