@@ -8,13 +8,16 @@
 * Added validation to the deploy method.
 * Added methods to get lists of processor types and resource types.
 * Descriptive error messages for configuration files errors.
+* Added tags to dsh services and apps to be able to identify them as trifonius components.
+* Added design documentation.
+* Added dry-run version of deploy() method.
 
 #### Bugfixes and Improvements
 
 * Updated some dependency versions.
 * Improved and refactored registries.
 * Renamed 'application' processor to 'dsh service'.
-*
+* More consistent naming of identifiers.
 
 ## Version 0.0.4
 
