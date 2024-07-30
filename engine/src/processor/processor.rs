@@ -4,13 +4,13 @@
 #![allow(clippy::module_inception)]
 
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
-use crate::pipeline::PipelineId;
 use async_trait::async_trait;
 
+use crate::pipeline::PipelineName;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorType, ProfileId, ServiceId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType, ProfileId, ServiceName};
 use crate::resource::ResourceIdentifier;
 
 /// Defines the behavior of a Trifonius `Processor`
@@ -19,10 +19,10 @@ pub trait Processor {
   /// # Deploy this `Processor`
   ///
   /// ## Parameters
-  /// * `service_id`         - Service id (name) of the deployed processor.
+  /// * `service_name`       - Service name of the deployed processor.
   /// * `inbound_junctions`  - Map containing the inbound resources.
   /// * `outbound_junctions` - Map containing the outbound resources.
-  /// * `parameters`         - Map containing the deployment parameters.
+  /// * `deploy_parameters`  - Map containing the deployment parameters.
   /// * `profile_id`         - Profile id.
   ///
   /// ## Returns
@@ -30,13 +30,37 @@ pub trait Processor {
   /// * `Err(msg)` - when the deployment request could not be sent.
   async fn deploy(
     &self,
-    pipeline_id: &PipelineId,
-    service_id: &ServiceId,
+    service_name: &ServiceName,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>,
+    deploy_parameters: &HashMap<ParameterId, String>,
+    profile_id: Option<&ProfileId>, // TODO Move this to start() method
   ) -> Result<(), String>;
+
+  /// # Dry-run for deployment of this `Processor`
+  ///
+  /// This method does everything that the regular `deploy()` method does,
+  /// except for the actual deployment to the target platform.
+  /// Instead, it returns the configuration that would be used if the deployment would be real.
+  ///
+  /// ## Parameters
+  /// * `service_name`       - Service name of the deployed processor.
+  /// * `inbound_junctions`  - Map containing the inbound resources.
+  /// * `outbound_junctions` - Map containing the outbound resources.
+  /// * `deploy_parameters`  - Map containing the deployment parameters.
+  /// * `profile_id`         - Profile id.
+  ///
+  /// ## Returns
+  /// * `Ok<String>` - when the deployment request was successfully sent.
+  /// * `Err(msg)`   - when the deployment request could not be sent.
+  async fn deploy_dry_run(
+    &self,
+    service_name: &ServiceName,
+    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    deploy_parameters: &HashMap<ParameterId, String>,
+    profile_id: Option<&ProfileId>, // TODO Move this to start() method
+  ) -> Result<String, String>;
 
   /// # Get the resources compatible with this `Processor`
   ///
@@ -84,46 +108,46 @@ pub trait Processor {
   /// # Start this `Processor`
   ///
   /// ## Parameters
-  /// * `service_id` - Service id (name) of the processor that should be undeployed.
+  /// * `service_name` - Service name of the deployed processor.
   ///
   /// ## Returns
   /// * `Ok<true>`  - when the start request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the start request could not be sent.
-  async fn start(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String>;
+  async fn start(&self, service_name: &ServiceName) -> Result<bool, String>;
 
   /// # Get this `Processor`s status
   ///
   /// ## Parameters
-  /// * `service_id` - Service id (name) of the processor that should be stopped.
+  /// * `service_name` - Service name of the deployed processor.
   ///
   /// ## Returns
   /// * `Ok<ProcessorStatus>` - signals whether the processor with the given `service_id` is active
   ///                           or not.
   /// * `Err(msg)`            - when the status request could not be sent.
-  async fn status(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<ProcessorStatus, String>;
+  async fn status(&self, service_name: &ServiceName) -> Result<ProcessorStatus, String>;
 
   /// # Stop this `Processor`
   ///
   /// ## Parameters
-  /// * `service_id` - Service id (name) of the processor that should be stopped.
+  /// * `service_name` - Service name of the deployed processor.
   ///
   /// ## Returns
   /// * `Ok<true>`  - when the stop request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the stop request could not be sent.
-  async fn stop(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String>;
+  async fn stop(&self, service_name: &ServiceName) -> Result<bool, String>;
 
   /// # Undeploy this `Processor`
   ///
   /// ## Parameters
-  /// * `service_id` - Service id (name) of the processor that should be undeployed.
+  /// * `service_name` - Service name of the deployed processor.
   ///
   /// ## Returns
   /// * `Ok<true>`  - when the undeployment request was successfully sent.
   /// * `Ok<false>` - when no processor with `service_id` exists.
   /// * `Err(msg)`  - when the undeployment request could not be sent.
-  async fn undeploy(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String>;
+  async fn undeploy(&self, service_name: &ServiceName) -> Result<bool, String>;
 }
 
 #[derive(Debug)]
@@ -141,6 +165,6 @@ impl Display for ProcessorStatus {
   }
 }
 
-pub fn service_name(pipeline_id: &PipelineId, processor_id: &ProcessorId, service_id: &ServiceId) -> String {
-  format!("{}-{}-{}", pipeline_id, processor_id, service_id)
+pub fn service_name(pipeline_name: &PipelineName, processor_name: &ProcessorName) -> String {
+  format!("{}-{}", pipeline_name, processor_name)
 }

@@ -2,19 +2,19 @@
 
 use std::collections::HashMap;
 
-use crate::pipeline::PipelineId;
 use async_trait::async_trait;
+use dsh_rest_api_client::types::Application;
 use dsh_rest_api_client::Error::UnexpectedResponse;
-use log::error;
+use log::{debug, error};
 use reqwest::StatusCode;
 
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
-use crate::processor::processor::{service_name, Processor, ProcessorStatus};
+use crate::processor::processor::{Processor, ProcessorStatus};
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorType, ProfileId, ServiceId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorType, ProfileId, ServiceName};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
@@ -81,13 +81,165 @@ impl Processor for DshService<'_> {
 
   async fn deploy(
     &self,
-    pipeline_id: &PipelineId,
-    service_id: &ServiceId,
+    service_name: &ServiceName,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
   ) -> Result<(), String> {
+    let target_client = self.target_client_factory.get().await?;
+    let user = target_client.user.clone();
+    let dsh_config = self.dsh_config(service_name, inbound_junctions, outbound_junctions, deploy_parameters, profile_id, user)?;
+    debug!("dsh configuration file\n{:#?}", &dsh_config);
+    match target_client
+      .client
+      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_name, &target_client.token, &dsh_config)
+      .await
+    {
+      Ok(response) => {
+        response.status();
+        match response.status() {
+          StatusCode::ACCEPTED => Ok(()),
+          unexpected => {
+            error!("unexpected response code {}: {:?}", unexpected, response);
+            Ok(())
+          }
+        }
+      }
+      Err(UnexpectedResponse(response)) => {
+        error!("unexpected response on get status request: {:?}", response);
+        Err("unexpected response on status request".to_string())
+      }
+      Err(error) => {
+        error!("unexpected error on get status request: {:?}", error);
+        Err("unexpected error on get status request".to_string())
+      }
+    }
+  }
+
+  async fn deploy_dry_run(
+    &self,
+    service_name: &ServiceName,
+    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    deploy_parameters: &HashMap<ParameterId, String>,
+    profile_id: Option<&ProfileId>,
+  ) -> Result<String, String> {
+    let target_client = self.target_client_factory.get().await?;
+    let user = target_client.user.clone();
+    let dsh_config = self.dsh_config(service_name, inbound_junctions, outbound_junctions, deploy_parameters, profile_id, user)?;
+    debug!("dsh configuration file\n{:#?}", &dsh_config);
+    match serde_json::to_string_pretty(&dsh_config) {
+      Ok(config) => Ok(config),
+      Err(error) => {
+        error!("unable to serialize configuration\n{}\n{:#?}", error, dsh_config);
+        Err("unable to serialize configuration".to_string())
+      }
+    }
+  }
+
+  fn descriptor(&self) -> ProcessorDescriptor {
+    let profiles = self
+      .processor_config
+      .dsh_service_specific_config
+      .as_ref()
+      .unwrap()
+      .profiles
+      .iter()
+      .map(|p| p.convert_to_descriptor())
+      .collect::<Vec<ProfileDescriptor>>();
+    self
+      .processor_config
+      .convert_to_descriptor(profiles, &TemplateMapping::from(self.target_client_factory))
+  }
+
+  fn id(&self) -> &ProcessorId {
+    &self.processor_identifier.id
+  }
+
+  fn identifier(&self) -> &ProcessorIdentifier {
+    &self.processor_identifier
+  }
+
+  fn label(&self) -> &str {
+    &self.processor_config.label
+  }
+
+  fn processor_type(&self) -> ProcessorType {
+    ProcessorType::DshService
+  }
+
+  async fn start(&self, _service_name: &ServiceName) -> Result<bool, String> {
+    Err("start method not yet implemented".to_string())
+  }
+
+  async fn status(&self, service_name: &ServiceName) -> Result<ProcessorStatus, String> {
+    let target_client = self.target_client_factory.get().await?;
+    match target_client
+      .client
+      .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_name, &target_client.token)
+      .await
+    {
+      Ok(response) => match response.status() {
+        StatusCode::OK => Ok(ProcessorStatus { up: true }),
+        _ => Ok(ProcessorStatus { up: false }),
+      },
+      Err(UnexpectedResponse(response)) => match response.status() {
+        StatusCode::NOT_FOUND => Ok(ProcessorStatus { up: false }),
+        _ => {
+          error!("unexpected response on get status request: {:?}", response);
+          Err("unexpected response on status request".to_string())
+        }
+      },
+      Err(error) => {
+        error!("unexpected error on get status request: {:?}", error);
+        Err("unexpected error on get status request".to_string())
+      }
+    }
+  }
+
+  async fn stop(&self, _service_name: &ServiceName) -> Result<bool, String> {
+    Err("stop method not yet implemented".to_string())
+  }
+
+  async fn undeploy(&self, service_name: &ServiceName) -> Result<bool, String> {
+    let target_client = self.target_client_factory.get().await?;
+    match target_client
+      .client
+      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_name, &target_client.token)
+      .await
+    {
+      Ok(response) => match response.status() {
+        StatusCode::ACCEPTED => Ok(true),
+        StatusCode::NO_CONTENT => Ok(true),
+        StatusCode::OK => Ok(true),
+        _ => Ok(false),
+      },
+      Err(UnexpectedResponse(response)) => match response.status() {
+        StatusCode::NOT_FOUND => Ok(false),
+        _ => {
+          error!("unexpected response on undeploy request: {:?}", response);
+          Err("unexpected response on undeploy request".to_string())
+        }
+      },
+      Err(error) => {
+        error!("unexpected error on undeploy request: {:?}", error);
+        Err("unexpected error on undeploy request".to_string())
+      }
+    }
+  }
+}
+
+impl DshService<'_> {
+  fn dsh_config(
+    &self,
+    service_name: &ServiceName,
+    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    deploy_parameters: &HashMap<ParameterId, String>,
+    profile_id: Option<&ProfileId>,
+    user: String,
+  ) -> Result<Application, String> {
     let inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
       Some(inbound_junction_configs) => self.junction_topics(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
       None => HashMap::new(),
@@ -130,150 +282,29 @@ impl Processor for DshService<'_> {
         if dsh_service_specific_config.profiles.is_empty() {
           return Err("no default profile defined".to_string());
         } else if dsh_service_specific_config.profiles.len() == 1 {
-          dsh_service_specific_config.profiles.get(0).cloned().unwrap()
+          dsh_service_specific_config.profiles.first().cloned().unwrap()
         } else {
           return Err("unable to select default profile".to_string());
         }
       }
     };
-    let target_client = self.target_client_factory.get().await?;
-    let service_name = service_name(pipeline_id, &self.processor_identifier.id, service_id);
     let mut template_mapping: TemplateMapping = TemplateMapping::from(self.target_client_factory);
     template_mapping.insert(PlaceHolder::ProcessorId, self.processor_identifier.id.0.clone());
-    template_mapping.insert(PlaceHolder::ServiceId, service_id.to_string());
+    template_mapping.insert(PlaceHolder::ServiceName, service_name.to_string());
     template_mapping.insert(PlaceHolder::DshServiceName, service_name.to_string());
     let api_application = into_api_application(
-      pipeline_id,
-      service_id,
+      service_name,
       dsh_service_specific_config,
       &inbound_junction_topics,
       &outbound_junction_topics,
       &validated_parameters,
       &profile,
-      target_client.user.clone(),
+      user,
       &template_mapping,
     )?;
-    match target_client
-      .client
-      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant, service_name.as_str(), &target_client.token, &api_application)
-      .await
-    {
-      Ok(response) => {
-        response.status();
-        match response.status() {
-          StatusCode::ACCEPTED => Ok(()),
-          unexpected => {
-            error!("unexpected response code {}: {:?}", unexpected, response);
-            Ok(())
-          }
-        }
-      }
-      Err(UnexpectedResponse(response)) => {
-        error!("unexpected response on get status request: {:?}", response);
-        Err("unexpected response on status request".to_string())
-      }
-      Err(error) => {
-        error!("unexpected error on get status request: {:?}", error);
-        Err("unexpected error on get status request".to_string())
-      }
-    }
+    Ok(api_application)
   }
 
-  fn descriptor(&self) -> ProcessorDescriptor {
-    let profiles = self
-      .processor_config
-      .dsh_service_specific_config
-      .as_ref()
-      .unwrap()
-      .profiles
-      .iter()
-      .map(|p| p.convert_to_descriptor())
-      .collect::<Vec<ProfileDescriptor>>();
-    self
-      .processor_config
-      .convert_to_descriptor(profiles, &TemplateMapping::from(self.target_client_factory))
-  }
-
-  fn identifier(&self) -> &ProcessorIdentifier {
-    &self.processor_identifier
-  }
-
-  fn id(&self) -> &ProcessorId {
-    &self.processor_identifier.id
-  }
-
-  fn label(&self) -> &str {
-    &self.processor_config.label
-  }
-
-  fn processor_type(&self) -> ProcessorType {
-    ProcessorType::DshService
-  }
-
-  async fn start(&self, _pipeline_id: &PipelineId, _service_id: &ServiceId) -> Result<bool, String> {
-    Err("start method not yet implemented".to_string())
-  }
-
-  async fn status(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<ProcessorStatus, String> {
-    let target_client = self.target_client_factory.get().await?;
-    let service_name = service_name(pipeline_id, &self.processor_identifier.id, service_id);
-    match target_client
-      .client
-      .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_name.as_str(), &target_client.token)
-      .await
-    {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(ProcessorStatus { up: true }),
-        _ => Ok(ProcessorStatus { up: false }),
-      },
-      Err(UnexpectedResponse(response)) => match response.status() {
-        StatusCode::NOT_FOUND => Ok(ProcessorStatus { up: false }),
-        _ => {
-          error!("unexpected response on get status request: {:?}", response);
-          Err("unexpected response on status request".to_string())
-        }
-      },
-      Err(error) => {
-        error!("unexpected error on get status request: {:?}", error);
-        Err("unexpected error on get status request".to_string())
-      }
-    }
-  }
-
-  async fn stop(&self, _pipeline_id: &PipelineId, _service_id: &ServiceId) -> Result<bool, String> {
-    Err("stop method not yet implemented".to_string())
-  }
-
-  async fn undeploy(&self, pipeline_id: &PipelineId, service_id: &ServiceId) -> Result<bool, String> {
-    let target_client = self.target_client_factory.get().await?;
-    let service_name = service_name(pipeline_id, &self.processor_identifier.id, service_id);
-    match target_client
-      .client
-      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant, service_name.as_str(), &target_client.token)
-      .await
-    {
-      Ok(response) => match response.status() {
-        StatusCode::ACCEPTED => Ok(true),
-        StatusCode::NO_CONTENT => Ok(true),
-        StatusCode::OK => Ok(true),
-        _ => Ok(false),
-      },
-      Err(UnexpectedResponse(response)) => match response.status() {
-        StatusCode::NOT_FOUND => Ok(false),
-        _ => {
-          error!("unexpected response on undeploy request: {:?}", response);
-          Err("unexpected response on undeploy request".to_string())
-        }
-      },
-      Err(error) => {
-        error!("unexpected error on undeploy request: {:?}", error);
-        Err("unexpected error on undeploy request".to_string())
-      }
-    }
-  }
-}
-
-impl DshService<'_> {
   fn junction_topics(
     &self,
     in_out: ResourceDirection,
