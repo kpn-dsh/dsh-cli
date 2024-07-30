@@ -1,46 +1,58 @@
 #![allow(clippy::module_inception)]
 
-pub trait Pipeline {}
+use std::collections::HashMap;
 
-// use serde::{Deserialize, Serialize};
-// use std::collections::HashMap;
-//
-// use crate::processor::processor::{Processor, ProcessorIdentifier};
-// use crate::resource::resource::{Resource, ResourceIdentifier};
-//
-// struct DeployablePipeline<'a> {
-//   processors: HashMap<ProcessorIdentifier, &'a dyn Processor>,
-//   resources: HashMap<ResourceIdentifier, &'a dyn Resource>,
-//   connections: Vec<String>,
-// }
-//
-// struct ProcessorPipeline {
-//   processor_identifier: ProcessorIdentifier,
-// }
-//
-// struct ProcessorInstance {}
-//
-// struct DeployableResource {
-//   resource_identifier: ResourceIdentifier,
-// }
-//
-// struct DeployableProcessor {
-//   processor_identifier: ProcessorIdentifier,
-//   inbound_junction_connections: HashMap<String, Vec<ResourceIdentifier>>,
-//   outbound_junction_connections: HashMap<String, Vec<ResourceIdentifier>>,
-//   parameters: HashMap<String, String>,
-//   profile_id: Option<String>,
-// }
-//
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub enum Edge {
-//   ProcessorToProcessor { edge_id: String, source: JunctionIdentifier, target: JunctionIdentifier },
-//   ResourceToProcessor { edge_id: String, source: ResourceIdentifier, target: JunctionIdentifier },
-//   ProcessorToResource { edge_id: String, source: JunctionIdentifier, target: ResourceIdentifier },
-// }
-//
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub struct JunctionIdentifier {
-//   pub processor_identifier: ProcessorIdentifier,
-//   pub junction_id: String,
-// }
+use serde::{Deserialize, Serialize};
+
+use crate::pipeline::PipelineName;
+use crate::processor::{JunctionId, ParameterId, ProcessorIdentifier, ProcessorName, ProfileId};
+use crate::resource::ResourceIdentifier;
+
+pub struct Pipeline {
+  name: PipelineName,
+  resources: Vec<PipelineResource>,
+  processors: Vec<PipelineProcessor>,
+  junctions: Vec<PipelineJunction>,
+  dependencies: Vec<PipelineDependency>,
+}
+
+pub struct PipelineResource {
+  resource: ResourceIdentifier,
+  parameters: HashMap<ParameterId, String>,
+}
+
+pub struct PipelineProcessor {
+  processor: ProcessorIdentifier,
+  name: ProcessorName,
+  parameters: HashMap<ParameterId, String>,
+  profile_id: Option<ProfileId>,
+}
+
+pub struct PipelineJunction {
+  junction: JunctionType,
+  parameters: HashMap<ParameterId, String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum JunctionType {
+  ResourceToProcessor { source: Vec<ResourceIdentifier>, target: JunctionIdentifier },
+  ProcessorToResource { source: JunctionIdentifier, target: Vec<ResourceIdentifier> },
+  ProcessorToProcessor { source: JunctionIdentifier, target: JunctionIdentifier },
+}
+
+struct PipelineDependency {
+  parameters: HashMap<ParameterId, String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum DependencyType {
+  ProcessorOnProcessor { depended: ProcessorIdentifier, depends_on: ProcessorIdentifier },
+  ProcessorOnResource { depended: JunctionIdentifier, depends_on: Vec<ResourceIdentifier> },
+  ResourceOnProcessor { depended: ProcessorIdentifier, depends_on: ResourceIdentifier },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct JunctionIdentifier {
+  pub processor_identifier: ProcessorIdentifier,
+  pub junction_id: JunctionId,
+}
