@@ -10,6 +10,7 @@ pub mod dsh_service;
 pub mod processor;
 pub mod processor_config;
 pub mod processor_descriptor;
+pub mod processor_realization;
 pub mod processor_registry;
 
 #[derive(Clone, Debug, Deserialize, Hash, Eq, PartialEq, Serialize)]
@@ -98,9 +99,15 @@ impl ProcessorType {
   }
 }
 
+impl ProcessorIdentifier {
+  pub fn new(processor_type: ProcessorType, id: ProcessorId) -> Self {
+    ProcessorIdentifier { processor_type, id }
+  }
+}
+
 impl Display for ProcessorIdentifier {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}", &self.id, &self.processor_type)
+    write!(f, "{}:{}", self.processor_type, self.id)
   }
 }
 

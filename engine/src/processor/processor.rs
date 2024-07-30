@@ -9,8 +9,7 @@ use std::fmt::{Debug, Display, Formatter};
 use async_trait::async_trait;
 
 use crate::pipeline::PipelineName;
-use crate::processor::processor_descriptor::ProcessorDescriptor;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType, ProfileId, ServiceName};
+use crate::processor::{JunctionId, ParameterId, ProcessorName, ProfileId, ServiceName};
 use crate::resource::ResourceIdentifier;
 
 /// Defines the behavior of a Trifonius `Processor`
@@ -72,38 +71,6 @@ pub trait Processor {
   /// * `Ok<Vec<ResourceIdentifier>` - list of identifiers of compatible resources.
   /// * `Err(msg)`                   - when the list could not be composed.
   async fn compatible_resources(&self, junction_id: &JunctionId) -> Result<Vec<ResourceIdentifier>, String>;
-
-  /// # Get this `Processor`s descriptor
-  ///
-  /// ## Returns
-  /// * This `Processor`s descriptor.
-  fn descriptor(&self) -> ProcessorDescriptor;
-
-  /// # Get this `Processor`s id (name)
-  ///
-  /// ## Returns
-  /// * This `Processor`s id.
-  fn id(&self) -> &ProcessorId;
-
-  /// # Get this `Processor`s `ProcessorIdentifier`
-  ///
-  /// ## Returns
-  /// * This `Processor`s identifier.
-  fn identifier(&self) -> &ProcessorIdentifier;
-
-  /// # Get this `Processor`s label
-  ///
-  /// A `Processor`s label should be used to present it to a user.
-  ///
-  /// ## Returns
-  /// * This `Processor`s label.
-  fn label(&self) -> &str;
-
-  /// # Get this `Processor`s type
-  ///
-  /// ## Returns
-  /// * This `Processor`s type.
-  fn processor_type(&self) -> ProcessorType;
 
   /// # Start this `Processor`
   ///
