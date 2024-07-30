@@ -462,10 +462,10 @@ fn parse_error_message(parse_error: Error) -> String {
   const TOML_PARSE_ERROR_PREFIX: &str = "TOML parse error at ";
   let description = parse_error.message().lines().collect::<Vec<&str>>().join(", ");
   let binding = parse_error.to_string();
-  match binding.lines().collect::<Vec<_>>().get(0) {
+  match binding.lines().collect::<Vec<_>>().first() {
     Some(first_line_column) => {
-      if first_line_column.starts_with(TOML_PARSE_ERROR_PREFIX) {
-        format!("parse error at {} ({})", &first_line_column[TOML_PARSE_ERROR_PREFIX.len()..], description)
+      if let Some(stripped) = first_line_column.strip_prefix(TOML_PARSE_ERROR_PREFIX) {
+        format!("parse error at {} ({})", stripped, description)
       } else {
         error!("{}", parse_error);
         description
