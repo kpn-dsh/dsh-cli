@@ -11,6 +11,7 @@
 * Added tags to dsh services and apps to be able to identify them as trifonius components.
 * Added design documentation.
 * Added dry-run version of deploy() method.
+* Added icon to processor config.
 
 #### Bugfixes and Improvements
 
@@ -18,6 +19,8 @@
 * Improved and refactored registries.
 * Renamed 'application' processor to 'dsh service'.
 * More consistent naming of identifiers.
+* Small changes to processor configuration file format.
+* Seperated processor realizations and processor instances.
 
 ## Version 0.0.4
 

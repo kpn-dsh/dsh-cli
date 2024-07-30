@@ -1,9 +1,10 @@
+[processor]
 type = "dsh-service"
 id = "test"
 label = "Test DSH Service"
 description = "Test profiles"
 version = "0.1.2"
-
+icon = "ICON"
 more-info-url = "https://dsh.kpn.com"
 metrics-url = "https://grafana.com"
 viewer-url = "https://eavesdropper.kpn.com"

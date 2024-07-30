@@ -23,6 +23,8 @@ pub struct ProcessorDescriptor {
   pub description: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub version: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub icon: Option<String>, // TODO Is String the proper type?
   #[serde(rename = "inbound-junctions", skip_serializing_if = "Vec::is_empty")]
   pub inbound_junctions: Vec<JunctionDescriptor>,
   #[serde(rename = "outbound-junctions", skip_serializing_if = "Vec::is_empty")]
@@ -107,6 +109,9 @@ impl Display for ProcessorDescriptor {
     write!(f, "{}:{} ({})", self.id, self.processor_type, self.label)?;
     if let Some(ref version) = self.version {
       write!(f, "\n  version {}", version)?;
+    }
+    if let Some(ref icon) = self.icon {
+      write!(f, "\n  icon {}", icon)?;
     }
     write!(f, "\n  {}", self.description)?;
     if !&self.inbound_junctions.is_empty() {
