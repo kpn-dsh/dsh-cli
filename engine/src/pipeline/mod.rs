@@ -14,11 +14,11 @@ pub mod pipeline_registry;
 
 identifier!(
   "pipeline",
-  PipelineId,
-  "pipeline id",
+  PipelineName,
+  "pipeline name",
   "^[a-z][a-z0-9]{0,19}$",
-  "validpipelineid",
-  "invalid.pipeline.id"
+  "validpipelinename",
+  "invalid.pipeline.name"
 );
 
 // Declared, Configured, Deleted

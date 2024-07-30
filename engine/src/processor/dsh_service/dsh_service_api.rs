@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::pipeline::PipelineId;
 use dsh_rest_api_client::types::{
   Application as ApiApplication, ApplicationSecret as ApiApplicationSecret, ApplicationVolumes as ApiApplicationVolumes, HealthCheck as ApiHealthCheck,
   HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec as ApiPathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
@@ -10,7 +9,7 @@ use crate::processor::dsh_service::dsh_service_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
 use crate::processor::processor_config::VariableType;
-use crate::processor::{JunctionId, ServiceId};
+use crate::processor::{JunctionId, ServiceName};
 use crate::target_client::{template_resolver, TemplateMapping};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
@@ -113,11 +112,10 @@ impl From<SecretConfig> for ApiApplicationSecret {
   }
 }
 
-const TRIFONIUS_CONTEXT_PREFIX: &str = "TRIFONIUS_CONTEXT";
+const TRIFONIUS_PREFIX: &str = "TRIFONIUS";
 
 pub fn into_api_application(
-  pipeline_id: &PipelineId,
-  service_id: &ServiceId,
+  service_name: &ServiceName,
   dsh_service_specific_config: &DshServiceSpecificConfig,
   inbound_junctions: &HashMap<JunctionId, String>,
   outbound_junctions: &HashMap<JunctionId, String>,
@@ -127,8 +125,7 @@ pub fn into_api_application(
   template_mapping: &TemplateMapping,
 ) -> Result<ApiApplication, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
-  environment_variables.insert(format!("{}_PIPELINE", TRIFONIUS_CONTEXT_PREFIX), pipeline_id.to_string());
-  environment_variables.insert(format!("{}_SERVICE", TRIFONIUS_CONTEXT_PREFIX), service_id.to_string());
+  environment_variables.insert(format!("{}_SERVICE_NAME", TRIFONIUS_PREFIX), service_name.to_string());
   if let Some(ref configured_environment_variables) = dsh_service_specific_config.environment_variables {
     for (configured_environment_variable, variable) in configured_environment_variables.clone() {
       match variable.typ {

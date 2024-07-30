@@ -14,7 +14,7 @@ const RANDOM_UUID: &str = "RANDOM_UUID";
 const REALM: &str = "REALM";
 const REST_ACCESS_TOKEN_URL: &str = "REST_ACCESS_TOKEN_URL";
 const REST_API_URL: &str = "REST_API_URL";
-const SERVICE_ID: &str = "SERVICE_ID";
+const SERVICE_NAME: &str = "SERVICE_NAME";
 const TENANT: &str = "TENANT";
 const USER: &str = "USER";
 
@@ -33,7 +33,7 @@ pub enum PlaceHolder {
   Realm,
   RestAccessTokenUrl,
   RestApiUrl,
-  ServiceId,
+  ServiceName,
   Tenant,
   User,
 }
@@ -54,7 +54,7 @@ impl Display for PlaceHolder {
       PlaceHolder::Realm => write!(f, "{}", REALM),
       PlaceHolder::RestAccessTokenUrl => write!(f, "{}", REST_ACCESS_TOKEN_URL),
       PlaceHolder::RestApiUrl => write!(f, "{}", REST_API_URL),
-      PlaceHolder::ServiceId => write!(f, "{}", SERVICE_ID),
+      PlaceHolder::ServiceName => write!(f, "{}", SERVICE_NAME),
       PlaceHolder::Tenant => write!(f, "{}", TENANT),
       PlaceHolder::User => write!(f, "{}", USER),
     }
@@ -79,7 +79,7 @@ impl TryFrom<&str> for PlaceHolder {
       REALM => Ok(PlaceHolder::Realm),
       REST_ACCESS_TOKEN_URL => Ok(PlaceHolder::RestAccessTokenUrl),
       REST_API_URL => Ok(PlaceHolder::RestApiUrl),
-      SERVICE_ID => Ok(PlaceHolder::ServiceId),
+      SERVICE_NAME => Ok(PlaceHolder::ServiceName),
       TENANT => Ok(PlaceHolder::Tenant),
       USER => Ok(PlaceHolder::User),
       unrecognized => Err(format!("unrecognized placeholder '{}'", unrecognized)),

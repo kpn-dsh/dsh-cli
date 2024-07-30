@@ -1,14 +1,12 @@
 use std::collections::HashMap;
-use trifonius_engine::pipeline::PipelineId;
 
 use trifonius_engine::processor::processor_registry::ProcessorRegistry;
-use trifonius_engine::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType, ProfileId, ServiceId};
+use trifonius_engine::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType, ProfileId, ServiceName};
 use trifonius_engine::resource::ResourceType;
 use trifonius_engine::resource::{ResourceId, ResourceIdentifier};
 
-const PIPELINE_ID: &str = "pipeline";
-const PROCESSOR_ID: &str = "consentfilter";
-const SERVICE_ID: &str = "test002";
+const SERVICE_NAME: &str = "consentfilter-test002";
+const PROCESSOR_ID: &str = "greenbox-consent-filter";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -38,14 +36,7 @@ async fn main() -> Result<(), String> {
   let profile_id = binding.as_ref();
 
   let r = dsh_service
-    .deploy(
-      &PipelineId::new(PIPELINE_ID),
-      &ServiceId::new(SERVICE_ID),
-      &inbound_junctions,
-      &outbound_junctions,
-      &parameters,
-      profile_id,
-    )
+    .deploy(&ServiceName::new(SERVICE_NAME), &inbound_junctions, &outbound_junctions, &parameters, profile_id)
     .await;
   println!("{:?}", r);
 
