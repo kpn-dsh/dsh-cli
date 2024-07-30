@@ -4,6 +4,7 @@ use trifonius_engine::processor::processor_registry::ProcessorRegistry;
 use trifonius_engine::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType, ProfileId, ServiceName};
 use trifonius_engine::resource::ResourceType;
 use trifonius_engine::resource::{ResourceId, ResourceIdentifier};
+use trifonius_engine::target_client::DEFAULT_TARGET_CLIENT_FACTORY;
 
 const SERVICE_NAME: &str = "consentfilter-test002";
 const PROCESSOR_ID: &str = "greenbox-consent-filter";
@@ -12,8 +13,10 @@ const PROCESSOR_ID: &str = "greenbox-consent-filter";
 async fn main() -> Result<(), String> {
   env_logger::init();
   let processor_registry = ProcessorRegistry::default();
-  let processor_id = ProcessorId::new(PROCESSOR_ID);
-  let dsh_service = processor_registry.processor(ProcessorType::DshService, &processor_id).unwrap();
+  let dsh_service_realization = processor_registry
+    .processor_realization(ProcessorType::DshService, &ProcessorId::new(PROCESSOR_ID))
+    .unwrap();
+  let dsh_service = dsh_service_realization.processor(Some(&DEFAULT_TARGET_CLIENT_FACTORY))?;
 
   let inbound_junction = JunctionId::new("inbound-kafka-topic");
   let inbound_resource_id = ResourceId::new("stream-reference-implementation-3p");
