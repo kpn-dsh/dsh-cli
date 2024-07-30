@@ -18,20 +18,7 @@ use crate::target_client::{template_resolver, validate_template, TemplateMapping
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorConfig {
-  #[serde(rename = "type")]
-  pub processor_type: ProcessorType,
-  pub id: String,
-  pub label: String,
-  pub description: String,
-  pub version: Option<String>,
-  // TODO pub icon: Option<String>,
-  pub metadata: Option<Vec<(String, String)>>,
-  #[serde(rename = "more-info-url")]
-  pub more_info_url: Option<String>,
-  #[serde(rename = "metrics-url")]
-  pub metrics_url: Option<String>,
-  #[serde(rename = "viewer-url")]
-  pub viewer_url: Option<String>,
+  pub processor: ProcessorGlobalConfig,
   #[serde(rename = "inbound-junctions")]
   pub inbound_junctions: Option<HashMap<JunctionId, JunctionConfig>>,
   #[serde(rename = "outbound-junctions")]
@@ -39,6 +26,24 @@ pub struct ProcessorConfig {
   pub deploy: Option<DeployConfig>,
   #[serde(rename = "dsh-service")]
   pub dsh_service_specific_config: Option<DshServiceSpecificConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProcessorGlobalConfig {
+  #[serde(rename = "type")]
+  pub processor_type: ProcessorType,
+  pub id: String,
+  pub label: String,
+  pub description: String,
+  pub version: Option<String>,
+  pub icon: Option<String>, // TODO Is String the proper type?
+  #[serde(rename = "more-info-url")]
+  pub more_info_url: Option<String>,
+  #[serde(rename = "metrics-url")]
+  pub metrics_url: Option<String>,
+  #[serde(rename = "viewer-url")]
+  pub viewer_url: Option<String>,
+  pub metadata: Option<Vec<(String, String)>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -123,28 +128,31 @@ pub struct DeploymentParameterConfigOptionLabel {
 
 impl ProcessorConfig {
   fn validate(&self, processor_type: ProcessorType) -> Result<(), String> {
-    if self.processor_type != processor_type {
-      return Err(format!("processor type '{}' doesn't match expected type '{}'", self.processor_type, processor_type));
+    if self.processor.processor_type != processor_type {
+      return Err(format!(
+        "processor type '{}' doesn't match expected type '{}'",
+        self.processor.processor_type, processor_type
+      ));
     }
-    if !ProcessorId::is_valid(&self.id) {
+    if !ProcessorId::is_valid(&self.processor.id) {
       return Err(format!(
         "illegal {} name (must be between 1 and 20 characters long and may contain only lowercase alphabetical characters and digits)",
         processor_type
       ));
     }
-    if self.description.is_empty() {
+    if self.processor.description.is_empty() {
       return Err(format!("{} description cannot be empty", processor_type));
     }
-    if self.version.clone().is_some_and(|ref version| version.is_empty()) {
+    if self.processor.version.clone().is_some_and(|ref version| version.is_empty()) {
       return Err(format!("{} version cannot be empty", processor_type));
     }
-    if let Some(ref url) = self.more_info_url {
+    if let Some(ref url) = self.processor.more_info_url {
       validate_config_template(url, "more-info-url template")?
     }
-    if let Some(ref url) = self.metrics_url {
+    if let Some(ref url) = self.processor.metrics_url {
       validate_config_template(url, "metrics-url template")?
     }
-    if let Some(ref url) = self.viewer_url {
+    if let Some(ref url) = self.processor.viewer_url {
       validate_config_template(url, "viewer-url template")?
     }
     if let (Some(inbound), Some(outbound)) = (&self.inbound_junctions, &self.outbound_junctions) {
@@ -175,10 +183,11 @@ impl ProcessorConfig {
   pub(crate) fn convert_to_descriptor(&self, profiles: Vec<ProfileDescriptor>, mapping: &TemplateMapping) -> ProcessorDescriptor {
     ProcessorDescriptor {
       processor_type: ProcessorType::DshService,
-      id: self.id.clone(),
-      label: self.label.clone(),
-      description: self.description.clone(),
-      version: self.version.clone(),
+      id: self.processor.id.clone(),
+      label: self.processor.label.clone(),
+      description: self.processor.description.clone(),
+      version: self.processor.version.clone(),
+      icon: self.processor.icon.clone(),
       inbound_junctions: match &self.inbound_junctions {
         Some(inbound_junctions) => inbound_junctions
           .iter()
@@ -205,10 +214,10 @@ impl ProcessorConfig {
         None => vec![],
       },
       profiles,
-      metadata: self.metadata.clone().unwrap_or_default(),
-      more_info_url: self.more_info_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-      metrics_url: self.metrics_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
-      viewer_url: self.viewer_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      metadata: self.processor.metadata.clone().unwrap_or_default(),
+      more_info_url: self.processor.more_info_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      metrics_url: self.processor.metrics_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
+      viewer_url: self.processor.viewer_url.clone().map(|ref u| template_resolver(u, mapping).unwrap_or_default()),
     }
   }
 }

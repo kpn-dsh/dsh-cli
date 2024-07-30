@@ -237,15 +237,16 @@ fn read_dsh_service_config_proper_values() {
   path.push("tests/processors/dsh-services/dsh-service-config-test.toml");
   let config = &read_processor_config(path.to_str().unwrap(), ProcessorType::DshService).unwrap();
 
-  assert_eq!(config.processor_type, ProcessorType::DshService);
-  assert_eq!(config.id, "test");
-  assert_eq!(config.description, "Test profiles");
-  assert_eq!(config.version, Some("0.1.2".to_string()));
-  assert_eq!(config.more_info_url, Some("https://dsh.kpn.com".to_string()));
-  assert_eq!(config.metrics_url, Some("https://grafana.com".to_string()));
-  assert_eq!(config.viewer_url, Some("https://eavesdropper.kpn.com".to_string()));
+  assert_eq!(config.processor.processor_type, ProcessorType::DshService);
+  assert_eq!(config.processor.id, "test");
+  assert_eq!(config.processor.description, "Test profiles");
+  assert_eq!(config.processor.version, Some("0.1.2".to_string()));
+  assert_eq!(config.processor.icon, Some("ICON".to_string()));
+  assert_eq!(config.processor.more_info_url, Some("https://dsh.kpn.com".to_string()));
+  assert_eq!(config.processor.metrics_url, Some("https://grafana.com".to_string()));
+  assert_eq!(config.processor.viewer_url, Some("https://eavesdropper.kpn.com".to_string()));
 
-  let metadata = config.metadata.clone().unwrap();
+  let metadata = config.processor.metadata.clone().unwrap();
   assert_eq!(
     metadata,
     vec![("metadata1".to_string(), "METADATA1".to_string()), ("metadata2".to_string(), "METADATA2".to_string())]
