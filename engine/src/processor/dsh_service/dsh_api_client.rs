@@ -11,6 +11,8 @@ use serde::Serialize;
 use crate::processor::{ServiceName, TaskId};
 use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
+// TODO Move to a separate crate.
+
 pub struct ServiceClient<'a> {
   target_client_factory: &'a TargetClientFactory,
 }
@@ -62,17 +64,17 @@ impl ServiceClient<'_> {
   ///     ...
   ///   },
   ///   "service-b": {
-  //      ...
+  ///      ...
   ///   }
   /// }
   ///
   /// ```
   pub async fn get_all_deployed_service_configurations(&self) -> Result<HashMap<String, Application>, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_application_actual(target_client.tenant, &target_client.token)
+        .client()
+        .application_get_by_tenant_application_actual(target_client.tenant(), target_client.token())
         .await,
     )
   }
@@ -91,11 +93,11 @@ impl ServiceClient<'_> {
   ///
   /// ```
   pub async fn get_deployed_service_configuration(&self, service_name: &ServiceName) -> Result<Application, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_application_by_appid_actual(target_client.tenant, service_name, &target_client.token)
+        .client()
+        .application_get_by_tenant_application_by_appid_actual(target_client.tenant(), service_name, target_client.token())
         .await,
     )
   }
@@ -114,11 +116,11 @@ impl ServiceClient<'_> {
   ///
   /// ```
   pub async fn get_service_configuration(&self, service_name: &ServiceName) -> Result<Application, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_application_by_appid_configuration(target_client.tenant, service_name, &target_client.token)
+        .client()
+        .application_get_by_tenant_application_by_appid_configuration(target_client.tenant(), service_name, target_client.token())
         .await,
     )
   }
@@ -131,11 +133,11 @@ impl ServiceClient<'_> {
   /// }
   /// ```
   pub async fn get_service_status(&self, service_name: &ServiceName) -> Result<AllocationStatus, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_application_by_appid_status(target_client.tenant, service_name, &target_client.token)
+        .client()
+        .application_get_by_tenant_application_by_appid_status(target_client.tenant(), service_name, target_client.token())
         .await,
     )
   }
@@ -160,11 +162,11 @@ impl ServiceClient<'_> {
   ///
   /// ```
   pub async fn get_all_service_configurations(&self) -> Result<HashMap<String, Application>, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_application_configuration(target_client.tenant, &target_client.token)
+        .client()
+        .application_get_by_tenant_application_configuration(target_client.tenant(), target_client.token())
         .await,
     )
   }
@@ -178,11 +180,11 @@ impl ServiceClient<'_> {
   /// ]
   /// ```
   pub async fn get_all_services_with_derived_tasks(&self) -> Result<ChildList, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_task(target_client.tenant, &target_client.token)
+        .client()
+        .application_get_by_tenant_task(target_client.tenant(), target_client.token())
         .await,
     )
   }
@@ -196,11 +198,11 @@ impl ServiceClient<'_> {
   /// ]
   /// ```
   pub async fn get_all_derived_task_ids(&self, service_name: &ServiceName) -> Result<ChildList, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_task_by_appid(target_client.tenant, service_name, &target_client.token)
+        .client()
+        .application_get_by_tenant_task_by_appid(target_client.tenant(), service_name, target_client.token())
         .await,
     )
   }
@@ -233,11 +235,11 @@ impl ServiceClient<'_> {
   /// }
   /// ```
   pub async fn get_derived_task_status(&self, service_name: &ServiceName, task_id: &TaskId) -> Result<TaskStatus, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_task_by_appid_by_id(target_client.tenant, service_name, task_id, &target_client.token)
+        .client()
+        .application_get_by_tenant_task_by_appid_by_id(target_client.tenant(), service_name, task_id, target_client.token())
         .await,
     )
   }
@@ -252,11 +254,11 @@ impl ServiceClient<'_> {
   /// ```
   ///
   pub async fn get_task_status_description(&self, service_name: &ServiceName, task_id: &TaskId) -> Result<AllocationStatus, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_task_by_appid_by_id_status(target_client.tenant, service_name, task_id, &target_client.token)
+        .client()
+        .application_get_by_tenant_task_by_appid_by_id_status(target_client.tenant(), service_name, task_id, target_client.token())
         .await,
     )
   }
@@ -275,11 +277,11 @@ impl ServiceClient<'_> {
   /// }
   /// ```
   pub async fn get_task_state(&self, service_name: &ServiceName, task_id: &TaskId) -> Result<Task, String> {
-    let target_client = self.target_client_factory.get().await?;
+    let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
-        .client
-        .application_get_by_tenant_task_by_appid_by_id_actual(target_client.tenant, service_name, task_id, &target_client.token)
+        .client()
+        .application_get_by_tenant_task_by_appid_by_id_actual(target_client.tenant(), service_name, task_id, target_client.token())
         .await,
     )
   }

@@ -40,18 +40,18 @@ impl<'a> TopicResourceImpl<'a> {
       metadata: Vec::default(),
       more_info_url: match topic_type {
         DshTopicType::Internal | DshTopicType::Stream => target_client_factory
-          .dsh_platform
+          .platform()
           .console_url()
-          .map(|url| format!("{}/#/profiles/{}/resources/streams", url, target_client_factory.tenant)),
+          .map(|url| format!("{}/#/profiles/{}/resources/streams", url, target_client_factory.tenant())),
         DshTopicType::Scratch => target_client_factory
-          .dsh_platform
+          .platform()
           .console_url()
-          .map(|url| format!("{}/#/profiles/{}/resources/topics", url, target_client_factory.tenant)),
+          .map(|url| format!("{}/#/profiles/{}/resources/topics", url, target_client_factory.tenant())),
       },
       metrics_url: None,
       viewer_url: target_client_factory
-        .dsh_platform
-        .app_domain(target_client_factory.tenant.as_str())
+        .platform()
+        .app_domain(target_client_factory.tenant())
         .map(|domain| format!("https://eavesdropper.{}?topics={}", domain, topic_name)),
       dsh_topic_descriptor: Some(DshTopicDescriptor {
         name: stream.name().to_string(),
@@ -108,10 +108,10 @@ impl Resource for TopicResourceImpl<'_> {
 }
 
 async fn get_topic_status(target_client_factory: &TargetClientFactory, topic_name: &str) -> Result<Option<ResourceStatus>, String> {
-  let target_client = target_client_factory.get().await?;
+  let target_client = target_client_factory.client().await?;
   match target_client
-    .client
-    .topic_get_by_tenant_topic_by_id_status(target_client.tenant, topic_name, target_client.token.as_str())
+    .client()
+    .topic_get_by_tenant_topic_by_id_status(target_client.tenant(), topic_name, target_client.token())
     .await
   {
     Ok(response) => {
