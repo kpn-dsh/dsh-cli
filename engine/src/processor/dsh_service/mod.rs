@@ -1,11 +1,12 @@
-use crate::identifier;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
-use crate::pipeline::PipelineName;
-use crate::processor::ProcessorName;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+
+use crate::identifier;
+use crate::pipeline::PipelineName;
+use crate::processor::ProcessorName;
 
 pub mod dsh_api_client;
 pub mod dsh_service_api;
@@ -21,6 +22,14 @@ identifier!(
   "^[a-z][a-z0-9]{0,17}(-[a-z][a-z0-9]{0,17})?$",
   "validname-validname",
   "validname_validname"
+);
+identifier!(
+  "processor::dsh_service",
+  TaskId,
+  "task identifier",
+  "^[a-z0-9-._]{1,32}$",
+  "84db5b4b79-6bgtl-00000000",
+  "invalid task id"
 );
 
 impl TryFrom<(Option<&PipelineName>, &ProcessorName)> for DshServiceName {

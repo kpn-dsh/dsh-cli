@@ -1,7 +1,8 @@
 use std::time::SystemTime;
 
 use trifonius_engine::processor::dsh_service::dsh_api_client::ServiceClient;
-use trifonius_engine::processor::{PipelineProcessorName, ProcessorId, TaskId};
+use trifonius_engine::processor::dsh_service::{DshServiceName, TaskId};
+use trifonius_engine::processor::ProcessorId;
 
 const SERVICE_NAME: &str = "consentfilter-test002";
 const TASK_ID: &str = "8f4b5747-lnmj4-00000000";
@@ -14,7 +15,7 @@ async fn main() -> Result<(), String> {
   env_logger::init();
 
   ProcessorId::regex();
-  let service_name = PipelineProcessorName::new(SERVICE_NAME);
+  let service_name = DshServiceName::new(SERVICE_NAME);
   let task_id = TaskId::new(TASK_ID);
   let client = ServiceClient::new();
 

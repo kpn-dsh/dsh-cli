@@ -21,14 +21,6 @@ identifier!(
   "invalid.resource.id"
 );
 identifier!("resource", ResourceName, "resource name", "^[a-z][a-z0-9]{0,17}$", "validname", "invalid-name");
-identifier!(
-  "resource",
-  PipelineResourceName,
-  "pipeline-resource name",
-  "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",
-  "validname-validname",
-  "validname_validname"
-);
 
 #[derive(Clone, Debug, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub enum ResourceType {

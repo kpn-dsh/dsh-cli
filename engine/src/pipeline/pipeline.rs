@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::pipeline::PipelineName;
-use crate::processor::{JunctionId, ParameterId, ProcessorIdentifier, ProcessorName, ProfileId};
+use crate::processor::{JunctionIdentifier, ParameterId, ProcessorIdentifier, ProcessorName, ProfileId};
 use crate::resource::ResourceIdentifier;
 
 pub struct Pipeline {
@@ -49,10 +49,4 @@ pub enum DependencyType {
   ProcessorOnProcessor { depended: ProcessorIdentifier, depends_on: ProcessorIdentifier },
   ProcessorOnResource { depended: JunctionIdentifier, depends_on: Vec<ResourceIdentifier> },
   ResourceOnProcessor { depended: ProcessorIdentifier, depends_on: ResourceIdentifier },
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct JunctionIdentifier {
-  pub processor_identifier: ProcessorIdentifier,
-  pub junction_id: JunctionId,
 }

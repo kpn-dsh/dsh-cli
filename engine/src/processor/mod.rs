@@ -54,27 +54,17 @@ identifier!(
   "valid-profile-id",
   "invalid_profile_id"
 );
-identifier!(
-  "processor",
-  PipelineProcessorName,
-  "pipeline-processor name",
-  "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",
-  "validname-validname",
-  "validname_validname"
-);
-identifier!(
-  "processor",
-  TaskId,
-  "task identifier",
-  "^[a-z0-9-._]{1,32}$",
-  "84db5b4b79-6bgtl-00000000",
-  "invalid task id"
-);
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ProcessorIdentifier {
   pub processor_type: ProcessorType,
   pub id: ProcessorId,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct JunctionIdentifier {
+  pub processor_identifier: ProcessorIdentifier,
+  pub junction_id: JunctionId,
 }
 
 impl Display for ProcessorType {

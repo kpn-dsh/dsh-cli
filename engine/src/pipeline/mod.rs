@@ -16,9 +16,25 @@ identifier!(
   "pipeline",
   PipelineName,
   "pipeline name",
-  "^[a-z][a-z0-9]{0,19}$",
+  "^[a-z][a-z0-9]{0,17}$",
   "validpipelinename",
   "invalid.pipeline.name"
+);
+identifier!(
+  "pipeline",
+  PipelineProcessorName,
+  "pipeline-processor name",
+  "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",
+  "validname-validname",
+  "validname_validname"
+);
+identifier!(
+  "pipeline",
+  PipelineResourceName,
+  "pipeline-resource name",
+  "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",
+  "validname-validname",
+  "validname_validname"
 );
 
 // Declared, Configured, Deleted
