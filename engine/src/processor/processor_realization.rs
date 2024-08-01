@@ -2,9 +2,10 @@
 
 #![allow(clippy::module_inception)]
 
-use crate::processor::processor::Processor;
+use crate::pipeline::PipelineName;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
-use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorType};
+use crate::processor::processor_instance::ProcessorInstance;
+use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType};
 use crate::target_client::TargetClientFactory;
 
 /// Defines the behavior of a Trifonius `ProcessorRealization`
@@ -35,11 +36,23 @@ pub trait ProcessorRealization<'a> {
   /// * This `ProcessorRealization`s label.
   fn label(&self) -> &str;
 
-  /// # Create a `Processor` from this `ProcessorRealization`
+  /// # Create a `ProcessorInstance` from this `ProcessorRealization`
+  ///
+  /// ## Parameters
+  /// * `pipeline_name`         - Pipeline name wrapped in a `Some` when the created
+  ///                             `ProcessorInstance` is part of a _Pipeline_,
+  ///                             `None` when it is not.
+  /// * `processor_name`        - Processor name.
+  /// * `target_client_factory` - Target client factory.
   ///
   /// ## Returns
-  /// * The created `Processor`.
-  fn processor(&'a self, target_client_factory: Option<&'a TargetClientFactory>) -> Result<Box<dyn Processor + 'a>, String>;
+  /// * The created `ProcessorInstance`.
+  fn processor_instance(
+    &'a self,
+    pipeline_name: Option<&PipelineName>,
+    processor_name: &ProcessorName,
+    target_client_factory: &'a TargetClientFactory,
+  ) -> Result<Box<dyn ProcessorInstance + 'a>, String>;
 
   /// # Get this `ProcessorRealization`s type
   ///

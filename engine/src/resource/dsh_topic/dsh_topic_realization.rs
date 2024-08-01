@@ -1,23 +1,22 @@
-use std::ops::Deref;
-
-use async_trait::async_trait;
+use crate::pipeline::PipelineName;
 use dsh_sdk::dsh::datastream::Stream;
 
 use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
+use crate::resource::dsh_topic::dsh_topic_instance::DshTopicInstance;
 use crate::resource::dsh_topic::DshTopicType;
-use crate::resource::resource::{Resource, ResourceStatus};
 use crate::resource::resource_descriptor::ResourceDescriptor;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
+use crate::resource::resource_instance::ResourceInstance;
+use crate::resource::resource_realization::ResourceRealization;
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceName, ResourceType};
 use crate::target_client::TargetClientFactory;
 
-pub struct TopicResourceImpl<'a> {
-  pub resource_identifier: ResourceIdentifier,
-  pub resource_descriptor: ResourceDescriptor,
-  target_client_factory: &'a TargetClientFactory,
+pub(crate) struct DshTopicRealization {
+  pub(crate) resource_identifier: ResourceIdentifier,
+  resource_descriptor: ResourceDescriptor,
 }
 
-impl<'a> TopicResourceImpl<'a> {
-  pub fn create(stream: &Stream, target_client_factory: &'a TargetClientFactory) -> Result<Self, String> {
+impl DshTopicRealization {
+  pub(crate) fn create(stream: &Stream, target_client_factory: &TargetClientFactory) -> Result<Self, String> {
     // TODO Check proper topic name
     let topic_name = match stream.write_pattern() {
       Ok(write_pattern) => write_pattern.to_string(),
@@ -73,14 +72,13 @@ impl<'a> TopicResourceImpl<'a> {
       }),
     };
     let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? };
-    Ok(TopicResourceImpl { resource_identifier, resource_descriptor, target_client_factory })
+    Ok(DshTopicRealization { resource_identifier, resource_descriptor })
   }
 }
 
-#[async_trait]
-impl Resource for TopicResourceImpl<'_> {
-  fn descriptor(&self) -> &ResourceDescriptor {
-    &self.resource_descriptor
+impl<'a> ResourceRealization<'a> for DshTopicRealization {
+  fn descriptor(&self) -> ResourceDescriptor {
+    self.resource_descriptor.clone()
   }
 
   fn identifier(&self) -> &ResourceIdentifier {
@@ -95,33 +93,19 @@ impl Resource for TopicResourceImpl<'_> {
     &self.resource_descriptor.label
   }
 
+  fn resource_instance(
+    &'a self,
+    pipeline_name: Option<&'a PipelineName>,
+    resource_name: &'a ResourceName,
+    target_client_factory: &'a TargetClientFactory,
+  ) -> Result<Box<dyn ResourceInstance + 'a>, String> {
+    match DshTopicInstance::create(pipeline_name, resource_name, self, target_client_factory) {
+      Ok(resource) => Ok(Box::new(resource)),
+      Err(error) => Err(error),
+    }
+  }
+
   fn resource_type(&self) -> ResourceType {
     ResourceType::DshTopic
-  }
-
-  async fn status(&self) -> Result<ResourceStatus, String> {
-    match get_topic_status(self.target_client_factory, &self.resource_descriptor.dsh_topic_descriptor.as_ref().unwrap().topic).await? {
-      Some(status) => Ok(status),
-      None => Err(format!("could not get status for non-existent topic '{}'", &self.resource_identifier.id)),
-    }
-  }
-}
-
-async fn get_topic_status(target_client_factory: &TargetClientFactory, topic_name: &str) -> Result<Option<ResourceStatus>, String> {
-  let target_client = target_client_factory.client().await?;
-  match target_client
-    .client()
-    .topic_get_by_tenant_topic_by_id_status(target_client.tenant(), topic_name, target_client.token())
-    .await
-  {
-    Ok(response) => {
-      if response.status() == 404 {
-        Ok(None)
-      } else {
-        let api_allocation_status = response.deref();
-        Ok(Some(ResourceStatus { up: api_allocation_status.provisioned }))
-      }
-    }
-    Err(e) => Err(format!("dsh api error ({})", e)),
   }
 }

@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 use crate::{config_dir_name, identifier};
 
 pub mod dsh_service;
-pub mod processor;
 pub mod processor_config;
 pub mod processor_descriptor;
+pub mod processor_instance;
 pub mod processor_realization;
 pub mod processor_registry;
 
@@ -56,9 +56,9 @@ identifier!(
 );
 identifier!(
   "processor",
-  ServiceName,
-  "service name",
-  "^[a-z][a-z0-9]{0,17}(-[a-z][a-z0-9]{0,17})?$",
+  PipelineProcessorName,
+  "pipeline-processor name",
+  "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",
   "validname-validname",
   "validname_validname"
 );

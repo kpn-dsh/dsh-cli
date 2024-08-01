@@ -21,10 +21,10 @@ impl<'a> DshServiceRealizationRegistry<'a> {
       let file_name = path.unwrap().path().display().to_string();
       let config = read_dsh_service_config(&file_name)?;
       let id = ProcessorId::try_from(config.processor.id.as_str())?;
-      let dsh_service = DshServiceRealization::create(config, target_client_factory.target_tenant().clone(), resource_registry)?;
-      dsh_service_realizations.insert(ProcessorIdentifier { processor_type: ProcessorType::DshService, id }, dsh_service);
+      let dsh_service_realization = DshServiceRealization::create(config, target_client_factory.target_tenant().clone(), resource_registry)?;
+      dsh_service_realizations.insert(ProcessorIdentifier { processor_type: ProcessorType::DshService, id }, dsh_service_realization);
     }
-    Ok(DshServiceRealizationRegistry { dsh_service_realizations })
+    Ok(Self { dsh_service_realizations })
   }
 
   pub(crate) fn dsh_service_realization_by_id(&self, id: &ProcessorId) -> Option<&dyn ProcessorRealization> {
@@ -37,7 +37,7 @@ impl<'a> DshServiceRealizationRegistry<'a> {
     }
   }
 
-  pub(crate) fn processor_identifiers(&self) -> Vec<&ProcessorIdentifier> {
+  pub(crate) fn dsh_service_identifiers(&self) -> Vec<&ProcessorIdentifier> {
     self.dsh_service_realizations.values().map(|realization| realization.identifier()).collect()
   }
 

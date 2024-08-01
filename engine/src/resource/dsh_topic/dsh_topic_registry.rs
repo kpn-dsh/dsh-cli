@@ -2,47 +2,42 @@ use std::collections::HashMap;
 
 use dsh_sdk::Properties;
 
-use crate::resource::dsh_topic::dsh_topic_resource::TopicResourceImpl;
-use crate::resource::resource::{Resource, ResourceStatus};
+use crate::resource::dsh_topic::dsh_topic_realization::DshTopicRealization;
 use crate::resource::resource_descriptor::ResourceDescriptor;
+use crate::resource::resource_realization::ResourceRealization;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
 use crate::target_client::TargetClientFactory;
 
-pub(crate) struct TopicRegistry<'a> {
-  resources: HashMap<ResourceIdentifier, TopicResourceImpl<'a>>,
+pub(crate) struct DshTopicRealizationRegistry {
+  dsh_topic_realizations: HashMap<ResourceIdentifier, DshTopicRealization>,
 }
 
-impl<'a> TopicRegistry<'a> {
-  pub(crate) fn create(target_client_factory: &'a TargetClientFactory) -> Result<TopicRegistry, String> {
-    let mut resources: HashMap<ResourceIdentifier, TopicResourceImpl<'a>> = HashMap::new();
+impl<'a> DshTopicRealizationRegistry {
+  pub(crate) fn create(target_client_factory: &'a TargetClientFactory) -> Result<Self, String> {
+    let mut dsh_topic_realizations: HashMap<ResourceIdentifier, DshTopicRealization> = HashMap::new();
     let dsh_properties: &Properties = Properties::get();
     for stream in dsh_properties.datastream().streams().values() {
-      let resource = TopicResourceImpl::create(stream, target_client_factory)?;
-      resources.insert(resource.resource_identifier.clone(), resource);
+      let dsh_topic_realization = DshTopicRealization::create(stream, target_client_factory)?;
+      dsh_topic_realizations.insert(dsh_topic_realization.resource_identifier.clone(), dsh_topic_realization);
     }
-    Ok(TopicRegistry { resources })
+    Ok(Self { dsh_topic_realizations })
   }
 
-  pub(crate) fn resource_by_id(&self, id: &ResourceId) -> Option<&(dyn Resource + Sync)> {
-    match self.resources.get(&ResourceIdentifier { resource_type: ResourceType::DshTopic, id: id.clone() }) {
+  pub(crate) fn dsh_topic_realization_by_id(&self, id: &ResourceId) -> Option<&(dyn ResourceRealization)> {
+    match self
+      .dsh_topic_realizations
+      .get(&ResourceIdentifier { resource_type: ResourceType::DshTopic, id: id.clone() })
+    {
       Some(a) => Some(a),
       None => None,
     }
   }
 
-  pub(crate) fn resource_identifiers(&self) -> Vec<&ResourceIdentifier> {
-    self.resources.values().map(|resource| resource.identifier()).collect()
+  pub(crate) fn dsh_topic_identifiers(&self) -> Vec<&ResourceIdentifier> {
+    self.dsh_topic_realizations.values().map(|realization| realization.identifier()).collect()
   }
 
-  pub(crate) fn resource_descriptors(&self) -> Vec<&ResourceDescriptor> {
-    self.resources.values().map(|resource| resource.descriptor()).collect()
-  }
-
-  pub(crate) async fn resource_descriptors_with_status(&self) -> Result<Vec<(&ResourceDescriptor, ResourceStatus)>, String> {
-    let mut descriptors: Vec<(&ResourceDescriptor, ResourceStatus)> = Vec::new();
-    for resource in self.resources.values() {
-      descriptors.push((resource.descriptor(), resource.status().await?))
-    }
-    Ok(descriptors)
+  pub(crate) fn dsh_topic_descriptors(&self) -> Vec<ResourceDescriptor> {
+    self.dsh_topic_realizations.values().map(|realization| realization.descriptor()).collect()
   }
 }

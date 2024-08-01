@@ -2,18 +2,19 @@
 
 use std::collections::HashMap;
 
+use crate::pipeline::PipelineName;
 use dsh_rest_api_client::types::Application;
 
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
-use crate::processor::dsh_service::dsh_service_implementation::DshServiceImplementation;
-use crate::processor::processor::Processor;
+use crate::processor::dsh_service::dsh_service_instance::DshServiceInstance;
+use crate::processor::dsh_service::DshServiceName;
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
+use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::ProcessorType::DshService;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorType, ProfileId, ServiceName};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType, ProfileId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceType};
@@ -31,7 +32,7 @@ pub struct DshServiceRealization<'a> {
 impl<'a> DshServiceRealization<'a> {
   pub fn create(processor_config: ProcessorConfig, target_tenant: TargetTenant, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
     Ok(DshServiceRealization {
-      processor_identifier: ProcessorIdentifier { processor_type: DshService, id: ProcessorId::try_from(processor_config.processor.id.as_str())? },
+      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: ProcessorId::try_from(processor_config.processor.id.as_str())? },
       processor_config,
       target_tenant,
       resource_registry,
@@ -65,13 +66,15 @@ impl<'a> ProcessorRealization<'a> for DshServiceRealization<'a> {
     &self.processor_config.processor.label
   }
 
-  fn processor(&'a self, target_client_factory: Option<&'a TargetClientFactory>) -> Result<Box<dyn Processor + 'a>, String> {
-    match target_client_factory {
-      Some(tcf) => match DshServiceImplementation::create(self, tcf, self.resource_registry) {
-        Ok(processor) => Ok(Box::new(processor)),
-        Err(error) => Err(error),
-      },
-      None => Err("dsh service processor requires target client factory".to_string()),
+  fn processor_instance(
+    &'a self,
+    pipeline_name: Option<&PipelineName>,
+    processor_name: &ProcessorName,
+    target_client_factory: &'a TargetClientFactory,
+  ) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
+    match DshServiceInstance::create(pipeline_name, processor_name, self, target_client_factory, self.resource_registry) {
+      Ok(processor) => Ok(Box::new(processor)),
+      Err(error) => Err(error),
     }
   }
 
@@ -81,9 +84,10 @@ impl<'a> ProcessorRealization<'a> for DshServiceRealization<'a> {
 }
 
 impl DshServiceRealization<'_> {
-  pub(crate) fn dsh_config(
+  pub(crate) fn dsh_deployment_config(
     &self,
-    service_name: &ServiceName,
+    pipeline_name: Option<&PipelineName>,
+    processor_name: &ProcessorName,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
@@ -140,10 +144,15 @@ impl DshServiceRealization<'_> {
     };
     let mut template_mapping: TemplateMapping = TemplateMapping::from(&self.target_tenant);
     template_mapping.insert(PlaceHolder::ProcessorId, self.processor_identifier.id.0.clone());
-    template_mapping.insert(PlaceHolder::ServiceName, service_name.to_string());
-    template_mapping.insert(PlaceHolder::DshServiceName, service_name.to_string());
+    if let Some(pipeline_name) = pipeline_name {
+      template_mapping.insert(PlaceHolder::PipelineName, pipeline_name.to_string());
+    }
+    template_mapping.insert(PlaceHolder::ProcessorName, processor_name.to_string());
+    let dsh_service_name = DshServiceName::try_from((pipeline_name, processor_name))?;
+    template_mapping.insert(PlaceHolder::ServiceName, dsh_service_name.to_string());
+    template_mapping.insert(PlaceHolder::DshServiceName, dsh_service_name.to_string());
     let api_application = into_api_application(
-      service_name,
+      &dsh_service_name,
       dsh_service_specific_config,
       &inbound_junction_topics,
       &outbound_junction_topics,
@@ -190,7 +199,7 @@ impl DshServiceRealization<'_> {
           }
           let mut topics = Vec::<String>::new();
           for resource_id in junction_resource_ids {
-            match self.resource_registry.resource_by_identifier(resource_id) {
+            match self.resource_registry.resource_realization_by_identifier(resource_id) {
               Some(resource) => match &resource.descriptor().dsh_topic_descriptor {
                 Some(dsh_topic_descriptor) => topics.push(dsh_topic_descriptor.topic.to_string()),
                 None => unreachable!(),

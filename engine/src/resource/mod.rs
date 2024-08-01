@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 use crate::identifier;
 
 pub mod dsh_topic;
-pub mod resource;
 pub mod resource_descriptor;
+pub mod resource_instance;
+pub mod resource_realization;
 pub mod resource_registry;
 
 identifier!(
@@ -19,12 +20,22 @@ identifier!(
   "valid_resource_id",
   "invalid.resource.id"
 );
+identifier!("resource", ResourceName, "resource name", "^[a-z][a-z0-9]{0,17}$", "validname", "invalid-name");
+identifier!(
+  "resource",
+  PipelineResourceName,
+  "pipeline-resource name",
+  "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",
+  "validname-validname",
+  "validname_validname"
+);
 
 #[derive(Clone, Debug, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub enum ResourceType {
+  // #[serde(rename = "dsh-gateway")]
+  // DshGateway,
   #[serde(rename = "dsh-topic")]
   DshTopic,
-  // DshGateway,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
@@ -36,6 +47,7 @@ pub struct ResourceIdentifier {
 impl Display for ResourceType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
+      // ResourceType::DshGateway => write!(f, "dsh-gateway"),
       ResourceType::DshTopic => write!(f, "dsh-topic"),
     }
   }
@@ -44,12 +56,14 @@ impl Display for ResourceType {
 impl ResourceType {
   fn description(&self) -> &str {
     match self {
+      // ResourceType::DshGateway => "Kafka streams topic connected to the DSH gateway",
       ResourceType::DshTopic => "Kafka topic managed by the DSH platform",
     }
   }
 
   fn label(&self) -> &str {
     match self {
+      // ResourceType::DshGateway => "Dsh Gateway",
       ResourceType::DshTopic => "Dsh Topic",
     }
   }

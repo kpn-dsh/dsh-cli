@@ -7,9 +7,12 @@ use dsh_rest_api_client::Error::UnexpectedResponse;
 use log::{debug, error};
 use reqwest::StatusCode;
 
+use crate::pipeline::PipelineName;
 use crate::processor::dsh_service::dsh_service_realization::DshServiceRealization;
-use crate::processor::processor::{Processor, ProcessorStatus};
-use crate::processor::{JunctionId, ParameterId, ProfileId, ServiceName};
+use crate::processor::dsh_service::DshServiceName;
+use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
+use crate::processor::processor_realization::ProcessorRealization;
+use crate::processor::{JunctionId, ParameterId, ProcessorName, ProfileId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
@@ -17,20 +20,36 @@ use crate::target_client::TargetClientFactory;
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
-pub struct DshServiceImplementation<'a> {
+pub struct DshServiceInstance<'a> {
+  pipeline_name: Option<PipelineName>,
+  processor_name: ProcessorName,
+  dsh_service_name: DshServiceName,
   processor_realization: &'a DshServiceRealization<'a>,
   target_client_factory: &'a TargetClientFactory,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
-impl<'a> DshServiceImplementation<'a> {
-  pub fn create(processor_realization: &'a DshServiceRealization, target_client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
-    Ok(DshServiceImplementation { processor_realization, target_client_factory, resource_registry })
+impl<'a> DshServiceInstance<'a> {
+  pub fn create(
+    pipeline_name: Option<&PipelineName>,
+    processor_name: &ProcessorName,
+    processor_realization: &'a DshServiceRealization,
+    target_client_factory: &'a TargetClientFactory,
+    resource_registry: &'a ResourceRegistry,
+  ) -> Result<Self, String> {
+    Ok(Self {
+      pipeline_name: pipeline_name.cloned(),
+      processor_name: processor_name.clone(),
+      dsh_service_name: DshServiceName::try_from((pipeline_name, processor_name))?,
+      processor_realization,
+      target_client_factory,
+      resource_registry,
+    })
   }
 }
 
 #[async_trait]
-impl Processor for DshServiceImplementation<'_> {
+impl ProcessorInstance for DshServiceInstance<'_> {
   async fn compatible_resources(&self, junction_id: &JunctionId) -> Result<Vec<ResourceIdentifier>, String> {
     if let Some((direction, junction_config)) = self
       .processor_realization
@@ -70,27 +89,31 @@ impl Processor for DshServiceImplementation<'_> {
     }
   }
 
+  fn processor_realization(&self) -> &dyn ProcessorRealization {
+    self.processor_realization
+  }
+
   async fn deploy(
     &self,
-    service_name: &ServiceName,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
   ) -> Result<(), String> {
     let target_client = self.target_client_factory.client().await?;
-    let dsh_config = self.processor_realization.dsh_config(
-      service_name,
+    let dsh_deployment_config = self.processor_realization.dsh_deployment_config(
+      self.pipeline_name.as_ref(),
+      &self.processor_name,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
       profile_id,
       target_client.user().to_string(),
     )?;
-    debug!("dsh configuration file\n{:#?}", &dsh_config);
+    debug!("dsh configuration file\n{:#?}", &dsh_deployment_config);
     match target_client
       .client()
-      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant(), service_name, target_client.token(), &dsh_config)
+      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dsh_service_name, target_client.token(), &dsh_deployment_config)
       .await
     {
       Ok(response) => {
@@ -116,15 +139,15 @@ impl Processor for DshServiceImplementation<'_> {
 
   async fn deploy_dry_run(
     &self,
-    service_name: &ServiceName,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
   ) -> Result<String, String> {
     let target_client = self.target_client_factory.client().await?;
-    let dsh_config = self.processor_realization.dsh_config(
-      service_name,
+    let dsh_config = self.processor_realization.dsh_deployment_config(
+      self.pipeline_name.as_ref(),
+      &self.processor_name,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
@@ -141,15 +164,23 @@ impl Processor for DshServiceImplementation<'_> {
     }
   }
 
-  async fn start(&self, _service_name: &ServiceName) -> Result<bool, String> {
+  fn pipeline_name(&self) -> Option<&PipelineName> {
+    self.pipeline_name.as_ref()
+  }
+
+  fn processor_name(&self) -> &ProcessorName {
+    &self.processor_name
+  }
+
+  async fn start(&self) -> Result<bool, String> {
     Err("start method not yet implemented".to_string())
   }
 
-  async fn status(&self, service_name: &ServiceName) -> Result<ProcessorStatus, String> {
+  async fn status(&self) -> Result<ProcessorStatus, String> {
     let target_client = self.target_client_factory.client().await?;
     match target_client
       .client()
-      .application_get_by_tenant_application_by_appid_status(target_client.tenant(), service_name, target_client.token())
+      .application_get_by_tenant_application_by_appid_status(target_client.tenant(), &self.dsh_service_name, target_client.token())
       .await
     {
       Ok(response) => match response.status() {
@@ -170,15 +201,15 @@ impl Processor for DshServiceImplementation<'_> {
     }
   }
 
-  async fn stop(&self, _service_name: &ServiceName) -> Result<bool, String> {
+  async fn stop(&self) -> Result<bool, String> {
     Err("stop method not yet implemented".to_string())
   }
 
-  async fn undeploy(&self, service_name: &ServiceName) -> Result<bool, String> {
+  async fn undeploy(&self) -> Result<bool, String> {
     let target_client = self.target_client_factory.client().await?;
     match target_client
       .client()
-      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant(), service_name, target_client.token())
+      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dsh_service_name, target_client.token())
       .await
     {
       Ok(response) => match response.status() {

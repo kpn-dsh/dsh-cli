@@ -8,8 +8,9 @@ use dsh_rest_api_client::types::{
 use crate::processor::dsh_service::dsh_service_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
+use crate::processor::dsh_service::DshServiceName;
 use crate::processor::processor_config::VariableType;
-use crate::processor::{JunctionId, ServiceName};
+use crate::processor::JunctionId;
 use crate::target_client::{template_resolver, TemplateMapping};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
@@ -115,7 +116,7 @@ impl From<SecretConfig> for ApiApplicationSecret {
 const TRIFONIUS_PREFIX: &str = "TRIFONIUS";
 
 pub fn into_api_application(
-  service_name: &ServiceName,
+  service_name: &DshServiceName,
   dsh_service_specific_config: &DshServiceSpecificConfig,
   inbound_junctions: &HashMap<JunctionId, String>,
   outbound_junctions: &HashMap<JunctionId, String>,

@@ -8,7 +8,7 @@ use log::debug;
 use reqwest::StatusCode;
 use serde::Serialize;
 
-use crate::processor::{ServiceName, TaskId};
+use crate::processor::{PipelineProcessorName, TaskId};
 use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
 // TODO Move to a separate crate.
@@ -33,7 +33,7 @@ impl ServiceClient<'_> {
     ServiceClient { target_client_factory: &DEFAULT_TARGET_CLIENT_FACTORY }
   }
 
-  pub async fn _get_tasks(&self, service_name: &ServiceName) -> Result<HashMap<TaskId, TaskStatus>, String> {
+  pub async fn _get_tasks(&self, service_name: &PipelineProcessorName) -> Result<HashMap<TaskId, TaskStatus>, String> {
     // TODO Panics
     match self.get_all_derived_task_ids(service_name).await {
       Ok(task_ids) => Ok(
@@ -92,7 +92,7 @@ impl ServiceClient<'_> {
   /// }
   ///
   /// ```
-  pub async fn get_deployed_service_configuration(&self, service_name: &ServiceName) -> Result<Application, String> {
+  pub async fn get_deployed_service_configuration(&self, service_name: &PipelineProcessorName) -> Result<Application, String> {
     let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
@@ -115,7 +115,7 @@ impl ServiceClient<'_> {
   /// }
   ///
   /// ```
-  pub async fn get_service_configuration(&self, service_name: &ServiceName) -> Result<Application, String> {
+  pub async fn get_service_configuration(&self, service_name: &PipelineProcessorName) -> Result<Application, String> {
     let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
@@ -132,7 +132,7 @@ impl ServiceClient<'_> {
   ///   "notifications": []
   /// }
   /// ```
-  pub async fn get_service_status(&self, service_name: &ServiceName) -> Result<AllocationStatus, String> {
+  pub async fn get_service_status(&self, service_name: &PipelineProcessorName) -> Result<AllocationStatus, String> {
     let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
@@ -197,7 +197,7 @@ impl ServiceClient<'_> {
   ///   ...
   /// ]
   /// ```
-  pub async fn get_all_derived_task_ids(&self, service_name: &ServiceName) -> Result<ChildList, String> {
+  pub async fn get_all_derived_task_ids(&self, service_name: &PipelineProcessorName) -> Result<ChildList, String> {
     let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
@@ -234,7 +234,7 @@ impl ServiceClient<'_> {
   ///   }
   /// }
   /// ```
-  pub async fn get_derived_task_status(&self, service_name: &ServiceName, task_id: &TaskId) -> Result<TaskStatus, String> {
+  pub async fn get_derived_task_status(&self, service_name: &PipelineProcessorName, task_id: &TaskId) -> Result<TaskStatus, String> {
     let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
@@ -253,7 +253,7 @@ impl ServiceClient<'_> {
   /// }
   /// ```
   ///
-  pub async fn get_task_status_description(&self, service_name: &ServiceName, task_id: &TaskId) -> Result<AllocationStatus, String> {
+  pub async fn get_task_status_description(&self, service_name: &PipelineProcessorName, task_id: &TaskId) -> Result<AllocationStatus, String> {
     let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client
@@ -276,7 +276,7 @@ impl ServiceClient<'_> {
   ///   "state": "RUNNING"
   /// }
   /// ```
-  pub async fn get_task_state(&self, service_name: &ServiceName, task_id: &TaskId) -> Result<Task, String> {
+  pub async fn get_task_state(&self, service_name: &PipelineProcessorName, task_id: &TaskId) -> Result<Task, String> {
     let target_client = self.target_client_factory.client().await?;
     self.process(
       target_client

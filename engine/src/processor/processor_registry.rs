@@ -1,10 +1,11 @@
+use crate::pipeline::PipelineName;
 use lazy_static::lazy_static;
 
 use crate::processor::dsh_service::dsh_service_registry::DshServiceRealizationRegistry;
-use crate::processor::processor::Processor;
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
+use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorType};
+use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType};
 use crate::resource::resource_registry::{ResourceRegistry, DEFAULT_RESOURCE_REGISTRY};
 use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
@@ -18,15 +19,9 @@ pub struct ProcessorRegistry<'a> {
   target_client_factory: &'a TargetClientFactory,
 }
 
-impl Default for ProcessorRegistry<'_> {
-  fn default() -> Self {
-    ProcessorRegistry::create(&DEFAULT_TARGET_CLIENT_FACTORY, &DEFAULT_RESOURCE_REGISTRY).expect("unable to create default processor registry")
-  }
-}
-
 impl<'a> ProcessorRegistry<'a> {
   pub fn new() -> Self {
-    ProcessorRegistry::default()
+    Self::default()
   }
 
   pub fn create(target_client_factory: &'a TargetClientFactory, resource_registry: &'a ResourceRegistry) -> Result<ProcessorRegistry<'a>, String> {
@@ -57,14 +52,25 @@ impl<'a> ProcessorRegistry<'a> {
     }
   }
 
-  pub fn processor(&'a self, processor_type: ProcessorType, processor_id: &ProcessorId) -> Option<Result<Box<dyn Processor + 'a>, String>> {
+  pub fn processor_instance(
+    &'a self,
+    processor_type: ProcessorType,
+    processor_id: &ProcessorId,
+    pipeline_name: Option<&'a PipelineName>,
+    processor_name: &'a ProcessorName,
+  ) -> Option<Result<Box<dyn ProcessorInstance + 'a>, String>> {
     self
       .processor_realization(processor_type, processor_id)
-      .map(|realization| realization.processor(Some(self.target_client_factory)))
+      .map(|realization| realization.processor_instance(pipeline_name, processor_name, self.target_client_factory))
   }
 
-  pub fn processor_by_identifier(&'a self, processor_identifier: &ProcessorIdentifier) -> Option<Result<Box<dyn Processor + 'a>, String>> {
-    self.processor(processor_identifier.processor_type.clone(), &processor_identifier.id)
+  pub fn processor_instance_by_identifier(
+    &'a self,
+    processor_identifier: &ProcessorIdentifier,
+    pipeline_name: Option<&'a PipelineName>,
+    processor_name: &'a ProcessorName,
+  ) -> Option<Result<Box<dyn ProcessorInstance + 'a>, String>> {
+    self.processor_instance(processor_identifier.processor_type.clone(), &processor_identifier.id, pipeline_name, processor_name)
   }
 
   pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &ProcessorId) -> Option<ProcessorDescriptor> {
@@ -72,7 +78,7 @@ impl<'a> ProcessorRegistry<'a> {
       ProcessorType::DshService => self
         .dsh_service_realization_registry
         .dsh_service_realization_by_id(processor_id)
-        .map(|a| a.descriptor()),
+        .map(|realization| realization.descriptor()),
     }
   }
 
@@ -81,7 +87,7 @@ impl<'a> ProcessorRegistry<'a> {
       ProcessorType::DshService => self
         .dsh_service_realization_registry
         .dsh_service_realization_by_id(&processor_identifier.id)
-        .map(|a| a.descriptor()),
+        .map(|realization| realization.descriptor()),
     }
   }
 
@@ -96,12 +102,18 @@ impl<'a> ProcessorRegistry<'a> {
   }
 
   pub fn processor_identifiers(&self) -> Vec<&ProcessorIdentifier> {
-    self.dsh_service_realization_registry.processor_identifiers()
+    self.dsh_service_realization_registry.dsh_service_identifiers()
   }
 
   pub fn processor_identifiers_by_type(&self, processor_type: ProcessorType) -> Vec<&ProcessorIdentifier> {
     match processor_type {
-      ProcessorType::DshService => self.dsh_service_realization_registry.processor_identifiers(),
+      ProcessorType::DshService => self.dsh_service_realization_registry.dsh_service_identifiers(),
     }
+  }
+}
+
+impl Default for ProcessorRegistry<'_> {
+  fn default() -> Self {
+    Self::create(&DEFAULT_TARGET_CLIENT_FACTORY, &DEFAULT_RESOURCE_REGISTRY).expect("unable to create default processor registry")
   }
 }
