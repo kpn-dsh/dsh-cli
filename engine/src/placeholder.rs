@@ -6,8 +6,10 @@ const CONSOLE_URL: &str = "CONSOLE_URL";
 const DSH_INTERNAL_DOMAIN: &str = "DSH_INTERNAL_DOMAIN";
 const DSH_SERVICE_NAME: &str = "DSH_SERVICE_NAME";
 const MONITORING_URL: &str = "MONITORING_URL";
+const PIPELINE_NAME: &str = "PIPELINE_NAME";
 const PLATFORM: &str = "PLATFORM";
 const PROCESSOR_ID: &str = "PROCESSOR_ID";
+const PROCESSOR_NAME: &str = "PROCESSOR_NAME";
 const PUBLIC_VHOSTS_DOMAIN: &str = "PUBLIC_VHOSTS_DOMAIN";
 const RANDOM: &str = "RANDOM";
 const RANDOM_UUID: &str = "RANDOM_UUID";
@@ -25,8 +27,10 @@ pub enum PlaceHolder {
   DshInternalDomain,
   DshServiceName,
   MonitoringUrl,
+  PipelineName,
   Platform,
   ProcessorId,
+  ProcessorName,
   PublicVhostsDomain,
   Random,
   RandomUuid,
@@ -46,8 +50,10 @@ impl Display for PlaceHolder {
       PlaceHolder::DshInternalDomain => write!(f, "{}", DSH_INTERNAL_DOMAIN),
       PlaceHolder::DshServiceName => write!(f, "{}", DSH_SERVICE_NAME),
       PlaceHolder::MonitoringUrl => write!(f, "{}", MONITORING_URL),
+      PlaceHolder::PipelineName => write!(f, "{}", PIPELINE_NAME),
       PlaceHolder::Platform => write!(f, "{}", PLATFORM),
       PlaceHolder::ProcessorId => write!(f, "{}", PROCESSOR_ID),
+      PlaceHolder::ProcessorName => write!(f, "{}", PROCESSOR_NAME),
       PlaceHolder::PublicVhostsDomain => write!(f, "{}", PUBLIC_VHOSTS_DOMAIN),
       PlaceHolder::Random => write!(f, "{}", RANDOM),
       PlaceHolder::RandomUuid => write!(f, "{}", RANDOM_UUID),
@@ -71,8 +77,10 @@ impl TryFrom<&str> for PlaceHolder {
       DSH_INTERNAL_DOMAIN => Ok(PlaceHolder::DshInternalDomain),
       DSH_SERVICE_NAME => Ok(PlaceHolder::DshServiceName),
       MONITORING_URL => Ok(PlaceHolder::MonitoringUrl),
+      PIPELINE_NAME => Ok(PlaceHolder::PipelineName),
       PLATFORM => Ok(PlaceHolder::Platform),
       PROCESSOR_ID => Ok(PlaceHolder::ProcessorId),
+      PROCESSOR_NAME => Ok(PlaceHolder::ProcessorName),
       PUBLIC_VHOSTS_DOMAIN => Ok(PlaceHolder::PublicVhostsDomain),
       RANDOM => Ok(PlaceHolder::Random),
       RANDOM_UUID => Ok(PlaceHolder::RandomUuid),
