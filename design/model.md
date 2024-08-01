@@ -4,7 +4,6 @@
 
 ### _Processor_
 
-A _Processor_ has a one-to-one relation with a technical solution to deploy services on the DSH.
 A _Processor_ is an abstraction of a service that can be deployed to the DSH platform.
 By following this abstraction, all types of _Processors_ can be treated exactly the same,
 e.g. all _Processors_ have `deploy()`, `start()`, `stop()` and `undeploy()` methods.
@@ -30,6 +29,9 @@ The configuration must specify things like,
 * deployment _Profiles_,
 * parameters that are specific for this _ProcessorRealization_.
 
+A _ProcessorRealization_ has a one-to-one relation with a technical solution to deploy services on
+the DSH.
+
 ### _ProcessorInstance_
 
 When a _ProcessorRealization_ is used as part of a _Pipeline_,
@@ -48,51 +50,48 @@ classDiagram
     class Processor {
         ProcessorType type*
         ProcessorId id*
+        JunctionConfiguration junction_configuration*
+        DeploymentParametersConfiguration parameters_configuration*
         ProcessorDescriptor descriptor()*
-        deploy()*
-        start()*
-        stop()*
     }
     class DshServiceProcessor {
         type = dsh-service
         DshServiceConfiguration configuration*
-        deploy()
-        start()
-        stop()
     }
     Processor <|-- DshServiceProcessor
     class DshAppProcessor {
         type = dsh-app
         DshAppConfiguration configuration*
-        deploy()
-        start()
-        stop()
     }
     Processor <|-- DshAppProcessor
     class ConsentFilterRealization[":DshServiceProcessorRealization"] {
         type = dsh-service
-        id = consentfilter
-        configuration = dsh service configuration
+        id = greenbox-consent-filter
+        configured junctions
+        configure deployment parameters
         ProcessorDescriptor descriptor()
     }
     DshServiceProcessor <|.. ConsentFilterRealization
     class ReplicatorRealization[":DshServiceProcessorRealization"] {
         type = dsh-service
         id = replicator
-        configuration = dsh service configuration
+        configured junctions
+        configure deployment parameters
         ProcessorDescriptor descriptor()
     }
     DshServiceProcessor <|.. ReplicatorRealization
     class Kafka2KafkaRealization[":DshAppProcessorRealization"] {
         type = dsh-app
-        id = kafka2kafka
-        configuration = dsh app configuration
+        id = kafka-2-kafka
+        configured junctions
+        configure deployment parameters
         ProcessorDescriptor descriptor()
     }
     DshAppProcessor <|.. Kafka2KafkaRealization
     class ConsentFilterProcessorInstance[":ProcessorInstance"] {
         name = consent filter processor name
         parameters = consent filter parameter values
+        junctions = connected to resources
         deploy()
         start()
         stop()
@@ -101,6 +100,7 @@ classDiagram
     class ReplicatorProcessorInstance[":ProcessorInstance"] {
         name = replicator processor name
         parameters = replicator parameter values
+        junctions = connected to resources
         deploy()
         start()
         stop()
@@ -109,16 +109,17 @@ classDiagram
     class Kafka2KafkaProcessorInstance[":ProcessorInstance"] {
         name = kafka-2-kafka processor name
         parameters = kafka-2-kafka parameter values
+        junctions = connected to resources
         deploy()
         start()
         stop()
     }
     Kafka2KafkaRealization <.. Kafka2KafkaProcessorInstance
-    class PipelineInstance {
+    class PipelineInstance[":PipelineInstance"] {
         name = pipeline name
-        deploy()
-        start()
-        stop()
+        deploy()*
+        start()*
+        stop()*
     }
     ConsentFilterProcessorInstance --* PipelineInstance
     ReplicatorProcessorInstance --* PipelineInstance

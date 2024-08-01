@@ -1,5 +1,22 @@
 # Glossary
 
+## Actors
+
+<table>
+  <tr>
+    <th>actor</th>
+    <th></th>
+  </tr>
+  <tr>
+    <td>pipeline designer</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>processor designer</td>
+    <td></td>
+  </tr>
+</table>
+
 ## Resource
 
 Exists independent of Trifonius.

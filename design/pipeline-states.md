@@ -1,4 +1,4 @@
-## Profile states
+## Pipeline states
 
 ```mermaid
 stateDiagram-v2
@@ -28,11 +28,11 @@ stateDiagram-v2
     <tr style="vertical-align: top;">
         <td><code>Declared</code></td>
         <td>
-            A pipeline is <code>Declared</code> when it is known to the backend 
-            pipeline registry, but not yet completely and properly configured. 
-            When a new pipeline is saved to the backend pipeline registry 
-            for the first time, it is assigned a <code>PipelineId</code>, 
-            which cannot be changed during the lifetime of the pipeline.
+            A <em>Pipeline</em> is <code>Declared</code> when it is known to the backend 
+            <em>Pipeline</em> registry, but not yet completely and properly configured. 
+            When a new <em>Pipeline</em> is saved to the backend <em>Pipeline</em> registry 
+            for the first time, it is assigned a <code>PipelineName</code>, 
+            which cannot be changed during the lifetime of the <em>Pipeline</em>.
         </td>
         <td>
             <code>Configured</code><br/>
@@ -43,8 +43,8 @@ stateDiagram-v2
     <tr style="vertical-align: top;">
         <td><code>Configured</code></td>
         <td>
-            A pipeline is <code>Configured</code> when it is saved in the pipeline registry 
-            with a complete and correct configuration. When a pipeline is <code>Configured</code>, 
+            A <em>Pipeline</em> is <code>Configured</code> when it is saved in the <em>Pipeline</em> registry 
+            with a complete and correct configuration. When a <em>Pipeline</em> is <code>Configured</code>, 
             is it eligible for deployment.
         </td>
         <td>
@@ -57,8 +57,8 @@ stateDiagram-v2
     <tr style="vertical-align: top;">
         <td><code>Deployed</code></td>
         <td>
-            A pipeline is <code>Deployed</code> when it is properly deployed and configured 
-            on the DSH platform, but not yet Started.
+            A <em>Pipeline</em> is <code>Deployed</code> when it is properly deployed and configured 
+            on the DSH platform, but not yet <code>Started</code>.
         </td>
         <td>
             <code>Configured</code><br/>
@@ -68,8 +68,8 @@ stateDiagram-v2
     <tr style="vertical-align: top;">
         <td><code>Started</code></td>
         <td>
-            A pipeline is <code>Started</code> when it is properly deployed and configured 
-            on the DSH platform, but not yet Started.
+            A <em>Pipeline</em> is <code>Started</code> when it is properly deployed and configured 
+            on the DSH platform, and was started successfully.
         </td>
         <td>
             <code>Deployed</code><br/>
@@ -79,7 +79,7 @@ stateDiagram-v2
     <tr style="vertical-align: top;">
         <td><code>Stopped</code></td>
         <td>
-            A pipeline is <code>Stopped</code> when it is deployed to the DSH platform. This does not mean that it is already started.
+            A <em>Pipeline</em> is <code>Stopped</code> when it is deployed to the DSH platform. This does not mean that it is already started.
         </td>
         <td>
             <code>Deployed</code><br/>
@@ -89,8 +89,8 @@ stateDiagram-v2
     <tr style="vertical-align: top;">
         <td><code>Deleted</code></td>
         <td>
-            A pipeline is <code>Deleted</code> when it has been successfully removed from the 
-            backend pipeline registry. A <code>Deleted</code> pipeline is no longer available
+            A <em>Pipeline</em> is <code>Deleted</code> when it has been successfully removed from the 
+            backend <em>Pipeline</em> registry. A <code>Deleted</code> <em>Pipeline</em> is no longer available
             for any action.
         </td>
         <td></td>

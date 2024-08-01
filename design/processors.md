@@ -1,5 +1,12 @@
 # Trifonius processors
 
+A Trifonius processor is
+
+* Processor
+* Processor realization
+* Processor instance
+*
+
 ## DSH Service processors
 
 `ProcessorType`: `dsh-service`
