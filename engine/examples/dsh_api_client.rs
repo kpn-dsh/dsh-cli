@@ -1,20 +1,20 @@
 use std::time::SystemTime;
 
 use trifonius_engine::processor::dsh_service::dsh_api_client::ServiceClient;
-use trifonius_engine::processor::{ProcessorId, ServiceName, TaskId};
+use trifonius_engine::processor::{PipelineProcessorName, ProcessorId, TaskId};
 
-const PROCESSOR_ID: &str = "greenbox-consent-filter";
 const SERVICE_NAME: &str = "consentfilter-test002";
 const TASK_ID: &str = "8f4b5747-lnmj4-00000000";
-// const TASK_ID: &str = "cd5c9d9f9-ftz8t-00000000";
+
+#[path = "common.rs"]
+mod common;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
   env_logger::init();
 
   ProcessorId::regex();
-  let _processor_id = ProcessorId::new(PROCESSOR_ID);
-  let service_name = ServiceName::new(SERVICE_NAME);
+  let service_name = PipelineProcessorName::new(SERVICE_NAME);
   let task_id = TaskId::new(TASK_ID);
   let client = ServiceClient::new();
 

@@ -1,22 +1,19 @@
 use std::collections::HashMap;
 
-use trifonius_engine::processor::processor_registry::ProcessorRegistry;
-use trifonius_engine::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType, ProfileId, ServiceName};
+use trifonius_engine::processor::{JunctionId, ParameterId, ProfileId};
 use trifonius_engine::resource::ResourceType;
 use trifonius_engine::resource::{ResourceId, ResourceIdentifier};
-use trifonius_engine::target_client::DEFAULT_TARGET_CLIENT_FACTORY;
 
-const SERVICE_NAME: &str = "consentfilter-test002";
-const PROCESSOR_ID: &str = "greenbox-consent-filter";
+use crate::common::default_dsh_service_instance;
+
+#[path = "common.rs"]
+mod common;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
   env_logger::init();
-  let processor_registry = ProcessorRegistry::default();
-  let dsh_service_realization = processor_registry
-    .processor_realization(ProcessorType::DshService, &ProcessorId::new(PROCESSOR_ID))
-    .unwrap();
-  let dsh_service = dsh_service_realization.processor(Some(&DEFAULT_TARGET_CLIENT_FACTORY))?;
+
+  let dsh_service_instance = default_dsh_service_instance();
 
   let inbound_junction = JunctionId::new("inbound-kafka-topic");
   let inbound_resource_id = ResourceId::new("stream-reference-implementation-3p");
@@ -38,9 +35,7 @@ async fn main() -> Result<(), String> {
   let binding = Some(ProfileId::new("minimal"));
   let profile_id = binding.as_ref();
 
-  let r = dsh_service
-    .deploy(&ServiceName::new(SERVICE_NAME), &inbound_junctions, &outbound_junctions, &parameters, profile_id)
-    .await;
+  let r = dsh_service_instance.deploy(&inbound_junctions, &outbound_junctions, &parameters, profile_id).await;
   println!("{:?}", r);
 
   Ok(())
