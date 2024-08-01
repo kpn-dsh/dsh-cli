@@ -6,14 +6,12 @@
     <tr align="top">
         <th align="left">variable</th>
         <th align="left">description</th>
-        <th align="left">example</th>
     </tr>
     <tr align="top">
         <td align="top"><code>TRIFONIUS_CONFIG_DIR</code></td>
         <td>Set the location of the configuration files directory. Defaults to the current working 
             directory.
         </td>
-        <td align="top">empty</td>
     </tr>
     <tr align="top">
         <td align="top"><code>TRIFONIUS_TARGET_PLATFORM</code></td>
@@ -27,23 +25,33 @@
                 <li><code>prodlz</code></li>
             </ul>
         </td>
-        <td align="top"><code>nlpz</code></td>
     </tr>
     <tr align="top">
         <td><code>TRIFONIUS_TARGET_TENANT</code></td>
         <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
             will be managed by Trifonius.</td>
-        <td><code>greenbox-dev</code></td>
     </tr>
     <tr align="top">
-        <td><code>TRIFONIUS_TARGET_TENANT_SECRET</code></td>
-        <td>Secret api token for the target tenant.</td>
-        <td><code>...</code></td>
+        <td><code>TRIFONIUS_TARGET_TENANT_[tenant]_SECRET</code></td>
+        <td>
+            Secret api token for the target tenant. 
+            Note that the placeholder <code>[tenant]</code> needs to be substituted 
+            with the tenant name in all capitals, and hyphens (<code>-</code>) 
+            replaced with underscores (<code>_</code>).
+            E.g. if the tenant name is <code>greenbox-dev</code>, the environment variable must be
+            <code>TRIFONIUS_TARGET_TENANT_GREENBOX_DEV_SECRET = "..."</code>.
+        </td>
     </tr>
     <tr align="top">
-        <td><code>TRIFONIUS_TARGET_TENANT_USER</code></td>
-        <td>Group id and user id for the target tenant.</td>
-        <td><code>1903:1903</code></td>
+        <td><code>TRIFONIUS_TARGET_TENANT_[tenant]_USER</code></td>
+        <td>
+            Group id and user id for the target tenant.
+            Note that the placeholder <code>[tenant]</code> needs to be substituted 
+            with the tenant name in all capitals, and hyphens (<code>-</code>) 
+            replaced with underscores (<code>_</code>).
+            E.g. if the tenant name is <code>greenbox-dev</code>, the environment variable must be
+            <code>TRIFONIUS_TARGET_TENANT_GREENBOX_DEV_USER = "1903:1903"</code>.
+        </td>
     </tr>
 </table>
 
@@ -67,12 +75,16 @@ async fn main() {
 
 ## How to publish to Artifactory
 
-On the KPN Artifactory we have a Cargo repository dedicated for [DSH-IUC](https://artifacts.kpn.org/ui/repos/tree/General/cargo-dsh-iuc-local).
+On the KPN Artifactory we have a Cargo repository dedicated
+for [DSH-IUC](https://artifacts.kpn.org/ui/repos/tree/General/cargo-dsh-iuc-local).
 LDAP Group `dig_dsh_iuc` has write access to this repository and is allowed to publish artifacts.
 
-As in .cargo/config.toml, the default registry points towards [DSH-IUC](https://artifacts.kpn.org/ui/repos/tree/General/cargo-dsh-iuc-local), you can publish your crate by running:
+As in .cargo/config.toml, the default registry points
+towards [DSH-IUC](https://artifacts.kpn.org/ui/repos/tree/General/cargo-dsh-iuc-local), you can
+publish your crate by running:
 
 Login to Artifactory (one time):
+
 ```bash
 make login
 ```

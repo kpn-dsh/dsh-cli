@@ -11,9 +11,8 @@ use uuid::Uuid;
 use crate::placeholder::PlaceHolder;
 use crate::platform::DshPlatform;
 
+const TRIFONIUS_TARGET: &str = "TRIFONIUS_TARGET";
 const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
-const TRIFONIUS_TARGET_TENANT_USER: &str = "TRIFONIUS_TARGET_TENANT_USER";
-const TRIFONIUS_TARGET_TENANT_SECRET: &str = "TRIFONIUS_TARGET_TENANT_SECRET";
 const TRIFONIUS_TARGET_PLATFORM: &str = "TRIFONIUS_TARGET_PLATFORM";
 
 #[derive(Clone, Debug)]
@@ -79,12 +78,13 @@ impl TargetClient<'_> {
 
 lazy_static! {
   pub static ref DEFAULT_TARGET_CLIENT_FACTORY: TargetClientFactory = {
-    let target_tenant = TargetTenant {
-      platform: DshPlatform::try_from(get_env(TRIFONIUS_TARGET_PLATFORM).as_str()).unwrap(),
-      tenant: get_env(TRIFONIUS_TARGET_TENANT),
-      user: get_env(TRIFONIUS_TARGET_TENANT_USER),
-    };
-    TargetClientFactory::create(target_tenant, get_env(TRIFONIUS_TARGET_TENANT_SECRET)).expect("could not create static target client factory")
+    let tenant = get_env(TRIFONIUS_TARGET_TENANT);
+    let tenant_env_name = tenant.to_ascii_uppercase().replace('-', "_");
+    let user = get_env(format!("{}_TENANT_{}_USER", TRIFONIUS_TARGET, tenant_env_name).as_str());
+    let secret = get_env(format!("{}_TENANT_{}_SECRET", TRIFONIUS_TARGET, tenant_env_name).as_str());
+    let platform = DshPlatform::try_from(get_env(TRIFONIUS_TARGET_PLATFORM).as_str()).unwrap();
+    let target_tenant = TargetTenant { platform, tenant, user };
+    TargetClientFactory::create(target_tenant, secret).expect("could not create static target client factory")
   };
 }
 
