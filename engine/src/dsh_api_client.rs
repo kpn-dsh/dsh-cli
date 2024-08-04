@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use dsh_rest_api_client::types::{AllocationStatus, Application, ChildList, Task, TaskStatus};
+use dsh_rest_api_client::types::{AllocationStatus, AppCatalogApp, AppCatalogAppConfiguration, AppCatalogManifest, Application, ChildList, Task, TaskStatus};
 use dsh_rest_api_client::Error::UnexpectedResponse;
 use dsh_rest_api_client::{Error, ResponseValue};
 use futures::future::join_all;
@@ -16,17 +16,6 @@ use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 pub struct ServiceClient<'a> {
   target_client_factory: &'a TargetClientFactory,
 }
-
-// application_get_by_tenant_application_actual(&self) -> Result<HashMap<String, Application>, String>
-// application_get_by_tenant_application_by_appid_actual(&self) -> Result<Application, String>
-// application_get_by_tenant_application_by_appid_configuration(&self) -> Result<Application, String>
-// application_get_by_tenant_application_by_appid_status(&self) -> Result<AllocationStatus, String>
-// application_get_by_tenant_application_configuration(&self) -> Result<HashMap<String, Application>, String>
-// application_get_by_tenant_task(&self) -> Result<ChildList, String>
-// application_get_by_tenant_task_by_appid(&self) -> Result<ChildList, String>
-// application_get_by_tenant_task_by_appid_by_id(&self, task_id: &str) -> Result<TaskStatus, String>
-// application_get_by_tenant_task_by_appid_by_id_status(&self, task_id: &str) -> Result<AllocationStatus, String>
-// application_get_by_tenant_task_by_appid_by_id_actual(&self, task_id: &str) -> Result<Task, String>
 
 impl ServiceClient<'_> {
   pub fn new() -> Self {
@@ -282,6 +271,121 @@ impl ServiceClient<'_> {
       target_client
         .client()
         .application_get_by_tenant_task_by_appid_by_id_actual(target_client.tenant(), service_name, task_id, target_client.token())
+        .await,
+    )
+  }
+
+  // /allocation/{tenant}/appcatalogapp/configuration                         get
+  // /allocation/{tenant}/appcatalogapp/actual                                get
+  // /allocation/{tenant}/appcatalogapp/{appcatalogappid}/configuration       get
+  // /allocation/{tenant}/appcatalogapp/{appcatalogappid}/actual              get
+  // /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/configuration       delete, get, put
+  // /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/status              get
+  // /appcatalog/{tenant}/manifest                                            get
+
+  // .app_catalog_app_configuration_delete_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration()
+  // .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration()
+  // .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_status()
+  // .app_catalog_app_configuration_put_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration()
+  // .app_catalog_get_by_tenant_appcatalogapp_actual()
+  // .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_actual()
+  // .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_configuration()
+  // .app_catalog_get_by_tenant_appcatalogapp_configuration()
+  // .app_catalog_manifest_get_appcatalog_by_tenant_manifest()
+
+  pub async fn app_catalog_app_configuration_delete_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(&self, app_catalog_id: &str) -> Result<(), String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_app_configuration_delete_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(target_client.tenant(), app_catalog_id, target_client.token())
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(
+    &self,
+    app_catalog_id: &str,
+  ) -> Result<AppCatalogAppConfiguration, String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(target_client.tenant(), app_catalog_id, target_client.token())
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_status(&self, app_catalog_id: &str) -> Result<AllocationStatus, String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_status(target_client.tenant(), app_catalog_id, target_client.token())
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_app_configuration_put_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(
+    &self,
+    app_catalog_id: &str,
+    body: &AppCatalogAppConfiguration,
+  ) -> Result<(), String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_app_configuration_put_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(target_client.tenant(), app_catalog_id, target_client.token(), body)
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_get_by_tenant_appcatalogapp_actual(&self) -> Result<HashMap<String, AppCatalogApp>, String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_get_by_tenant_appcatalogapp_actual(target_client.tenant(), target_client.token())
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_actual(&self, app_catalog_id: &str) -> Result<AppCatalogApp, String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_actual(target_client.tenant(), app_catalog_id, target_client.token())
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_configuration(&self, app_catalog_id: &str) -> Result<AppCatalogApp, String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_configuration(target_client.tenant(), app_catalog_id, target_client.token())
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_get_by_tenant_appcatalogapp_configuration(&self) -> Result<HashMap<String, AppCatalogApp>, String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_get_by_tenant_appcatalogapp_configuration(target_client.tenant(), target_client.token())
+        .await,
+    )
+  }
+
+  pub async fn app_catalog_manifest_get_appcatalog_by_tenant_manifest(&self) -> Result<Vec<AppCatalogManifest>, String> {
+    let target_client = self.target_client_factory.client().await?;
+    self.process(
+      target_client
+        .client()
+        .app_catalog_manifest_get_appcatalog_by_tenant_manifest(target_client.tenant(), target_client.token())
         .await,
     )
   }
