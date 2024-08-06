@@ -2,9 +2,10 @@
 
 use std::collections::HashMap;
 
-use crate::pipeline::PipelineName;
-use dsh_rest_api_client::types::Application;
+use trifonius_dsh_api::types::Application;
+use trifonius_dsh_api::{DshApiClientFactory, DshApiTenant};
 
+use crate::pipeline::PipelineName;
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
 use crate::processor::dsh_service::dsh_service_config::ProfileConfig;
@@ -18,23 +19,21 @@ use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceType};
-use crate::target_client::{TargetClientFactory, TargetTenant, TemplateMapping};
-
-// TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
+use crate::target_client::{from_tenant_to_template_mapping, TemplateMapping};
 
 pub struct DshServiceRealization<'a> {
   processor_identifier: ProcessorIdentifier,
   pub(crate) processor_config: ProcessorConfig,
-  target_tenant: TargetTenant,
+  dsh_api_tenant: DshApiTenant,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
 impl<'a> DshServiceRealization<'a> {
-  pub fn create(processor_config: ProcessorConfig, target_tenant: TargetTenant, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
+  pub fn create(processor_config: ProcessorConfig, dsh_api_tenant: DshApiTenant, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
     Ok(DshServiceRealization {
       processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: ProcessorId::try_from(processor_config.processor.id.as_str())? },
       processor_config,
-      target_tenant,
+      dsh_api_tenant,
       resource_registry,
     })
   }
@@ -51,7 +50,9 @@ impl<'a> ProcessorRealization<'a> for DshServiceRealization<'a> {
       .iter()
       .map(|p| p.convert_to_descriptor())
       .collect::<Vec<ProfileDescriptor>>();
-    self.processor_config.convert_to_descriptor(profiles, &TemplateMapping::from(&self.target_tenant))
+    self
+      .processor_config
+      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(&self.dsh_api_tenant))
   }
 
   fn id(&self) -> &ProcessorId {
@@ -70,9 +71,9 @@ impl<'a> ProcessorRealization<'a> for DshServiceRealization<'a> {
     &'a self,
     pipeline_name: Option<&PipelineName>,
     processor_name: &ProcessorName,
-    target_client_factory: &'a TargetClientFactory,
+    client_factory: &'a DshApiClientFactory,
   ) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
-    match DshServiceInstance::create(pipeline_name, processor_name, self, target_client_factory, self.resource_registry) {
+    match DshServiceInstance::create(pipeline_name, processor_name, self, client_factory, self.resource_registry) {
       Ok(processor) => Ok(Box::new(processor)),
       Err(error) => Err(error),
     }
@@ -142,7 +143,7 @@ impl DshServiceRealization<'_> {
         }
       }
     };
-    let mut template_mapping: TemplateMapping = TemplateMapping::from(&self.target_tenant);
+    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(&self.dsh_api_tenant);
     template_mapping.insert(PlaceHolder::ProcessorId, self.processor_identifier.id.0.clone());
     if let Some(pipeline_name) = pipeline_name {
       template_mapping.insert(PlaceHolder::PipelineName, pipeline_name.to_string());
@@ -152,6 +153,8 @@ impl DshServiceRealization<'_> {
     template_mapping.insert(PlaceHolder::ServiceName, dsh_service_name.to_string());
     template_mapping.insert(PlaceHolder::DshServiceName, dsh_service_name.to_string());
     let api_application = into_api_application(
+      pipeline_name,
+      processor_name,
       &dsh_service_name,
       dsh_service_specific_config,
       &inbound_junction_topics,

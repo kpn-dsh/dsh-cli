@@ -1,11 +1,10 @@
 use crate::DshApiClient;
 
-// /allocation/{tenant}/task                                                get
-// /allocation/{tenant}/task/{appid}                                        get
-// /allocation/{tenant}/task/{appid}/{id}                                   get
-// /allocation/{tenant}/task/{appid}/{id}/actual                            get
-// /allocation/{tenant}/task/{appid}/{id}/status                            get
-
+/// /allocation/{tenant}/task                                                get
+/// /allocation/{tenant}/task/{appid}                                        get
+/// /allocation/{tenant}/task/{appid}/{id}                                   get
+/// /allocation/{tenant}/task/{appid}/{id}/actual                            get
+/// /allocation/{tenant}/task/{appid}/{id}/status                            get
 impl DshApiClient<'_> {
   // pub async fn _get_tasks(&self, service_name: &str) -> DshApiResult<HashMap<TaskId, TaskStatus>> {
   //   // TODO Panics

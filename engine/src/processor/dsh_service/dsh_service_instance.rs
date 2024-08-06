@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use dsh_rest_api_client::Error::UnexpectedResponse;
-use log::{debug, error};
-use reqwest::StatusCode;
+
+use trifonius_dsh_api::DshApiError;
+use trifonius_dsh_api::{DshApiClient, DshApiClientFactory};
 
 use crate::pipeline::PipelineName;
 use crate::processor::dsh_service::dsh_service_realization::DshServiceRealization;
@@ -16,16 +16,13 @@ use crate::processor::{JunctionId, ParameterId, ProcessorName, ProfileId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
-use crate::target_client::TargetClientFactory;
-
-// TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
 pub struct DshServiceInstance<'a> {
   pipeline_name: Option<PipelineName>,
   processor_name: ProcessorName,
   dsh_service_name: DshServiceName,
   processor_realization: &'a DshServiceRealization<'a>,
-  target_client_factory: &'a TargetClientFactory,
+  client_factory: &'a DshApiClientFactory,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
@@ -34,7 +31,7 @@ impl<'a> DshServiceInstance<'a> {
     pipeline_name: Option<&PipelineName>,
     processor_name: &ProcessorName,
     processor_realization: &'a DshServiceRealization,
-    target_client_factory: &'a TargetClientFactory,
+    client_factory: &'a DshApiClientFactory,
     resource_registry: &'a ResourceRegistry,
   ) -> Result<Self, String> {
     Ok(Self {
@@ -42,7 +39,7 @@ impl<'a> DshServiceInstance<'a> {
       processor_name: processor_name.clone(),
       dsh_service_name: DshServiceName::try_from((pipeline_name, processor_name))?,
       processor_realization,
-      target_client_factory,
+      client_factory,
       resource_registry,
     })
   }
@@ -100,40 +97,21 @@ impl ProcessorInstance for DshServiceInstance<'_> {
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
   ) -> Result<(), String> {
-    let target_client = self.target_client_factory.client().await?;
-    let dsh_deployment_config = self.processor_realization.dsh_deployment_config(
+    let dsh_application_config = self.processor_realization.dsh_deployment_config(
       self.pipeline_name.as_ref(),
       &self.processor_name,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      target_client.user().to_string(),
+      self.client_factory.user().to_string(),
     )?;
-    debug!("dsh configuration file\n{:#?}", &dsh_deployment_config);
-    match target_client
-      .client()
-      .application_put_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dsh_service_name, target_client.token(), &dsh_deployment_config)
-      .await
-    {
-      Ok(response) => {
-        response.status();
-        match response.status() {
-          StatusCode::ACCEPTED => Ok(()),
-          unexpected => {
-            error!("unexpected response code {}: {:?}", unexpected, response);
-            Ok(())
-          }
-        }
-      }
-      Err(UnexpectedResponse(response)) => {
-        error!("unexpected response on get status request: {:?}", response);
-        Err("unexpected response on status request".to_string())
-      }
-      Err(error) => {
-        error!("unexpected error on get status request: {:?}", error);
-        Err("unexpected error on get status request".to_string())
-      }
+    let client: DshApiClient = self.client_factory.client().await?;
+    match client.deploy_application(&self.dsh_service_name, dsh_application_config).await {
+      Ok(()) => Ok(()),
+      Err(DshApiError::NotFound) => Err(format!("unexpected NotFound response when deploying service {}", &self.dsh_service_name)),
+      Err(DshApiError::NotAuthorized) => Err(format!("authorization failure when deploying service {}", &self.dsh_service_name)),
+      Err(DshApiError::Unexpected(error)) => Err(format!("unexpected error when deploying service {} ({})", &self.dsh_service_name, error)),
     }
   }
 
@@ -144,23 +122,18 @@ impl ProcessorInstance for DshServiceInstance<'_> {
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
   ) -> Result<String, String> {
-    let target_client = self.target_client_factory.client().await?;
-    let dsh_config = self.processor_realization.dsh_deployment_config(
+    let dsh_application_config = self.processor_realization.dsh_deployment_config(
       self.pipeline_name.as_ref(),
       &self.processor_name,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      target_client.user().to_string(),
+      self.client_factory.user().to_string(),
     )?;
-    debug!("dsh configuration file\n{:#?}", &dsh_config);
-    match serde_json::to_string_pretty(&dsh_config) {
+    match serde_json::to_string_pretty(&dsh_application_config) {
       Ok(config) => Ok(config),
-      Err(error) => {
-        error!("unable to serialize configuration\n{}\n{:#?}", error, dsh_config);
-        Err("unable to serialize configuration".to_string())
-      }
+      Err(_) => Err("unable to serialize configuration".to_string()),
     }
   }
 
@@ -177,27 +150,20 @@ impl ProcessorInstance for DshServiceInstance<'_> {
   }
 
   async fn status(&self) -> Result<ProcessorStatus, String> {
-    let target_client = self.target_client_factory.client().await?;
-    match target_client
-      .client()
-      .application_get_by_tenant_application_by_appid_status(target_client.tenant(), &self.dsh_service_name, target_client.token())
-      .await
-    {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(ProcessorStatus { up: true }),
-        _ => Ok(ProcessorStatus { up: false }),
-      },
-      Err(UnexpectedResponse(response)) => match response.status() {
-        StatusCode::NOT_FOUND => Ok(ProcessorStatus { up: false }),
-        _ => {
-          error!("unexpected response on get status request: {:?}", response);
-          Err("unexpected response on status request".to_string())
+    match self.client_factory.client().await?.get_application_status(&self.dsh_service_name).await {
+      Ok(status) => {
+        if status.provisioned {
+          Ok(ProcessorStatus { deployed: true, up: Some(true) })
+        } else {
+          Ok(ProcessorStatus { deployed: true, up: Some(false) })
         }
-      },
-      Err(error) => {
-        error!("unexpected error on get status request: {:?}", error);
-        Err("unexpected error on get status request".to_string())
       }
+      Err(DshApiError::NotFound) => Ok(ProcessorStatus { deployed: false, up: None }),
+      Err(DshApiError::NotAuthorized) => Err(format!("authorization failure when requesting status for {} service", &self.dsh_service_name)),
+      Err(DshApiError::Unexpected(error)) => Err(format!(
+        "unexpected error when requesting status for {} service ({})",
+        &self.dsh_service_name, error
+      )),
     }
   }
 
@@ -206,29 +172,11 @@ impl ProcessorInstance for DshServiceInstance<'_> {
   }
 
   async fn undeploy(&self) -> Result<bool, String> {
-    let target_client = self.target_client_factory.client().await?;
-    match target_client
-      .client()
-      .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dsh_service_name, target_client.token())
-      .await
-    {
-      Ok(response) => match response.status() {
-        StatusCode::ACCEPTED => Ok(true),
-        StatusCode::NO_CONTENT => Ok(true),
-        StatusCode::OK => Ok(true),
-        _ => Ok(false),
-      },
-      Err(UnexpectedResponse(response)) => match response.status() {
-        StatusCode::NOT_FOUND => Ok(false),
-        _ => {
-          error!("unexpected response on undeploy request: {:?}", response);
-          Err("unexpected response on undeploy request".to_string())
-        }
-      },
-      Err(error) => {
-        error!("unexpected error on undeploy request: {:?}", error);
-        Err("unexpected error on undeploy request".to_string())
-      }
+    match self.client_factory.client().await?.undeploy_application(&self.dsh_service_name).await {
+      Ok(()) => Ok(true),
+      Err(DshApiError::NotFound) => Ok(false),
+      Err(DshApiError::NotAuthorized) => Ok(false),
+      Err(DshApiError::Unexpected(message)) => Err(format!("unexpected error when undeploying {} service ({})", &self.dsh_service_name, message)),
     }
   }
 }

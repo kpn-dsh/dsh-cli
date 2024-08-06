@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{config_dir_name, identifier};
 
+pub mod dsh_app;
 pub mod dsh_service;
 pub mod processor_config;
 pub mod processor_descriptor;
@@ -15,8 +16,8 @@ pub mod processor_registry;
 
 #[derive(Clone, Debug, Deserialize, Hash, Eq, PartialEq, Serialize)]
 pub enum ProcessorType {
-  // #[serde(rename = "dsh-app")]
-  // DshApp,
+  #[serde(rename = "dsh-app")]
+  DshApp,
   #[serde(rename = "dsh-service")]
   DshService,
 }
@@ -70,6 +71,7 @@ pub struct JunctionIdentifier {
 impl Display for ProcessorType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
+      ProcessorType::DshApp => write!(f, "dsh-app"),
       ProcessorType::DshService => write!(f, "dsh-service"),
     }
   }
@@ -78,12 +80,14 @@ impl Display for ProcessorType {
 impl ProcessorType {
   fn description(&self) -> &str {
     match self {
+      ProcessorType::DshApp => "DSH App Catalog application, managed by the DSH platform",
       ProcessorType::DshService => "DSH service managed by the DSH platform",
     }
   }
 
   fn label(&self) -> &str {
     match self {
+      ProcessorType::DshApp => "DSH App",
       ProcessorType::DshService => "DSH Service",
     }
   }

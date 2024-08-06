@@ -1,8 +1,6 @@
 use std::time::SystemTime;
-use trifonius_dsh_api::DshApiClient;
 
-#[path = "common.rs"]
-mod common;
+use trifonius_dsh_api::DEFAULT_DSH_API_CLIENT_FACTORY;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -12,11 +10,11 @@ async fn main() -> Result<(), String> {
   let app_catalog_id = "keyring-dev-proxy";
   // let body = AppCatalogAppConfiguration { configuration: Default::default(), manifest_urn: "".to_string(), name: "".to_string(), stopped: false };
 
-  let client = DshApiClient::new();
+  let client = &DEFAULT_DSH_API_CLIENT_FACTORY.client().await?;
 
   let start_time = SystemTime::now();
 
-  let resp = client.get_apps().await?;
+  let _resp = client.get_apps().await?;
   let resp = client.get_app(&app_catalog_id).await?;
   // println!("{}", serde_json::to_string_pretty(&resp.configuration).unwrap());
   println!("{}", serde_json::to_string_pretty(&resp).unwrap());

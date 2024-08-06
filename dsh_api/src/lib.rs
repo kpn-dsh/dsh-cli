@@ -1,21 +1,42 @@
-// use dsh_sdk::error::DshRestTokenError::StatusCode;
+use std::env;
 use std::fmt::{Display, Formatter};
 
+use dsh_sdk::RestTokenFetcher;
+use lazy_static::lazy_static;
+use progenitor_client::Error as RestApiError;
+
+use crate::platform::DshPlatform;
+
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
-
-use log::debug;
-use progenitor_client::{Error as RestApiError, ResponseValue as RestApiResponseValue};
-use reqwest::StatusCode;
-use serde::Serialize;
-
-use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
 pub mod app;
 pub mod app_catalog;
 pub mod application;
+pub mod dsh_api_client;
 pub mod platform;
-pub mod target_client;
+pub mod secret;
 pub mod task;
+
+// 200 - OK
+// 201 - CREATED
+// 202 - ACCEPTED
+// 204 - NO_CONTENT
+// 400 - BAD_REQUEST
+// 401 - UNAUTHORIZED
+// 403 - FORBIDDEN
+// 404 - NOT_FOUND
+// 405 - NOT_ALLOWED
+// 500 - INTERNAL_SERVER_ERROR
+
+// DELETE  200,204  resource successfully deleted
+//         202      request accepted, result unknown
+// GET     200      resource successfully retrieved
+// POST    200      resource created successfully
+//         201      created new resource
+//         202      request accepted, result unknown
+// PUT     200,204  resource updated successfully
+//         201      created new resource
+//         202      request accepted, result unknown
 
 // tenant is implicit in the client
 
@@ -23,111 +44,60 @@ pub mod task;
 // get_xxx                     get one SUBJECT by implicit subject key
 // get_xxx_by_yyy              get one SUBJECT by explicit subject key
 
-pub struct DshApiClient<'a> {
-  target_client_factory: &'a TargetClientFactory,
-}
-
-impl DshApiClient<'_> {
-  pub fn new() -> Self {
-    DshApiClient { target_client_factory: &DEFAULT_TARGET_CLIENT_FACTORY }
-  }
-
-  pub(crate) fn process_get<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(response.into_inner()),
-        other_status_code => {
-          debug!(
-            "unexpected status code {} from get request\n{}",
-            other_status_code,
-            serde_json::to_string_pretty(&response.into_inner()).unwrap_or("invalid json".to_string())
-          );
-          Err(DshApiError::Unexpected(format!("unexpected status code {} from get request", other_status_code)))
-        }
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
-    }
-  }
-
-  #[allow(dead_code)]
-  pub(crate) fn process_post<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(response.into_inner()),
-        StatusCode::CREATED => Ok(response.into_inner()),
-        StatusCode::ACCEPTED => Ok(response.into_inner()),
-        other_status_code => {
-          debug!(
-            "unexpected status code {} from post request\n{}",
-            other_status_code,
-            serde_json::to_string_pretty(&response.into_inner()).unwrap_or("invalid json".to_string())
-          );
-          Err(DshApiError::Unexpected(format!("unexpected status code {} from post request", other_status_code)))
-        }
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
-    }
-  }
-
-  pub(crate) fn process_put<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(response.into_inner()),
-        StatusCode::CREATED => Ok(response.into_inner()),
-        StatusCode::ACCEPTED => Ok(response.into_inner()),
-        StatusCode::NO_CONTENT => Ok(response.into_inner()),
-        other_status_code => {
-          debug!(
-            "unexpected status code {} from put request\n{}",
-            other_status_code,
-            serde_json::to_string_pretty(&response.into_inner()).unwrap_or("invalid json".to_string())
-          );
-          Err(DshApiError::Unexpected(format!("unexpected status code {} from put request", other_status_code)))
-        }
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
-    }
-  }
-
-  pub(crate) fn process_delete<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(response.into_inner()),
-        StatusCode::ACCEPTED => Ok(response.into_inner()),
-        StatusCode::NO_CONTENT => Ok(response.into_inner()),
-        other_status_code => {
-          debug!(
-            "unexpected status code {} from delete request\n{}",
-            other_status_code,
-            serde_json::to_string_pretty(&response.into_inner()).unwrap_or("invalid json".to_string())
-          );
-          Err(DshApiError::Unexpected(format!("unexpected status code {} from delete request", other_status_code)))
-        }
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
-    }
-  }
-}
-
-impl Default for DshApiClient<'_> {
-  fn default() -> Self {
-    Self::new()
-  }
-}
+// pub struct DshApiClient<'a> {
+//   dsh_api_client_factory: &'a DshApiClientFactory,
+// }
 
 type DshApiResult<T> = Result<T, DshApiError>;
 
+#[derive(Clone, Debug)]
+pub struct DshApiTenant {
+  platform: DshPlatform,
+  tenant: String,
+  user: String,
+}
+
+#[derive(Debug)]
+pub struct DshApiClient<'a> {
+  pub(crate) generated_client: &'a Client,
+  token: String,
+  dsh_api_client_factory: &'a DshApiClientFactory,
+}
+
+#[derive(Debug)]
+pub struct DshApiClientFactory {
+  generated_client: Client,
+  token_fetcher: RestTokenFetcher,
+  dsh_api_tenant: DshApiTenant,
+}
+
 #[derive(Debug)]
 pub enum DshApiError {
-  NotAuthenticated,
+  NotAuthorized,
   NotFound,
   Unexpected(String),
+}
+
+const TRIFONIUS_TARGET: &str = "TRIFONIUS_TARGET";
+const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
+const TRIFONIUS_TARGET_PLATFORM: &str = "TRIFONIUS_TARGET_PLATFORM";
+
+lazy_static! {
+  pub static ref DEFAULT_DSH_API_CLIENT_FACTORY: DshApiClientFactory = {
+    let tenant = get_env(TRIFONIUS_TARGET_TENANT);
+    let tenant_env_name = tenant.to_ascii_uppercase().replace('-', "_");
+    let user = get_env(format!("{}_TENANT_{}_USER", TRIFONIUS_TARGET, tenant_env_name).as_str());
+    let secret = get_env(format!("{}_TENANT_{}_SECRET", TRIFONIUS_TARGET, tenant_env_name).as_str());
+    let platform = DshPlatform::try_from(get_env(TRIFONIUS_TARGET_PLATFORM).as_str()).unwrap();
+    let dsh_api_tenant = DshApiTenant { platform, tenant, user };
+    DshApiClientFactory::create(dsh_api_tenant, secret).expect("could not create static target client factory")
+  };
 }
 
 impl Display for DshApiError {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      DshApiError::NotAuthenticated => write!(f, "not authenticated"),
+      DshApiError::NotAuthorized => write!(f, "not authorized"),
       DshApiError::NotFound => write!(f, "not found"),
       DshApiError::Unexpected(message) => write!(f, "unexpected error ({})", message),
     }
@@ -155,11 +125,15 @@ impl From<RestApiError> for DshApiError {
       RestApiError::ErrorResponse(response) => DshApiError::Unexpected(format!("error response: {:?}", response)),
       RestApiError::ResponseBodyError(error) => DshApiError::Unexpected(format!("response body error: {}", error)),
       RestApiError::InvalidResponsePayload(_, json_error) => DshApiError::Unexpected(format!("invalid response payload: {}", json_error)),
-      RestApiError::UnexpectedResponse(response) => match response.status() {
-        StatusCode::NOT_FOUND => DshApiError::NotFound,
-        other => DshApiError::Unexpected(format!("unexpected status code {}", other)),
-      },
+      RestApiError::UnexpectedResponse(response) => DshApiError::Unexpected(format!("error response: {:?}", response)),
       RestApiError::PreHookError(message) => DshApiError::Unexpected(format!("pre-hook error: {}", message)),
     }
+  }
+}
+
+fn get_env(name: &str) -> String {
+  match env::var(name) {
+    Ok(value) => value,
+    Err(_) => panic!("environment variable {} not set", name),
   }
 }

@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 use std::env;
 
-use dsh_rest_api_client::Client;
 use dsh_sdk::{RestTokenFetcher, RestTokenFetcherBuilder};
 use lazy_static::lazy_static;
 use rand::Rng;
 use regex::Regex;
 use uuid::Uuid;
+
+use trifonius_dsh_api::Client;
+use trifonius_dsh_api::DshApiTenant;
 
 use crate::placeholder::PlaceHolder;
 use crate::platform::DshPlatform;
@@ -145,34 +147,32 @@ impl TargetTenant {
   }
 }
 
-impl From<&TargetTenant> for TemplateMapping {
-  fn from(target_tenant: &TargetTenant) -> Self {
-    let mut mapping = TemplateMapping::new();
-    if let Some(app_domain) = target_tenant.app_domain() {
-      mapping.insert(PlaceHolder::AppDomain, app_domain);
-    }
-    if let Some(console_url) = target_tenant.console_url() {
-      mapping.insert(PlaceHolder::ConsoleUrl, console_url);
-    }
-    if let Some(dsh_internal_domain) = target_tenant.dsh_internal_domain() {
-      mapping.insert(PlaceHolder::DshInternalDomain, dsh_internal_domain);
-    }
-    if let Some(monitoring_url) = target_tenant.monitoring_url() {
-      mapping.insert(PlaceHolder::MonitoringUrl, monitoring_url);
-    }
-    mapping.insert(PlaceHolder::Platform, target_tenant.platform.to_string());
-    if let Some(public_vhosts_domain) = target_tenant.public_vhosts_domain() {
-      mapping.insert(PlaceHolder::PublicVhostsDomain, public_vhosts_domain);
-    }
-    mapping.insert(PlaceHolder::Random, format!("{:x}", rand::thread_rng().gen_range(0x10000000_u64..=0xffffffff_u64)));
-    mapping.insert(PlaceHolder::RandomUuid, Uuid::new_v4().to_string());
-    mapping.insert(PlaceHolder::Realm, target_tenant.realm());
-    mapping.insert(PlaceHolder::RestAccessTokenUrl, target_tenant.endpoint_rest_access_token());
-    mapping.insert(PlaceHolder::RestApiUrl, target_tenant.endpoint_rest_api());
-    mapping.insert(PlaceHolder::Tenant, target_tenant.tenant.clone());
-    mapping.insert(PlaceHolder::User, target_tenant.user.clone());
-    mapping
+pub fn from_tenant_to_template_mapping(tenant: &DshApiTenant) -> TemplateMapping {
+  let mut mapping = TemplateMapping::new();
+  if let Some(app_domain) = tenant.app_domain() {
+    mapping.insert(PlaceHolder::AppDomain, app_domain);
   }
+  if let Some(console_url) = tenant.console_url() {
+    mapping.insert(PlaceHolder::ConsoleUrl, console_url);
+  }
+  if let Some(dsh_internal_domain) = tenant.dsh_internal_domain() {
+    mapping.insert(PlaceHolder::DshInternalDomain, dsh_internal_domain);
+  }
+  if let Some(monitoring_url) = tenant.monitoring_url() {
+    mapping.insert(PlaceHolder::MonitoringUrl, monitoring_url);
+  }
+  mapping.insert(PlaceHolder::Platform, tenant.platform().to_string());
+  if let Some(public_vhosts_domain) = tenant.public_vhosts_domain() {
+    mapping.insert(PlaceHolder::PublicVhostsDomain, public_vhosts_domain);
+  }
+  mapping.insert(PlaceHolder::Random, format!("{:x}", rand::thread_rng().gen_range(0x10000000_u64..=0xffffffff_u64)));
+  mapping.insert(PlaceHolder::RandomUuid, Uuid::new_v4().to_string());
+  mapping.insert(PlaceHolder::Realm, tenant.realm());
+  mapping.insert(PlaceHolder::RestAccessTokenUrl, tenant.endpoint_rest_access_token());
+  mapping.insert(PlaceHolder::RestApiUrl, tenant.endpoint_rest_api());
+  mapping.insert(PlaceHolder::Tenant, tenant.tenant().clone());
+  mapping.insert(PlaceHolder::User, tenant.user().clone());
+  mapping
 }
 
 fn get_env(name: &str) -> String {

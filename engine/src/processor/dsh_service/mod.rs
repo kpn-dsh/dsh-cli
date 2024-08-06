@@ -8,7 +8,6 @@ use crate::identifier;
 use crate::pipeline::PipelineName;
 use crate::processor::ProcessorName;
 
-pub mod dsh_api_client;
 pub mod dsh_service_api;
 pub mod dsh_service_config;
 pub mod dsh_service_instance;

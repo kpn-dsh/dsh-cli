@@ -1,20 +1,21 @@
+// get_deployed_applications() -> `HashMap<ApplicationId, Application>`
+// get_deployed_application(application_id) -> `Application`
+// undeploy_application(application_id) -> `()`
+// get_application(application_id) -> `Application`
+// get_application_status(application_id) -> `AllocationStatus`
+// get_applications() -> HashMap<ApplicationId, `Application>`
+// get_applications_with_tasks() -> `Vec<ApplicationId>`
+// get_tasks(application_id) -> `Vec<TaskId>`
+// get_task_status(application_id, task_id) -> `TaskStatus`
+// get_task_allocation_status(application_id, task_id) -> `AllocationStatus`
+// get_task_state(application_id, task_id) -> `Task`
+// deploy_application(application_id, application) -> `()`
+
 use std::collections::HashMap;
 
 use crate::types::{AllocationStatus, Application, Task, TaskStatus};
-use crate::{DshApiClient, DshApiResult};
-
-/// get_deployed_applications() -> HashMap<ApplicationId, Application>
-/// get_deployed_application(application_id) -> Application
-/// undeploy_application(application_id) -> ()
-/// get_application(application_id) -> Application
-/// get_application_status(application_id) -> AllocationStatus
-/// get_applications() -> HashMap<ApplicationId, Application>
-/// get_applications_with_tasks() -> Vec<ApplicationId>
-/// get_tasks(application_id) -> Vec<TaskId>
-/// get_task_status(application_id, task_id: &TaskId) -> TaskStatus
-/// get_task_allocation_status(application_id, task_id: &TaskId) -> AllocationStatus
-/// get_task_state(application_id, task_id: &TaskId) -> Task
-/// deploy_application(application_id, application: Application) -> ()
+use crate::DshApiClient;
+use crate::DshApiResult;
 
 impl DshApiClient<'_> {
   /// Returns all deployed services with their configuration
@@ -36,14 +37,12 @@ impl DshApiClient<'_> {
   ///      ...
   ///   }
   /// }
-  ///
   /// ```
   pub async fn get_deployed_applications(&self) -> DshApiResult<HashMap<String, Application>> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_application_actual(target_client.tenant(), target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_application_actual(self.tenant(), self.token())
         .await,
     )
   }
@@ -62,14 +61,14 @@ impl DshApiClient<'_> {
   ///   },
   ///   ...
   /// }
-  ///
   /// ```
+  /// ## Parameters
+  /// `application_id` - service name of the requested application
   pub async fn get_deployed_application(&self, application_id: &str) -> DshApiResult<Application> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_application_by_appid_actual(target_client.tenant(), application_id, target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_application_by_appid_actual(self.tenant(), application_id, self.token())
         .await,
     )
   }
@@ -88,14 +87,14 @@ impl DshApiClient<'_> {
   ///   },
   ///   ...
   /// }
-  ///
   /// ```
+  /// ## Parameters
+  /// `application_id` - service name of the application to undeploy
   pub async fn undeploy_application(&self, application_id: &str) -> DshApiResult<()> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_delete(
-      target_client
-        .client()
-        .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant(), application_id, target_client.token())
+      self
+        .generated_client()
+        .application_delete_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token())
         .await,
     )
   }
@@ -114,14 +113,14 @@ impl DshApiClient<'_> {
   ///   },
   ///   ...
   /// }
-  ///
   /// ```
+  /// ## Parameters
+  /// `application_id` - service name of the requested application
   pub async fn get_application(&self, application_id: &str) -> DshApiResult<Application> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_application_by_appid_configuration(target_client.tenant(), application_id, target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token())
         .await,
     )
   }
@@ -136,12 +135,13 @@ impl DshApiClient<'_> {
   ///   "notifications": []
   /// }
   /// ```
+  /// ## Parameters
+  /// `application_id` - service name of the requested application
   pub async fn get_application_status(&self, application_id: &str) -> DshApiResult<AllocationStatus> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_application_by_appid_status(target_client.tenant(), application_id, target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_application_by_appid_status(self.tenant(), application_id, self.token())
         .await,
     )
   }
@@ -165,14 +165,12 @@ impl DshApiClient<'_> {
   ///     ...
   ///   }
   /// }
-  ///
   /// ```
   pub async fn get_applications(&self) -> DshApiResult<HashMap<String, Application>> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_application_configuration(target_client.tenant(), target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_application_configuration(self.tenant(), self.token())
         .await,
     )
   }
@@ -186,14 +184,8 @@ impl DshApiClient<'_> {
   /// ]
   /// ```
   pub async fn get_applications_with_tasks(&self) -> DshApiResult<Vec<String>> {
-    let target_client = self.target_client_factory.client().await?;
     self
-      .process_get(
-        target_client
-          .client()
-          .application_get_by_tenant_task(target_client.tenant(), target_client.token())
-          .await,
-      )
+      .process_get(self.generated_client().application_get_by_tenant_task(self.tenant(), self.token()).await)
       .map(|application_ids| application_ids.iter().map(|application_id| application_id.to_string()).collect())
   }
 
@@ -205,13 +197,14 @@ impl DshApiClient<'_> {
   ///   ...
   /// ]
   /// ```
+  /// ## Parameters
+  /// `application_id` - service name for which the tasks will be returned
   pub async fn get_tasks(&self, application_id: &str) -> DshApiResult<Vec<String>> {
-    let target_client = self.target_client_factory.client().await?;
     self
       .process_get(
-        target_client
-          .client()
-          .application_get_by_tenant_task_by_appid(target_client.tenant(), application_id, target_client.token())
+        self
+          .generated_client()
+          .application_get_by_tenant_task_by_appid(self.tenant(), application_id, self.token())
           .await,
       )
       .map(|task_ids| task_ids.iter().map(|task_id| task_id.to_string()).collect())
@@ -244,12 +237,14 @@ impl DshApiClient<'_> {
   ///   }
   /// }
   /// ```
+  /// ## Parameters
+  /// `application_id` - service name of the requested application
+  /// `task_id`        - id of the requested task
   pub async fn get_task_status(&self, application_id: &str, task_id: &str) -> DshApiResult<TaskStatus> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_task_by_appid_by_id(target_client.tenant(), application_id, task_id, target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_task_by_appid_by_id(self.tenant(), application_id, task_id, self.token())
         .await,
     )
   }
@@ -262,13 +257,14 @@ impl DshApiClient<'_> {
   ///   "notifications": []
   /// }
   /// ```
-  ///
+  /// ## Parameters
+  /// `application_id` - service name of the requested application
+  /// `task_id`        - id of the requested task
   pub async fn get_task_allocation_status(&self, application_id: &str, task_id: &str) -> DshApiResult<AllocationStatus> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_task_by_appid_by_id_status(target_client.tenant(), application_id, task_id, target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_task_by_appid_by_id_status(self.tenant(), application_id, task_id, self.token())
         .await,
     )
   }
@@ -286,24 +282,30 @@ impl DshApiClient<'_> {
   ///   "state": "RUNNING"
   /// }
   /// ```
+  /// ## Parameters
+  /// `application_id` - service name of the requested application
+  /// `task_id`        - id of the requested task
   pub async fn get_task_state(&self, application_id: &str, task_id: &str) -> DshApiResult<Task> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_get(
-      target_client
-        .client()
-        .application_get_by_tenant_task_by_appid_by_id_actual(target_client.tenant(), application_id, task_id, target_client.token())
+      self
+        .generated_client()
+        .application_get_by_tenant_task_by_appid_by_id_actual(self.tenant(), application_id, task_id, self.token())
         .await,
     )
   }
 
   /// Deploy application
+  ///
   /// `PUT /allocation/{tenant}/application/{appid}/configuration`
+  ///
+  /// ## Parameters
+  /// `application_id` - service name used when deploying the application
+  /// `application`    - configuration used when deploying the application
   pub async fn deploy_application(&self, application_id: &str, application: Application) -> DshApiResult<()> {
-    let target_client = self.target_client_factory.client().await?;
     self.process_put(
-      target_client
-        .client()
-        .application_put_by_tenant_application_by_appid_configuration(target_client.tenant(), application_id, target_client.token(), &application)
+      self
+        .generated_client()
+        .application_put_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token(), &application)
         .await,
     )
   }
