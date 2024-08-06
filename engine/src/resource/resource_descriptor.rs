@@ -45,6 +45,10 @@ pub struct ResourceDescriptor {
   pub description: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub version: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub icon: Option<String>, // TODO Is String the proper type?
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub tags: Vec<String>,
   pub writable: bool,
   pub readable: bool,
   #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -55,6 +59,8 @@ pub struct ResourceDescriptor {
   pub metrics_url: Option<String>,
   #[serde(rename = "viewer-url", skip_serializing_if = "Option::is_none")]
   pub viewer_url: Option<String>,
+  #[serde(rename = "data-catalog-url", skip_serializing_if = "Option::is_none")]
+  pub data_catalog_url: Option<String>,
   #[serde(rename = "dsh-topic-descriptor", skip_serializing_if = "Option::is_none")]
   pub dsh_topic_descriptor: Option<DshTopicDescriptor>,
 }

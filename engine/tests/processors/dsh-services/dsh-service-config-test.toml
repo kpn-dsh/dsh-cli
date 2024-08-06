@@ -5,6 +5,7 @@ label = "Test DSH Service"
 description = "Test profiles"
 version = "0.1.2"
 icon = "ICON"
+tags = ["TAG1", "TAG2"]
 more-info-url = "https://dsh.kpn.com"
 metrics-url = "https://grafana.com"
 viewer-url = "https://eavesdropper.kpn.com"

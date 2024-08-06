@@ -1,6 +1,6 @@
-use crate::pipeline::PipelineName;
 use dsh_sdk::dsh::datastream::Stream;
 
+use crate::pipeline::PipelineName;
 use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
 use crate::resource::dsh_topic::dsh_topic_instance::DshTopicInstance;
 use crate::resource::dsh_topic::DshTopicType;
@@ -34,6 +34,8 @@ impl DshTopicRealization {
       label: stream.name().to_string(),
       description: "DSH Kafka topic".to_string(),
       version: None,
+      icon: None,
+      tags: vec![],
       writable: stream.write_access(),
       readable: stream.read_access(),
       metadata: Vec::default(),
@@ -52,6 +54,7 @@ impl DshTopicRealization {
         .platform()
         .app_domain(target_client_factory.tenant())
         .map(|domain| format!("https://eavesdropper.{}?topics={}", domain, topic_name)),
+      data_catalog_url: None,
       dsh_topic_descriptor: Some(DshTopicDescriptor {
         name: stream.name().to_string(),
         topic: topic_name,

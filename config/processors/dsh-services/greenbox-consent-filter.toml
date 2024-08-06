@@ -4,6 +4,8 @@ id = "greenbox-consent-filter"
 label = "Greenbox Consent Filter"
 description = "Record processor filters records based on customer consent"
 version = "0.2.7"
+icon = "filter"
+tags = ["greenbox", "consent", "filter", "privacy", "compliancy", "gdps", "avg", "whitelist", "blacklist"]
 metrics-url = "${MONITORING_URL}"
 viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
 

@@ -25,6 +25,8 @@ pub struct ProcessorDescriptor {
   pub version: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub icon: Option<String>, // TODO Is String the proper type?
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub tags: Vec<String>,
   #[serde(rename = "inbound-junctions", skip_serializing_if = "Vec::is_empty")]
   pub inbound_junctions: Vec<JunctionDescriptor>,
   #[serde(rename = "outbound-junctions", skip_serializing_if = "Vec::is_empty")]

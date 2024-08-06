@@ -8,13 +8,12 @@ use serde::{Deserialize, Serialize};
 use toml::de::Error;
 
 use crate::placeholder::PlaceHolder;
+use crate::processor::dsh_app::dsh_app_config::DshAppSpecificConfig;
 use crate::processor::dsh_service::dsh_service_config::DshServiceSpecificConfig;
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType};
 use crate::resource::ResourceType;
 use crate::target_client::{template_resolver, validate_template, TemplateMapping};
-
-// TODO Add [processor] table to config format, containing all processor wide settings (id, label, etc)
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorConfig {
@@ -24,6 +23,8 @@ pub struct ProcessorConfig {
   #[serde(rename = "outbound-junctions")]
   pub outbound_junctions: Option<HashMap<JunctionId, JunctionConfig>>,
   pub deploy: Option<DeployConfig>,
+  #[serde(rename = "dsh-app")]
+  pub dsh_app_specific_config: Option<DshAppSpecificConfig>,
   #[serde(rename = "dsh-service")]
   pub dsh_service_specific_config: Option<DshServiceSpecificConfig>,
 }
@@ -37,6 +38,7 @@ pub struct ProcessorGlobalConfig {
   pub description: String,
   pub version: Option<String>,
   pub icon: Option<String>, // TODO Is String the proper type?
+  pub tags: Option<Vec<String>>,
   #[serde(rename = "more-info-url")]
   pub more_info_url: Option<String>,
   #[serde(rename = "metrics-url")]
@@ -109,7 +111,7 @@ pub enum DeploymentParameterType {
   FreeText,
   #[serde(rename = "selection")]
   Selection,
-  // TODO Json, Multiline, Number, RegularExpression, Sql, Toml, Yaml
+  // TODO Json, Multiline, Number, RegularExpression, SelectionOrFreeText Sql, Toml, Yaml
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -188,6 +190,7 @@ impl ProcessorConfig {
       description: self.processor.description.clone(),
       version: self.processor.version.clone(),
       icon: self.processor.icon.clone(),
+      tags: self.processor.tags.clone().unwrap_or_default(),
       inbound_junctions: match &self.inbound_junctions {
         Some(inbound_junctions) => inbound_junctions
           .iter()
@@ -275,7 +278,7 @@ impl JunctionConfig {
 
 impl DeployConfig {
   pub fn validate(&self, _attribute: &str) -> Result<(), String> {
-    todo!()
+    Ok(())
   }
 }
 
@@ -373,7 +376,7 @@ impl DeploymentParameterConfig {
 
 impl DeploymentParameterConfigOptionLabel {
   pub fn validate(&self, _attribute: &str) -> Result<(), String> {
-    todo!()
+    Ok(())
   }
 }
 
