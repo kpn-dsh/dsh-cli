@@ -1,16 +1,17 @@
 use std::collections::HashMap;
 
-use dsh_rest_api_client::types::{
+use trifonius_dsh_api::types::{
   Application as ApiApplication, ApplicationSecret as ApiApplicationSecret, ApplicationVolumes as ApiApplicationVolumes, HealthCheck as ApiHealthCheck,
   HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec as ApiPathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
 };
 
+use crate::pipeline::PipelineName;
 use crate::processor::dsh_service::dsh_service_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
 use crate::processor::dsh_service::DshServiceName;
 use crate::processor::processor_config::VariableType;
-use crate::processor::JunctionId;
+use crate::processor::{JunctionId, ProcessorName, ProcessorType};
 use crate::target_client::{template_resolver, TemplateMapping};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
@@ -116,6 +117,8 @@ impl From<SecretConfig> for ApiApplicationSecret {
 const TRIFONIUS_PREFIX: &str = "TRIFONIUS";
 
 pub fn into_api_application(
+  pipeline_name: Option<&PipelineName>,
+  processor_name: &ProcessorName,
   service_name: &DshServiceName,
   dsh_service_specific_config: &DshServiceSpecificConfig,
   inbound_junctions: &HashMap<JunctionId, String>,
@@ -126,6 +129,12 @@ pub fn into_api_application(
   template_mapping: &TemplateMapping,
 ) -> Result<ApiApplication, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
+  if let Some(pipeline_name) = pipeline_name {
+    environment_variables.insert(format!("{}_PIPELINE_NAME", TRIFONIUS_PREFIX), pipeline_name.to_string());
+  }
+  environment_variables.insert(format!("{}_PROCESSOR_NAME", TRIFONIUS_PREFIX), processor_name.to_string());
+  environment_variables.insert(format!("{}_PROCESSOR_TYPE", TRIFONIUS_PREFIX), ProcessorType::DshService.to_string());
+  environment_variables.insert(format!("{}_PROCESSOR_ID", TRIFONIUS_PREFIX), "TODO".to_string());
   environment_variables.insert(format!("{}_SERVICE_NAME", TRIFONIUS_PREFIX), service_name.to_string());
   if let Some(ref configured_environment_variables) = dsh_service_specific_config.environment_variables {
     for (configured_environment_variable, variable) in configured_environment_variables.clone() {

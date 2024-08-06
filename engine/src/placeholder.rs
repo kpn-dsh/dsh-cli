@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 const _REGISTRY: &str = "REGISTRY"; // TODO
 const APP_DOMAIN: &str = "APP_DOMAIN";
 const CONSOLE_URL: &str = "CONSOLE_URL";
+const DSH_APP_NAME: &str = "DSH_APP_NAME";
 const DSH_INTERNAL_DOMAIN: &str = "DSH_INTERNAL_DOMAIN";
 const DSH_SERVICE_NAME: &str = "DSH_SERVICE_NAME";
 const MONITORING_URL: &str = "MONITORING_URL";
@@ -24,6 +25,7 @@ const USER: &str = "USER";
 pub enum PlaceHolder {
   AppDomain,
   ConsoleUrl,
+  DshAppName,
   DshInternalDomain,
   DshServiceName,
   MonitoringUrl,
@@ -47,6 +49,7 @@ impl Display for PlaceHolder {
     match &self {
       PlaceHolder::AppDomain => write!(f, "{}", APP_DOMAIN),
       PlaceHolder::ConsoleUrl => write!(f, "{}", CONSOLE_URL),
+      PlaceHolder::DshAppName => write!(f, "{}", DSH_APP_NAME),
       PlaceHolder::DshInternalDomain => write!(f, "{}", DSH_INTERNAL_DOMAIN),
       PlaceHolder::DshServiceName => write!(f, "{}", DSH_SERVICE_NAME),
       PlaceHolder::MonitoringUrl => write!(f, "{}", MONITORING_URL),
@@ -74,6 +77,7 @@ impl TryFrom<&str> for PlaceHolder {
     match value {
       APP_DOMAIN => Ok(PlaceHolder::AppDomain),
       CONSOLE_URL => Ok(PlaceHolder::ConsoleUrl),
+      DSH_APP_NAME => Ok(PlaceHolder::DshAppName),
       DSH_INTERNAL_DOMAIN => Ok(PlaceHolder::DshInternalDomain),
       DSH_SERVICE_NAME => Ok(PlaceHolder::DshServiceName),
       MONITORING_URL => Ok(PlaceHolder::MonitoringUrl),
