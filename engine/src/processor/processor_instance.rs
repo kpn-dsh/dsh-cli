@@ -122,15 +122,25 @@ pub trait ProcessorInstance {
 
 #[derive(Debug)]
 pub struct ProcessorStatus {
-  pub up: bool,
+  pub deployed: bool,
+  pub up: Option<bool>,
 }
 
 impl Display for ProcessorStatus {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    if self.up {
-      write!(f, "up")
+    if self.deployed {
+      match self.up {
+        Some(up) => {
+          if up {
+            write!(f, "deployed:up")
+          } else {
+            write!(f, "deployed:down")
+          }
+        }
+        None => write!(f, "deployed:unknown"),
+      }
     } else {
-      write!(f, "down")
+      write!(f, "not-deployed")
     }
   }
 }
