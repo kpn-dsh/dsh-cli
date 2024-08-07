@@ -3,52 +3,25 @@ use std::fmt::{Display, Formatter};
 
 use dsh_sdk::RestTokenFetcher;
 use lazy_static::lazy_static;
-use progenitor_client::Error as RestApiError;
 
 use crate::platform::DshPlatform;
 
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
-pub mod app;
 pub mod app_catalog;
+pub mod app_catalog_app_configuration;
+pub mod app_catalog_manifest;
 pub mod application;
 pub mod dsh_api_client;
 pub mod platform;
 pub mod secret;
 pub mod task;
 
-// 200 - OK
-// 201 - CREATED
-// 202 - ACCEPTED
-// 204 - NO_CONTENT
-// 400 - BAD_REQUEST
-// 401 - UNAUTHORIZED
-// 403 - FORBIDDEN
-// 404 - NOT_FOUND
-// 405 - NOT_ALLOWED
-// 500 - INTERNAL_SERVER_ERROR
-
-// DELETE  200,204  resource successfully deleted
-//         202      request accepted, result unknown
-// GET     200      resource successfully retrieved
-// POST    200      resource created successfully
-//         201      created new resource
-//         202      request accepted, result unknown
-// PUT     200,204  resource updated successfully
-//         201      created new resource
-//         202      request accepted, result unknown
-
 // tenant is implicit in the client
 
 // get_[SUBJECT]s              get all SUBJECTs
 // get_xxx                     get one SUBJECT by implicit subject key
 // get_xxx_by_yyy              get one SUBJECT by explicit subject key
-
-// pub struct DshApiClient<'a> {
-//   dsh_api_client_factory: &'a DshApiClientFactory,
-// }
-
-type DshApiResult<T> = Result<T, DshApiError>;
 
 #[derive(Clone, Debug)]
 pub struct DshApiTenant {
@@ -59,7 +32,7 @@ pub struct DshApiTenant {
 
 #[derive(Debug)]
 pub struct DshApiClient<'a> {
-  pub(crate) generated_client: &'a Client,
+  generated_client: &'a Client,
   token: String,
   dsh_api_client_factory: &'a DshApiClientFactory,
 }
@@ -77,6 +50,8 @@ pub enum DshApiError {
   NotFound,
   Unexpected(String),
 }
+
+pub type DshApiResult<T> = Result<T, DshApiError>;
 
 const TRIFONIUS_TARGET: &str = "TRIFONIUS_TARGET";
 const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
@@ -113,21 +88,6 @@ impl From<String> for DshApiError {
 impl From<DshApiError> for String {
   fn from(value: DshApiError) -> Self {
     value.to_string()
-  }
-}
-
-impl From<RestApiError> for DshApiError {
-  fn from(rest_api_error: RestApiError) -> Self {
-    match rest_api_error {
-      RestApiError::InvalidRequest(message) => DshApiError::Unexpected(format!("invalid request: {}", message)),
-      RestApiError::CommunicationError(error) => DshApiError::Unexpected(format!("communication error: {}", error)),
-      RestApiError::InvalidUpgrade(error) => DshApiError::Unexpected(format!("invalid upgrade error: {}", error)),
-      RestApiError::ErrorResponse(response) => DshApiError::Unexpected(format!("error response: {:?}", response)),
-      RestApiError::ResponseBodyError(error) => DshApiError::Unexpected(format!("response body error: {}", error)),
-      RestApiError::InvalidResponsePayload(_, json_error) => DshApiError::Unexpected(format!("invalid response payload: {}", json_error)),
-      RestApiError::UnexpectedResponse(response) => DshApiError::Unexpected(format!("error response: {:?}", response)),
-      RestApiError::PreHookError(message) => DshApiError::Unexpected(format!("pre-hook error: {}", message)),
-    }
   }
 }
 

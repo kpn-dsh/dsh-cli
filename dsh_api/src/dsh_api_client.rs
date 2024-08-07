@@ -1,74 +1,106 @@
+use std::fmt::{Display, Formatter};
+
 use dsh_sdk::RestTokenFetcherBuilder;
-use progenitor_client::{Error as RestApiError, ResponseValue as RestApiResponseValue};
-use reqwest::StatusCode;
+use progenitor_client::{Error as ProgenitorError, ResponseValue as ProgenitorResponseValue};
+use reqwest::StatusCode as ReqwestStatusCode;
 use serde::Serialize;
 
 use crate::platform::DshPlatform;
 use crate::{Client as GeneratedClient, DshApiClient, DshApiClientFactory, DshApiError, DshApiTenant};
 
+// 200 - OK
+// 201 - CREATED
+// 202 - ACCEPTED
+// 204 - NO_CONTENT
+// 400 - BAD_REQUEST
+// 401 - UNAUTHORIZED
+// 403 - FORBIDDEN
+// 404 - NOT_FOUND
+// 405 - NOT_ALLOWED
+// 500 - INTERNAL_SERVER_ERROR
+
+// DELETE  200,204  resource successfully deleted
+//         202      request accepted, result unknown
+// GET     200      resource successfully retrieved
+// POST    200      resource created successfully
+//         201      created new resource
+//         202      request accepted, result unknown
+// PUT     200,204  resource updated successfully
+//         201      created new resource
+//         202      request accepted, result unknown
+
+pub(crate) enum DshApiResponseStatus {
+  Accepted,
+  Created,
+  NoContent,
+  Ok,
+  Unknown,
+}
+
+pub(crate) type DshApiProcessResult<T> = Result<(DshApiResponseStatus, T), DshApiError>;
+
+impl Display for DshApiResponseStatus {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      DshApiResponseStatus::Accepted => write!(f, "accepted"),
+      DshApiResponseStatus::Created => write!(f, "created"),
+      DshApiResponseStatus::NoContent => write!(f, "no content"),
+      DshApiResponseStatus::Ok => write!(f, "ok"),
+      DshApiResponseStatus::Unknown => write!(f, "unknown"),
+    }
+  }
+}
+
+impl From<ReqwestStatusCode> for DshApiResponseStatus {
+  fn from(status: ReqwestStatusCode) -> Self {
+    match status {
+      ReqwestStatusCode::ACCEPTED => Self::Accepted,
+      ReqwestStatusCode::CREATED => Self::Created,
+      ReqwestStatusCode::NO_CONTENT => Self::NoContent,
+      ReqwestStatusCode::OK => Self::Ok,
+      _ => Self::Unknown,
+    }
+  }
+}
+
+impl From<ProgenitorError> for DshApiError {
+  fn from(progenitor_error: ProgenitorError) -> Self {
+    match progenitor_error {
+      ProgenitorError::InvalidRequest(string) => DshApiError::Unexpected(format!("invalid request ({})", string)),
+      ProgenitorError::CommunicationError(reqwest_error) => DshApiError::Unexpected(format!("communication error (reqwest error: {})", reqwest_error)),
+      ProgenitorError::InvalidUpgrade(reqwest_error) => DshApiError::Unexpected(format!("invalid upgrade (reqwest error: {})", reqwest_error)),
+      ProgenitorError::ErrorResponse(progenitor_response_value) => DshApiError::Unexpected(format!("error response (progenitor response value: {:?})", progenitor_response_value)),
+      ProgenitorError::ResponseBodyError(reqwest_error) => DshApiError::Unexpected(format!("response body error (reqwest error: {})", reqwest_error)),
+      ProgenitorError::InvalidResponsePayload(_bytes, json_error) => DshApiError::Unexpected(format!("invalid response payload (json error: {})", json_error)),
+      ProgenitorError::UnexpectedResponse(reqwest_response) => match reqwest_response.status() {
+        ReqwestStatusCode::NOT_FOUND => DshApiError::NotFound,
+        ReqwestStatusCode::UNAUTHORIZED | ReqwestStatusCode::FORBIDDEN | ReqwestStatusCode::METHOD_NOT_ALLOWED => DshApiError::NotAuthorized,
+        other_status_code => DshApiError::Unexpected(format!(
+          "unexpected response (status: {}, reqwest response: {:?})",
+          other_status_code, reqwest_response
+        )),
+      },
+      ProgenitorError::PreHookError(string) => DshApiError::Unexpected(format!("pre-hook error ({})", string)),
+    }
+  }
+}
+
 impl DshApiClient<'_> {
   pub fn api_version(&self) -> &'static str {
-    &self.generated_client.api_version()
+    self.generated_client.api_version()
   }
 
-  pub(crate) fn process_get<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(response.into_inner()),
-        StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(DshApiError::NotAuthorized),
-        StatusCode::NOT_FOUND => Err(DshApiError::NotFound),
-        other_status_code => Err(DshApiError::Unexpected(format!("unexpected status code {} from get request", other_status_code))),
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
+  pub(crate) fn process<T: Serialize>(&self, progenitor_response: Result<ProgenitorResponseValue<T>, ProgenitorError>) -> DshApiProcessResult<T> {
+    match progenitor_response {
+      Ok::<ProgenitorResponseValue<T>, ProgenitorError>(response) => Ok((DshApiResponseStatus::from(response.status()), response.into_inner())),
+      Err(progenitor_error) => Err(DshApiError::from(progenitor_error)),
     }
   }
 
-  pub(crate) fn process_get_raw<T>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK => Ok(response.into_inner()),
-        StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(DshApiError::NotAuthorized),
-        StatusCode::NOT_FOUND => Err(DshApiError::NotFound),
-        other_status_code => Err(DshApiError::Unexpected(format!("unexpected status code {} from get request", other_status_code))),
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
-    }
-  }
-
-  #[allow(dead_code)]
-  pub(crate) fn process_post<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK | StatusCode::CREATED | StatusCode::ACCEPTED => Ok(response.into_inner()),
-        StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(DshApiError::NotAuthorized),
-        StatusCode::NOT_FOUND => Err(DshApiError::NotFound),
-        other_status_code => Err(DshApiError::Unexpected(format!("unexpected status code {} from post request", other_status_code))),
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
-    }
-  }
-
-  pub(crate) fn process_put<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK | StatusCode::CREATED | StatusCode::ACCEPTED | StatusCode::NO_CONTENT => Ok(response.into_inner()),
-        StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(DshApiError::NotAuthorized),
-        StatusCode::NOT_FOUND => Err(DshApiError::NotFound),
-        other_status_code => Err(DshApiError::Unexpected(format!("unexpected status code {} from put request", other_status_code))),
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
-    }
-  }
-
-  pub(crate) fn process_delete<T: Serialize>(&self, response: Result<RestApiResponseValue<T>, RestApiError>) -> Result<T, DshApiError> {
-    match response {
-      Ok(response) => match response.status() {
-        StatusCode::OK | StatusCode::ACCEPTED | StatusCode::NO_CONTENT => Ok(response.into_inner()),
-        StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(DshApiError::NotAuthorized),
-        StatusCode::NOT_FOUND => Err(DshApiError::NotFound),
-        other_status_code => Err(DshApiError::Unexpected(format!("unexpected status code {} from delete request", other_status_code))),
-      },
-      Err(rest_api_error) => Err(DshApiError::from(rest_api_error)),
+  pub(crate) fn process_raw<T>(&self, progenitor_response: Result<ProgenitorResponseValue<T>, ProgenitorError>) -> DshApiProcessResult<T> {
+    match progenitor_response {
+      Ok::<ProgenitorResponseValue<T>, ProgenitorError>(response) => Ok((DshApiResponseStatus::from(response.status()), response.into_inner())),
+      Err(progenitor_error) => Err(DshApiError::from(progenitor_error)),
     }
   }
 

@@ -1,15 +1,19 @@
-// get_deployed_applications() -> `HashMap<ApplicationId, Application>`
-// get_deployed_application(application_id) -> `Application`
-// undeploy_application(application_id) -> `()`
-// get_application(application_id) -> `Application`
-// get_application_status(application_id) -> `AllocationStatus`
-// get_applications() -> HashMap<ApplicationId, `Application>`
-// get_applications_with_tasks() -> `Vec<ApplicationId>`
-// get_tasks(application_id) -> `Vec<TaskId>`
-// get_task_status(application_id, task_id) -> `TaskStatus`
-// get_task_allocation_status(application_id, task_id) -> `AllocationStatus`
-// get_task_state(application_id, task_id) -> `Task`
-// deploy_application(application_id, application) -> `()`
+//! # application
+//!
+//! Manage applications
+//!
+//! * `get_deployed_applications() -> HashMap<ApplicationId, Application>`
+//! * `get_deployed_application(application_id) -> Application`
+//! * `undeploy_application(application_id) -> ()`
+//! * `get_application(application_id) -> Application`
+//! * `get_application_status(application_id) -> AllocationStatus`
+//! * `get_applications() -> HashMap<ApplicationId, Application>`
+//! * `get_applications_with_tasks() -> Vec<ApplicationId>`
+//! * `get_tasks(application_id) -> Vec<TaskId>`
+//! * `get_task_status(application_id, task_id) -> TaskStatus`
+//! * `get_task_allocation_status(application_id, task_id) -> AllocationStatus`
+//! * `get_task_state(application_id, task_id) -> Task`
+//! * `deploy_application(application_id, application) -> ()`
 
 use std::collections::HashMap;
 
@@ -39,12 +43,14 @@ impl DshApiClient<'_> {
   /// }
   /// ```
   pub async fn get_deployed_applications(&self) -> DshApiResult<HashMap<String, Application>> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_application_actual(self.tenant(), self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_application_actual(self.tenant(), self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns configuration of deployed service
@@ -65,12 +71,14 @@ impl DshApiClient<'_> {
   /// ## Parameters
   /// `application_id` - service name of the requested application
   pub async fn get_deployed_application(&self, application_id: &str) -> DshApiResult<Application> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_application_by_appid_actual(self.tenant(), application_id, self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_application_by_appid_actual(self.tenant(), application_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns configuration of deployed service
@@ -91,12 +99,14 @@ impl DshApiClient<'_> {
   /// ## Parameters
   /// `application_id` - service name of the application to undeploy
   pub async fn undeploy_application(&self, application_id: &str) -> DshApiResult<()> {
-    self.process_delete(
-      self
-        .generated_client()
-        .application_delete_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_delete_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns service configuration
@@ -117,12 +127,14 @@ impl DshApiClient<'_> {
   /// ## Parameters
   /// `application_id` - service name of the requested application
   pub async fn get_application(&self, application_id: &str) -> DshApiResult<Application> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns status of a service
@@ -138,12 +150,14 @@ impl DshApiClient<'_> {
   /// ## Parameters
   /// `application_id` - service name of the requested application
   pub async fn get_application_status(&self, application_id: &str) -> DshApiResult<AllocationStatus> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_application_by_appid_status(self.tenant(), application_id, self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_application_by_appid_status(self.tenant(), application_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns all services with their configuration
@@ -167,12 +181,14 @@ impl DshApiClient<'_> {
   /// }
   /// ```
   pub async fn get_applications(&self) -> DshApiResult<HashMap<String, Application>> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_application_configuration(self.tenant(), self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_application_configuration(self.tenant(), self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns all services that have derived tasks
@@ -185,7 +201,8 @@ impl DshApiClient<'_> {
   /// ```
   pub async fn get_applications_with_tasks(&self) -> DshApiResult<Vec<String>> {
     self
-      .process_get(self.generated_client().application_get_by_tenant_task(self.tenant(), self.token()).await)
+      .process(self.generated_client().application_get_by_tenant_task(self.tenant(), self.token()).await)
+      .map(|result| result.1)
       .map(|application_ids| application_ids.iter().map(|application_id| application_id.to_string()).collect())
   }
 
@@ -201,12 +218,13 @@ impl DshApiClient<'_> {
   /// `application_id` - service name for which the tasks will be returned
   pub async fn get_tasks(&self, application_id: &str) -> DshApiResult<Vec<String>> {
     self
-      .process_get(
+      .process(
         self
           .generated_client()
           .application_get_by_tenant_task_by_appid(self.tenant(), application_id, self.token())
           .await,
       )
+      .map(|result| result.1)
       .map(|task_ids| task_ids.iter().map(|task_id| task_id.to_string()).collect())
   }
 
@@ -241,12 +259,14 @@ impl DshApiClient<'_> {
   /// `application_id` - service name of the requested application
   /// `task_id`        - id of the requested task
   pub async fn get_task_status(&self, application_id: &str, task_id: &str) -> DshApiResult<TaskStatus> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_task_by_appid_by_id(self.tenant(), application_id, task_id, self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_task_by_appid_by_id(self.tenant(), application_id, task_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns task status description
@@ -261,12 +281,14 @@ impl DshApiClient<'_> {
   /// `application_id` - service name of the requested application
   /// `task_id`        - id of the requested task
   pub async fn get_task_allocation_status(&self, application_id: &str, task_id: &str) -> DshApiResult<AllocationStatus> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_task_by_appid_by_id_status(self.tenant(), application_id, task_id, self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_task_by_appid_by_id_status(self.tenant(), application_id, task_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Returns task state
@@ -286,12 +308,14 @@ impl DshApiClient<'_> {
   /// `application_id` - service name of the requested application
   /// `task_id`        - id of the requested task
   pub async fn get_task_state(&self, application_id: &str, task_id: &str) -> DshApiResult<Task> {
-    self.process_get(
-      self
-        .generated_client()
-        .application_get_by_tenant_task_by_appid_by_id_actual(self.tenant(), application_id, task_id, self.token())
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_get_by_tenant_task_by_appid_by_id_actual(self.tenant(), application_id, task_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
   /// Deploy application
@@ -302,11 +326,13 @@ impl DshApiClient<'_> {
   /// `application_id` - service name used when deploying the application
   /// `application`    - configuration used when deploying the application
   pub async fn deploy_application(&self, application_id: &str, application: Application) -> DshApiResult<()> {
-    self.process_put(
-      self
-        .generated_client()
-        .application_put_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token(), &application)
-        .await,
-    )
+    self
+      .process(
+        self
+          .generated_client()
+          .application_put_by_tenant_application_by_appid_configuration(self.tenant(), application_id, self.token(), &application)
+          .await,
+      )
+      .map(|result| result.1)
   }
 }

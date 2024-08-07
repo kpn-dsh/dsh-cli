@@ -1,60 +1,77 @@
-use crate::types::{AllocationStatus, AppCatalogAppConfiguration, AppCatalogManifest};
+use std::collections::HashMap;
+
+use crate::types::AppCatalogApp;
 use crate::DshApiClient;
 use crate::DshApiResult;
 
-/// delete_app_catalog_app(app_catalog_id) -> ()
-/// deploy_app_catalog_app(app_catalog_id, body) -> ()
-/// get_app_catalog_app(app_catalog_id) -> `AppCatalogAppConfiguration`
-/// get_app_catalog_app_status(app_catalog_id) -> `AllocationStatus`
-/// get_app_catalog_manifests() -> `Vec<AppCatalogManifest>`
+/// # app catalog
+///
+/// Manage pre-packaged, easily configured apps that you can select from the App Catalog.
+///
+/// * `get_app(app_catalog_id) -> AppCatalogApp`
+/// * `get_apps() -> HashMap<AppCatalogId, AppCatalogApp>`
+/// * `get_deployed_app(app_catalog_id) -> AppCatalogApp`
+/// * `get_deployed_apps() -> HashMap<AppCatalogId, AppCatalogApp>`
 impl DshApiClient<'_> {
-  /// `DELETE /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/configuration`
-  pub async fn delete_app_catalog_app(&self, app_catalog_id: &str) -> DshApiResult<()> {
-    self.process_delete(
-      self
-        .generated_client()
-        .app_catalog_app_configuration_delete_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(self.tenant(), app_catalog_id, self.token())
-        .await,
-    )
+  /// # Get an App Catalog App's configuration
+  ///
+  /// `GET /allocation/{tenant}/appcatalogapp/{appcatalogappid}/configuration`
+  ///
+  /// ## Parameters
+  /// `app_catalog_id` - app id of the requested configuration
+  pub async fn get_app(&self, app_catalog_id: &str) -> DshApiResult<AppCatalogApp> {
+    self
+      .process(
+        self
+          .generated_client()
+          .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_configuration(self.tenant(), app_catalog_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
-  /// `PUT /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/configuration`
-  pub async fn deploy_app_catalog_app(&self, app_catalog_id: &str, body: &AppCatalogAppConfiguration) -> DshApiResult<()> {
-    self.process_put(
-      self
-        .generated_client()
-        .app_catalog_app_configuration_put_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(self.tenant(), app_catalog_id, self.token(), body)
-        .await,
-    )
+  /// # Get all App Catalog App configurations
+  ///
+  /// `GET /allocation/{tenant}/appcatalogapp/configuration`
+  pub async fn get_apps(&self) -> DshApiResult<HashMap<String, AppCatalogApp>> {
+    self
+      .process(
+        self
+          .generated_client()
+          .app_catalog_get_by_tenant_appcatalogapp_configuration(self.tenant(), self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
-  /// `GET /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/configuration`
-  pub async fn get_app_catalog_app(&self, app_catalog_id: &str) -> DshApiResult<AppCatalogAppConfiguration> {
-    self.process_get(
-      self
-        .generated_client()
-        .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(self.tenant(), app_catalog_id, self.token())
-        .await,
-    )
+  /// # Get a deployed App Catalog App's configuration
+  ///
+  /// `GET /allocation/{tenant}/appcatalogapp/{appcatalogappid}/actual`
+  ///
+  /// ## Parameters
+  /// `app_catalog_id` - app catalog app id of the requested configuration
+  pub async fn get_deployed_app(&self, app_catalog_id: &str) -> DshApiResult<AppCatalogApp> {
+    self
+      .process(
+        self
+          .generated_client()
+          .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_actual(self.tenant(), app_catalog_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 
-  /// `GET /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/status`
-  pub async fn get_app_catalog_app_status(&self, app_catalog_id: &str) -> DshApiResult<AllocationStatus> {
-    self.process_get(
-      self
-        .generated_client()
-        .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_status(self.tenant(), app_catalog_id, self.token())
-        .await,
-    )
-  }
-
-  /// `GET /appcatalog/{tenant}/manifest`
-  pub async fn get_app_catalog_manifests(&self) -> DshApiResult<Vec<AppCatalogManifest>> {
-    self.process_get(
-      self
-        .generated_client()
-        .app_catalog_manifest_get_appcatalog_by_tenant_manifest(self.tenant(), self.token())
-        .await,
-    )
+  /// # Get all deployed App Catalog App configurations
+  ///
+  /// `GET /allocation/{tenant}/appcatalogapp/actual`
+  pub async fn get_deployed_apps(&self) -> DshApiResult<HashMap<String, AppCatalogApp>> {
+    self
+      .process(
+        self
+          .generated_client()
+          .app_catalog_get_by_tenant_appcatalogapp_actual(self.tenant(), self.token())
+          .await,
+      )
+      .map(|result| result.1)
   }
 }
