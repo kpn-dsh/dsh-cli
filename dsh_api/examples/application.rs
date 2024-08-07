@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::time::SystemTime;
 
 use trifonius_dsh_api::types::{AllocationStatus, Application, Task};
 use trifonius_dsh_api::DEFAULT_DSH_API_CLIENT_FACTORY;
@@ -9,14 +8,10 @@ const TASK_ID: &str = "8f4b5747-lnmj4-00000000";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-  env_logger::init();
-
   let application_name = SERVICE_NAME;
   let task_id = TASK_ID;
 
   let client = &DEFAULT_DSH_API_CLIENT_FACTORY.client().await?;
-
-  let start_time = SystemTime::now();
 
   // Return deployed applications
   let applications: HashMap<String, Application> = client.get_deployed_applications().await?;
@@ -62,8 +57,6 @@ async fn main() -> Result<(), String> {
   // Return task status
   let status = client.get_task_status(&application_name, &task_id).await?;
   println!("task status {}, {}\n{}", application_name, task_id, serde_json::to_string_pretty(&status).unwrap());
-
-  println!("{:?}", SystemTime::now().duration_since(start_time));
 
   Ok(())
 }
