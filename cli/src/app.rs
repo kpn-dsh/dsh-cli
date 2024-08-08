@@ -18,7 +18,7 @@ pub(crate) fn app_command() -> Command {
     .long_about("Show app details")
 }
 
-pub(crate) async fn run_app_command(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+pub(crate) async fn run_app_command(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   let resp = dsh_api_client.get_apps().await.unwrap();
   println!("{}", serde_json::to_string_pretty(&resp).unwrap());
 }

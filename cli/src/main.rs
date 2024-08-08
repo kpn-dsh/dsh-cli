@@ -1,3 +1,6 @@
+#![doc(html_favicon_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+#![doc(html_logo_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -38,7 +41,7 @@ async fn main() {
     .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
     .placeholder(styling::AnsiColor::Cyan.on_default());
 
-  let command = Command::new("trifonius")
+  let command = Command::new("tcli")
     .about(ABOUT)
     .long_about(LONG_ABOUT)
     .args(arguments())
@@ -49,19 +52,20 @@ async fn main() {
     .hide_possible_values(true)
     .styles(styles)
     .subcommands([app_command(), application_command(), processor_command(), secret_command(), task_command(), vhost_command()])
-    .version("1.7.0");
+    .version("0.0.6")
+    .long_version("version: 0.0.6\ntrifonius version: 0.0.6\ndsh api version: 1.7.0");
 
   let matches = command.get_matches();
 
   let dsh_api_client = &DEFAULT_DSH_API_CLIENT_FACTORY.client().await.expect("unable to create dsh api client");
 
   match matches.subcommand() {
-    Some((APP_COMMAND, sub_matches)) => run_app_command(sub_matches, &dsh_api_client).await,
-    Some((APPLICATION_COMMAND, sub_matches)) => run_application_command(sub_matches, &dsh_api_client).await,
-    Some((PROCESSOR_COMMAND, sub_matches)) => run_processor_command(sub_matches, &dsh_api_client).await,
-    Some((SECRET_COMMAND, sub_matches)) => run_secret_command(sub_matches, &dsh_api_client).await,
-    Some((TASK_COMMAND, sub_matches)) => run_task_command(sub_matches, &dsh_api_client).await,
-    Some((VHOST_COMMAND, sub_matches)) => run_vhost_command(sub_matches, &dsh_api_client).await,
+    Some((APP_COMMAND, sub_matches)) => run_app_command(sub_matches, dsh_api_client).await,
+    Some((APPLICATION_COMMAND, sub_matches)) => run_application_command(sub_matches, dsh_api_client).await,
+    Some((PROCESSOR_COMMAND, sub_matches)) => run_processor_command(sub_matches, dsh_api_client).await,
+    Some((SECRET_COMMAND, sub_matches)) => run_secret_command(sub_matches, dsh_api_client).await,
+    Some((TASK_COMMAND, sub_matches)) => run_task_command(sub_matches, dsh_api_client).await,
+    Some((VHOST_COMMAND, sub_matches)) => run_vhost_command(sub_matches, dsh_api_client).await,
     Some((_command, _sub_matches)) => {}
     None => (),
   }

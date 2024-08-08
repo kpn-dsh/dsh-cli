@@ -26,7 +26,7 @@ pub(crate) fn secret_command() -> Command {
     ])
 }
 
-pub(crate) async fn run_secret_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+pub(crate) async fn run_secret_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.subcommand() {
     Some((SECRET_LIST_SUBCOMMAND, sub_matches)) => run_secret_list_subcommand(sub_matches, dsh_api_client).await,
     Some((SECRET_SHOW_SUBCOMMAND, sub_matches)) => run_secret_show_subcommand(sub_matches, dsh_api_client).await,
@@ -67,7 +67,7 @@ fn secret_usage_subcommand() -> Command {
     .args(vec![secret_argument()])
 }
 
-async fn run_secret_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_secret_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match dsh_api_client.get_secrets().await {
     Ok(mut secrets) => {
       secrets.sort();
@@ -79,7 +79,7 @@ async fn run_secret_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshA
   }
 }
 
-async fn run_secret_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_secret_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.get_one::<String>(SECRET_ARGUMENT) {
     Some(secret_id) => match dsh_api_client.get_secret(secret_id).await {
       Ok(_secret_bytestream) => println!("{}", 42),
@@ -89,7 +89,7 @@ async fn run_secret_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshAp
   }
 }
 
-async fn run_secret_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_secret_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.get_one::<String>(SECRET_ARGUMENT) {
     Some(application_id) => match dsh_api_client.get_tasks(application_id).await {
       Ok(application_tasks) => println!("{}", serde_json::to_string_pretty(&application_tasks).unwrap()),
@@ -101,7 +101,7 @@ async fn run_secret_status_subcommand(matches: &ArgMatches, dsh_api_client: &Dsh
 }
 
 // TODO Secrets are also used for buckets, databases and apps
-async fn run_secret_usage_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_secret_usage_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.get_one::<String>(SECRET_ARGUMENT) {
     Some(secret_argument) => match dsh_api_client.get_applications().await {
       Ok(applications) => {

@@ -106,7 +106,7 @@ where
     .collect::<Vec<Vec<String>>>()
 }
 
-fn column_widths(string_rows: &Vec<Vec<String>>) -> Vec<usize> {
+fn column_widths(string_rows: &[Vec<String>]) -> Vec<usize> {
   transpose(string_rows.iter().map(|row| row.iter().map(|cell| cell.len()).collect()).collect())
     .iter()
     .map(|col| col.iter().max().cloned().unwrap_or_default())

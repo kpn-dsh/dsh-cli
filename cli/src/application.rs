@@ -27,7 +27,7 @@ pub(crate) fn application_command() -> Command {
     ])
 }
 
-pub(crate) async fn run_application_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+pub(crate) async fn run_application_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.subcommand() {
     Some((APPLICATION_LIST_SUBCOMMAND, sub_matches)) => run_application_list_subcommand(sub_matches, dsh_api_client).await,
     Some((APPLICATION_SHOW_SUBCOMMAND, sub_matches)) => run_application_show_subcommand(sub_matches, dsh_api_client).await,
@@ -68,7 +68,7 @@ fn application_tasks_subcommand() -> Command {
     .args(vec![application_argument()])
 }
 
-async fn run_application_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_application_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.get_one::<String>(APPLICATION_ARGUMENT) {
     Some(application_id) => match dsh_api_client.get_application(application_id).await {
       Ok(application) => println!("{}", serde_json::to_string_pretty(&application).unwrap()),
@@ -79,10 +79,10 @@ async fn run_application_show_subcommand(matches: &ArgMatches, dsh_api_client: &
   }
 }
 
-async fn run_application_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_application_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match dsh_api_client.get_applications().await {
     Ok(applications) => {
-      let mut application_ids = applications.keys().into_iter().map(|k| k.to_string()).collect::<Vec<String>>();
+      let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
       application_ids.sort();
 
       let mut table: Vec<Vec<String>> = vec![];
@@ -97,7 +97,7 @@ async fn run_application_list_subcommand(_matches: &ArgMatches, dsh_api_client: 
   }
 }
 
-async fn run_application_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_application_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.get_one::<String>(APPLICATION_ARGUMENT) {
     Some(application_id) => match dsh_api_client.get_application_status(application_id).await {
       Ok(application_status) => println!("{}", serde_json::to_string_pretty(&application_status).unwrap()),
@@ -108,7 +108,7 @@ async fn run_application_status_subcommand(matches: &ArgMatches, dsh_api_client:
   }
 }
 
-async fn run_application_tasks_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_application_tasks_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.get_one::<String>(APPLICATION_ARGUMENT) {
     Some(application_id) => match dsh_api_client.get_tasks(application_id).await {
       Ok(application_tasks) => {

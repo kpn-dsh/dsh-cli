@@ -20,7 +20,7 @@ pub(crate) fn vhost_command() -> Command {
     .subcommands(vec![vhost_usage_subcommand()])
 }
 
-pub(crate) async fn run_vhost_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+pub(crate) async fn run_vhost_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.subcommand() {
     Some((VHOST_USAGE_SUBCOMMAND, sub_matches)) => run_vhost_usage_subcommand(sub_matches, dsh_api_client).await,
     _ => unreachable!(),
@@ -35,7 +35,7 @@ fn vhost_usage_subcommand() -> Command {
     .args(vec![vhost_argument()])
 }
 
-async fn run_vhost_usage_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_vhost_usage_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.get_one::<String>(VHOST_ARGUMENT) {
     Some(vhost_argument) => match dsh_api_client.get_applications().await {
       Ok(applications) => {

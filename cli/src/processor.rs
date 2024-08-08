@@ -20,7 +20,7 @@ pub(crate) fn processor_command() -> Command {
     .subcommands(vec![processor_list_subcommand()])
 }
 
-pub(crate) async fn run_processor_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+pub(crate) async fn run_processor_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match matches.subcommand() {
     Some((PROCESSOR_LIST_SUBCOMMAND, sub_matches)) => run_processor_list_subcommand(sub_matches, dsh_api_client).await,
     _ => unreachable!(),
@@ -41,7 +41,7 @@ const TRIFONIUS_PROCESSOR_NAME: &str = "TRIFONIUS_PROCESSOR_NAME";
 const TRIFONIUS_PROCESSOR_TYPE: &str = "TRIFONIUS_PROCESSOR_TYPE";
 const TRIFONIUS_SERVICE_NAME: &str = "TRIFONIUS_SERVICE_NAME";
 
-async fn run_processor_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> () {
+async fn run_processor_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
   match dsh_api_client.get_applications().await {
     Ok(applications) => {
       let mut table: Vec<Vec<String>> = vec![];
@@ -63,7 +63,7 @@ async fn run_processor_list_subcommand(_matches: &ArgMatches, dsh_api_client: &D
   }
 }
 
-fn find_trifonius_parameters<'a>(application: &Application) -> Option<HashMap<&'static str, String>> {
+fn find_trifonius_parameters(application: &Application) -> Option<HashMap<&'static str, String>> {
   let mut parameters: HashMap<&'static str, String> = HashMap::new();
   if let Some(pipeline_name) = application.env.get(TRIFONIUS_PIPELINE_NAME) {
     parameters.insert(TRIFONIUS_PIPELINE_NAME, pipeline_name.to_string());
