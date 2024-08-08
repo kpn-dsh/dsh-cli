@@ -1,6 +1,5 @@
 [package]
-name = "trifonius-cli"
-
+name = "tcli"
 
 authors.workspace = true
 description.workspace = true
@@ -10,26 +9,11 @@ version.workspace = true
 publish.workspace = true
 
 [dependencies]
-trifonius-dsh-api = { path = "../dsh_api" }
-dsh_rest_api_client = "0.1.0"
-dsh_sdk = { version = "0.4.5", features = ["bootstrap", "rdkafka", "rest-token-fetcher"], default-features = false }
-
-clapcmd = "0.3.3"
 clap = { version = "4.5", features = ["wrap_help"] }
+#clapcmd = "0.3.3"
 ctrlc = "3.4.4"
-
-async-trait = "0.1.81"
-futures = "0.3.30"
-lazy_static = "1.5.0"
-log = "0.4.22"
-regex = "1.10.5"
-reqwest = { version = "0.12.5", features = ["json"] }
-serde = { version = "1.0.204", features = ["derive"] }
+dsh_sdk = { version = "0.4.5", features = ["rest-token-fetcher"], default-features = false }
 serde_json = "1.0.120"
 tokio = { version = "1.39.1", features = ["rt", "rt-multi-thread", "macros"] }
-toml = "0.8.15"
-
-# Move dependency to dev-dependencies
-env_logger = "0.11.4"
-rand = "0.8.5"
-uuid = { version = "1.10.0", features = ["v4"] }
+#toml = "0.8.15"
+trifonius-dsh-api = { path = "../dsh_api" }
