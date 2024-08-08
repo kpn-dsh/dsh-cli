@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use trifonius_dsh_api::types::AppCatalogApp as ApiAppCatalogApp;
 
+use crate::engine_target::{template_resolver, TemplateMapping};
 use crate::processor::dsh_app::dsh_app_config::{DshAppSpecificConfig, ProfileConfig};
 use crate::processor::dsh_app::DshAppName;
 use crate::processor::processor_config::VariableType;
 use crate::processor::JunctionId;
-use crate::target_client::{template_resolver, TemplateMapping};
 
 const TRIFONIUS_PREFIX: &str = "TRIFONIUS";
 
@@ -16,8 +16,8 @@ pub fn into_api_app_catalog(
   inbound_junctions: &HashMap<JunctionId, String>,
   outbound_junctions: &HashMap<JunctionId, String>,
   parameters: &HashMap<String, String>, // TODO ParameterId?
-  profile: &ProfileConfig,
-  user: String,
+  _profile: &ProfileConfig,             // TODO
+  _user: String,                        // TODO
   template_mapping: &TemplateMapping,
 ) -> Result<ApiAppCatalogApp, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
