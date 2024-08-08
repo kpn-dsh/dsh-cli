@@ -1,5 +1,6 @@
 use dsh_sdk::dsh::datastream::Stream;
 
+use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineName;
 use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
 use crate::resource::dsh_topic::dsh_topic_instance::DshTopicInstance;
@@ -8,7 +9,6 @@ use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_instance::ResourceInstance;
 use crate::resource::resource_realization::ResourceRealization;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceName, ResourceType};
-use crate::target_client::TargetClientFactory;
 
 pub(crate) struct DshTopicRealization {
   pub(crate) resource_identifier: ResourceIdentifier,
@@ -16,7 +16,7 @@ pub(crate) struct DshTopicRealization {
 }
 
 impl DshTopicRealization {
-  pub(crate) fn create(stream: &Stream, target_client_factory: &TargetClientFactory) -> Result<Self, String> {
+  pub(crate) fn create(stream: &Stream, engine_target: &EngineTarget) -> Result<Self, String> {
     // TODO Check proper topic name
     let topic_name = match stream.write_pattern() {
       Ok(write_pattern) => write_pattern.to_string(),
@@ -40,19 +40,19 @@ impl DshTopicRealization {
       readable: stream.read_access(),
       metadata: Vec::default(),
       more_info_url: match topic_type {
-        DshTopicType::Internal | DshTopicType::Stream => target_client_factory
+        DshTopicType::Internal | DshTopicType::Stream => engine_target
           .platform()
           .console_url()
-          .map(|url| format!("{}/#/profiles/{}/resources/streams", url, target_client_factory.tenant())),
-        DshTopicType::Scratch => target_client_factory
+          .map(|url| format!("{}/#/profiles/{}/resources/streams", url, engine_target.tenant().name())),
+        DshTopicType::Scratch => engine_target
           .platform()
           .console_url()
-          .map(|url| format!("{}/#/profiles/{}/resources/topics", url, target_client_factory.tenant())),
+          .map(|url| format!("{}/#/profiles/{}/resources/topics", url, engine_target.tenant().name())),
       },
       metrics_url: None,
-      viewer_url: target_client_factory
+      viewer_url: engine_target
         .platform()
-        .app_domain(target_client_factory.tenant())
+        .app_domain(engine_target.tenant().name())
         .map(|domain| format!("https://eavesdropper.{}?topics={}", domain, topic_name)),
       data_catalog_url: None,
       dsh_topic_descriptor: Some(DshTopicDescriptor {
@@ -100,9 +100,9 @@ impl<'a> ResourceRealization<'a> for DshTopicRealization {
     &'a self,
     pipeline_name: Option<&'a PipelineName>,
     resource_name: &'a ResourceName,
-    target_client_factory: &'a TargetClientFactory,
+    engine_target: &'a EngineTarget,
   ) -> Result<Box<dyn ResourceInstance + 'a>, String> {
-    match DshTopicInstance::create(pipeline_name, resource_name, self, target_client_factory) {
+    match DshTopicInstance::create(pipeline_name, resource_name, self, engine_target) {
       Ok(resource) => Ok(Box::new(resource)),
       Err(error) => Err(error),
     }

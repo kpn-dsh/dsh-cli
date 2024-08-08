@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::{DshApiClientFactory, DshApiTenant};
 
+use crate::engine_target::{from_tenant_to_template_mapping, TemplateMapping};
 use crate::pipeline::PipelineName;
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
@@ -19,7 +20,6 @@ use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceType};
-use crate::target_client::{from_tenant_to_template_mapping, TemplateMapping};
 
 pub struct DshServiceRealization<'a> {
   processor_identifier: ProcessorIdentifier,

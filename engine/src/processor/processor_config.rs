@@ -7,13 +7,13 @@ use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use toml::de::Error;
 
+use crate::engine_target::{template_resolver, validate_template, TemplateMapping};
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_app::dsh_app_config::DshAppSpecificConfig;
 use crate::processor::dsh_service::dsh_service_config::DshServiceSpecificConfig;
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType};
 use crate::resource::ResourceType;
-use crate::target_client::{template_resolver, validate_template, TemplateMapping};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorConfig {

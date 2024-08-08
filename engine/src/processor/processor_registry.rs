@@ -1,7 +1,6 @@
 use lazy_static::lazy_static;
 
-use trifonius_dsh_api::{DshApiClientFactory, DEFAULT_DSH_API_CLIENT_FACTORY};
-
+use crate::engine_target::{EngineTarget, DEFAULT_ENGINE_TARGET};
 use crate::pipeline::PipelineName;
 use crate::processor::dsh_app::dsh_app_registry::DshAppRealizationRegistry;
 use crate::processor::dsh_service::dsh_service_registry::DshServiceRealizationRegistry;
@@ -19,7 +18,7 @@ pub struct ProcessorRegistry<'a> {
   dsh_app_realization_registry: DshAppRealizationRegistry<'a>,
   dsh_service_realization_registry: DshServiceRealizationRegistry<'a>,
   resource_registry: &'a ResourceRegistry<'a>,
-  client_factory: &'a DshApiClientFactory,
+  engine_target: &'a EngineTarget<'a>,
 }
 
 impl<'a> ProcessorRegistry<'a> {
@@ -27,12 +26,12 @@ impl<'a> ProcessorRegistry<'a> {
     Self::default()
   }
 
-  pub fn create(client_factory: &'a DshApiClientFactory, resource_registry: &'a ResourceRegistry) -> Result<ProcessorRegistry<'a>, String> {
+  pub fn create(engine_target: &'a EngineTarget, resource_registry: &'a ResourceRegistry) -> Result<ProcessorRegistry<'a>, String> {
     Ok(ProcessorRegistry {
-      dsh_app_realization_registry: DshAppRealizationRegistry::create(client_factory, resource_registry)?,
-      dsh_service_realization_registry: DshServiceRealizationRegistry::create(client_factory, resource_registry)?,
+      dsh_app_realization_registry: DshAppRealizationRegistry::create(engine_target.dsh_api_client_factory, resource_registry)?,
+      dsh_service_realization_registry: DshServiceRealizationRegistry::create(engine_target.dsh_api_client_factory, resource_registry)?,
       resource_registry,
-      client_factory,
+      engine_target,
     })
   }
 
@@ -67,7 +66,7 @@ impl<'a> ProcessorRegistry<'a> {
   ) -> Option<Result<Box<dyn ProcessorInstance + 'a>, String>> {
     self
       .processor_realization(processor_type, processor_id)
-      .map(|realization| realization.processor_instance(pipeline_name, processor_name, self.client_factory))
+      .map(|realization| realization.processor_instance(pipeline_name, processor_name, self.engine_target.dsh_api_client_factory))
   }
 
   pub fn processor_instance_by_identifier(
@@ -130,6 +129,6 @@ impl<'a> ProcessorRegistry<'a> {
 
 impl Default for ProcessorRegistry<'_> {
   fn default() -> Self {
-    Self::create(&DEFAULT_DSH_API_CLIENT_FACTORY, &DEFAULT_RESOURCE_REGISTRY).expect("unable to create default processor registry")
+    Self::create(&DEFAULT_ENGINE_TARGET, &DEFAULT_RESOURCE_REGISTRY).expect("unable to create default processor registry")
   }
 }

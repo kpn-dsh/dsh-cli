@@ -1,10 +1,10 @@
 #![allow(clippy::module_inception)]
 
+use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineName;
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_instance::ResourceInstance;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceName, ResourceType};
-use crate::target_client::TargetClientFactory;
 
 pub trait ResourceRealization<'a> {
   /// # Get this `ResourceRealization`s descriptor
@@ -48,7 +48,7 @@ pub trait ResourceRealization<'a> {
     &'a self,
     pipeline_name: Option<&'a PipelineName>,
     resource_name: &'a ResourceName,
-    target_client_factory: &'a TargetClientFactory,
+    engine_target: &'a EngineTarget,
   ) -> Result<Box<dyn ResourceInstance + 'a>, String>;
 
   /// # Get this `ResourceRealization`s type

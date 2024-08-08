@@ -2,22 +2,22 @@ use std::collections::HashMap;
 
 use dsh_sdk::Properties;
 
+use crate::engine_target::EngineTarget;
 use crate::resource::dsh_topic::dsh_topic_realization::DshTopicRealization;
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_realization::ResourceRealization;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
-use crate::target_client::TargetClientFactory;
 
 pub(crate) struct DshTopicRealizationRegistry {
   dsh_topic_realizations: HashMap<ResourceIdentifier, DshTopicRealization>,
 }
 
 impl<'a> DshTopicRealizationRegistry {
-  pub(crate) fn create(target_client_factory: &'a TargetClientFactory) -> Result<Self, String> {
+  pub(crate) fn create(engine_target: &'a EngineTarget) -> Result<Self, String> {
     let mut dsh_topic_realizations: HashMap<ResourceIdentifier, DshTopicRealization> = HashMap::new();
     let dsh_properties: &Properties = Properties::get();
     for stream in dsh_properties.datastream().streams().values() {
-      let dsh_topic_realization = DshTopicRealization::create(stream, target_client_factory)?;
+      let dsh_topic_realization = DshTopicRealization::create(stream, engine_target)?;
       dsh_topic_realizations.insert(dsh_topic_realization.resource_identifier.clone(), dsh_topic_realization);
     }
     Ok(Self { dsh_topic_realizations })

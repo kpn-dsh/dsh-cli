@@ -1,12 +1,12 @@
-use crate::pipeline::PipelineName;
 use lazy_static::lazy_static;
 
+use crate::engine_target::{EngineTarget, DEFAULT_ENGINE_TARGET};
+use crate::pipeline::PipelineName;
 use crate::resource::dsh_topic::dsh_topic_registry::DshTopicRealizationRegistry;
 use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceTypeDescriptor};
 use crate::resource::resource_instance::ResourceInstance;
 use crate::resource::resource_realization::ResourceRealization;
 use crate::resource::{ResourceId, ResourceIdentifier, ResourceName, ResourceType};
-use crate::target_client::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTORY};
 
 lazy_static! {
   pub static ref DEFAULT_RESOURCE_REGISTRY: ResourceRegistry<'static> = ResourceRegistry::default();
@@ -14,7 +14,7 @@ lazy_static! {
 
 pub struct ResourceRegistry<'a> {
   dsh_topic_realization_registry: DshTopicRealizationRegistry,
-  target_client_factory: &'a TargetClientFactory,
+  engine_target: &'a EngineTarget<'a>,
 }
 
 impl<'a> ResourceRegistry<'a> {
@@ -22,8 +22,8 @@ impl<'a> ResourceRegistry<'a> {
     Self::default()
   }
 
-  pub fn create(target_client_factory: &'a TargetClientFactory) -> Result<ResourceRegistry<'a>, String> {
-    Ok(Self { dsh_topic_realization_registry: DshTopicRealizationRegistry::create(target_client_factory)?, target_client_factory })
+  pub fn create(engine_target: &'a EngineTarget) -> Result<ResourceRegistry<'a>, String> {
+    Ok(Self { dsh_topic_realization_registry: DshTopicRealizationRegistry::create(engine_target)?, engine_target })
   }
 
   pub fn resource_types(&self) -> Vec<ResourceTypeDescriptor> {
@@ -51,7 +51,7 @@ impl<'a> ResourceRegistry<'a> {
   ) -> Option<Result<Box<dyn ResourceInstance + 'a>, String>> {
     self
       .resource_realization(resource_type, resource_id)
-      .map(|realization| realization.resource_instance(pipeline_name, resource_name, self.target_client_factory))
+      .map(|realization| realization.resource_instance(pipeline_name, resource_name, self.engine_target))
   }
 
   pub fn resource_instance_by_identifier(
@@ -104,6 +104,6 @@ impl<'a> ResourceRegistry<'a> {
 
 impl Default for ResourceRegistry<'_> {
   fn default() -> Self {
-    Self::create(&DEFAULT_TARGET_CLIENT_FACTORY).expect("unable to create default resource registry")
+    Self::create(&DEFAULT_ENGINE_TARGET).expect("unable to create default resource registry")
   }
 }

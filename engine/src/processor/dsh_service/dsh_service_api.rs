@@ -5,6 +5,7 @@ use trifonius_dsh_api::types::{
   HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec as ApiPathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
 };
 
+use crate::engine_target::{template_resolver, TemplateMapping};
 use crate::pipeline::PipelineName;
 use crate::processor::dsh_service::dsh_service_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
@@ -12,7 +13,6 @@ use crate::processor::dsh_service::dsh_service_config::{
 use crate::processor::dsh_service::DshServiceName;
 use crate::processor::processor_config::VariableType;
 use crate::processor::{JunctionId, ProcessorName, ProcessorType};
-use crate::target_client::{template_resolver, TemplateMapping};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
   fn from(value: ApiHealthCheck) -> Self {

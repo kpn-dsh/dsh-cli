@@ -22,7 +22,7 @@ impl<'a> DshServiceRealizationRegistry<'a> {
       let file_name = path.unwrap().path().display().to_string();
       let config = read_dsh_service_config(&file_name)?;
       let id = ProcessorId::try_from(config.processor.id.as_str())?;
-      let dsh_service_realization = DshServiceRealization::create(config, client_factory.target_tenant().clone(), resource_registry)?;
+      let dsh_service_realization = DshServiceRealization::create(config, client_factory.tenant().clone(), resource_registry)?;
       dsh_service_realizations.insert(ProcessorIdentifier { processor_type: ProcessorType::DshService, id }, dsh_service_realization);
     }
     Ok(Self { dsh_service_realizations })
