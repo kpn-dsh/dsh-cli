@@ -9,5 +9,6 @@ fn main() {
   let content = prettyplease::unparse(&ast);
   let mut out_file = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).to_path_buf();
   out_file.push("codegen.rs");
+  // println!("cargo:warning= out_file: {:?}", &out_file);
   std::fs::write(out_file, content).unwrap();
 }

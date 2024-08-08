@@ -1,12 +1,15 @@
+#![doc(html_favicon_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+#![doc(html_logo_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+
 use std::env;
 use std::fmt::{Display, Formatter};
 
 use dsh_sdk::RestTokenFetcher;
 use lazy_static::lazy_static;
 
+pub use crate::generated::types;
+use crate::generated::Client as GeneratedClient;
 use crate::platform::DshPlatform;
-
-include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
 pub mod app_catalog;
 pub mod app_catalog_app_configuration;
@@ -15,8 +18,12 @@ pub mod application;
 pub mod dsh_api_client;
 pub mod platform;
 pub mod secret;
-pub mod task;
+pub mod topic;
 
+// Private module `generated` will contain the generated Client code.
+mod generated {
+  include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+}
 // tenant is implicit in the client
 
 // get_[SUBJECT]s              get all SUBJECTs
@@ -25,23 +32,23 @@ pub mod task;
 
 #[derive(Clone, Debug)]
 pub struct DshApiTenant {
-  platform: DshPlatform,
-  tenant: String,
+  name: String,
   user: String,
+  platform: DshPlatform,
 }
 
 #[derive(Debug)]
 pub struct DshApiClient<'a> {
-  generated_client: &'a Client,
   token: String,
-  dsh_api_client_factory: &'a DshApiClientFactory,
+  generated_client: &'a GeneratedClient,
+  tenant: &'a DshApiTenant,
 }
 
 #[derive(Debug)]
 pub struct DshApiClientFactory {
-  generated_client: Client,
   token_fetcher: RestTokenFetcher,
-  dsh_api_tenant: DshApiTenant,
+  generated_client: GeneratedClient,
+  tenant: DshApiTenant,
 }
 
 #[derive(Debug)]
@@ -59,12 +66,12 @@ const TRIFONIUS_TARGET_PLATFORM: &str = "TRIFONIUS_TARGET_PLATFORM";
 
 lazy_static! {
   pub static ref DEFAULT_DSH_API_CLIENT_FACTORY: DshApiClientFactory = {
-    let tenant = get_env(TRIFONIUS_TARGET_TENANT);
-    let tenant_env_name = tenant.to_ascii_uppercase().replace('-', "_");
+    let tenant_name = get_env(TRIFONIUS_TARGET_TENANT);
+    let tenant_env_name = tenant_name.to_ascii_uppercase().replace('-', "_");
     let user = get_env(format!("{}_TENANT_{}_USER", TRIFONIUS_TARGET, tenant_env_name).as_str());
     let secret = get_env(format!("{}_TENANT_{}_SECRET", TRIFONIUS_TARGET, tenant_env_name).as_str());
     let platform = DshPlatform::try_from(get_env(TRIFONIUS_TARGET_PLATFORM).as_str()).unwrap();
-    let dsh_api_tenant = DshApiTenant { platform, tenant, user };
+    let dsh_api_tenant = DshApiTenant { platform, name: tenant_name, user };
     DshApiClientFactory::create(dsh_api_tenant, secret).expect("could not create static target client factory")
   };
 }

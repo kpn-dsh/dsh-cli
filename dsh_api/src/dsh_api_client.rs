@@ -1,12 +1,15 @@
+//! Client for accessing the DSH api
+
 use std::fmt::{Display, Formatter};
 
+use dsh_sdk::Platform as SdkPlatform;
 use dsh_sdk::RestTokenFetcherBuilder;
 use progenitor_client::{Error as ProgenitorError, ResponseValue as ProgenitorResponseValue};
 use reqwest::StatusCode as ReqwestStatusCode;
 use serde::Serialize;
 
 use crate::platform::DshPlatform;
-use crate::{Client as GeneratedClient, DshApiClient, DshApiClientFactory, DshApiError, DshApiTenant};
+use crate::{generated::Client as GeneratedClient, DshApiClient, DshApiClientFactory, DshApiError, DshApiTenant};
 
 // 200 - OK
 // 201 - CREATED
@@ -104,20 +107,20 @@ impl DshApiClient<'_> {
     }
   }
 
-  pub fn platform(&self) -> &DshPlatform {
-    &self.dsh_api_client_factory.dsh_api_tenant.platform
+  pub fn tenant(&self) -> &DshApiTenant {
+    self.tenant
   }
 
-  pub fn tenant(&self) -> &str {
-    &self.dsh_api_client_factory.dsh_api_tenant.tenant
+  pub fn tenant_name(&self) -> &str {
+    &self.tenant.name
+  }
+
+  pub fn platform(&self) -> &DshPlatform {
+    &self.tenant.platform
   }
 
   pub fn user(&self) -> &str {
-    &self.dsh_api_client_factory.dsh_api_tenant.user
-  }
-
-  pub fn generated_client(&self) -> &GeneratedClient {
-    self.generated_client
+    &self.tenant.user
   }
 
   pub fn token(&self) -> &str {
@@ -127,30 +130,30 @@ impl DshApiClient<'_> {
 
 impl DshApiClientFactory {
   pub fn platform(&self) -> &DshPlatform {
-    &self.dsh_api_tenant.platform
+    &self.tenant.platform
   }
 
-  pub fn target_tenant(&self) -> &DshApiTenant {
-    &self.dsh_api_tenant
+  pub fn tenant(&self) -> &DshApiTenant {
+    &self.tenant
   }
 
-  pub fn tenant(&self) -> &str {
-    &self.dsh_api_tenant.tenant
+  pub fn tenant_name(&self) -> &str {
+    &self.tenant.name
   }
 
   pub fn user(&self) -> &str {
-    &self.dsh_api_tenant.user
+    &self.tenant.user
   }
 
   pub fn create(dsh_api_tenant: DshApiTenant, client_secret: String) -> Result<Self, String> {
-    match RestTokenFetcherBuilder::new(dsh_api_tenant.platform.sdk_platform())
-      .tenant_name(dsh_api_tenant.tenant.clone())
+    match RestTokenFetcherBuilder::new(SdkPlatform::from(&dsh_api_tenant.platform))
+      .tenant_name(dsh_api_tenant.name().clone())
       .client_secret(client_secret)
       .build()
     {
       Ok(token_fetcher) => {
         let generated_client = GeneratedClient::new(dsh_api_tenant.platform.endpoint_rest_api().as_str());
-        Ok(DshApiClientFactory { generated_client, token_fetcher, dsh_api_tenant })
+        Ok(DshApiClientFactory { token_fetcher, generated_client, tenant: dsh_api_tenant })
       }
       Err(e) => Err(format!("could not create token fetcher ({})", e)),
     }
@@ -158,7 +161,7 @@ impl DshApiClientFactory {
 
   pub async fn client(&self) -> Result<DshApiClient, String> {
     match self.token_fetcher.get_token().await {
-      Ok(token) => Ok(DshApiClient { generated_client: &self.generated_client, token, dsh_api_client_factory: self }),
+      Ok(token) => Ok(DshApiClient { token, generated_client: &self.generated_client, tenant: &self.tenant }),
       Err(e) => Err(format!("could not create token ({})", e)),
     }
   }
@@ -169,8 +172,8 @@ impl DshApiTenant {
     &self.platform
   }
 
-  pub fn tenant(&self) -> &String {
-    &self.tenant
+  pub fn name(&self) -> &String {
+    &self.name
   }
 
   pub fn user(&self) -> &String {
@@ -178,7 +181,7 @@ impl DshApiTenant {
   }
 
   pub fn app_domain(&self) -> Option<String> {
-    self.platform.app_domain(&self.tenant)
+    self.platform.app_domain(&self.name)
   }
 
   pub fn console_url(&self) -> Option<String> {
@@ -186,11 +189,11 @@ impl DshApiTenant {
   }
 
   pub fn dsh_internal_domain(&self) -> Option<String> {
-    self.platform.dsh_internal_domain(&self.tenant)
+    self.platform.dsh_internal_domain(&self.name)
   }
 
   pub fn monitoring_url(&self) -> Option<String> {
-    self.platform.monitoring_url(&self.tenant)
+    self.platform.monitoring_url(&self.name)
   }
 
   pub fn public_vhosts_domain(&self) -> Option<String> {

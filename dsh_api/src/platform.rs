@@ -1,3 +1,5 @@
+//! Defines DSH platforms and their properties
+
 use std::fmt::{Display, Formatter};
 
 use dsh_sdk::Platform as SdkPlatform;
@@ -38,19 +40,21 @@ impl TryFrom<&str> for DshPlatform {
   }
 }
 
-impl DshPlatform {
-  pub fn sdk_platform(&self) -> SdkPlatform {
-    match self {
-      Self::NpLz => SdkPlatform::NpLz,
-      Self::Poc => SdkPlatform::Poc,
-      Self::Prod => SdkPlatform::Prod,
-      Self::ProdAz => SdkPlatform::ProdAz,
-      Self::ProdLz => SdkPlatform::ProdLz,
+impl From<&DshPlatform> for SdkPlatform {
+  fn from(dsh_platform: &DshPlatform) -> Self {
+    match dsh_platform {
+      DshPlatform::NpLz => SdkPlatform::NpLz,
+      DshPlatform::Poc => SdkPlatform::Poc,
+      DshPlatform::Prod => SdkPlatform::Prod,
+      DshPlatform::ProdAz => SdkPlatform::ProdAz,
+      DshPlatform::ProdLz => SdkPlatform::ProdLz,
     }
   }
+}
 
+impl DshPlatform {
   pub fn realm(&self) -> String {
-    self.sdk_platform().realm().to_string()
+    SdkPlatform::from(self).realm().to_string()
   }
 
   pub fn console_url(&self) -> Option<String> {
@@ -104,10 +108,10 @@ impl DshPlatform {
   }
 
   pub fn endpoint_rest_api(&self) -> String {
-    self.sdk_platform().endpoint_rest_api().to_string()
+    SdkPlatform::from(self).endpoint_rest_api().to_string()
   }
 
   pub fn endpoint_rest_access_token(&self) -> String {
-    self.sdk_platform().endpoint_rest_access_token().to_string()
+    SdkPlatform::from(self).endpoint_rest_access_token().to_string()
   }
 }
