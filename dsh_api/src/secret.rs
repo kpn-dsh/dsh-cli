@@ -6,14 +6,14 @@
 //! * [`delete_secret(secret_id) -> ()`](DshApiClient::delete_secret)
 //! * [`get_secret(secret_id) -> ByteStream`](DshApiClient::get_secret)
 //! * [`get_secret_actual(secret_id) -> Empty`](DshApiClient::get_secret_actual)
+//! * [`get_secret_allocation_status(secret_id) -> AllocationStatus`](DshApiClient::get_secret_allocation_status)
 //! * [`get_secret_configuration(secret_id) -> Empty`](DshApiClient::get_secret_configuration)
-//! * [`get_secret_status(secret_id) -> AllocationStatus`](DshApiClient::get_secret_status)
-//! * [`get_secrets() -> Vec<String>`](DshApiClient::get_secrets)
+//! * [`get_secret_ids() -> Vec<String>`](DshApiClient::get_secret_ids)
 //! * [`update_secret(secret_id) -> ()`](DshApiClient::update_secret)
 
-use progenitor_client::ByteStream;
-
-use crate::types::{AllocationStatus, Empty, Secret};
+#[allow(unused_imports)]
+use crate::types::Empty;
+use crate::types::{AllocationStatus, Secret};
 #[allow(unused_imports)]
 use crate::DshApiError;
 use crate::{DshApiClient, DshApiResult};
@@ -26,9 +26,9 @@ use crate::{DshApiClient, DshApiResult};
 /// * [`delete_secret(secret_id) -> ()`](DshApiClient::delete_secret)
 /// * [`get_secret(secret_id) -> ByteStream`](DshApiClient::get_secret)
 /// * [`get_secret_actual(secret_id) -> Empty`](DshApiClient::get_secret_actual)
+/// * [`get_secret_allocation_status(secret_id) -> AllocationStatus`](DshApiClient::get_secret_allocation_status)
 /// * [`get_secret_configuration(secret_id) -> Empty`](DshApiClient::get_secret_configuration)
-/// * [`get_secret_status(secret_id) -> AllocationStatus`](DshApiClient::get_secret_status)
-/// * [`get_secrets() -> Vec<String>`](DshApiClient::get_secrets)
+/// * [`get_secret_ids() -> Vec<String>`](DshApiClient::get_secret_ids)
 /// * [`update_secret(secret_id) -> ()`](DshApiClient::update_secret)
 impl DshApiClient<'_> {
   /// # Create secret
@@ -42,9 +42,9 @@ impl DshApiClient<'_> {
   /// * `Ok(())` - when DSH has properly received the request
   ///              (note that this does not mean that the secret has been successfully created)
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn create_secret(&self, secret: Secret) -> DshApiResult<()> {
+  pub async fn create_secret(&self, secret: &Secret) -> DshApiResult<()> {
     self
-      .process(self.generated_client.secret_post_by_tenant_secret(self.tenant_name(), self.token(), &secret).await)
+      .process(self.generated_client.secret_post_by_tenant_secret(self.tenant_name(), self.token(), secret).await)
       .map(|result| result.1)
   }
 
@@ -78,16 +78,17 @@ impl DshApiClient<'_> {
   /// * `secret_id` - id of the requested secret
   ///
   /// ## Returns
-  /// * `Ok<`[`ByteStream`]`>` - secret
+  /// * `Ok<String>` - secret
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_secret(&self, secret_id: &str) -> DshApiResult<ByteStream> {
+  pub async fn get_secret(&self, secret_id: &str) -> DshApiResult<String> {
     self
-      .process_raw(
+      .process_string(
         self
           .generated_client
           .secret_get_by_tenant_secret_by_id(self.tenant_name(), secret_id, self.token())
           .await,
       )
+      .await
       .map(|result| result.1)
   }
 
@@ -107,6 +108,27 @@ impl DshApiClient<'_> {
         self
           .generated_client
           .secret_get_by_tenant_secret_by_id_actual(self.tenant_name(), secret_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
+  }
+
+  /// # Return secret allocation status
+  ///
+  /// `GET /allocation/{tenant}/secret/{id}/status`
+  ///
+  /// ## Parameters
+  /// * `secret_id` - id of the requested secret
+  ///
+  /// ## Returns
+  /// * `Ok<`[`AllocationStatus`]`>` - allocation status of the secret
+  /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
+  pub async fn get_secret_allocation_status(&self, secret_id: &str) -> DshApiResult<AllocationStatus> {
+    self
+      .process(
+        self
+          .generated_client
+          .secret_get_by_tenant_secret_by_id_status(self.tenant_name(), secret_id, self.token())
           .await,
       )
       .map(|result| result.1)
@@ -133,27 +155,6 @@ impl DshApiClient<'_> {
       .map(|result| result.1)
   }
 
-  /// # Return secret allocation status
-  ///
-  /// `GET /allocation/{tenant}/secret/{id}/status`
-  ///
-  /// ## Parameters
-  /// * `secret_id` - id of the requested secret
-  ///
-  /// ## Returns
-  /// * `Ok<`[`AllocationStatus`]`>` - allocation status of the secret
-  /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_secret_status(&self, secret_id: &str) -> DshApiResult<AllocationStatus> {
-    self
-      .process(
-        self
-          .generated_client
-          .secret_get_by_tenant_secret_by_id_status(self.tenant_name(), secret_id, self.token())
-          .await,
-      )
-      .map(|result| result.1)
-  }
-
   /// # Return list of secret names
   ///
   /// `GET /allocation/{tenant}/secret`
@@ -161,7 +162,7 @@ impl DshApiClient<'_> {
   /// ## Returns
   /// * `Ok<Vec<String>>` - list of secret names
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_secrets(&self) -> DshApiResult<Vec<String>> {
+  pub async fn get_secret_ids(&self) -> DshApiResult<Vec<String>> {
     self
       .process(self.generated_client.secret_get_by_tenant_secret(self.tenant_name(), self.token()).await)
       .map(|result| result.1)

@@ -24,12 +24,12 @@ async fn main() -> Result<(), String> {
 
   println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>");
 
-  let deployed_app: AppCatalogApp = client.get_deployed_app(app_catalog_id).await?;
+  let deployed_app: AppCatalogApp = client.get_app_actual(app_catalog_id).await?;
   println!("{}", serde_json::to_string_pretty(&deployed_app).unwrap());
 
   println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>");
 
-  let deployed_apps: HashMap<String, AppCatalogApp> = client.get_deployed_apps().await?;
+  let deployed_apps: HashMap<String, AppCatalogApp> = client.get_apps_actual().await?;
   let mut keys = deployed_apps.keys().into_iter().map(|k| k.to_string()).collect::<Vec<String>>();
   keys.sort();
   for key in keys {

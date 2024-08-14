@@ -150,7 +150,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
   }
 
   async fn status(&self) -> Result<ProcessorStatus, String> {
-    match self.client_factory.client().await?.get_application_status(&self.dsh_service_name).await {
+    match self.client_factory.client().await?.get_application_allocation_status(&self.dsh_service_name).await {
       Ok(status) => {
         if status.provisioned {
           Ok(ProcessorStatus { deployed: true, up: Some(true) })

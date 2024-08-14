@@ -1,4 +1,4 @@
-use trifonius_dsh_api::types::{AllocationStatus, AppCatalogAppConfiguration, AppCatalogManifest};
+use trifonius_dsh_api::types::{AllocationStatus, AppCatalogAppConfiguration};
 use trifonius_dsh_api::DEFAULT_DSH_API_CLIENT_FACTORY;
 
 #[tokio::main]

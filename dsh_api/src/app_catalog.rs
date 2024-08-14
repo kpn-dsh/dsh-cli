@@ -4,9 +4,9 @@
 //! easily configured apps that you can select from the App Catalog.
 //!
 //! * [`get_app(app_catalog_id) -> AppCatalogApp`](DshApiClient::get_app)
+//! * [`get_app_actual(app_catalog_id) -> AppCatalogApp`](DshApiClient::get_app_actual)
 //! * [`get_apps() -> HashMap<String, AppCatalogApp>`](DshApiClient::get_apps)
-//! * [`get_deployed_app(app_catalog_id) -> AppCatalogApp`](DshApiClient::get_deployed_app)
-//! * [`get_deployed_apps() -> HashMap<String, AppCatalogApp>`](DshApiClient::get_deployed_apps)
+//! * [`get_apps_actual() -> HashMap<String, AppCatalogApp>`](DshApiClient::get_apps_actual)
 
 use std::collections::HashMap;
 
@@ -21,32 +21,53 @@ use crate::{DshApiClient, DshApiResult};
 /// easily configured apps that you can select from the App Catalog.
 ///
 /// * [`get_app(app_catalog_id) -> AppCatalogApp`](DshApiClient::get_app)
+/// * [`get_app_actual(app_catalog_id) -> AppCatalogApp`](DshApiClient::get_app_actual)
 /// * [`get_apps() -> HashMap<String, AppCatalogApp>`](DshApiClient::get_apps)
-/// * [`get_deployed_app(app_catalog_id) -> AppCatalogApp`](DshApiClient::get_deployed_app)
-/// * [`get_deployed_apps() -> HashMap<String, AppCatalogApp>`](DshApiClient::get_deployed_apps)
+/// * [`get_apps_actual() -> HashMap<String, AppCatalogApp>`](DshApiClient::get_apps_actual)
 impl DshApiClient<'_> {
-  /// # Get an App Catalog App's configuration
+  /// # Return App configuration
   ///
   /// `GET /allocation/{tenant}/appcatalogapp/{appcatalogappid}/configuration`
   ///
   /// ## Parameters
-  /// * `app_catalog_id` - app id of the requested configuration
+  /// * `app_id` - app id of the requested configuration
   ///
   /// ## Returns
   /// * `Ok<`[`AppCatalogApp`]`>` - app configuration
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_app(&self, app_catalog_id: &str) -> DshApiResult<AppCatalogApp> {
+  pub async fn get_app(&self, app_id: &str) -> DshApiResult<AppCatalogApp> {
     self
       .process(
         self
           .generated_client
-          .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_configuration(self.tenant_name(), app_catalog_id, self.token())
+          .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_configuration(self.tenant_name(), app_id, self.token())
           .await,
       )
       .map(|result| result.1)
   }
 
-  /// # Get all App Catalog App configurations
+  /// # Return configuration of deployed App
+  ///
+  /// `GET /allocation/{tenant}/appcatalogapp/{appcatalogappid}/actual`
+  ///
+  /// ## Parameters
+  /// * `app_id` - app id of the requested configuration
+  ///
+  /// ## Returns
+  /// * `Ok<`[`AppCatalogApp`]`>` - app configuration
+  /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
+  pub async fn get_app_actual(&self, app_id: &str) -> DshApiResult<AppCatalogApp> {
+    self
+      .process(
+        self
+          .generated_client
+          .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_actual(self.tenant_name(), app_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
+  }
+
+  /// # Return all Apps with their configuration
   ///
   /// `GET /allocation/{tenant}/appcatalogapp/configuration`
   ///
@@ -64,35 +85,14 @@ impl DshApiClient<'_> {
       .map(|result| result.1)
   }
 
-  /// # Get a deployed App Catalog App's configuration
-  ///
-  /// `GET /allocation/{tenant}/appcatalogapp/{appcatalogappid}/actual`
-  ///
-  /// ## Parameters
-  /// * `app_catalog_id` - app id of the requested configuration
-  ///
-  /// ## Returns
-  /// * `Ok<`[`AppCatalogApp`]`>` - app configuration
-  /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_deployed_app(&self, app_catalog_id: &str) -> DshApiResult<AppCatalogApp> {
-    self
-      .process(
-        self
-          .generated_client
-          .app_catalog_get_by_tenant_appcatalogapp_by_appcatalogappid_actual(self.tenant_name(), app_catalog_id, self.token())
-          .await,
-      )
-      .map(|result| result.1)
-  }
-
-  /// # Get all deployed App Catalog App configurations
+  /// # Get all deployed Apps with their configuration
   ///
   /// `GET /allocation/{tenant}/appcatalogapp/actual`
   ///
   /// ## Returns
   /// * `Ok<HashMap<String, `[`AppCatalogApp`]`>>` - hashmap containing the app configurations
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_deployed_apps(&self) -> DshApiResult<HashMap<String, AppCatalogApp>> {
+  pub async fn get_apps_actual(&self) -> DshApiResult<HashMap<String, AppCatalogApp>> {
     self
       .process(
         self

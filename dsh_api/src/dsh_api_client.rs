@@ -2,9 +2,11 @@
 
 use std::fmt::{Display, Formatter};
 
+use bytes::Bytes;
 use dsh_sdk::Platform as SdkPlatform;
 use dsh_sdk::RestTokenFetcherBuilder;
-use progenitor_client::{Error as ProgenitorError, ResponseValue as ProgenitorResponseValue};
+use futures::TryStreamExt;
+use progenitor_client::{ByteStream, Error as ProgenitorError, ResponseValue as ProgenitorResponseValue};
 use reqwest::StatusCode as ReqwestStatusCode;
 use serde::Serialize;
 
@@ -93,7 +95,10 @@ impl DshApiClient<'_> {
     self.generated_client.api_version()
   }
 
-  pub(crate) fn process<T: Serialize>(&self, progenitor_response: Result<ProgenitorResponseValue<T>, ProgenitorError>) -> DshApiProcessResult<T> {
+  pub(crate) fn process<T>(&self, progenitor_response: Result<ProgenitorResponseValue<T>, ProgenitorError>) -> DshApiProcessResult<T>
+  where
+    T: Serialize,
+  {
     match progenitor_response {
       Ok::<ProgenitorResponseValue<T>, ProgenitorError>(response) => Ok((DshApiResponseStatus::from(response.status()), response.into_inner())),
       Err(progenitor_error) => Err(DshApiError::from(progenitor_error)),
@@ -103,6 +108,21 @@ impl DshApiClient<'_> {
   pub(crate) fn process_raw<T>(&self, progenitor_response: Result<ProgenitorResponseValue<T>, ProgenitorError>) -> DshApiProcessResult<T> {
     match progenitor_response {
       Ok::<ProgenitorResponseValue<T>, ProgenitorError>(response) => Ok((DshApiResponseStatus::from(response.status()), response.into_inner())),
+      Err(progenitor_error) => Err(DshApiError::from(progenitor_error)),
+    }
+  }
+
+  pub(crate) async fn process_string(&self, progenitor_response: Result<ProgenitorResponseValue<ByteStream>, ProgenitorError>) -> DshApiProcessResult<String> {
+    match progenitor_response {
+      Ok(response) => {
+        let status = DshApiResponseStatus::from(response.status());
+        let mut inner = response.into_inner();
+        let mut string = String::new();
+        while let Some::<Bytes>(ref bytes) = inner.try_next().await? {
+          string.push_str(std::str::from_utf8(bytes)?)
+        }
+        Ok((status, string))
+      }
       Err(progenitor_error) => Err(DshApiError::from(progenitor_error)),
     }
   }

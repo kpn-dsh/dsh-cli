@@ -3,9 +3,11 @@
 
 use std::env;
 use std::fmt::{Display, Formatter};
+use std::str::Utf8Error;
 
 use dsh_sdk::RestTokenFetcher;
 use lazy_static::lazy_static;
+use reqwest::Error as ReqwestError;
 
 pub use crate::generated::types;
 use crate::generated::Client as GeneratedClient;
@@ -15,6 +17,7 @@ pub mod app_catalog;
 pub mod app_catalog_app_configuration;
 pub mod app_catalog_manifest;
 pub mod application;
+pub mod bucket;
 pub mod dsh_api_client;
 pub mod platform;
 pub mod secret;
@@ -24,11 +27,21 @@ pub mod topic;
 mod generated {
   include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 }
-// tenant is implicit in the client
 
-// get_[SUBJECT]s              get all SUBJECTs
-// get_xxx                     get one SUBJECT by implicit subject key
-// get_xxx_by_yyy              get one SUBJECT by explicit subject key
+// Naming conventions
+// deploy_[SUBJECT]                       (subject_id),SUBJECT  deploy/create SUBJECT
+// get_[SUBJECT]                          subject_id            get SUBJECT/configuration by subject_id
+// get_[SUBJECT]_actual                   subject_id            get deployed SUBJECT/configuration by subject_id
+// get_[SUBJECT]_allocation_status        subject_id            get SUBJECT allocation status by subject_id
+// get_[SUBJECT]_ids                                            get all SUBJECTs/configurations
+// get_[SUBJECT]_[SUB]                    subject_id,sub_id     get SUB/configuration by subject_id and sub_id
+// get_[SUBJECT]_[SUB]_actual             subject_id,sub_id     get deployed SUB by subject_id and sub_id
+// get_[SUBJECT]_[SUB]_allocation_status  subject_id,sub_id     get SUB allocation status by subject_id and sub_id
+// get_[SUBJECT]_[SUB]_ids                subject_id,sub_id     get all SUB ids by subject_id
+// get_[SUBJECT]s                                               get all SUBJECTs/configurations
+// get_[SUBJECT]s_actual                                        get all deployed SUBJECTs/configurations
+// get_[SUBJECT]s_with_[SUB]_ids          subject_id            get ids of all SUBJECTs with SUB
+// undeploy_[SUBJECT]                     subject_id            undeploy/delete SUBJECT by subject_id
 
 #[derive(Clone, Debug)]
 pub struct DshApiTenant {
@@ -83,6 +96,18 @@ impl Display for DshApiError {
       DshApiError::NotFound => write!(f, "not found"),
       DshApiError::Unexpected(message) => write!(f, "unexpected error ({})", message),
     }
+  }
+}
+
+impl From<ReqwestError> for DshApiError {
+  fn from(error: ReqwestError) -> Self {
+    DshApiError::Unexpected(error.to_string())
+  }
+}
+
+impl From<Utf8Error> for DshApiError {
+  fn from(error: Utf8Error) -> Self {
+    DshApiError::Unexpected(error.to_string())
   }
 }
 
