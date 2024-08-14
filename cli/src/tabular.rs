@@ -15,7 +15,7 @@ use std::fmt::Display;
 ///
 /// ## Returns
 /// * formatted table as a `Vec<String>`
-pub(crate) fn make_tabular(rows: Vec<Vec<String>>, start: &str, separator: &str, end: &str) -> Vec<String> {
+pub fn make_tabular(rows: Vec<Vec<String>>, start: &str, separator: &str, end: &str) -> Vec<String> {
   let column_widths = column_widths(&rows);
   rows
     .into_iter()
@@ -35,6 +35,12 @@ pub(crate) fn make_tabular(rows: Vec<Vec<String>>, start: &str, separator: &str,
     .collect()
 }
 
+pub fn print_table(rows: Vec<Vec<String>>, start: &str, separator: &str, end: &str) {
+  for row in make_tabular(rows, start, separator, end) {
+    println!("{}", row)
+  }
+}
+
 /// Converts a sequence of sequences into a formatted table
 ///
 /// Converts a `Vec<Vec<T: Display>>` into a nicely formatted table.
@@ -50,7 +56,7 @@ pub(crate) fn make_tabular(rows: Vec<Vec<String>>, start: &str, separator: &str,
 ///
 /// ## Returns
 /// * formatted table as a `Vec<String>`
-pub(crate) fn _make_tabular_display<T>(rows: Vec<Vec<T>>, start: &str, separator: &str, end: &str) -> Vec<String>
+pub fn _make_tabular_display<T>(rows: Vec<Vec<T>>, start: &str, separator: &str, end: &str) -> Vec<String>
 where
   T: Display,
 {
@@ -68,7 +74,7 @@ where
 ///
 /// ## Returns
 /// * formatted table as a `Vec<String>`
-pub(crate) fn _make_tabular_default<T>(rows: Vec<Vec<T>>) -> Vec<String>
+pub fn _make_tabular_default<T>(rows: Vec<Vec<T>>) -> Vec<String>
 where
   T: Display,
 {
@@ -86,7 +92,7 @@ where
 ///
 /// ## Returns
 /// * formatted table as a `Vec<String>`
-pub(crate) fn make_tabular_with_headers<H, T>(headers: Vec<H>, rows: Vec<Vec<T>>) -> Vec<String>
+pub fn make_tabular_with_headers<H, T>(headers: &[H], rows: Vec<Vec<T>>) -> Vec<String>
 where
   H: Display,
   T: Display,
@@ -94,6 +100,12 @@ where
   let mut table = vec![headers.iter().map(|h| h.to_string()).collect()];
   table.append(&mut from_display(rows));
   make_tabular(table, "", "  ", "")
+}
+
+pub fn print_tabular(prefix: &str, table: &Vec<String>) {
+  for line in table {
+    println!("{}{}", prefix, line)
+  }
 }
 
 fn from_display<T>(rows: Vec<Vec<T>>) -> Vec<Vec<String>>

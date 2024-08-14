@@ -1,133 +1,158 @@
-use clap::{builder, Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command};
 
 use trifonius_dsh_api::DshApiClient;
-use trifonius_dsh_api::DshApiError;
 
-use crate::tabular::make_tabular_with_headers;
+use crate::arguments::{actual_flag, status_flag, ACTUAL_FLAG, STATUS_FLAG};
+use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table_row};
+use crate::formatters::application::{application_to_default_vector, default_application_column_labels, default_application_table};
+use crate::subcommands::{
+  list_subcommand, show_subcommand, status_subcommand, target_argument, CommandDescriptor, LIST_SUBCOMMAND, SHOW_SUBCOMMAND, STATUS_SUBCOMMAND, TARGET_ARGUMENT,
+};
+use crate::tabular::{make_tabular, make_tabular_with_headers, print_tabular};
+use crate::{to_command_error, to_command_error_missing_id, to_command_error_with_id, CommandResult};
 
 pub(crate) const APPLICATION_COMMAND: &str = "application";
-const APPLICATION_ARGUMENT: &str = "application-argument";
+pub(crate) const APPLICATIONS_COMMAND: &str = "applications";
 
-const APPLICATION_LIST_SUBCOMMAND: &str = "list";
-const APPLICATION_SHOW_SUBCOMMAND: &str = "show";
-const APPLICATION_STATUS_SUBCOMMAND: &str = "status";
-const APPLICATION_TASKS_SUBCOMMAND: &str = "tasks";
+const WHAT: &str = "application";
+const UPPER_WHAT: &str = "APPLICATION";
+
+const TASKS_SUBCOMMAND: &str = "tasks";
 
 pub(crate) fn application_command() -> Command {
+  let command_descriptor = CommandDescriptor::new(WHAT, UPPER_WHAT);
   Command::new(APPLICATION_COMMAND)
     .alias("a")
     .about("Show application details")
     .long_about("Show application details")
     .arg_required_else_help(true)
     .subcommands(vec![
-      application_list_subcommand(),
-      application_show_subcommand(),
-      application_status_subcommand(),
-      application_tasks_subcommand(),
+      list_subcommand(&command_descriptor, vec![actual_flag(), status_flag()]),
+      show_subcommand(&command_descriptor, vec![]),
+      status_subcommand(&command_descriptor, vec![]),
+      application_tasks_subcommand(&command_descriptor, vec![]),
     ])
 }
 
-pub(crate) async fn run_application_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
+pub(crate) fn applications_command() -> Command {
+  Command::new(APPLICATIONS_COMMAND)
+    .about("List application details")
+    .alias("as")
+    .long_about("List application details")
+    .hide(true)
+    .args(vec![actual_flag(), status_flag()])
+}
+
+pub(crate) async fn run_application_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
   match matches.subcommand() {
-    Some((APPLICATION_LIST_SUBCOMMAND, sub_matches)) => run_application_list_subcommand(sub_matches, dsh_api_client).await,
-    Some((APPLICATION_SHOW_SUBCOMMAND, sub_matches)) => run_application_show_subcommand(sub_matches, dsh_api_client).await,
-    Some((APPLICATION_STATUS_SUBCOMMAND, sub_matches)) => run_application_status_subcommand(sub_matches, dsh_api_client).await,
-    Some((APPLICATION_TASKS_SUBCOMMAND, sub_matches)) => run_application_tasks_subcommand(sub_matches, dsh_api_client).await,
+    Some((LIST_SUBCOMMAND, sub_matches)) => run_application_list_subcommand(sub_matches, dsh_api_client).await,
+    Some((SHOW_SUBCOMMAND, sub_matches)) => run_application_show_subcommand(sub_matches, dsh_api_client).await,
+    Some((STATUS_SUBCOMMAND, sub_matches)) => run_application_status_subcommand(sub_matches, dsh_api_client).await,
+    Some((TASKS_SUBCOMMAND, sub_matches)) => run_application_tasks_subcommand(sub_matches, dsh_api_client).await,
     _ => unreachable!(),
   }
 }
 
-fn application_list_subcommand() -> Command {
-  Command::new(APPLICATION_LIST_SUBCOMMAND)
-    .about("List applications")
-    .after_help("List applications")
-    .after_long_help("List applications.")
-}
-
-fn application_show_subcommand() -> Command {
-  Command::new(APPLICATION_SHOW_SUBCOMMAND)
-    .about("Show application details")
-    .after_help("Show application details")
-    .after_long_help("Show application details.")
-    .args(vec![application_argument()])
-}
-
-fn application_status_subcommand() -> Command {
-  Command::new(APPLICATION_STATUS_SUBCOMMAND)
-    .about("Show application status")
-    .after_help("Show application status")
-    .after_long_help("Show application status.")
-    .args(vec![application_argument()])
-}
-
-fn application_tasks_subcommand() -> Command {
-  Command::new(APPLICATION_TASKS_SUBCOMMAND)
+fn application_tasks_subcommand(command_descriptor: &CommandDescriptor, _arguments: Vec<Arg>) -> Command {
+  Command::new(TASKS_SUBCOMMAND)
     .about("Show application tasks")
     .after_help("Show application tasks")
     .after_long_help("Show application tasks.")
-    .args(vec![application_argument()])
+    .args(vec![target_argument(command_descriptor)])
 }
 
-async fn run_application_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
-  match matches.get_one::<String>(APPLICATION_ARGUMENT) {
+pub(crate) async fn run_applications_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  run_application_list_subcommand(matches, dsh_api_client).await
+}
+
+async fn run_application_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  match matches.get_one::<String>(TARGET_ARGUMENT) {
     Some(application_id) => match dsh_api_client.get_application(application_id).await {
-      Ok(application) => println!("{}", serde_json::to_string_pretty(&application).unwrap()),
-      Err(DshApiError::NotFound) => println!("application id {} does not exist", application_id),
-      Err(error) => println!("unexpected error {}", error),
+      Ok(application) => {
+        let table = default_application_table(application_id, &application);
+        let tabular = make_tabular(table, "", "  ", "");
+        print_tabular("", &tabular);
+        Ok(())
+      }
+      Err(error) => to_command_error_with_id(error, WHAT, application_id),
     },
-    None => println!("missing application id"),
+    None => to_command_error_missing_id(WHAT),
   }
 }
 
-async fn run_application_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
-  match dsh_api_client.get_applications().await {
+async fn run_application_list_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  if matches.get_flag(STATUS_FLAG) {
+    run_application_list_subcommand_status(matches, dsh_api_client).await
+  } else {
+    run_application_list_subcommand_normal(matches, dsh_api_client).await
+  }
+}
+
+async fn run_application_list_subcommand_normal(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  let applications = if matches.get_flag(ACTUAL_FLAG) { dsh_api_client.get_applications_actual().await } else { dsh_api_client.get_applications().await };
+  match applications {
     Ok(applications) => {
       let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
       application_ids.sort();
-
       let mut table: Vec<Vec<String>> = vec![];
       for application_id in application_ids {
-        table.push(vec![application_id.clone(), applications.get(&application_id).unwrap().image.clone()]);
+        let application = applications.get(&application_id).unwrap();
+        table.push(application_to_default_vector(application_id.as_str(), application));
       }
-      for line in make_tabular_with_headers(vec!["application", "image"], table) {
+      for line in make_tabular_with_headers(&default_application_column_labels(), table) {
         println!("{}", line)
       }
+      Ok(())
     }
-    Err(error) => println!("unexpected error {}", error),
+    Err(error) => to_command_error(error),
   }
 }
 
-async fn run_application_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
-  match matches.get_one::<String>(APPLICATION_ARGUMENT) {
-    Some(application_id) => match dsh_api_client.get_application_status(application_id).await {
-      Ok(application_status) => println!("{}", serde_json::to_string_pretty(&application_status).unwrap()),
-      Err(DshApiError::NotFound) => println!("application id {} does not exist", application_id),
-      Err(error) => println!("unexpected error {}", error),
+async fn run_application_list_subcommand_status(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  let applications = if matches.get_flag(ACTUAL_FLAG) { dsh_api_client.get_applications_actual().await } else { dsh_api_client.get_applications().await };
+  match applications {
+    Ok(applications) => {
+      let mut application_ids: Vec<String> = applications.keys().map(|k| k.to_string()).collect();
+      application_ids.sort();
+      let allocation_statusses = futures::future::join_all(application_ids.iter().map(|id| dsh_api_client.get_application_allocation_status(id.as_str()))).await;
+      let mut table = vec![];
+      for (id, allocation_status) in application_ids.iter().zip(allocation_statusses) {
+        let status = allocation_status.unwrap(); // TODO
+        table.push(allocation_status_to_table_row(id, &status));
+      }
+      for line in make_tabular_with_headers(&allocation_status_table_column_labels(WHAT), table) {
+        println!("{}", line)
+      }
+      Ok(())
+    }
+    Err(error) => to_command_error(error),
+  }
+}
+
+async fn run_application_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  match matches.get_one::<String>(TARGET_ARGUMENT) {
+    Some(application_id) => match dsh_api_client.get_application_allocation_status(application_id).await {
+      Ok(application_status) => {
+        println!("{}", serde_json::to_string_pretty(&application_status).unwrap());
+        Ok(())
+      }
+      Err(error) => to_command_error_with_id(error, WHAT, application_id),
     },
-    None => println!("missing application id"),
+    None => to_command_error_missing_id(WHAT),
   }
 }
 
-async fn run_application_tasks_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
-  match matches.get_one::<String>(APPLICATION_ARGUMENT) {
-    Some(application_id) => match dsh_api_client.get_tasks(application_id).await {
+async fn run_application_tasks_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  match matches.get_one::<String>(TARGET_ARGUMENT) {
+    Some(application_id) => match dsh_api_client.get_application_task_ids(application_id).await {
       Ok(application_tasks) => {
         for task_id in application_tasks {
           println!("{}", task_id)
         }
+        Ok(())
       }
-      Err(DshApiError::NotFound) => println!("application id {} does not exist", application_id),
-      Err(error) => println!("unexpected error {}", error),
+      Err(error) => to_command_error_with_id(error, WHAT, application_id),
     },
-    None => println!("missing application id"),
+    None => to_command_error_missing_id(WHAT),
   }
-}
-
-fn application_argument() -> Arg {
-  Arg::new(APPLICATION_ARGUMENT)
-    .action(ArgAction::Append)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("APPLICATION")
-    .help("Application name")
-    .long_help("Application name.")
 }

@@ -5,34 +5,40 @@ use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiClient;
 
+use crate::arguments::status_flag;
 use crate::tabular::make_tabular_with_headers;
+use crate::{to_command_error, CommandResult};
 
 pub(crate) const PROCESSOR_COMMAND: &str = "processor";
 const PROCESSOR_ARGUMENT: &str = "processor-argument";
+
+const _WHAT: &str = "processor";
 
 const PROCESSOR_LIST_SUBCOMMAND: &str = "list";
 
 pub(crate) fn processor_command() -> Command {
   Command::new(PROCESSOR_COMMAND)
     .about("Show Trifonius processor details")
+    .alias("p")
     .long_about("Show Trifonius processor details")
     .arg_required_else_help(true)
-    .subcommands(vec![processor_list_subcommand()])
+    .subcommands(vec![processor_list_subcommand(vec![status_flag()])])
 }
 
-pub(crate) async fn run_processor_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
+fn processor_list_subcommand(_arguments: Vec<Arg>) -> Command {
+  Command::new(PROCESSOR_LIST_SUBCOMMAND)
+    .about("List Trifonius processors")
+    .alias("ps")
+    .after_help("List Trifonius processors")
+    .after_long_help("List Trifonius processors.")
+    .args(vec![processor_argument()])
+}
+
+pub(crate) async fn run_processor_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
   match matches.subcommand() {
     Some((PROCESSOR_LIST_SUBCOMMAND, sub_matches)) => run_processor_list_subcommand(sub_matches, dsh_api_client).await,
     _ => unreachable!(),
   }
-}
-
-fn processor_list_subcommand() -> Command {
-  Command::new(PROCESSOR_LIST_SUBCOMMAND)
-    .about("List Trifonius processors")
-    .after_help("List Trifonius processors")
-    .after_long_help("List Trifonius processors.")
-    .args(vec![processor_argument()])
 }
 
 const TRIFONIUS_PIPELINE_NAME: &str = "TRIFONIUS_PIPELINE_NAME";
@@ -41,7 +47,7 @@ const TRIFONIUS_PROCESSOR_NAME: &str = "TRIFONIUS_PROCESSOR_NAME";
 const TRIFONIUS_PROCESSOR_TYPE: &str = "TRIFONIUS_PROCESSOR_TYPE";
 const TRIFONIUS_SERVICE_NAME: &str = "TRIFONIUS_SERVICE_NAME";
 
-async fn run_processor_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) {
+async fn run_processor_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
   match dsh_api_client.get_applications().await {
     Ok(applications) => {
       let mut table: Vec<Vec<String>> = vec![];
@@ -51,15 +57,28 @@ async fn run_processor_list_subcommand(_matches: &ArgMatches, dsh_api_client: &D
             application_id,
             trifonius_parameters.get(TRIFONIUS_PIPELINE_NAME).cloned().unwrap_or("-".to_string()),
             trifonius_parameters.get(TRIFONIUS_PROCESSOR_NAME).cloned().unwrap_or("-".to_string()),
+            trifonius_parameters.get(TRIFONIUS_PROCESSOR_TYPE).cloned().unwrap_or("-".to_string()),
+            trifonius_parameters.get(TRIFONIUS_PROCESSOR_ID).cloned().unwrap_or("-".to_string()),
+            trifonius_parameters.get(TRIFONIUS_SERVICE_NAME).cloned().unwrap_or("-".to_string()),
+            application.exposed_ports.keys().map(|k| k.to_string()).collect::<Vec<String>>().join(","),
+            application.cpus.to_string(),
+            application.mem.to_string(),
+            application.instances.to_string(),
+            application.user,
+            application.metrics.clone().map(|m| format!("{}:{}", m.path, m.port)).unwrap_or_default(),
           ];
           table.push(parameters);
         }
       }
-      for line in make_tabular_with_headers(vec!["application", "pipeline", "processor"], table) {
+      for line in make_tabular_with_headers(
+        &["application", "pipeline", "processor", "type", "processor id", "service name", "ports", "cpus", "mem", "#", "user", "metrics"],
+        table,
+      ) {
         println!("{}", line)
       }
+      Ok(())
     }
-    Err(error) => println!("unexpected error {}", error),
+    Err(error) => to_command_error(error),
   }
 }
 
