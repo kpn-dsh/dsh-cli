@@ -20,6 +20,7 @@ label = "Sink topics"
 description = "Kafka topic that the consent filter dsh service will produce to."
 allowed-resource-types = ["dsh-topic"]
 
+
 [[deploy.parameters]]
 type = "selection"
 id = "compliancy-agent"
@@ -56,7 +57,6 @@ description = "Mitigation strategy to be applied to records for customers that g
 options = ["anonymize", "block", "clip"]
 
 [dsh-service]
-
 image = 'registry.cp.kpn-dsh.com/${TENANT}/greenbox-consent-filter:0.2.7-SNAPSHOT'
 needs-token = true
 single-instance = false
