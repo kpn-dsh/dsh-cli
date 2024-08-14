@@ -23,6 +23,8 @@ pub struct ProcessorConfig {
   #[serde(rename = "outbound-junctions")]
   pub outbound_junctions: Option<HashMap<JunctionId, JunctionConfig>>,
   pub deploy: Option<DeployConfig>,
+  #[serde(rename = "health-check")]
+  pub health_check: Option<HealthCheck>,
   #[serde(rename = "dsh-app")]
   pub dsh_app_specific_config: Option<DshAppSpecificConfig>,
   #[serde(rename = "dsh-service")]
@@ -65,6 +67,29 @@ pub struct JunctionConfig {
 #[derive(Clone, Debug, Deserialize)]
 pub struct DeployConfig {
   pub parameters: Option<Vec<DeploymentParameterConfig>>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct HealthCheck {
+  pub ping: Option<HealthCheckPing>,
+  #[serde(rename = "http-response-status")]
+  pub http_response_status: Option<HealthCheckHttpResponseStatus>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct HealthCheckPing {
+  pub host: VariableConfig,
+  #[serde(rename = "timeout-millis")]
+  pub timeout_millis: Option<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct HealthCheckHttpResponseStatus {
+  pub endpoint: VariableConfig,
+  #[serde(rename = "accepted-response-status")]
+  pub accepted_response_status: Option<Vec<u32>>,
+  #[serde(rename = "timeout-millis")]
+  pub timeout_millis: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]

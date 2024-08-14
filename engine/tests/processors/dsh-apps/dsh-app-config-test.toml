@@ -41,6 +41,10 @@ parameters = [
     { type = "selection", id = "sel4", label = "S4", description = "DS4", options = ["s11"], initial-value = "s11", optional = true, default = "s11" }
 ]
 
+[health-check]
+ping = { host = "127.0.0.1", timeout-millis = 3000 }
+http-response-status = { endpoint = "www.kpn.com", accepted-response-status = [200, 202, 204], timeout-millis = 3000 }
+
 [dsh-service]
 
 image = "test-image:0.1.2-SNAPSHOT"

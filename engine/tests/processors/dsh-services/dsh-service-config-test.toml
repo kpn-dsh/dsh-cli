@@ -42,6 +42,10 @@ parameters = [
     { type = "selection", id = "sel4", label = "S4", description = "DS4", options = ["s11"], initial-value = "s11", optional = true, default = "s11" }
 ]
 
+[health-check]
+ping = { host = { type = "value", value = "127.0.0.1" }, timeout-millis = 3000 }
+http-response-status = { endpoint = { type = "value", value = "www.kpn.com" }, accepted-response-status = [200, 202, 204], timeout-millis = 3000 }
+
 [dsh-service]
 
 image = "test-image:0.1.2-SNAPSHOT"
@@ -74,7 +78,6 @@ injections = [{ env = "SECRET" }]
 "/volume_path" = "{ volume('correct_volume_name') }"
 
 [dsh-service.environment-variables]
-
 DSH_SERVICE_ENV_VAR1 = { type = "deployment-parameter", id = "bool1" }
 DSH_SERVICE_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
 DSH_SERVICE_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
@@ -88,23 +91,21 @@ description = "Profile 1"
 cpus = 1
 instances = 1
 mem = 1
-[dsh-service.profiles.environment-variables]
-PROFILE1_ENV_VAR1 = { type = "deployment-parameter", id = "free1" }
-PROFILE1_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
-PROFILE1_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
-PROFILE1_ENV_VAR4 = { type = "template", value = "value14${TENANT}" }
-PROFILE1_ENV_VAR5 = { type = "value", value = "value15" }
+environment-variables.PROFILE1_ENV_VAR1 = { type = "deployment-parameter", id = "free1" }
+environment-variables.PROFILE1_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
+environment-variables.PROFILE1_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
+environment-variables.PROFILE1_ENV_VAR4 = { type = "template", value = "value14${TENANT}" }
+environment-variables.PROFILE1_ENV_VAR5 = { type = "value", value = "value15" }
 
 [[dsh-service.profiles]]
-id = "profile-1"
-label = "Profile 1"
+id = "profile-2"
+label = "Profile 2"
 description = "Profile 2"
 cpus = 2
 instances = 2
 mem = 2
-[dsh-service.profiles.profile-2.environment-variables]
-PROFILE2_ENV_VAR1 = { type = "deployment-parameter", id = "sel1" }
-PROFILE2_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
-PROFILE2_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
-PROFILE2_ENV_VAR4 = { type = "template", value = "value24${TENANT}" }
-PROFILE2_ENV_VAR5 = { type = "value", value = "value25" }
+environment-variables.PROFILE2_ENV_VAR1 = { type = "deployment-parameter", id = "sel1" }
+environment-variables.PROFILE2_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
+environment-variables.PROFILE2_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
+environment-variables.PROFILE2_ENV_VAR4 = { type = "template", value = "value24${TENANT}" }
+environment-variables.PROFILE2_ENV_VAR5 = { type = "value", value = "value25" }
