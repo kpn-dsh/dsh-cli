@@ -1,4 +1,8 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 use dsh_sdk::dsh::datastream::Stream;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineName;
@@ -17,11 +21,8 @@ pub(crate) struct DshTopicRealization {
 
 impl DshTopicRealization {
   pub(crate) fn create(stream: &Stream, engine_target: &EngineTarget) -> Result<Self, String> {
-    // TODO Check proper topic name
-    let topic_name = match stream.write_pattern() {
-      Ok(write_pattern) => write_pattern.to_string(),
-      Err(_) => stream.name().to_string(),
-    };
+    let resource_id = resource_id_from_stream_name(stream.name())?;
+    let topic_name = topic_name_from_stream(stream);
     let topic_type = DshTopicType::try_from_topic_name(topic_name.as_str())?;
     let gateway_topic_name = match topic_type {
       DshTopicType::Internal => None,
@@ -30,7 +31,7 @@ impl DshTopicRealization {
     };
     let resource_descriptor = ResourceDescriptor {
       resource_type: ResourceType::DshTopic,
-      id: stream.name().replace('.', "-"),
+      id: resource_id.to_string(),
       label: stream.name().to_string(),
       description: "DSH Kafka topic".to_string(),
       version: None,
@@ -79,6 +80,48 @@ impl DshTopicRealization {
   }
 }
 
+const MAX_RESOURCE_ID_LENGTH: usize = 50;
+lazy_static! {
+  static ref STREAM_NAME_REGEX: Regex = Regex::new("^[a-zA-Z0-9\\.\\-_]+$").unwrap();
+}
+
+fn resource_id_from_stream_name(stream_name: &str) -> Result<ResourceId, String> {
+  if STREAM_NAME_REGEX.is_match(stream_name) {
+    let parts: Vec<&str> = stream_name.split('.').collect();
+    let id = if parts.len() == 2 {
+      format!("{}-{}", parts.first().unwrap().replace('_', "-"), parts.get(1).unwrap().replace('_', "-"))
+    } else if parts.len() == 3 {
+      format!(
+        "{}-{}-{}",
+        parts.first().unwrap().replace('_', "-"),
+        parts.get(2).unwrap().replace('_', "-"),
+        parts.get(1).unwrap().replace('_', "-")
+      )
+    } else {
+      return Err(format!("could not convert stream name {} to resource id", stream_name));
+    };
+    let id = if id.len() > MAX_RESOURCE_ID_LENGTH {
+      let mut hasher = DefaultHasher::new();
+      stream_name.hash(&mut hasher);
+      let hash = hasher.finish();
+      format!("{:.33}-{:016x}", id, hash)
+    } else {
+      id
+    };
+    ResourceId::try_from(id)
+  } else {
+    Err(format!("stream name {} contains invalid characters", stream_name))
+  }
+}
+
+fn topic_name_from_stream(stream: &Stream) -> String {
+  // TODO Check proper topic name
+  match stream.write_pattern() {
+    Ok(write_pattern) => write_pattern.to_string(),
+    Err(_) => stream.name().to_string(),
+  }
+}
+
 impl<'a> ResourceRealization<'a> for DshTopicRealization {
   fn descriptor(&self) -> ResourceDescriptor {
     self.resource_descriptor.clone()
@@ -111,4 +154,38 @@ impl<'a> ResourceRealization<'a> for DshTopicRealization {
   fn resource_type(&self) -> ResourceType {
     ResourceType::DshTopic
   }
+}
+
+#[test]
+fn test() {
+  println!(
+    "{}",
+    resource_id_from_stream_name("internal.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz-100-2.tenant")
+      .unwrap()
+      .to_string()
+  );
+  assert_eq!(
+    resource_id_from_stream_name("internal.abcdefghijklmnopqrstuvwxyzabcd-49.tenant")
+      .unwrap()
+      .to_string(),
+    "internal-tenant-abcdefghijklmnopqrstuvwxyzabcd-49".to_string()
+  );
+  assert_eq!(
+    resource_id_from_stream_name("internal.abcdefghijklmnopqrstuvwxyzabcde-50.tenant")
+      .unwrap()
+      .to_string(),
+    "internal-tenant-abcdefghijklmnopqrstuvwxyzabcde-50".to_string()
+  );
+  assert!(resource_id_from_stream_name("internal.abcdefghijklmnopqrstuvwxyzabcdef-51.tenant")
+    .unwrap()
+    .to_string()
+    .starts_with("internal-tenant-abcdefghijklmnopq-"));
+  assert_ne!(
+    resource_id_from_stream_name("internal.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz-100-1.tenant")
+      .unwrap()
+      .to_string(),
+    resource_id_from_stream_name("internal.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz-100-2.tenant")
+      .unwrap()
+      .to_string()
+  );
 }
