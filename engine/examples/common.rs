@@ -7,9 +7,9 @@ use trifonius_engine::processor::processor_registry::{ProcessorRegistry, DEFAULT
 use trifonius_engine::processor::{ProcessorId, ProcessorName, ProcessorType};
 
 lazy_static! {
-  static ref PIPELINE_NAME: PipelineName = PipelineName::new("consentfilter");
+  static ref PIPELINE_NAME: PipelineName = PipelineName::new("pipeline");
   static ref PROCESSOR_ID: ProcessorId = ProcessorId::new("greenbox-consent-filter");
-  static ref PROCESSOR_NAME: ProcessorName = ProcessorName::new("test002");
+  static ref PROCESSOR_NAME: ProcessorName = ProcessorName::new("consentfilter002");
 }
 
 #[allow(dead_code)]
