@@ -17,7 +17,7 @@ async fn main() -> Result<(), String> {
     println!("{}", bucket_id);
   }
 
-  let bucket: BucketStatus = client.get_bucket_status(bucket_id).await?;
+  let bucket: BucketStatus = client.get_bucket(bucket_id).await?;
   println!("get_bucket_status({})\n{}", bucket_id, serde_json::to_string_pretty(&bucket).unwrap());
 
   let bucket_status: AllocationStatus = client.get_bucket_allocation_status(bucket_id).await?;

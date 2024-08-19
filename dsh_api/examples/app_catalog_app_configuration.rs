@@ -16,7 +16,7 @@ async fn main() -> Result<(), String> {
   let configuration: AppCatalogAppConfiguration = client.get_app_catalog_app_configuration(app_catalog_id).await?;
   println!("{}", serde_json::to_string_pretty(&configuration).unwrap());
 
-  let status: AllocationStatus = client.get_app_catalog_app_status(app_catalog_id).await?;
+  let status: AllocationStatus = client.get_app_catalog_app_allocation_status(app_catalog_id).await?;
   println!("{}", serde_json::to_string_pretty(&status).unwrap());
 
   Ok(())

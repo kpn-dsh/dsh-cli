@@ -155,7 +155,7 @@ impl DshApiClient<'_> {
       .map(|result| result.1)
   }
 
-  /// # Return list of secret names
+  /// # Return sorted list of secret names
   ///
   /// `GET /allocation/{tenant}/secret`
   ///
@@ -163,10 +163,12 @@ impl DshApiClient<'_> {
   /// * `Ok<Vec<String>>` - list of secret names
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
   pub async fn get_secret_ids(&self) -> DshApiResult<Vec<String>> {
-    self
+    let mut secret_ids: Vec<String> = self
       .process(self.generated_client.secret_get_by_tenant_secret(self.tenant_name(), self.token()).await)
       .map(|result| result.1)
-      .map(|secret_ids| secret_ids.iter().map(|secret_id| secret_id.to_string()).collect())
+      .map(|secret_ids| secret_ids.iter().map(|secret_id| secret_id.to_string()).collect())?;
+    secret_ids.sort();
+    Ok(secret_ids)
   }
 
   /// # Update secret value

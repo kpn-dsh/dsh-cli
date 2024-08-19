@@ -28,7 +28,11 @@ mod generated {
   include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 }
 
+// Configuration is what was configured
+// Actual is what is actual deployed
+
 // Naming conventions
+// create_[SUBJECT]                       (subject_id),SUBJECT  create SUBJECT
 // deploy_[SUBJECT]                       (subject_id),SUBJECT  deploy/create SUBJECT
 // get_[SUBJECT]                          subject_id            get SUBJECT/configuration by subject_id
 // get_[SUBJECT]_actual                   subject_id            get deployed SUBJECT/configuration by subject_id

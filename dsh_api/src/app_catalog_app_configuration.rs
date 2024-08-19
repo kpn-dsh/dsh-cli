@@ -4,8 +4,8 @@
 //!
 //! * [`delete_app_catalog_app(app_catalog_id) -> ()`](DshApiClient::delete_app_catalog_app)
 //! * [`deploy_app_catalog_app(app_catalog_id, body) -> ()`](DshApiClient::deploy_app_catalog_app)
+//! * [`get_app_catalog_app_allocation_status(app_catalog_id) -> AllocationStatus`](DshApiClient::get_app_catalog_app_allocation_status)
 //! * [`get_app_catalog_app_configuration(app_catalog_id) -> AppCatalogAppConfiguration`](DshApiClient::get_app_catalog_app_configuration)
-//! * [`get_app_catalog_app_status(app_catalog_id) -> AllocationStatus`](DshApiClient::get_app_catalog_app_status)
 
 use crate::types::{AllocationStatus, AppCatalogAppConfiguration};
 #[allow(unused_imports)]
@@ -18,8 +18,8 @@ use crate::{DshApiClient, DshApiResult};
 ///
 /// * [`delete_app_catalog_app(app_catalog_id) -> ()`](DshApiClient::delete_app_catalog_app)
 /// * [`deploy_app_catalog_app(app_catalog_id, body) -> ()`](DshApiClient::deploy_app_catalog_app)
+/// * [`get_app_catalog_app_allocation_status(app_catalog_id) -> AllocationStatus`](DshApiClient::get_app_catalog_app_allocation_status)
 /// * [`get_app_catalog_app_configuration(app_catalog_id) -> AppCatalogAppConfiguration`](DshApiClient::get_app_catalog_app_configuration)
-/// * [`get_app_catalog_app_status(app_catalog_id) -> AllocationStatus`](DshApiClient::get_app_catalog_app_status)
 impl DshApiClient<'_> {
   /// # Delete an App Catalog App
   ///
@@ -66,6 +66,27 @@ impl DshApiClient<'_> {
       .map(|result| result.1)
   }
 
+  /// # Get an App Catalog App status
+  ///
+  /// `GET /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/status`
+  ///
+  /// ## Parameters
+  /// * `app_catalog_id` - id of the requested app
+  ///
+  /// ## Returns
+  /// * `Ok<`[`AllocationStatus`]`>` - app status
+  /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
+  pub async fn get_app_catalog_app_allocation_status(&self, app_catalog_id: &str) -> DshApiResult<AllocationStatus> {
+    self
+      .process(
+        self
+          .generated_client
+          .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_status(self.tenant_name(), app_catalog_id, self.token())
+          .await,
+      )
+      .map(|result| result.1)
+  }
+
   /// # Get an App Catalog App configuration
   ///
   /// `GET /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/configuration`
@@ -82,27 +103,6 @@ impl DshApiClient<'_> {
         self
           .generated_client
           .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_configuration(self.tenant_name(), app_catalog_id, self.token())
-          .await,
-      )
-      .map(|result| result.1)
-  }
-
-  /// # Get an App Catalog App status
-  ///
-  /// `GET /appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/status`
-  ///
-  /// ## Parameters
-  /// * `app_catalog_id` - id of the requested app
-  ///
-  /// ## Returns
-  /// * `Ok<`[`AllocationStatus`]`>` - app status
-  /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_app_catalog_app_status(&self, app_catalog_id: &str) -> DshApiResult<AllocationStatus> {
-    self
-      .process(
-        self
-          .generated_client
-          .app_catalog_app_configuration_get_appcatalog_by_tenant_appcatalogapp_by_appcatalogappid_status(self.tenant_name(), app_catalog_id, self.token())
           .await,
       )
       .map(|result| result.1)

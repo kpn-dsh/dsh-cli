@@ -14,7 +14,7 @@ async fn main() -> Result<(), String> {
   // undeploy_application
 
   // Show all applications
-  let applications: HashMap<String, Application> = client.get_applications().await?;
+  let applications: HashMap<String, Application> = client.get_application_configurations().await?;
   println!(
     "get_applications() -> {} entries\n{}",
     applications.len(),
@@ -22,7 +22,7 @@ async fn main() -> Result<(), String> {
   );
 
   // Show all deployed applications
-  let applications_actual: HashMap<String, Application> = client.get_applications_actual().await?;
+  let applications_actual: HashMap<String, Application> = client.get_application_actual_configurations().await?;
   println!(
     "get_applications_actual() -> {} entries\n{}",
     applications_actual.len(),
@@ -30,11 +30,11 @@ async fn main() -> Result<(), String> {
   );
 
   // Show application
-  let application: Application = client.get_application(APPLICATION_ID).await?;
+  let application: Application = client.get_application_configuration(APPLICATION_ID).await?;
   println!("get_application({})\n{}", APPLICATION_ID, serde_json::to_string_pretty(&application).unwrap());
 
   // Show deployed application
-  let application: Application = client.get_application_actual(APPLICATION_ID).await?;
+  let application: Application = client.get_application_actual_configuration(APPLICATION_ID).await?;
   println!(
     "get_application_actual({})\n{}",
     APPLICATION_ID,
@@ -50,7 +50,7 @@ async fn main() -> Result<(), String> {
   );
 
   // List application ids with tasks
-  let mut applications_with_tasks: Vec<String> = client.get_applications_with_tasks_ids().await?;
+  let mut applications_with_tasks: Vec<String> = client.get_application_ids_with_derived_tasks().await?;
   applications_with_tasks.sort();
   println!("get_applications_with_tasks_ids() -> {}", applications_with_tasks.len());
   for application_id in applications_with_tasks {
@@ -58,7 +58,7 @@ async fn main() -> Result<(), String> {
   }
 
   // Show application task
-  let task_status: TaskStatus = client.get_application_task(APPLICATION_ID, TASK_ID).await?;
+  let task_status: TaskStatus = client.get_application_task_status(APPLICATION_ID, TASK_ID).await?;
   println!(
     "get_application_task({}, {})\n{}",
     APPLICATION_ID,
@@ -67,7 +67,7 @@ async fn main() -> Result<(), String> {
   );
 
   // Show deployed application task
-  let task: Task = client.get_application_task_actual(APPLICATION_ID, TASK_ID).await?;
+  let task: Task = client.get_application_task_state(APPLICATION_ID, TASK_ID).await?;
   println!(
     "get_application_task_actual({}, {})\n{}",
     APPLICATION_ID,
@@ -85,7 +85,7 @@ async fn main() -> Result<(), String> {
   );
 
   // List application task ids
-  let mut application_task_ids: Vec<String> = client.get_application_task_ids(APPLICATION_ID).await?;
+  let mut application_task_ids: Vec<String> = client.get_application_derived_task_ids(APPLICATION_ID).await?;
   application_task_ids.sort();
   println!("get_application_task_ids({}) -> {}", APPLICATION_ID, application_task_ids.len());
   for application_task_id in application_task_ids {
