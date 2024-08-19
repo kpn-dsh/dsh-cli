@@ -1,158 +1,189 @@
-use clap::{Arg, ArgMatches, Command};
+use std::collections::HashMap;
 
-use trifonius_dsh_api::DshApiClient;
+use async_trait::async_trait;
+use clap::ArgMatches;
+use lazy_static::lazy_static;
 
-use crate::arguments::{actual_flag, status_flag, ACTUAL_FLAG, STATUS_FLAG};
-use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table_row};
+use trifonius_dsh_api::types::Application;
+use trifonius_dsh_api::{DshApiClient, DshApiResult};
+
+use crate::arguments::Flag;
+use crate::command::SubjectCommand;
+use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table, allocation_status_to_table_row};
 use crate::formatters::application::{application_to_default_vector, default_application_column_labels, default_application_table};
-use crate::subcommands::{
-  list_subcommand, show_subcommand, status_subcommand, target_argument, CommandDescriptor, LIST_SUBCOMMAND, SHOW_SUBCOMMAND, STATUS_SUBCOMMAND, TARGET_ARGUMENT,
-};
-use crate::tabular::{make_tabular, make_tabular_with_headers, print_tabular};
-use crate::{to_command_error, to_command_error_missing_id, to_command_error_with_id, CommandResult};
+use crate::tabular::{make_tabular, make_tabular_with_headers, print_table, print_tabular};
+use crate::CommandResult;
 
-pub(crate) const APPLICATION_COMMAND: &str = "application";
-pub(crate) const APPLICATIONS_COMMAND: &str = "applications";
+pub(crate) struct ApplicationCommand {}
 
-const WHAT: &str = "application";
-const UPPER_WHAT: &str = "APPLICATION";
-
-const TASKS_SUBCOMMAND: &str = "tasks";
-
-pub(crate) fn application_command() -> Command {
-  let command_descriptor = CommandDescriptor::new(WHAT, UPPER_WHAT);
-  Command::new(APPLICATION_COMMAND)
-    .alias("a")
-    .about("Show application details")
-    .long_about("Show application details")
-    .arg_required_else_help(true)
-    .subcommands(vec![
-      list_subcommand(&command_descriptor, vec![actual_flag(), status_flag()]),
-      show_subcommand(&command_descriptor, vec![]),
-      status_subcommand(&command_descriptor, vec![]),
-      application_tasks_subcommand(&command_descriptor, vec![]),
-    ])
+lazy_static! {
+  pub static ref APPLICATION_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(ApplicationCommand {});
 }
 
-pub(crate) fn applications_command() -> Command {
-  Command::new(APPLICATIONS_COMMAND)
-    .about("List application details")
-    .alias("as")
-    .long_about("List application details")
-    .hide(true)
-    .args(vec![actual_flag(), status_flag()])
-}
-
-pub(crate) async fn run_application_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.subcommand() {
-    Some((LIST_SUBCOMMAND, sub_matches)) => run_application_list_subcommand(sub_matches, dsh_api_client).await,
-    Some((SHOW_SUBCOMMAND, sub_matches)) => run_application_show_subcommand(sub_matches, dsh_api_client).await,
-    Some((STATUS_SUBCOMMAND, sub_matches)) => run_application_status_subcommand(sub_matches, dsh_api_client).await,
-    Some((TASKS_SUBCOMMAND, sub_matches)) => run_application_tasks_subcommand(sub_matches, dsh_api_client).await,
-    _ => unreachable!(),
+#[async_trait]
+impl SubjectCommand for ApplicationCommand {
+  fn subject(&self) -> &'static str {
+    "application"
   }
-}
 
-fn application_tasks_subcommand(command_descriptor: &CommandDescriptor, _arguments: Vec<Arg>) -> Command {
-  Command::new(TASKS_SUBCOMMAND)
-    .about("Show application tasks")
-    .after_help("Show application tasks")
-    .after_long_help("Show application tasks.")
-    .args(vec![target_argument(command_descriptor)])
-}
+  fn subject_first_upper(&self) -> &'static str {
+    "Application"
+  }
 
-pub(crate) async fn run_applications_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  run_application_list_subcommand(matches, dsh_api_client).await
-}
+  fn about(&self) -> String {
+    "Show application details".to_string()
+  }
 
-async fn run_application_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(application_id) => match dsh_api_client.get_application(application_id).await {
+  fn long_about(&self) -> String {
+    "Show application details.".to_string()
+  }
+
+  fn alias(&self) -> Option<&str> {
+    Some("a")
+  }
+
+  fn list_flags(&self) -> &'static [Flag] {
+    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids, Flag::Tasks]
+  }
+
+  fn show_flags(&self) -> &'static [Flag] {
+    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Tasks]
+  }
+
+  async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    print_applications(&dsh_api_client.get_application_actual_configurations().await?)
+  }
+
+  async fn list_allocation_status(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application_ids = dsh_api_client.get_application_ids().await?;
+    let allocation_statuses = futures::future::join_all(
+      application_ids
+        .iter()
+        .map(|application_id| dsh_api_client.get_application_allocation_status(application_id.as_str())),
+    )
+    .await;
+    let mut table = vec![];
+    for (id, allocation_status) in application_ids.iter().zip(allocation_statuses) {
+      table.push(allocation_status_to_table_row(id, allocation_status.ok().as_ref()));
+    }
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(self.subject()), table) {
+      println!("{}", line)
+    }
+    Ok(())
+  }
+
+  async fn list_configuration(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    print_applications(&dsh_api_client.get_application_configurations().await?)
+  }
+
+  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.list_ids(matches, dsh_api_client).await
+  }
+
+  async fn list_ids(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application_ids = dsh_api_client.get_application_ids().await?;
+    for application_id in application_ids {
+      println!("{}", application_id)
+    }
+    Ok(())
+  }
+
+  async fn list_tasks(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application_ids = dsh_api_client.get_application_ids_with_derived_tasks().await?;
+    let tasks: Vec<DshApiResult<Vec<String>>> = futures::future::join_all(
+      application_ids
+        .iter()
+        .map(|application_id| dsh_api_client.get_application_derived_task_ids(application_id.as_str())),
+    )
+    .await;
+    let mut table = vec![];
+    for (application_id, tasks) in application_ids.iter().zip(tasks) {
+      if let Ok(mut ts) = tasks {
+        if !ts.is_empty() {
+          ts.sort();
+          let vector = vec![
+            application_id.to_string(),
+            if ts.len() <= 4 {
+              ts.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")
+            } else {
+              format!(
+                "{}, plus {} more",
+                ts.iter().take(4).map(|t| t.to_string()).collect::<Vec<_>>().join(", "),
+                ts.len() - 4,
+              )
+            },
+          ];
+
+          table.push(vector);
+        }
+      }
+    }
+    for line in make_tabular_with_headers(&["application", "tasks"], table) {
+      println!("{}", line)
+    }
+    Ok(())
+  }
+
+  async fn show_all(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    match dsh_api_client.get_application_actual_configuration(target_id).await {
       Ok(application) => {
-        let table = default_application_table(application_id, &application);
+        let table = default_application_table(target_id, &application);
         let tabular = make_tabular(table, "", "  ", "");
         print_tabular("", &tabular);
         Ok(())
       }
-      Err(error) => to_command_error_with_id(error, WHAT, application_id),
-    },
-    None => to_command_error_missing_id(WHAT),
-  }
-}
-
-async fn run_application_list_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  if matches.get_flag(STATUS_FLAG) {
-    run_application_list_subcommand_status(matches, dsh_api_client).await
-  } else {
-    run_application_list_subcommand_normal(matches, dsh_api_client).await
-  }
-}
-
-async fn run_application_list_subcommand_normal(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  let applications = if matches.get_flag(ACTUAL_FLAG) { dsh_api_client.get_applications_actual().await } else { dsh_api_client.get_applications().await };
-  match applications {
-    Ok(applications) => {
-      let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
-      application_ids.sort();
-      let mut table: Vec<Vec<String>> = vec![];
-      for application_id in application_ids {
-        let application = applications.get(&application_id).unwrap();
-        table.push(application_to_default_vector(application_id.as_str(), application));
-      }
-      for line in make_tabular_with_headers(&default_application_column_labels(), table) {
-        println!("{}", line)
-      }
-      Ok(())
+      Err(error) => self.to_command_error_with_id(error, target_id),
     }
-    Err(error) => to_command_error(error),
   }
-}
 
-async fn run_application_list_subcommand_status(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  let applications = if matches.get_flag(ACTUAL_FLAG) { dsh_api_client.get_applications_actual().await } else { dsh_api_client.get_applications().await };
-  match applications {
-    Ok(applications) => {
-      let mut application_ids: Vec<String> = applications.keys().map(|k| k.to_string()).collect();
-      application_ids.sort();
-      let allocation_statusses = futures::future::join_all(application_ids.iter().map(|id| dsh_api_client.get_application_allocation_status(id.as_str()))).await;
-      let mut table = vec![];
-      for (id, allocation_status) in application_ids.iter().zip(allocation_statusses) {
-        let status = allocation_status.unwrap(); // TODO
-        table.push(allocation_status_to_table_row(id, &status));
-      }
-      for line in make_tabular_with_headers(&allocation_status_table_column_labels(WHAT), table) {
-        println!("{}", line)
-      }
-      Ok(())
+  async fn show_allocation_status(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let allocation_status = dsh_api_client.get_application_allocation_status(target_id).await?;
+    let table = allocation_status_to_table(self.subject(), target_id, &allocation_status);
+    print_table(table, "", "  ", "");
+    Ok(())
+  }
+
+  async fn show_configuration(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application = dsh_api_client.get_application_configuration(target_id).await?;
+    let table = default_application_table(target_id, &application);
+    let tabular = make_tabular(table, "", "  ", "");
+    print_tabular("", &tabular);
+    Ok(())
+  }
+
+  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.show_configuration(target_id, matches, dsh_api_client).await
+  }
+
+  async fn show_tasks(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let task_ids = dsh_api_client.get_application_derived_task_ids(target_id).await?;
+    let allocation_statuses = futures::future::join_all(
+      task_ids
+        .iter()
+        .map(|task_id| dsh_api_client.get_application_task_allocation_status(target_id, task_id.as_str())),
+    )
+    .await;
+    let mut table = vec![];
+    for (task_id, allocation_status) in task_ids.iter().zip(allocation_statuses) {
+      table.push(allocation_status_to_table_row(task_id, allocation_status.ok().as_ref()));
     }
-    Err(error) => to_command_error(error),
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(self.subject()), table) {
+      println!("{}", line)
+    }
+    Ok(())
   }
 }
 
-async fn run_application_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(application_id) => match dsh_api_client.get_application_allocation_status(application_id).await {
-      Ok(application_status) => {
-        println!("{}", serde_json::to_string_pretty(&application_status).unwrap());
-        Ok(())
-      }
-      Err(error) => to_command_error_with_id(error, WHAT, application_id),
-    },
-    None => to_command_error_missing_id(WHAT),
+fn print_applications(applications: &HashMap<String, Application>) -> CommandResult {
+  let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+  application_ids.sort();
+  let mut table: Vec<Vec<String>> = vec![];
+  for application_id in application_ids {
+    let application = applications.get(&application_id).unwrap();
+    table.push(application_to_default_vector(application_id.as_str(), application));
   }
-}
-
-async fn run_application_tasks_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(application_id) => match dsh_api_client.get_application_task_ids(application_id).await {
-      Ok(application_tasks) => {
-        for task_id in application_tasks {
-          println!("{}", task_id)
-        }
-        Ok(())
-      }
-      Err(error) => to_command_error_with_id(error, WHAT, application_id),
-    },
-    None => to_command_error_missing_id(WHAT),
+  for line in make_tabular_with_headers(&default_application_column_labels(), table) {
+    println!("{}", line)
   }
+  Ok(())
 }

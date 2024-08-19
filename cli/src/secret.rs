@@ -1,150 +1,134 @@
 use std::collections::HashMap;
 
-use clap::{ArgMatches, Command};
+use async_trait::async_trait;
+use clap::ArgMatches;
+use lazy_static::lazy_static;
 
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::{actual_flag, status_flag, usage_flag, STATUS_FLAG};
-use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table_row};
-use crate::subcommands::{
-  list_subcommand, show_subcommand, status_subcommand, usage_subcommand, CommandDescriptor, LIST_SUBCOMMAND, SHOW_SUBCOMMAND, STATUS_SUBCOMMAND, TARGET_ARGUMENT, USAGE_SUBCOMMAND,
-};
-use crate::tabular::make_tabular_with_headers;
-use crate::{to_command_error, to_command_error_missing_id, to_command_error_with_id, CommandResult};
+use crate::arguments::Flag;
+use crate::command::SubjectCommand;
+use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table, allocation_status_to_table_row};
+use crate::tabular::{make_tabular_with_headers, print_table};
+use crate::CommandResult;
 
-pub(crate) const SECRET_COMMAND: &str = "secret";
-pub(crate) const SECRETS_COMMAND: &str = "secrets";
+pub(crate) struct SecretCommand {}
 
-const WHAT: &str = "secret";
-const UPPER_WHAT: &str = "SECRET";
-
-pub(crate) fn secret_command() -> Command {
-  let command_descriptor = CommandDescriptor::new(WHAT, UPPER_WHAT);
-  Command::new(SECRET_COMMAND)
-    .about("Show secret details")
-    .alias("s")
-    .long_about("Show secret details")
-    .arg_required_else_help(true)
-    .subcommands(vec![
-      list_subcommand(&command_descriptor, vec![actual_flag(), status_flag(), usage_flag(WHAT)]),
-      show_subcommand(&command_descriptor, vec![]),
-      status_subcommand(&command_descriptor, vec![]),
-      usage_subcommand(&command_descriptor, vec![]),
-    ])
+lazy_static! {
+  pub static ref SECRET_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(SecretCommand {});
 }
 
-pub(crate) fn secrets_command() -> Command {
-  Command::new(SECRETS_COMMAND)
-    .about("List secrets")
-    .alias("ss")
-    .long_about("List secrets")
-    .hide(true)
-    .args(vec![actual_flag(), status_flag()])
-}
-
-pub(crate) async fn run_secret_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.subcommand() {
-    Some((LIST_SUBCOMMAND, sub_matches)) => run_secret_list_subcommand(sub_matches, dsh_api_client).await,
-    Some((SHOW_SUBCOMMAND, sub_matches)) => run_secret_show_subcommand(sub_matches, dsh_api_client).await,
-    Some((STATUS_SUBCOMMAND, sub_matches)) => run_secret_status_subcommand(sub_matches, dsh_api_client).await,
-    Some((USAGE_SUBCOMMAND, sub_matches)) => run_secret_usage_subcommand(sub_matches, dsh_api_client).await,
-    _ => unreachable!(),
+#[async_trait]
+impl SubjectCommand for SecretCommand {
+  fn subject(&self) -> &'static str {
+    "secret"
   }
-}
 
-pub(crate) async fn run_secrets_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  run_secret_list_subcommand(matches, dsh_api_client).await
-}
-
-async fn run_secret_list_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  if matches.get_flag(STATUS_FLAG) {
-    run_secret_list_subcommand_status(matches, dsh_api_client).await
-  } else {
-    run_secret_list_subcommand_normal(matches, dsh_api_client).await
+  fn subject_first_upper(&self) -> &'static str {
+    "Secret"
   }
-}
 
-async fn run_secret_list_subcommand_normal(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match dsh_api_client.get_secret_ids().await {
-    Ok(mut secrets) => {
-      secrets.sort();
-      for secret in secrets {
-        println!("{}", secret)
-      }
-      Ok(())
+  fn about(&self) -> String {
+    "Show secret details".to_string()
+  }
+
+  fn long_about(&self) -> String {
+    "Show secret details".to_string()
+  }
+
+  fn alias(&self) -> Option<&str> {
+    Some("s")
+  }
+
+  fn list_flags(&self) -> &'static [Flag] {
+    &[Flag::All, Flag::AllocationStatus, Flag::Ids, Flag::Usage]
+  }
+
+  fn show_flags(&self) -> &'static [Flag] {
+    &[Flag::AllocationStatus, Flag::Usage, Flag::Value]
+  }
+
+  async fn list_all(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.list_ids(matches, dsh_api_client).await
+  }
+
+  async fn list_allocation_status(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let secret_ids = dsh_api_client.get_secret_ids().await?;
+    let allocation_statusses = futures::future::join_all(secret_ids.iter().map(|id| dsh_api_client.get_secret_allocation_status(id.as_str()))).await;
+    let mut table = vec![];
+    for (secret_id, secret_status) in secret_ids.iter().zip(allocation_statusses) {
+      table.push(allocation_status_to_table_row(secret_id, secret_status.ok().as_ref()));
     }
-    Err(error) => to_command_error(error),
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(self.subject()), table) {
+      println!("{}", line)
+    }
+    Ok(())
   }
-}
 
-async fn run_secret_list_subcommand_status(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match dsh_api_client.get_secret_ids().await {
-    Ok(mut secret_ids) => {
-      secret_ids.sort();
-      let allocation_statusses = futures::future::join_all(secret_ids.iter().map(|id| dsh_api_client.get_secret_allocation_status(id.as_str()))).await;
-      let mut table = vec![];
-      for (id, secret_status) in secret_ids.iter().zip(allocation_statusses) {
-        let status = secret_status.unwrap(); // TODO
-        table.push(allocation_status_to_table_row(id, &status));
+  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.list_ids(matches, dsh_api_client).await
+  }
+
+  async fn list_ids(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let secret_ids = dsh_api_client.get_secret_ids().await?;
+    for secret_id in secret_ids {
+      println!("{}", secret_id)
+    }
+    Ok(())
+  }
+
+  async fn list_usages(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let applications = dsh_api_client.get_application_configurations().await?;
+    let secret_ids = dsh_api_client.get_secret_ids().await?;
+    let mut table: Vec<Vec<String>> = vec![];
+    for secret_id in &secret_ids {
+      let mut first = true;
+      let usages: Vec<(String, String)> = applications_that_use_secret(secret_id, &applications);
+      for (application_id, envs) in usages {
+        if first {
+          table.push(vec![secret_id.clone(), application_id, envs])
+        } else {
+          table.push(vec!["".to_string(), application_id, envs])
+        }
+        first = false;
       }
-      for line in make_tabular_with_headers(&allocation_status_table_column_labels(WHAT), table) {
+    }
+    for line in make_tabular_with_headers(&["secret", "application", "usage"], table) {
+      println!("{}", line)
+    }
+    Ok(())
+  }
+
+  async fn show_allocation_status(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let allocation_status = dsh_api_client.get_secret_allocation_status(target_id).await?;
+    let table = allocation_status_to_table(self.subject(), target_id, &allocation_status);
+    print_table(table, "", "  ", "");
+    Ok(())
+  }
+
+  async fn show_usage(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let applications = dsh_api_client.get_application_configurations().await?;
+    let usage = applications_that_use_secret(target_id, &applications);
+    if !usage.is_empty() {
+      let table: Vec<Vec<String>> = usage.iter().map(|(application_id, usage)| vec![application_id.clone(), usage.clone()]).collect();
+      for line in make_tabular_with_headers(&["application", "usage"], table) {
         println!("{}", line)
       }
-      Ok(())
+    } else {
+      println!("secret not used")
     }
-    Err(error) => to_command_error(error),
+    Ok(())
+  }
+
+  async fn show_value(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let secret = dsh_api_client.get_secret(target_id).await?;
+    println!("{}", secret);
+    Ok(())
   }
 }
 
-async fn run_secret_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(secret_id) => match dsh_api_client.get_secret(secret_id).await {
-      Ok(secret) => {
-        println!("{}", secret);
-        Ok(())
-      }
-      Err(error) => to_command_error_with_id(error, WHAT, secret_id),
-    },
-    None => to_command_error_missing_id(WHAT),
-  }
-}
-
-async fn run_secret_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(secret_id) => match dsh_api_client.get_secret_allocation_status(secret_id).await {
-      Ok(allocation_status) => {
-        println!("{:?}", allocation_status);
-        Ok(())
-      }
-      Err(error) => to_command_error_with_id(error, WHAT, secret_id),
-    },
-    None => to_command_error_missing_id(WHAT),
-  }
-}
-
-// TODO Secrets are also used for buckets, databases and apps
-async fn run_secret_usage_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(secret_id) => match dsh_api_client.get_applications().await {
-      Ok(applications) => {
-        let usage = applications_that_use_secret(secret_id, &applications);
-        if !usage.is_empty() {
-          let table: Vec<Vec<String>> = usage.iter().map(|(application_id, usage)| vec![application_id.clone(), usage.clone()]).collect();
-          for line in make_tabular_with_headers(&["application", "usage"], table) {
-            println!("{}", line)
-          }
-        } else {
-          println!("secret not used")
-        }
-        Ok(())
-      }
-      Err(error) => to_command_error_with_id(error, WHAT, secret_id),
-    },
-    None => to_command_error_missing_id(WHAT),
-  }
-}
-
+// Returns vector with pairs (application_id, environment variables)
 fn applications_that_use_secret(secret_id: &str, applications: &HashMap<String, Application>) -> Vec<(String, String)> {
   let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
   application_ids.sort();

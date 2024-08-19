@@ -1,45 +1,16 @@
 use std::collections::HashMap;
 
-use clap::{builder, Arg, ArgAction, ArgMatches, Command};
+use async_trait::async_trait;
+use clap::ArgMatches;
+use lazy_static::lazy_static;
 
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::status_flag;
+use crate::arguments::Flag;
+use crate::command::SubjectCommand;
 use crate::tabular::make_tabular_with_headers;
-use crate::{to_command_error, CommandResult};
-
-pub(crate) const PROCESSOR_COMMAND: &str = "processor";
-const PROCESSOR_ARGUMENT: &str = "processor-argument";
-
-const _WHAT: &str = "processor";
-
-const PROCESSOR_LIST_SUBCOMMAND: &str = "list";
-
-pub(crate) fn processor_command() -> Command {
-  Command::new(PROCESSOR_COMMAND)
-    .about("Show Trifonius processor details")
-    .alias("p")
-    .long_about("Show Trifonius processor details")
-    .arg_required_else_help(true)
-    .subcommands(vec![processor_list_subcommand(vec![status_flag()])])
-}
-
-fn processor_list_subcommand(_arguments: Vec<Arg>) -> Command {
-  Command::new(PROCESSOR_LIST_SUBCOMMAND)
-    .about("List Trifonius processors")
-    .alias("ps")
-    .after_help("List Trifonius processors")
-    .after_long_help("List Trifonius processors.")
-    .args(vec![processor_argument()])
-}
-
-pub(crate) async fn run_processor_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.subcommand() {
-    Some((PROCESSOR_LIST_SUBCOMMAND, sub_matches)) => run_processor_list_subcommand(sub_matches, dsh_api_client).await,
-    _ => unreachable!(),
-  }
-}
+use crate::CommandResult;
 
 const TRIFONIUS_PIPELINE_NAME: &str = "TRIFONIUS_PIPELINE_NAME";
 const TRIFONIUS_PROCESSOR_ID: &str = "TRIFONIUS_PROCESSOR_ID";
@@ -47,38 +18,111 @@ const TRIFONIUS_PROCESSOR_NAME: &str = "TRIFONIUS_PROCESSOR_NAME";
 const TRIFONIUS_PROCESSOR_TYPE: &str = "TRIFONIUS_PROCESSOR_TYPE";
 const TRIFONIUS_SERVICE_NAME: &str = "TRIFONIUS_SERVICE_NAME";
 
-async fn run_processor_list_subcommand(_matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match dsh_api_client.get_applications().await {
-    Ok(applications) => {
-      let mut table: Vec<Vec<String>> = vec![];
-      for (application_id, application) in applications {
-        if let Some(trifonius_parameters) = find_trifonius_parameters(&application) {
-          let parameters = vec![
-            application_id,
-            trifonius_parameters.get(TRIFONIUS_PIPELINE_NAME).cloned().unwrap_or("-".to_string()),
-            trifonius_parameters.get(TRIFONIUS_PROCESSOR_NAME).cloned().unwrap_or("-".to_string()),
-            trifonius_parameters.get(TRIFONIUS_PROCESSOR_TYPE).cloned().unwrap_or("-".to_string()),
-            trifonius_parameters.get(TRIFONIUS_PROCESSOR_ID).cloned().unwrap_or("-".to_string()),
-            trifonius_parameters.get(TRIFONIUS_SERVICE_NAME).cloned().unwrap_or("-".to_string()),
-            application.exposed_ports.keys().map(|k| k.to_string()).collect::<Vec<String>>().join(","),
-            application.cpus.to_string(),
-            application.mem.to_string(),
-            application.instances.to_string(),
-            application.user,
-            application.metrics.clone().map(|m| format!("{}:{}", m.path, m.port)).unwrap_or_default(),
-          ];
-          table.push(parameters);
-        }
+pub(crate) struct ProcessorCommand {}
+
+lazy_static! {
+  pub static ref PROCESSOR_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(ProcessorCommand {});
+}
+
+#[async_trait]
+impl SubjectCommand for ProcessorCommand {
+  fn subject(&self) -> &'static str {
+    "processor"
+  }
+
+  fn subject_first_upper(&self) -> &'static str {
+    "Processor"
+  }
+
+  fn about(&self) -> String {
+    "Show Trifonius processor details".to_string()
+  }
+
+  fn long_about(&self) -> String {
+    "Show Trifonius processor details.".to_string()
+  }
+
+  fn alias(&self) -> Option<&str> {
+    Some("p")
+  }
+
+  fn list_flags(&self) -> &'static [Flag] {
+    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids, Flag::Usage]
+  }
+
+  fn show_flags(&self) -> &'static [Flag] {
+    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Usage]
+  }
+
+  async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let applications = dsh_api_client.get_application_configurations().await?;
+    let mut table: Vec<Vec<String>> = vec![];
+    for (application_id, application) in applications {
+      if let Some(trifonius_parameters) = find_trifonius_parameters(&application) {
+        let parameters = vec![
+          application_id,
+          trifonius_parameters.get(TRIFONIUS_PIPELINE_NAME).cloned().unwrap_or("-".to_string()),
+          trifonius_parameters.get(TRIFONIUS_PROCESSOR_NAME).cloned().unwrap_or("-".to_string()),
+          trifonius_parameters.get(TRIFONIUS_PROCESSOR_TYPE).cloned().unwrap_or("-".to_string()),
+          trifonius_parameters.get(TRIFONIUS_PROCESSOR_ID).cloned().unwrap_or("-".to_string()),
+          trifonius_parameters.get(TRIFONIUS_SERVICE_NAME).cloned().unwrap_or("-".to_string()),
+          application.exposed_ports.keys().map(|k| k.to_string()).collect::<Vec<String>>().join(","),
+          application.cpus.to_string(),
+          application.mem.to_string(),
+          application.instances.to_string(),
+          application.user,
+          application.metrics.clone().map(|m| format!("{}:{}", m.path, m.port)).unwrap_or_default(),
+        ];
+        table.push(parameters);
       }
-      for line in make_tabular_with_headers(
-        &["application", "pipeline", "processor", "type", "processor id", "service name", "ports", "cpus", "mem", "#", "user", "metrics"],
-        table,
-      ) {
-        println!("{}", line)
-      }
-      Ok(())
     }
-    Err(error) => to_command_error(error),
+    for line in make_tabular_with_headers(
+      &["application", "pipeline", "processor", "type", "processor id", "service name", "ports", "cpus", "mem", "#", "user", "metrics"],
+      table,
+    ) {
+      println!("{}", line)
+    }
+    Ok(())
+  }
+
+  async fn list_allocation_status(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
+  }
+
+  async fn list_configuration(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
+  }
+
+  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.list_ids(matches, dsh_api_client).await
+  }
+
+  async fn list_ids(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
+  }
+
+  async fn list_usages(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
+  }
+
+  async fn show_all(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
+  }
+
+  async fn show_allocation_status(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
+  }
+
+  async fn show_configuration(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
+  }
+
+  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.show_all(target_id, matches, dsh_api_client).await
+  }
+
+  async fn show_usage(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    todo!()
   }
 }
 
@@ -104,13 +148,4 @@ fn find_trifonius_parameters(application: &Application) -> Option<HashMap<&'stat
   } else {
     Some(parameters)
   }
-}
-
-fn processor_argument() -> Arg {
-  Arg::new(PROCESSOR_ARGUMENT)
-    .action(ArgAction::Append)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("VHOST")
-    .help("Vhost")
-    .long_help("Vhost.")
 }

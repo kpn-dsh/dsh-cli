@@ -1,168 +1,148 @@
-use clap::{ArgMatches, Command};
+use async_trait::async_trait;
+use clap::ArgMatches;
+use lazy_static::lazy_static;
 
-use trifonius_dsh_api::types::AppCatalogAppResourcesValue;
+use trifonius_dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue, Application};
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::{actual_flag, status_flag, ACTUAL_FLAG, STATUS_FLAG};
-use crate::formatters::app::get_application_from_app;
-use crate::formatters::application::{application_to_default_vector, default_application_column_labels, default_application_table};
-use crate::subcommands::{list_subcommand, show_subcommand, status_subcommand, CommandDescriptor, LIST_SUBCOMMAND, SHOW_SUBCOMMAND, STATUS_SUBCOMMAND, TARGET_ARGUMENT};
+use crate::arguments::Flag;
+use crate::command::SubjectCommand;
+use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table_row};
+use crate::formatters::app::{app_to_default_vector, default_app_column_labels};
+use crate::formatters::application::default_application_table;
 use crate::tabular::{make_tabular_with_headers, print_table};
-use crate::{to_command_error, to_command_error_missing_id, to_command_error_with_id, CommandResult};
+use crate::CommandResult;
 
-pub(crate) const APP_COMMAND: &str = "app";
-pub(crate) const APPS_COMMAND: &str = "apps";
+pub(crate) struct AppCommand {}
 
-const WHAT: &str = "app";
-const UPPER_WHAT: &str = "APP";
-
-pub(crate) fn app_command() -> Command {
-  let command_descriptor = CommandDescriptor::new(WHAT, UPPER_WHAT);
-  Command::new(APP_COMMAND)
-    .about("Show app details")
-    .long_about("Show app details.")
-    .arg_required_else_help(true)
-    .subcommands(vec![
-      list_subcommand(&command_descriptor, vec![actual_flag(), status_flag()]),
-      show_subcommand(&command_descriptor, vec![]),
-      status_subcommand(&command_descriptor, vec![]),
-    ])
+lazy_static! {
+  pub static ref APP_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(AppCommand {});
 }
 
-pub(crate) fn apps_command() -> Command {
-  Command::new(APPS_COMMAND)
-    .about("List app details")
-    .long_about("List app details")
-    .hide(true)
-    .args(vec![actual_flag(), status_flag()])
-}
-
-pub(crate) async fn run_app_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.subcommand() {
-    Some((LIST_SUBCOMMAND, sub_matches)) => run_app_list_subcommand(sub_matches, dsh_api_client).await,
-    Some((SHOW_SUBCOMMAND, sub_matches)) => run_app_show_subcommand(sub_matches, dsh_api_client).await,
-    Some((STATUS_SUBCOMMAND, sub_matches)) => run_app_status_subcommand(sub_matches, dsh_api_client).await,
-    _ => unreachable!(),
+#[async_trait]
+impl SubjectCommand for AppCommand {
+  fn subject(&self) -> &'static str {
+    "app"
   }
-}
 
-pub(crate) async fn run_apps_command(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  run_app_list_subcommand(matches, dsh_api_client).await
-}
+  fn subject_first_upper(&self) -> &'static str {
+    "App"
+  }
 
-async fn run_app_show_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(app_id) => match dsh_api_client.get_app(app_id).await {
-      Ok(app) => {
-        println!("name:                 {}", app.name);
-        println!("manifest urn:         {}", app.manifest_urn);
-        println!("configuration:        {}", app.configuration.clone().unwrap_or("none".to_string()));
-        for (resource_name, resource) in &app.resources {
-          match resource {
-            AppCatalogAppResourcesValue::Application(application) => {
-              println!("resource/application: {}", resource_name);
-              print_table(default_application_table(app.name.as_str(), application), "  ", "  ", "");
-            }
-            AppCatalogAppResourcesValue::Bucket(bucket) => {
-              println!("resource/bucket:      {}", resource_name);
-              println!("  {:?}", bucket)
-            }
-            AppCatalogAppResourcesValue::Certificate(certificate) => {
-              println!("resource/certificate: {}", resource_name);
-              println!("  {:?}", certificate)
-            }
-            AppCatalogAppResourcesValue::Secret(secret) => {
-              println!("resource/secret:      {}", resource_name);
-              println!("  {:?}", secret)
-            }
-            AppCatalogAppResourcesValue::Topic(topic) => {
-              println!("resource/topic:       {}", resource_name);
-              println!("  {:?}", topic)
-            }
-            AppCatalogAppResourcesValue::Vhost(vhost) => {
-              println!("resource/vhost:       {}", resource_name);
-              println!("  {:?}", vhost)
-            }
-            AppCatalogAppResourcesValue::Volume(volume) => {
-              println!("resource/volume:      {}", resource_name);
-              println!("  {:?}", volume)
-            }
-          }
+  fn alias(&self) -> Option<&str> {
+    None
+  }
+
+  fn about(&self) -> String {
+    "Show app details".to_string()
+  }
+
+  fn long_about(&self) -> String {
+    "Show app details.".to_string()
+  }
+
+  fn list_flags(&self) -> &'static [Flag] {
+    &[Flag::All, Flag::Configuration, Flag::AllocationStatus]
+  }
+
+  fn show_flags(&self) -> &'static [Flag] {
+    &[Flag::All]
+  }
+
+  async fn list_all(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.list_configuration(matches, dsh_api_client).await
+  }
+
+  async fn list_allocation_status(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let app_ids = dsh_api_client.get_app_ids().await?;
+    let allocation_statuses = futures::future::join_all(app_ids.iter().map(|app_id| dsh_api_client.get_app_catalog_app_allocation_status(app_id))).await;
+    let mut table: Vec<Vec<String>> = vec![];
+    for (app_id, allocation_status) in app_ids.iter().zip(allocation_statuses) {
+      table.push(allocation_status_to_table_row(app_id, allocation_status.ok().as_ref()));
+    }
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(self.subject()), table) {
+      println!("{}", line)
+    }
+    Ok(())
+  }
+
+  async fn list_configuration(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let apps = &dsh_api_client.get_app_configurations().await?;
+    let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+    app_ids.sort();
+    let mut table: Vec<Vec<String>> = vec![];
+    for app_id in app_ids {
+      let app = apps.get(&app_id).unwrap();
+      table.push(app_to_default_vector(app_id.as_str(), app));
+    }
+    for line in make_tabular_with_headers(&default_app_column_labels(), table) {
+      println!("{}", line)
+    }
+    Ok(())
+  }
+
+  async fn list_ids(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let app_ids = dsh_api_client.get_app_ids().await?;
+    for app_id in app_ids {
+      println!("{}", app_id)
+    }
+    Ok(())
+  }
+
+  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.list_ids(matches, dsh_api_client).await
+  }
+
+  async fn show_all(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let app = dsh_api_client.get_app_configuration(target_id).await?;
+    println!("name:                 {}", app.name);
+    println!("manifest urn:         {}", app.manifest_urn);
+    println!("configuration:        {}", app.configuration.clone().unwrap_or("none".to_string()));
+    for (resource_name, resource) in &app.resources {
+      match resource {
+        AppCatalogAppResourcesValue::Application(application) => {
+          println!("resource/application: {}", resource_name);
+          print_table(default_application_table(app.name.as_str(), application), "  ", "  ", "");
         }
-        Ok(())
+        AppCatalogAppResourcesValue::Bucket(bucket) => {
+          println!("resource/bucket:      {}", resource_name);
+          println!("  {:?}", bucket)
+        }
+        AppCatalogAppResourcesValue::Certificate(certificate) => {
+          println!("resource/certificate: {}", resource_name);
+          println!("  {:?}", certificate)
+        }
+        AppCatalogAppResourcesValue::Secret(secret) => {
+          println!("resource/secret:      {}", resource_name);
+          println!("  {:?}", secret)
+        }
+        AppCatalogAppResourcesValue::Topic(topic) => {
+          println!("resource/topic:       {}", resource_name);
+          println!("  {:?}", topic)
+        }
+        AppCatalogAppResourcesValue::Vhost(vhost) => {
+          println!("resource/vhost:       {}", resource_name);
+          println!("  {:?}", vhost)
+        }
+        AppCatalogAppResourcesValue::Volume(volume) => {
+          println!("resource/volume:      {}", resource_name);
+          println!("  {:?}", volume)
+        }
       }
-      Err(dsh_api_error) => to_command_error_with_id(dsh_api_error, WHAT, app_id),
-    },
-    None => to_command_error_missing_id(WHAT),
-  }
-}
-
-async fn run_app_list_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  if matches.get_flag(STATUS_FLAG) {
-    run_app_list_subcommand_status(matches, dsh_api_client).await
-  } else {
-    run_app_list_subcommand_normal(matches, dsh_api_client).await
-  }
-}
-
-async fn run_app_list_subcommand_normal(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  let apps = if matches.get_flag(ACTUAL_FLAG) { dsh_api_client.get_apps_actual().await } else { dsh_api_client.get_apps().await };
-  match apps {
-    Ok(apps) => {
-      let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
-      app_ids.sort();
-      let mut table: Vec<Vec<String>> = vec![];
-      for app_id in app_ids {
-        let app = apps.get(&app_id).unwrap();
-        let (_, application) = get_application_from_app(app).unwrap();
-        table.push(application_to_default_vector(app_id.as_str(), application));
-      }
-      for line in make_tabular_with_headers(&default_application_column_labels(), table) {
-        println!("{}", line)
-      }
-      Ok(())
     }
-    Err(error) => to_command_error(error),
+    Ok(())
+  }
+
+  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.show_all(target_id, matches, dsh_api_client).await
   }
 }
 
-async fn run_app_list_subcommand_status(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  let apps = if matches.get_flag(ACTUAL_FLAG) { dsh_api_client.get_apps_actual().await } else { dsh_api_client.get_apps().await };
-  match apps {
-    Ok(apps) => {
-      let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
-      app_ids.sort();
-      let mut table: Vec<Vec<String>> = vec![];
-      for app_id in app_ids {
-        let app = apps.get(&app_id).unwrap();
-        let application = app
-          .resources
-          .iter()
-          .find_map(|(_key, resource)| match resource {
-            AppCatalogAppResourcesValue::Application(application) => Some(application),
-            _ => None,
-          })
-          .unwrap();
-        table.push(application_to_default_vector(app_id.as_str(), application));
-      }
-      for line in make_tabular_with_headers(&[WHAT, "manifest urn"], table) {
-        println!("{}", line)
-      }
-      Ok(())
-    }
-    Err(error) => to_command_error(error),
-  }
-}
-
-async fn run_app_status_subcommand(matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-  match matches.get_one::<String>(TARGET_ARGUMENT) {
-    Some(app_id) => match dsh_api_client.get_app_catalog_app_status(app_id).await {
-      Ok(app_status) => {
-        println!("{}", serde_json::to_string_pretty(&app_status).unwrap());
-        Ok(())
-      }
-      Err(error) => to_command_error_with_id(error, WHAT, app_id),
-    },
-    None => to_command_error_missing_id(WHAT),
-  }
+/// ## Returns
+/// * (resource_id, application)
+pub(crate) fn get_application_from_app(app: &AppCatalogApp) -> Option<(&String, &Application)> {
+  app.resources.iter().find_map(|(resource_id, resource)| match resource {
+    AppCatalogAppResourcesValue::Application(application) => Some((resource_id, application)),
+    _ => None,
+  })
 }

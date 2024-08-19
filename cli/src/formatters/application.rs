@@ -84,7 +84,7 @@ pub(crate) fn default_application_column_labels() -> Vec<String> {
 }
 
 impl ApplicationLabel {
-  fn row_label(&self) -> &str {
+  pub(crate) fn row_label(&self) -> &str {
     match self {
       Self::Application => "application",
       Self::Cpus => "cpus",
@@ -107,7 +107,7 @@ impl ApplicationLabel {
     }
   }
 
-  fn column_label(&self) -> &str {
+  pub(crate) fn column_label(&self) -> &str {
     match self {
       Self::Application => "application",
       Self::Cpus => "cpus",
@@ -131,7 +131,7 @@ impl ApplicationLabel {
   }
 }
 
-fn application_value(application: &Application, column: &ApplicationLabel, application_id: &str) -> String {
+pub(crate) fn application_value(application: &Application, column: &ApplicationLabel, application_id: &str) -> String {
   match column {
     ApplicationLabel::Application => application_id.to_string(),
     ApplicationLabel::Cpus => application.cpus.to_string(),
