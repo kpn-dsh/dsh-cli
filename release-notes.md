@@ -1,5 +1,37 @@
 # Release notes
 
+## Version 0.0.6
+
+#### New Features
+
+* Added `replicator` and `regex-filter` processor configurations.
+* Added buckets and topics to the dsh api.
+* Added cli tool:
+    * Supports dsh api and Trifonius engine.
+    * List resources.
+    * Show resource details.
+    * List resource usage (reversed look-up).
+* Strict validation on all identifiers.
+* Added dry-run for deploy function.
+
+#### Bugfixes and Improvements
+
+* Reduced code duplication in tcli.
+* Consistent naming convention on the dsh api.
+* Added health check to processors.
+* Added icon and tags fields to processor configuration.
+* Improved generation of topic id from very long topic names.
+* Moved generation of api code to this crate, for better control and one less dependency.
+* Better separation of concerns between engine and dsh api.
+* Introduced macro for identifiers.
+* Improved documentation.
+* Added favicon and logo to generated doc.
+* Added some design documentation.
+* Improved resource model.
+* Added more and better example code.
+* Improved error handling.
+* Better readme files.
+
 ## Version 0.0.5
 
 #### New Features
