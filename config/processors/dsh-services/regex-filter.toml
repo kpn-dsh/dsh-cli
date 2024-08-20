@@ -1,0 +1,189 @@
+[processor]
+type = "dsh-service"
+id = "regex-filter"
+label = "Regex filter"
+description = "Retain records that (don't) match a regular expression. Filters can be applied on the key, value and/or headers. Supports Avro, JSON and plain text. In case of AVRO and JSON it supports to match on nested fields."
+version = "0.0.1-SNAPSHOT"
+icon = "filter"
+tags = ["filter", "regex", "match", "avro", "json"]
+metrics-url = "${MONITORING_URL}"
+viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
+
+[inbound-junctions.inbound-kafka-topic]
+label = "Source topics"
+description = "Kafka topic that the filter will consume from."
+allowed-resource-types = ["dsh-topic"]
+
+[outbound-junctions.outbound-kafka-topic]
+label = "Sink topics"
+description = "Kafka topic that the filter will produce to."
+allowed-resource-types = ["dsh-topic"]
+
+[[deploy.parameters]]
+type = "boolean"
+id = "metrics-enabled"
+label = "Enable metrics"
+description = "Enable prometheus metrics."
+default = "false"
+
+[[deploy.parameters]]
+type = "selection"
+id = "kafka-offset-reset"
+label = "Kafka read position"
+description = "Start position of where to read from."
+options = [
+    { id = "earliest", label = "Beginning", description = "Start reading from the begininng of the topic." },
+    { id = "latest", label = "End", description = "Start reading at the end of the topic." },
+]
+
+[[deploy.parameters]]
+type = "free-text"
+id = "key-regex"
+label = "Key regex"
+description = "Regular expression to match the key."
+optional = true
+
+[[deploy.parameters]]
+type = "selection"
+id = "key-type"
+label = "Key type"
+description = "Select the deserialization type for the key."
+optional = true
+options = [
+    { id = "string", label = "String", description = "Deserialize key as string." },
+    { id = "avro", label = "Avro", description = "Deserialize key as Avro." },
+    { id = "json", label = "JSON", description = "Deserialize key as JSON." }
+]
+
+[[deploy.parameters]]
+type = "free-text"
+id = "key-attribute-key"
+label = "Key attribute key"
+description = "Match on a value of a specific key (only required for Avro and JSON values)\nNested keys are supported, provide the keys pipe(|) seperated\n\nExample:\nTo filter on the values in 'bar' in `{ \"foo\": {\"bar\": \"baz\"} }`\nfoo|bar"
+optional = true
+
+[[deploy.parameters]]
+type = "boolean"
+id = "key-retain-match"
+label = "Retain match"
+description = "Retain the record if the key matches the regex."
+optional = true
+
+[[deploy.parameters]]
+type = "free-text"
+id = "payload-regex"
+label = "Payload regex"
+description = "Regular expression to match the value."
+optional = true
+
+[[deploy.parameters]]
+type = "selection"
+id = "payload-type"
+label = "Payload type"
+description = "Select the deserialization type for the value."
+optional = true
+options = [
+    { id = "string", label = "String", description = "Deserialize value as string." },
+    { id = "avro", label = "Avro", description = "Deserialize value as Avro." },
+    { id = "json", label = "JSON", description = "Deserialize value as JSON." }
+]
+
+[[deploy.parameters]]
+type = "free-text"
+id = "payload-attribute-key"
+label = "Value attribute key"
+description = "Match on a value of a specific key (only required for Avro and JSON values)\nNested keys are supported, provide the keys pipe(|) seperated\n\nExaample:\nTo filter on the values in 'bar' in `{ \"foo\": {\"bar\": \"baz\"} }`\nfoo|bar"
+optional = true
+
+[[deploy.parameters]]
+type = "boolean"
+id = "payload-retain-match"
+label = "Retain match"
+description = "Retain the record if the value matches the regex."
+optional = true
+
+[[deploy.parameters]]
+type = "free-text"
+id = "header-regex"
+label = "Header regex"
+description = "Regular expression to match the header."
+optional = true
+
+[[deploy.parameters]]
+type = "free-text"
+id = "header-attribute-key"
+label = "Header attribute key"
+description = "Match on a value of a specific header."
+optional = true
+
+[[deploy.parameters]]
+type = "boolean"
+id = "header-retain-match"
+label = "Retain match"
+description = "Retain the record if the header matches the regex."
+optional = true
+
+[dsh-service]
+image = 'registry.cp.kpn-dsh.com/greenbox-dev/regex-filter:0.0.1-SNAPSHOT'
+needs-token = true
+single-instance = false
+
+[dsh-service.environment-variables]
+KAFKA_SOURCE_TOPIC = { type = "inbound-junction", id = "inbound-kafka-topic" }
+KAFKA_TARGET_TOPIC = { type = "outbound-junction", id = "outbound-kafka-topic" }
+# Generic parameters
+KAFKA_AUTO_OFFSET_RESET = { type = "deployment-parameter", id = "kafka-offset-reset" }
+KAFKA_CONSUMER_GROUP_TYPE = { type = "value", value = "SHARED" }
+METRICS_ENABLED = { type = "deployment-parameter", id = "metrics-enabled" }
+# Key parameters
+KEY_TYPE = { type = "deployment-parameter", id = "key-type" }
+KEY_FILTER_REGEX = { type = "deployment-parameter", id = "key-regex" }
+KEY_ATTRIBUTE_KEYS = { type = "deployment-parameter", id = "key-attribute-key" }
+KEY_ATTRIBUTE_KEY_DELIMITER = { type = "value", value = "|" }
+KEY_RETAIN_MATCH = { type = "deployment-parameter", id = "key-retain-match" }
+# Value parameters
+PAYLOAD_TYPE = { type = "deployment-parameter", id = "payload-type" }
+PAYLOAD_FILTER_REGEX = { type = "deployment-parameter", id = "payload-regex" }
+PAYLOAD_ATTRIBUTE_KEYS = { type = "deployment-parameter", id = "payload-attribute-key" }
+PAYLOAD_ATTRIBUTE_KEY_DELIMITER = { type = "value", value = "|" }
+PAYLOAD_RETAIN_MATCH = { type = "deployment-parameter", id = "payload-retain-match" }
+# Header parameters
+HEADER_FILTER_REGEX = { type = "deployment-parameter", id = "header-regex" }
+HEADER_ATTRIBUTE_KEYS = { type = "deployment-parameter", id = "header-attribute-key" }
+HEADER_ATTRIBUTE_KEY_DELIMITER = { type = "value", value = "|" }
+
+[[dsh-service.profiles]]
+id = "minimal"
+label = "10K records per minute"
+description = "Minimal profile to handle 0 to 10k records per minute."
+cpus = 0.1
+instances = 1
+mem = 128
+environment-variables.KAFKA_CONSUMER_QUEUED_BUFFERING_MAX_MESSAGES_KBYTES = { type = "value", value = "40000" }
+environment-variables.KAFKA_PRODUCER_BATCH_NUM_MESSAGES = { type = "value", value = "500" }
+environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_MESSAGES = { type = "value", value = "1000" }
+environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_KBYTES = { type = "value", value = "40000" }
+
+[[dsh-service.profiles]]
+id = "medium"
+label = "100K records per minute"
+description = "Medium profile to handle 10k to 100k records per minute."
+cpus = 0.1
+instances = 1
+mem = 348
+environment-variables.KAFKA_CONSUMER_QUEUED_BUFFERING_MAX_MESSAGES_KBYTES = { type = "value", value = "65536" }
+environment-variables.KAFKA_PRODUCER_BATCH_NUM_MESSAGES = { type = "value", value = "750" }
+environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_MESSAGES = { type = "value", value = "1250" }
+environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_KBYTES = { type = "value", value = "80000" }
+
+[[dsh-service.profiles]]
+id = "maximal"
+label = "1 Million records per minute"
+description = "Maximal profile to handle 1 million maximum records per minute."
+cpus = 0.2
+instances = 1 # could  increased
+mem = 512
+environment-variables.KAFKA_CONSUMER_QUEUED_BUFFERING_MAX_MESSAGES_KBYTES = { type = "value", value = "65536" }
+environment-variables.KAFKA_PRODUCER_BATCH_NUM_MESSAGES = { type = "value", value = "1000" }
+environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_MESSAGES = { type = "value", value = "1500" }
+environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_KBYTES = { type = "value", value = "1048576" }

@@ -1,70 +1,134 @@
-use crate::processor::application::application_registry::ApplicationRegistry;
-use crate::processor::application::{TargetClientFactory, DEFAULT_TARGET_CLIENT_FACTOR};
-use crate::processor::processor::{Processor, ProcessorIdentifier};
-use crate::processor::processor_descriptor::ProcessorDescriptor;
-use crate::processor::ProcessorType;
+use lazy_static::lazy_static;
 
-pub struct ProcessorRegistry<'a> {
-  application_registry: ApplicationRegistry<'a>,
+use crate::engine_target::{EngineTarget, DEFAULT_ENGINE_TARGET};
+use crate::pipeline::PipelineName;
+use crate::processor::dsh_app::dsh_app_registry::DshAppRealizationRegistry;
+use crate::processor::dsh_service::dsh_service_registry::DshServiceRealizationRegistry;
+use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
+use crate::processor::processor_instance::ProcessorInstance;
+use crate::processor::processor_realization::ProcessorRealization;
+use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType};
+use crate::resource::resource_registry::{ResourceRegistry, DEFAULT_RESOURCE_REGISTRY};
+
+lazy_static! {
+  pub static ref DEFAULT_PROCESSOR_REGISTRY: ProcessorRegistry<'static> = ProcessorRegistry::default();
 }
 
-impl Default for ProcessorRegistry<'_> {
-  fn default() -> Self {
-    let target_client_factory = &DEFAULT_TARGET_CLIENT_FACTOR;
-    let application_registry = ApplicationRegistry::create(target_client_factory).expect("unable to create default application registry");
-    ProcessorRegistry { application_registry }
-  }
+pub struct ProcessorRegistry<'a> {
+  dsh_app_realization_registry: DshAppRealizationRegistry<'a>,
+  dsh_service_realization_registry: DshServiceRealizationRegistry<'a>,
+  resource_registry: &'a ResourceRegistry<'a>,
+  engine_target: &'a EngineTarget<'a>,
 }
 
 impl<'a> ProcessorRegistry<'a> {
-  pub fn create(target_client_factory: &'a TargetClientFactory) -> Result<ProcessorRegistry<'a>, String> {
-    Ok(ProcessorRegistry { application_registry: ApplicationRegistry::create(target_client_factory)? })
+  pub fn new() -> Self {
+    Self::default()
   }
 
-  pub fn processor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<&(dyn Processor)> {
+  pub fn create(engine_target: &'a EngineTarget, resource_registry: &'a ResourceRegistry) -> Result<ProcessorRegistry<'a>, String> {
+    Ok(ProcessorRegistry {
+      dsh_app_realization_registry: DshAppRealizationRegistry::create(engine_target.dsh_api_client_factory, resource_registry)?,
+      dsh_service_realization_registry: DshServiceRealizationRegistry::create(engine_target.dsh_api_client_factory, resource_registry)?,
+      resource_registry,
+      engine_target,
+    })
+  }
+
+  pub fn resource_registry(&self) -> &ResourceRegistry {
+    self.resource_registry
+  }
+
+  pub fn processor_types(&self) -> Vec<ProcessorTypeDescriptor> {
+    vec![ProcessorTypeDescriptor::from(&ProcessorType::DshApp), ProcessorTypeDescriptor::from(&ProcessorType::DshService)]
+  }
+
+  pub fn processor_realization(&self, processor_type: ProcessorType, processor_id: &ProcessorId) -> Option<&(dyn ProcessorRealization)> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_by_id(processor_id),
+      ProcessorType::DshApp => self.dsh_app_realization_registry.dsh_app_realization_by_id(processor_id),
+      ProcessorType::DshService => self.dsh_service_realization_registry.dsh_service_realization_by_id(processor_id),
     }
   }
 
-  pub fn processor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&(dyn Processor)> {
+  pub fn processor_realization_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&(dyn ProcessorRealization)> {
     match processor_identifier.processor_type {
-      ProcessorType::Application => self.application_registry.application_by_id(processor_identifier.id.as_str()),
+      ProcessorType::DshApp => self.dsh_app_realization_registry.dsh_app_realization_by_id(&processor_identifier.id),
+      ProcessorType::DshService => self.dsh_service_realization_registry.dsh_service_realization_by_id(&processor_identifier.id),
     }
   }
 
-  pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &str) -> Option<&ProcessorDescriptor> {
+  pub fn processor_instance(
+    &'a self,
+    processor_type: ProcessorType,
+    processor_id: &ProcessorId,
+    pipeline_name: Option<&'a PipelineName>,
+    processor_name: &'a ProcessorName,
+  ) -> Option<Result<Box<dyn ProcessorInstance + 'a>, String>> {
+    self
+      .processor_realization(processor_type, processor_id)
+      .map(|realization| realization.processor_instance(pipeline_name, processor_name, self.engine_target.dsh_api_client_factory))
+  }
+
+  pub fn processor_instance_by_identifier(
+    &'a self,
+    processor_identifier: &ProcessorIdentifier,
+    pipeline_name: Option<&'a PipelineName>,
+    processor_name: &'a ProcessorName,
+  ) -> Option<Result<Box<dyn ProcessorInstance + 'a>, String>> {
+    self.processor_instance(processor_identifier.processor_type.clone(), &processor_identifier.id, pipeline_name, processor_name)
+  }
+
+  pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &ProcessorId) -> Option<ProcessorDescriptor> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_by_id(processor_id).map(|a| a.descriptor()),
+      ProcessorType::DshApp => self
+        .dsh_app_realization_registry
+        .dsh_app_realization_by_id(processor_id)
+        .map(|realization| realization.descriptor()),
+      ProcessorType::DshService => self
+        .dsh_service_realization_registry
+        .dsh_service_realization_by_id(processor_id)
+        .map(|realization| realization.descriptor()),
     }
   }
 
-  pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&ProcessorDescriptor> {
+  pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<ProcessorDescriptor> {
     match processor_identifier.processor_type {
-      ProcessorType::Application => self
-        .application_registry
-        .application_by_id(processor_identifier.id.as_str())
-        .map(|a| a.descriptor()),
+      ProcessorType::DshApp => self
+        .dsh_app_realization_registry
+        .dsh_app_realization_by_id(&processor_identifier.id)
+        .map(|realization| realization.descriptor()),
+      ProcessorType::DshService => self
+        .dsh_service_realization_registry
+        .dsh_service_realization_by_id(&processor_identifier.id)
+        .map(|realization| realization.descriptor()),
     }
   }
 
-  pub fn processor_descriptors(&self) -> Vec<&ProcessorDescriptor> {
-    self.application_registry.application_descriptors()
+  pub fn processor_descriptors(&self) -> Vec<ProcessorDescriptor> {
+    self.dsh_service_realization_registry.dsh_service_descriptors()
   }
 
-  pub fn processor_descriptors_by_type(&self, processor_type: ProcessorType) -> Vec<&ProcessorDescriptor> {
+  pub fn processor_descriptors_by_type(&self, processor_type: ProcessorType) -> Vec<ProcessorDescriptor> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.application_descriptors(),
+      ProcessorType::DshApp => self.dsh_app_realization_registry.dsh_app_descriptors(),
+      ProcessorType::DshService => self.dsh_service_realization_registry.dsh_service_descriptors(),
     }
   }
 
   pub fn processor_identifiers(&self) -> Vec<&ProcessorIdentifier> {
-    self.application_registry.processor_identifiers()
+    [self.dsh_app_realization_registry.dsh_app_identifiers(), self.dsh_service_realization_registry.dsh_service_identifiers()].concat()
   }
 
   pub fn processor_identifiers_by_type(&self, processor_type: ProcessorType) -> Vec<&ProcessorIdentifier> {
     match processor_type {
-      ProcessorType::Application => self.application_registry.processor_identifiers(),
+      ProcessorType::DshApp => self.dsh_app_realization_registry.dsh_app_identifiers(),
+      ProcessorType::DshService => self.dsh_service_realization_registry.dsh_service_identifiers(),
     }
+  }
+}
+
+impl Default for ProcessorRegistry<'_> {
+  fn default() -> Self {
+    Self::create(&DEFAULT_ENGINE_TARGET, &DEFAULT_RESOURCE_REGISTRY).expect("unable to create default processor registry")
   }
 }
