@@ -41,7 +41,7 @@ lazy_static! {
 pub(crate) fn _app_table(app_id: &str, app: &AppCatalogApp, app_rows: &[AppLabel], application_rows: &[ApplicationLabel]) -> Vec<Vec<String>> {
   let mut table: Vec<Vec<String>> = vec![];
   for app_row in app_rows {
-    table.push(vec![app_row.row_label().to_string(), app_value(app, app_row, app_id)])
+    table.push(vec![app_row._row_label().to_string(), app_value(app, app_row, app_id)])
   }
   match get_application_from_app(app) {
     Some((application_resource, application)) => {
@@ -111,7 +111,7 @@ fn app_value(app: &AppCatalogApp, label: &AppLabel, app_id: &str) -> String {
 }
 
 impl AppLabel {
-  fn row_label(&self) -> &str {
+  fn _row_label(&self) -> &str {
     match self {
       AppLabel::App => "app",
       AppLabel::Configuration => "app configuration",

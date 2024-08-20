@@ -57,12 +57,12 @@ lazy_static! {
 pub(crate) fn _topic_status_to_table(target: &str, target_id: &str, topic: &TopicStatus) -> Vec<Vec<String>> {
   DEFAULT_TOPIC_STATUS_TABLE_ROWS
     .iter()
-    .map(|row| vec![row.row_label(target).to_string(), topic_status_value(target_id, topic, row)])
+    .map(|row| vec![row._row_label(target).to_string(), topic_status_value(target_id, topic, row)])
     .collect()
 }
 
 pub(crate) fn _topic_status_table_row_labels(target: &str) -> Vec<String> {
-  DEFAULT_TOPIC_STATUS_TABLE_ROWS.iter().map(|column| column.row_label(target).to_string()).collect()
+  DEFAULT_TOPIC_STATUS_TABLE_ROWS.iter().map(|column| column._row_label(target).to_string()).collect()
 }
 
 pub(crate) fn _topic_to_table_row(target_id: &str, topic: &Topic) -> Vec<String> {
@@ -145,7 +145,7 @@ fn topic_value(target: &str, topic: &Topic, label: &TopicLabel) -> String {
 }
 
 impl TopicLabel {
-  fn row_label<'a>(&'a self, target: &'a str) -> &str {
+  fn _row_label<'a>(&'a self, target: &'a str) -> &str {
     match self {
       Self::CleanupPolicy => "cleanup policy",
       Self::DerivedFrom => "derived from",
