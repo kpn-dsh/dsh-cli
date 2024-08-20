@@ -6,6 +6,8 @@ use crate::CommandResult;
 pub(crate) enum Flag {
   All,
   AllocationStatus,
+  Applications,
+  Apps,
   Configuration,
   Ids,
   Tasks,
@@ -18,6 +20,8 @@ impl Flag {
     match &self {
       Flag::All => "all-flag",
       Flag::AllocationStatus => "status-flag",
+      Flag::Applications => "applications-flag",
+      Flag::Apps => "apps-flag",
       Flag::Configuration => "configuration-flag",
       Flag::Ids => "ids-flag",
       Flag::Tasks => "tasks-flag",
@@ -30,6 +34,8 @@ impl Flag {
     match &self {
       Flag::All => "all",
       Flag::AllocationStatus => "status",
+      Flag::Applications => "application",
+      Flag::Apps => "app",
       Flag::Configuration => "configuration",
       Flag::Ids => "ids",
       Flag::Tasks => "tasks",

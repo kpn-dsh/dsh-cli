@@ -15,6 +15,7 @@ use crate::application::APPLICATION_COMMAND;
 use crate::arguments::{set_verbosity_argument, verbosity_argument};
 use crate::bucket::BUCKET_COMMAND;
 use crate::command::SubjectCommand;
+use crate::env::ENV_COMMAND;
 use crate::processor::PROCESSOR_COMMAND;
 use crate::secret::SECRET_COMMAND;
 use crate::topic::TOPIC_COMMAND;
@@ -26,6 +27,7 @@ mod arguments;
 mod bucket;
 mod command;
 mod def_impl;
+mod env;
 mod formatters;
 mod processor;
 mod secret;
@@ -53,7 +55,7 @@ async fn main() {
     .placeholder(styling::AnsiColor::Cyan.on_default());
 
   let subject_commands: Vec<&Box<dyn SubjectCommand + Send + Sync>> =
-    vec![&APP_COMMAND, &APPLICATION_COMMAND, &BUCKET_COMMAND, &PROCESSOR_COMMAND, &SECRET_COMMAND, &TOPIC_COMMAND, &VHOST_COMMAND];
+    vec![&APP_COMMAND, &APPLICATION_COMMAND, &BUCKET_COMMAND, &ENV_COMMAND, &PROCESSOR_COMMAND, &SECRET_COMMAND, &TOPIC_COMMAND, &VHOST_COMMAND];
 
   let mut subject_command_registry: HashMap<String, &Box<dyn SubjectCommand + Send + Sync>> = HashMap::new();
   let mut subject_command_shortcut_registry: HashMap<String, &Box<dyn SubjectCommand + Send + Sync>> = HashMap::new();
