@@ -9,7 +9,7 @@ async fn main() -> Result<(), String> {
   let application_id = SERVICE_ID;
   let task_id = TASK_ID;
 
-  let client = DshApiClient::default().await;
+  let client = DshApiClient::default_client().await;
 
   // Return applications that have derived tasks
   let applications: Vec<String> = client.get_application_ids_with_derived_tasks().await?;

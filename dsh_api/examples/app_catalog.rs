@@ -7,7 +7,7 @@ use trifonius_dsh_api::DshApiClient;
 async fn main() -> Result<(), String> {
   let app_catalog_id = "keyring-050";
 
-  let client = DshApiClient::default().await;
+  let client = DshApiClient::default_client().await;
 
   let app_catalog_app: AppCatalogApp = client.get_app_configuration(app_catalog_id).await?;
   println!("{}", serde_json::to_string_pretty(&app_catalog_app).unwrap());

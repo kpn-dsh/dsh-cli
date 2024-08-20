@@ -5,7 +5,7 @@ use trifonius_dsh_api::DshApiClient;
 async fn main() -> Result<(), String> {
   let app_catalog_id = "keyring-dev-proxy";
 
-  let client = DshApiClient::default().await;
+  let client = DshApiClient::default_client().await;
 
   // let deleted: () = client.delete_app_catalog_app(app_catalog_id).await?;
   // println!("{}", serde_json::to_string_pretty(&deleted).unwrap());

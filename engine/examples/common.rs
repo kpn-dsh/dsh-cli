@@ -26,7 +26,7 @@ pub fn dsh_service_instance<'a>(processor_id: &'static str, pipeline_name: &'sta
   let processor_registry: &'static ProcessorRegistry = &DEFAULT_PROCESSOR_REGISTRY;
   let dsh_service_realization = processor_registry.processor_realization(ProcessorType::DshService, &processor_id).unwrap();
   dsh_service_realization
-    .processor_instance(Some(&pipeline_name), &processor_name, DshApiClientFactory::default())
+    .processor_instance(Some(&pipeline_name), &processor_name, DshApiClientFactory::default_factory())
     .unwrap()
 }
 

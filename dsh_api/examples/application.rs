@@ -8,7 +8,7 @@ const TASK_ID: &str = "8f4b5747-lnmj4-00000000";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-  let client = DshApiClient::default().await;
+  let client = DshApiClient::default_client().await;
 
   // deploy_application
   // undeploy_application

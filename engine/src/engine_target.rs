@@ -36,7 +36,7 @@ impl EngineTarget<'_> {
 
 lazy_static! {
   pub static ref DEFAULT_ENGINE_TARGET: EngineTarget<'static> = {
-    let dsh_api_client_factory = &DshApiClientFactory::default();
+    let dsh_api_client_factory = &DshApiClientFactory::default_factory();
     EngineTarget { dsh_api_client_factory, tenant: dsh_api_client_factory.tenant() }
   };
 }

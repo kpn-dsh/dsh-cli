@@ -93,7 +93,7 @@ impl From<ProgenitorError> for DshApiError {
 }
 
 impl DshApiClient<'_> {
-  pub async fn default() -> Self {
+  pub async fn default_client() -> Self {
     DEFAULT_DSH_API_CLIENT_FACTORY.client().await.expect("could not create dsh api client")
   }
 
@@ -171,7 +171,7 @@ lazy_static! {
 }
 
 impl DshApiClientFactory {
-  pub fn default() -> &'static DshApiClientFactory {
+  pub fn default_factory() -> &'static DshApiClientFactory {
     &DEFAULT_DSH_API_CLIENT_FACTORY
   }
 

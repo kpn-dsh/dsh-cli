@@ -90,7 +90,7 @@ async fn main() {
 
   let matches = command.get_matches();
 
-  let dsh_api_client = DshApiClient::default().await;
+  let dsh_api_client = DshApiClient::default_client().await;
 
   let command_result = match matches.subcommand() {
     Some((command_name, sub_matches)) => match subject_command_registry.get(command_name) {

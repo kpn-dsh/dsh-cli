@@ -5,7 +5,7 @@ use trifonius_dsh_api::DshApiClient;
 async fn main() -> Result<(), String> {
   let bucket_id = "schema-registry";
 
-  let client = DshApiClient::default().await;
+  let client = DshApiClient::default_client().await;
 
   // let bucket = client.delete_bucket(bucket_id).await?;
   // let bucket = client.update_bucket(bucket_id).await?;

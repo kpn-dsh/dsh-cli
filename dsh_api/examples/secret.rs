@@ -10,7 +10,7 @@ async fn main() -> Result<(), String> {
   // let secret = client.delete_secret(secret_id).await?;
   // let secret = client.update_secret(secret_id).await?;
 
-  let client = DshApiClient::default().await;
+  let client = DshApiClient::default_client().await;
 
   let mut secrets: Vec<String> = client.get_secret_ids().await?;
   secrets.sort();
