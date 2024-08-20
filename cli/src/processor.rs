@@ -46,12 +46,16 @@ impl SubjectCommand for ProcessorCommand {
     Some("p")
   }
 
+  fn supports_show(&self) -> bool {
+    false
+  }
+
   fn list_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids, Flag::Usage]
+    &[Flag::All]
   }
 
   fn show_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Usage]
+    &[]
   }
 
   async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
@@ -85,44 +89,8 @@ impl SubjectCommand for ProcessorCommand {
     Ok(())
   }
 
-  async fn list_allocation_status(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
-  }
-
-  async fn list_configuration(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
-  }
-
   async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.list_ids(matches, dsh_api_client).await
-  }
-
-  async fn list_ids(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
-  }
-
-  async fn list_usages(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
-  }
-
-  async fn show_all(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
-  }
-
-  async fn show_allocation_status(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
-  }
-
-  async fn show_configuration(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
-  }
-
-  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.show_all(target_id, matches, dsh_api_client).await
-  }
-
-  async fn show_usage(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    todo!()
+    self.list_all(matches, dsh_api_client).await
   }
 }
 

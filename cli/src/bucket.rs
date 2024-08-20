@@ -40,7 +40,7 @@ impl SubjectCommand for BucketCommand {
   }
 
   fn list_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids, Flag::Tasks, Flag::Usage, Flag::Value]
+    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids]
   }
 
   fn show_flags(&self) -> &'static [Flag] {
