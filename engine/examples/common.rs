@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use trifonius_dsh_api::DEFAULT_DSH_API_CLIENT_FACTORY;
+use trifonius_dsh_api::DshApiClientFactory;
 use trifonius_engine::pipeline::PipelineName;
 use trifonius_engine::processor::processor_instance::ProcessorInstance;
 use trifonius_engine::processor::processor_registry::{ProcessorRegistry, DEFAULT_PROCESSOR_REGISTRY};
@@ -26,7 +26,7 @@ pub fn dsh_service_instance<'a>(processor_id: &'static str, pipeline_name: &'sta
   let processor_registry: &'static ProcessorRegistry = &DEFAULT_PROCESSOR_REGISTRY;
   let dsh_service_realization = processor_registry.processor_realization(ProcessorType::DshService, &processor_id).unwrap();
   dsh_service_realization
-    .processor_instance(Some(&pipeline_name), &processor_name, &DEFAULT_DSH_API_CLIENT_FACTORY)
+    .processor_instance(Some(&pipeline_name), &processor_name, DshApiClientFactory::default())
     .unwrap()
 }
 

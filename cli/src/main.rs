@@ -8,7 +8,7 @@ use std::sync::Arc;
 use clap::builder::styling;
 use clap::Command;
 
-use trifonius_dsh_api::{DshApiError, DEFAULT_DSH_API_CLIENT_FACTORY};
+use trifonius_dsh_api::{DshApiClient, DshApiError};
 
 use crate::app::APP_COMMAND;
 use crate::application::APPLICATION_COMMAND;
@@ -90,13 +90,13 @@ async fn main() {
 
   let matches = command.get_matches();
 
-  let dsh_api_client = &DEFAULT_DSH_API_CLIENT_FACTORY.client().await.expect("unable to create dsh api client");
+  let dsh_api_client = DshApiClient::default().await;
 
   let command_result = match matches.subcommand() {
     Some((command_name, sub_matches)) => match subject_command_registry.get(command_name) {
-      Some(subject_command) => subject_command.run_command(sub_matches, dsh_api_client).await,
+      Some(subject_command) => subject_command.run_command(sub_matches, &dsh_api_client).await,
       None => match subject_command_shortcut_registry.get(command_name) {
-        Some(subject_command) => subject_command.run_list_shortcut(sub_matches, dsh_api_client).await,
+        Some(subject_command) => subject_command.run_list_shortcut(sub_matches, &dsh_api_client).await,
         None => Err("unexpected error".to_string()),
       },
     },

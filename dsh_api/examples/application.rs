@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use trifonius_dsh_api::types::{AllocationStatus, Application, Task, TaskStatus};
-use trifonius_dsh_api::DEFAULT_DSH_API_CLIENT_FACTORY;
+use trifonius_dsh_api::DshApiClient;
 
 const APPLICATION_ID: &str = "consentfilter-test002";
 const TASK_ID: &str = "8f4b5747-lnmj4-00000000";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-  let client = &DEFAULT_DSH_API_CLIENT_FACTORY.client().await?;
+  let client = DshApiClient::default().await;
 
   // deploy_application
   // undeploy_application

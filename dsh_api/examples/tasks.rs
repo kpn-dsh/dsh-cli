@@ -1,5 +1,5 @@
 use trifonius_dsh_api::types::{AllocationStatus, Task};
-use trifonius_dsh_api::DEFAULT_DSH_API_CLIENT_FACTORY;
+use trifonius_dsh_api::DshApiClient;
 
 const SERVICE_ID: &str = "consentfilter-test002";
 const TASK_ID: &str = "8f4b5747-lnmj4-00000000";
@@ -9,7 +9,7 @@ async fn main() -> Result<(), String> {
   let application_id = SERVICE_ID;
   let task_id = TASK_ID;
 
-  let client = &DEFAULT_DSH_API_CLIENT_FACTORY.client().await?;
+  let client = DshApiClient::default().await;
 
   // Return applications that have derived tasks
   let applications: Vec<String> = client.get_application_ids_with_derived_tasks().await?;

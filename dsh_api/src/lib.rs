@@ -1,12 +1,10 @@
 #![doc(html_favicon_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
 #![doc(html_logo_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
 
-use std::env;
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
 use dsh_sdk::RestTokenFetcher;
-use lazy_static::lazy_static;
 use reqwest::Error as ReqwestError;
 
 pub use crate::generated::types;
@@ -82,22 +80,6 @@ pub enum DshApiError {
 
 pub type DshApiResult<T> = Result<T, DshApiError>;
 
-const TRIFONIUS_TARGET: &str = "TRIFONIUS_TARGET";
-const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
-const TRIFONIUS_TARGET_PLATFORM: &str = "TRIFONIUS_TARGET_PLATFORM";
-
-lazy_static! {
-  pub static ref DEFAULT_DSH_API_CLIENT_FACTORY: DshApiClientFactory = {
-    let tenant_name = get_env(TRIFONIUS_TARGET_TENANT);
-    let tenant_env_name = tenant_name.to_ascii_uppercase().replace('-', "_");
-    let user = get_env(format!("{}_TENANT_{}_USER", TRIFONIUS_TARGET, tenant_env_name).as_str());
-    let secret = get_env(format!("{}_TENANT_{}_SECRET", TRIFONIUS_TARGET, tenant_env_name).as_str());
-    let platform = DshPlatform::try_from(get_env(TRIFONIUS_TARGET_PLATFORM).as_str()).unwrap();
-    let dsh_api_tenant = DshApiTenant { platform, name: tenant_name, user };
-    DshApiClientFactory::create(dsh_api_tenant, secret).expect("could not create static target client factory")
-  };
-}
-
 impl Display for DshApiError {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
@@ -129,12 +111,5 @@ impl From<String> for DshApiError {
 impl From<DshApiError> for String {
   fn from(value: DshApiError) -> Self {
     value.to_string()
-  }
-}
-
-fn get_env(name: &str) -> String {
-  match env::var(name) {
-    Ok(value) => value,
-    Err(_) => panic!("environment variable {} not set", name),
   }
 }

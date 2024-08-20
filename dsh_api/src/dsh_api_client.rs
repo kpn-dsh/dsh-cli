@@ -1,11 +1,13 @@
 //! Client for accessing the DSH api
 
+use std::env;
 use std::fmt::{Display, Formatter};
 
 use bytes::Bytes;
 use dsh_sdk::Platform as SdkPlatform;
 use dsh_sdk::RestTokenFetcherBuilder;
 use futures::TryStreamExt;
+use lazy_static::lazy_static;
 use progenitor_client::{ByteStream, Error as ProgenitorError, ResponseValue as ProgenitorResponseValue};
 use reqwest::StatusCode as ReqwestStatusCode;
 use serde::Serialize;
@@ -91,6 +93,10 @@ impl From<ProgenitorError> for DshApiError {
 }
 
 impl DshApiClient<'_> {
+  pub async fn default() -> Self {
+    DEFAULT_DSH_API_CLIENT_FACTORY.client().await.expect("could not create dsh api client")
+  }
+
   pub fn api_version(&self) -> &'static str {
     self.generated_client.api_version()
   }
@@ -148,7 +154,27 @@ impl DshApiClient<'_> {
   }
 }
 
+const TRIFONIUS_TARGET: &str = "TRIFONIUS_TARGET";
+const TRIFONIUS_TARGET_TENANT: &str = "TRIFONIUS_TARGET_TENANT";
+const TRIFONIUS_TARGET_PLATFORM: &str = "TRIFONIUS_TARGET_PLATFORM";
+
+lazy_static! {
+  static ref DEFAULT_DSH_API_CLIENT_FACTORY: DshApiClientFactory = {
+    let tenant_name = get_env(TRIFONIUS_TARGET_TENANT);
+    let tenant_env_name = tenant_name.to_ascii_uppercase().replace('-', "_");
+    let user = get_env(format!("{}_TENANT_{}_USER", TRIFONIUS_TARGET, tenant_env_name).as_str());
+    let secret = get_env(format!("{}_TENANT_{}_SECRET", TRIFONIUS_TARGET, tenant_env_name).as_str());
+    let platform = DshPlatform::try_from(get_env(TRIFONIUS_TARGET_PLATFORM).as_str()).unwrap();
+    let dsh_api_tenant = DshApiTenant { platform, name: tenant_name, user };
+    DshApiClientFactory::create(dsh_api_tenant, secret).expect("could not create static target client factory")
+  };
+}
+
 impl DshApiClientFactory {
+  pub fn default() -> &'static DshApiClientFactory {
+    &DEFAULT_DSH_API_CLIENT_FACTORY
+  }
+
   pub fn platform(&self) -> &DshPlatform {
     &self.tenant.platform
   }
@@ -230,5 +256,12 @@ impl DshApiTenant {
 
   pub fn endpoint_rest_api(&self) -> String {
     self.platform.endpoint_rest_api()
+  }
+}
+
+fn get_env(name: &str) -> String {
+  match env::var(name) {
+    Ok(value) => value,
+    Err(_) => panic!("environment variable {} not set", name),
   }
 }

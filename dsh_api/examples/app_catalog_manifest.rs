@@ -1,9 +1,9 @@
 use trifonius_dsh_api::types::AppCatalogManifest;
-use trifonius_dsh_api::DEFAULT_DSH_API_CLIENT_FACTORY;
+use trifonius_dsh_api::DshApiClient;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-  let client = &DEFAULT_DSH_API_CLIENT_FACTORY.client().await?;
+  let client = DshApiClient::default().await;
 
   let manifests: Vec<AppCatalogManifest> = client.get_app_catalog_manifests().await?;
   for manifest in manifests {

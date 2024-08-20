@@ -6,7 +6,7 @@ use regex::Regex;
 use uuid::Uuid;
 
 use trifonius_dsh_api::platform::DshPlatform;
-use trifonius_dsh_api::{DshApiClient, DshApiClientFactory, DshApiTenant, DEFAULT_DSH_API_CLIENT_FACTORY};
+use trifonius_dsh_api::{DshApiClient, DshApiClientFactory, DshApiTenant};
 
 use crate::placeholder::PlaceHolder;
 
@@ -36,7 +36,7 @@ impl EngineTarget<'_> {
 
 lazy_static! {
   pub static ref DEFAULT_ENGINE_TARGET: EngineTarget<'static> = {
-    let dsh_api_client_factory = &DEFAULT_DSH_API_CLIENT_FACTORY;
+    let dsh_api_client_factory = &DshApiClientFactory::default();
     EngineTarget { dsh_api_client_factory, tenant: dsh_api_client_factory.tenant() }
   };
 }
