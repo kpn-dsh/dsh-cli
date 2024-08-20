@@ -178,14 +178,14 @@ pub trait SubjectCommand {
     if self.supports_update() {
       subcommands.push(self.update_subcommand())
     }
-    let command_name = format!("{}", self.subject());
+    let command_name = self.subject().to_string();
     let mut command = Command::new(&command_name)
       .about(self.about())
       .long_about(self.long_about())
       .arg_required_else_help(true)
       .subcommands(subcommands);
     if let Some(alias) = self.alias() {
-      command = command.alias(format!("{}", alias))
+      command = command.alias(alias.to_string())
     }
     (command_name, command)
   }
@@ -197,7 +197,7 @@ pub trait SubjectCommand {
       let mut list_shortcut_command = Command::new(&list_shortcut_command_name)
         .about(self.about())
         .long_about(self.long_about())
-        .args(self.flag_arguments(&self.list_flags()))
+        .args(self.flag_arguments(self.list_flags()))
         .hide(true);
       if let Some(alias) = self.alias() {
         list_shortcut_command = list_shortcut_command.alias(format!("{}s", alias))
@@ -369,7 +369,7 @@ pub trait SubjectCommand {
       .after_help(format!("Create a new {}", self.subject()))
       .after_long_help(format!("Create a new {}", self.subject()))
       .arg(self.target_argument())
-      .args(self.flag_arguments(&self.create_flags()))
+      .args(self.flag_arguments(self.create_flags()))
   }
 
   // Final
@@ -379,7 +379,7 @@ pub trait SubjectCommand {
       .after_help(format!("Delete {}", self.subject()))
       .after_long_help(format!("Delete {}", self.subject()))
       .arg(self.target_argument())
-      .args(self.flag_arguments(&self.delete_flags()))
+      .args(self.flag_arguments(self.delete_flags()))
   }
 
   // Final
@@ -387,7 +387,7 @@ pub trait SubjectCommand {
     Command::new(LIST_SUBCOMMAND)
       .about(format!("List {}s", self.subject()))
       .alias("l")
-      .args(self.flag_arguments(&self.list_flags()))
+      .args(self.flag_arguments(self.list_flags()))
       .after_help(format!("List {}s", self.subject()))
       .after_long_help(format!("List all available {}s", self.subject()))
   }
@@ -400,7 +400,7 @@ pub trait SubjectCommand {
       .after_help(format!("Show {} details", self.subject()))
       .after_long_help(format!("Show {} details", self.subject()))
       .arg(self.target_argument())
-      .args(self.flag_arguments(&self.show_flags()))
+      .args(self.flag_arguments(self.show_flags()))
   }
 
   // Final
@@ -410,7 +410,7 @@ pub trait SubjectCommand {
       .after_help(format!("Update an existing {}", self.subject()))
       .after_long_help(format!("Update an existing {}", self.subject()))
       .arg(self.target_argument())
-      .args(self.flag_arguments(&self.update_flags()))
+      .args(self.flag_arguments(self.update_flags()))
   }
 
   // Final
@@ -421,15 +421,6 @@ pub trait SubjectCommand {
       .value_name(self.subject_first_upper())
       .help(format!("{} name", self.subject_first_upper()))
       .long_help(format!("{} name", self.subject_first_upper()))
-  }
-
-  // Final
-  fn to_command_error(&self, error: DshApiError) -> CommandResult {
-    match error {
-      DshApiError::NotAuthorized => Err("not authorized".to_string()),
-      DshApiError::NotFound => Err(format!("{} not found", &self.subject())),
-      DshApiError::Unexpected(error) => Err(format!("unexpected error {}", error)),
-    }
   }
 
   // Final
