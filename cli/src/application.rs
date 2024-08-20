@@ -31,11 +31,11 @@ impl SubjectCommand for ApplicationCommand {
   }
 
   fn about(&self) -> String {
-    "Show application details".to_string()
+    "Show, manage and list DSH applications.".to_string()
   }
 
   fn long_about(&self) -> String {
-    "Show application details.".to_string()
+    "Show, manage and list applications deployed on the DSH.".to_string()
   }
 
   fn alias(&self) -> Option<&str> {

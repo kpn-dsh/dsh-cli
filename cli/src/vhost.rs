@@ -29,11 +29,11 @@ impl SubjectCommand for VhostCommand {
   }
 
   fn about(&self) -> String {
-    "Show vhost details".to_string()
+    "Show usage of vhosts.".to_string()
   }
 
   fn long_about(&self) -> String {
-    "Show vhost details".to_string()
+    "Show usage of hosts managed by the DSH. Note that at this time, vhosts can not be listed by this tool.".to_string()
   }
 
   fn alias(&self) -> Option<&str> {

@@ -30,11 +30,11 @@ impl SubjectCommand for SecretCommand {
   }
 
   fn about(&self) -> String {
-    "Show secret details".to_string()
+    "Show, manage and list DSH secrets.".to_string()
   }
 
   fn long_about(&self) -> String {
-    "Show secret details".to_string()
+    "Show, manage and list secrets used on the DSH.".to_string()
   }
 
   fn alias(&self) -> Option<&str> {
@@ -105,6 +105,10 @@ impl SubjectCommand for SecretCommand {
     let table = allocation_status_to_table(self.subject(), target_id, &allocation_status);
     print_table(table, "", "  ", "");
     Ok(())
+  }
+
+  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.show_allocation_status(target_id, matches, dsh_api_client).await
   }
 
   async fn show_usage(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {

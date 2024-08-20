@@ -35,11 +35,11 @@ impl SubjectCommand for ProcessorCommand {
   }
 
   fn about(&self) -> String {
-    "Show Trifonius processor details".to_string()
+    "Show, manage and list Trifonius processors".to_string()
   }
 
   fn long_about(&self) -> String {
-    "Show Trifonius processor details.".to_string()
+    "Show, manage and list Trifonius processor.".to_string()
   }
 
   fn alias(&self) -> Option<&str> {
@@ -52,10 +52,6 @@ impl SubjectCommand for ProcessorCommand {
 
   fn list_flags(&self) -> &'static [Flag] {
     &[Flag::All]
-  }
-
-  fn show_flags(&self) -> &'static [Flag] {
-    &[]
   }
 
   async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {

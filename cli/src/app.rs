@@ -34,15 +34,15 @@ impl SubjectCommand for AppCommand {
   }
 
   fn about(&self) -> String {
-    "Show app details".to_string()
+    "Show, manage and list apps.".to_string()
   }
 
   fn long_about(&self) -> String {
-    "Show app details.".to_string()
+    "Show, manage and list apps deployed from the DSH App Catalog.".to_string()
   }
 
   fn list_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::Configuration, Flag::AllocationStatus]
+    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids]
   }
 
   fn show_flags(&self) -> &'static [Flag] {

@@ -28,11 +28,11 @@ impl SubjectCommand for BucketCommand {
   }
 
   fn about(&self) -> String {
-    "Show bucket details".to_string()
+    "Show, manage and list DSH buckets.".to_string()
   }
 
   fn long_about(&self) -> String {
-    "Show bucket details".to_string()
+    "Show, manage and list buckets deployed on the DSH.".to_string()
   }
 
   fn alias(&self) -> Option<&str> {
@@ -86,6 +86,10 @@ impl SubjectCommand for BucketCommand {
     Ok(())
   }
 
+  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.list_ids(matches, dsh_api_client).await
+  }
+
   async fn list_ids(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
     for bucket_id in bucket_ids {
@@ -118,5 +122,9 @@ impl SubjectCommand for BucketCommand {
       },
       None => to_command_error_missing_id(self),
     }
+  }
+
+  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    self.show_all(target_id, matches, dsh_api_client).await
   }
 }

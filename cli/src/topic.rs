@@ -31,11 +31,11 @@ impl SubjectCommand for TopicCommand {
   }
 
   fn about(&self) -> String {
-    "Show topic details".to_string()
+    "Show, manage and list DSH topics.".to_string()
   }
 
   fn long_about(&self) -> String {
-    "Show topic details".to_string()
+    "Show, manage and list topics managed by the DSH. Note that 'tcli' can only work with stream and internal topics. Scratch topics can not be used by this tool.".to_string()
   }
 
   fn alias(&self) -> Option<&str> {
