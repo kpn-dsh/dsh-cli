@@ -30,7 +30,7 @@ impl SubjectCommand for EnvCommand {
   }
 
   fn about(&self) -> String {
-    "Find environment variables".to_string()
+    "Find environment variables.".to_string()
   }
 
   fn long_about(&self) -> String {

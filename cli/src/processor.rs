@@ -35,7 +35,7 @@ impl SubjectCommand for ProcessorCommand {
   }
 
   fn about(&self) -> String {
-    "Show, manage and list Trifonius processors".to_string()
+    "Show, manage and list Trifonius processors.".to_string()
   }
 
   fn long_about(&self) -> String {
