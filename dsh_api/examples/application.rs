@@ -58,7 +58,7 @@ async fn main() -> Result<(), String> {
   }
 
   // Show application task
-  let task_status: TaskStatus = client.get_application_task_status(APPLICATION_ID, TASK_ID).await?;
+  let task_status: TaskStatus = client.get_application_task(APPLICATION_ID, TASK_ID).await?;
   println!(
     "get_application_task({}, {})\n{}",
     APPLICATION_ID,

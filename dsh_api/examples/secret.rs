@@ -22,7 +22,7 @@ async fn main() -> Result<(), String> {
   let secret: String = client.get_secret("greenbox_backend_password").await?;
   println!("get_secret(greenbox_backend_password)\n{}", secret);
 
-  let secret_actual: Empty = client.get_secret_actual(test_secret_id).await?;
+  let secret_actual: Empty = client.get_secret_actual_configuration(test_secret_id).await?;
   println!("get_secret_actual({})\n{}", test_secret_id, serde_json::to_string_pretty(&secret_actual).unwrap());
 
   let secret_configuration: Empty = client.get_secret_configuration(test_secret_id).await?;

@@ -7,7 +7,7 @@
 //! * [`get_topic(topic_id) -> TopicStatus`](DshApiClient::get_topic)
 //! * [`get_topic_allocation_status(topic_id) -> AllocationStatus`](DshApiClient::get_topic_allocation_status)
 //! * [`get_topic_configuration(topic_id) -> Topic`](DshApiClient::get_topic_configuration)
-//! * [`get_topic_configuration_actual(topic_id) -> Topic`](DshApiClient::get_topic_configuration_actual)
+//! * [`get_topic_actual_configuration(topic_id) -> Topic`](DshApiClient::get_topic_actual_configuration)
 //! * [`get_topic_ids() -> Vec<String>`](DshApiClient::get_topic_ids)
 
 use crate::types::{AllocationStatus, Topic, TopicStatus};
@@ -24,7 +24,7 @@ use crate::{DshApiClient, DshApiResult};
 /// * [`get_topic(topic_id) -> TopicStatus`](DshApiClient::get_topic)
 /// * [`get_topic_allocation_status(topic_id) -> AllocationStatus`](DshApiClient::get_topic_allocation_status)
 /// * [`get_topic_configuration(topic_id) -> Topic`](DshApiClient::get_topic_configuration)
-/// * [`get_topic_configuration_actual(topic_id) -> Topic`](DshApiClient::get_topic_configuration_actual)
+/// * [`get_topic_actual_configuration(topic_id) -> Topic`](DshApiClient::get_topic_actual_configuration)
 /// * [`get_topic_ids() -> Vec<String>`](DshApiClient::get_topic_ids)
 impl DshApiClient<'_> {
   /// # Create topic
@@ -72,14 +72,14 @@ impl DshApiClient<'_> {
       .map(|result| result.1)
   }
 
-  /// # Return topic status
+  /// # Return topic
   ///
   /// `GET /allocation/{tenant}/topic/{id}`
   ///
   /// This method combines the results of the methods
   /// [`get_topic_allocation_status()`](DshApiClient::get_topic_allocation_status),
   /// [`get_topic_configuration()`](DshApiClient::get_topic_configuration) and
-  /// [`get_topic_configuration_actual()`](DshApiClient::get_topic_configuration_actual)
+  /// [`get_topic_configuration_actual()`](DshApiClient::get_topic_actual_configuration)
   /// into one method call.
   ///
   /// ## Parameters
@@ -99,7 +99,7 @@ impl DshApiClient<'_> {
       .map(|result| result.1)
   }
 
-  /// # Return topic status
+  /// # Return topic allocation status
   ///
   /// `GET /allocation/{tenant}/topic/{id}/status`
   ///
@@ -141,7 +141,7 @@ impl DshApiClient<'_> {
       .map(|result| result.1)
   }
 
-  /// # Return deployed topic configuration
+  /// # Return actual topic configuration
   ///
   /// `GET /allocation/{tenant}/topic/{id}/actual`
   ///
@@ -151,7 +151,7 @@ impl DshApiClient<'_> {
   /// ## Returns
   /// * `Ok<`[`Topic`]`>` - topic configuration
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_topic_configuration_actual(&self, topic_id: &str) -> DshApiResult<Topic> {
+  pub async fn get_topic_actual_configuration(&self, topic_id: &str) -> DshApiResult<Topic> {
     self
       .process(
         self

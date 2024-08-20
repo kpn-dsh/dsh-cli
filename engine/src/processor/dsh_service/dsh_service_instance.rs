@@ -107,7 +107,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
       self.client_factory.user().to_string(),
     )?;
     let client: DshApiClient = self.client_factory.client().await?;
-    match client.deploy_application(&self.dsh_service_name, dsh_application_config).await {
+    match client.create_application(&self.dsh_service_name, dsh_application_config).await {
       Ok(()) => Ok(()),
       Err(DshApiError::NotFound) => Err(format!("unexpected NotFound response when deploying service {}", &self.dsh_service_name)),
       Err(DshApiError::NotAuthorized) => Err(format!("authorization failure when deploying service {}", &self.dsh_service_name)),
@@ -172,7 +172,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
   }
 
   async fn undeploy(&self) -> Result<bool, String> {
-    match self.client_factory.client().await?.undeploy_application(&self.dsh_service_name).await {
+    match self.client_factory.client().await?.delete_application(&self.dsh_service_name).await {
       Ok(()) => Ok(true),
       Err(DshApiError::NotFound) => Ok(false),
       Err(DshApiError::NotAuthorized) => Ok(false),

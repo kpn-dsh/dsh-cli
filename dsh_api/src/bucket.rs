@@ -5,7 +5,7 @@
 //! * [`create_bucket(bucket_id, bucket)`](DshApiClient::create_bucket)
 //! * [`delete_bucket(bucket_id)`](DshApiClient::delete_bucket)
 //! * [`get_bucket(bucket_id) -> BucketStatus`](DshApiClient::get_bucket)
-//! * [`get_bucket_actual(bucket_id) -> Bucket`](DshApiClient::get_bucket_actual)
+//! * [`get_bucket_actual_configuration(bucket_id) -> Bucket`](DshApiClient::get_bucket_actual_configuration)
 //! * [`get_bucket_allocation_status(bucket_id) -> AllocationStatus`](DshApiClient::get_bucket_allocation_status)
 //! * [`get_bucket_configuration(bucket_id) -> Bucket`](DshApiClient::get_bucket_configuration)
 //! * [`get_bucket_ids(&self) -> Vec<String>`](DshApiClient::get_bucket_ids)
@@ -22,7 +22,7 @@ use crate::{DshApiClient, DshApiResult};
 /// * [`create_bucket(bucket_id, bucket)`](DshApiClient::create_bucket)
 /// * [`delete_bucket(bucket_id)`](DshApiClient::delete_bucket)
 /// * [`get_bucket(bucket_id) -> BucketStatus`](DshApiClient::get_bucket)
-/// * [`get_bucket_actual(bucket_id) -> Bucket`](DshApiClient::get_bucket_actual)
+/// * [`get_bucket_actual_configuration(bucket_id) -> Bucket`](DshApiClient::get_bucket_actual_configuration)
 /// * [`get_bucket_allocation_status(bucket_id) -> AllocationStatus`](DshApiClient::get_bucket_allocation_status)
 /// * [`get_bucket_configuration(bucket_id) -> Bucket`](DshApiClient::get_bucket_configuration)
 /// * [`get_bucket_ids(&self) -> Vec<String>`](DshApiClient::get_bucket_ids)
@@ -77,7 +77,7 @@ impl DshApiClient<'_> {
   /// `GET /allocation/{tenant}/bucket/{id}`
   ///
   /// This method combines the results of the methods
-  /// [`get_bucket_actual()`](DshApiClient::get_bucket_actual),
+  /// [`get_bucket_actual()`](DshApiClient::get_bucket_actual_configuration),
   /// [`get_bucket_allocation_status()`](DshApiClient::get_bucket_allocation_status) and
   /// [`get_bucket_configuration()`](DshApiClient::get_bucket_configuration)
   /// into one method call.
@@ -109,7 +109,7 @@ impl DshApiClient<'_> {
   /// ## Returns
   /// * `Ok<`[`Bucket`]`>` - indicates that bucket is ok
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_bucket_actual(&self, bucket_id: &str) -> DshApiResult<Bucket> {
+  pub async fn get_bucket_actual_configuration(&self, bucket_id: &str) -> DshApiResult<Bucket> {
     self
       .process(
         self

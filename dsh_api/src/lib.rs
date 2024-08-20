@@ -32,20 +32,25 @@ mod generated {
 // Actual is what is actual deployed
 
 // Naming conventions
-// create_[SUBJECT]                       (subject_id),SUBJECT  create SUBJECT
-// deploy_[SUBJECT]                       (subject_id),SUBJECT  deploy/create SUBJECT
-// get_[SUBJECT]                          subject_id            get SUBJECT/configuration by subject_id
-// get_[SUBJECT]_actual                   subject_id            get deployed SUBJECT/configuration by subject_id
-// get_[SUBJECT]_allocation_status        subject_id            get SUBJECT allocation status by subject_id
-// get_[SUBJECT]_ids                                            get all SUBJECTs/configurations
-// get_[SUBJECT]_[SUB]                    subject_id,sub_id     get SUB/configuration by subject_id and sub_id
-// get_[SUBJECT]_[SUB]_actual             subject_id,sub_id     get deployed SUB by subject_id and sub_id
-// get_[SUBJECT]_[SUB]_allocation_status  subject_id,sub_id     get SUB allocation status by subject_id and sub_id
-// get_[SUBJECT]_[SUB]_ids                subject_id,sub_id     get all SUB ids by subject_id
-// get_[SUBJECT]s                                               get all SUBJECTs/configurations
-// get_[SUBJECT]s_actual                                        get all deployed SUBJECTs/configurations
-// get_[SUBJECT]s_with_[SUB]_ids          subject_id            get ids of all SUBJECTs with SUB
-// undeploy_[SUBJECT]                     subject_id            undeploy/delete SUBJECT by subject_id
+// create_SUBJECT                        SUBJECT_id?, CONFIG    create SUBJECT
+// delete_SUBJECT                        SUBJECT_id             delete SUBJECT
+// deploy_SUBJECT                        SUBJECT_id?, CONFIG    deploy SUBJECT
+// get_SUBJECT                           SUBJECT_id             get all actual/current SUBJECT data, by SUBJECT_id
+// get_SUBJECT_[SUB]_allocation_status   SUBJECT_id, SUB_id     get SUB allocation status, by SUBJECT_id and SUB_id
+// get_SUBJECT_actual_configuration      SUBJECT_id             get actual/current configuration, by SUBJECT_id
+// get_SUBJECT_actual_configurations                            get actual/current configurations, for all SUBJECTs
+// get_SUBJECT_allocation_status         SUBJECT_id             get SUBJECT allocation status, by SUBJECT_id
+// get_SUBJECT_configuration             SUBJECT_id             get configuration provided at creation, by SUBJECT_id
+// get_SUBJECT_configurations                                   get configurations provided at creation, for all SUBJECTs
+// get_SUBJECT_derived_task_ids          SUBJECT_id             get all taskIids for all derived tasks, by SUBJECT_id
+// get_SUBJECT_ids                                              get all ids, for all SUBJECTs
+// get_SUBJECT_ids_with_derived_tasks                           get ids for all SUBJECTs that have derived tasks
+// get_SUBJECT_SPECIFIC                  SUBJECT_id             get SUBJECT specific data, by SUBJECT_id
+// get_SUBJECT_SPECIFICs                 SUBJECT_id             get SUBJECT specific data, for all SUBJECTs
+// get_SUBJECT_SUB_allocation_status     SUBJECT_id, SUB_id     get SUB allocation status, by SUBJECT_id and SUB_id
+// get_SUBJECTs                                                 get all actual/current SUBJECT data, for all SUBJECTs
+// undeploy_SUBJECT                      SUBJECT_id             undeploy SUBJECT, by SUBJECT_id
+// update_SUBJECT                        SUBJECT_id, CONFIG     deploy SUBJECT, by SUBJECT_id
 
 #[derive(Clone, Debug)]
 pub struct DshApiTenant {

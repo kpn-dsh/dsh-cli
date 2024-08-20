@@ -5,11 +5,11 @@
 //! * [`create_secret(secret) -> ()`](DshApiClient::create_secret)
 //! * [`delete_secret(secret_id) -> ()`](DshApiClient::delete_secret)
 //! * [`get_secret(secret_id) -> ByteStream`](DshApiClient::get_secret)
-//! * [`get_secret_actual(secret_id) -> Empty`](DshApiClient::get_secret_actual)
+//! * [`get_secret_actual_configuration(secret_id) -> Empty`](DshApiClient::get_secret_actual_configuration)
 //! * [`get_secret_allocation_status(secret_id) -> AllocationStatus`](DshApiClient::get_secret_allocation_status)
 //! * [`get_secret_configuration(secret_id) -> Empty`](DshApiClient::get_secret_configuration)
 //! * [`get_secret_ids() -> Vec<String>`](DshApiClient::get_secret_ids)
-//! * [`update_secret(secret_id) -> ()`](DshApiClient::update_secret)
+//! * [`update_secret(secret_id, secret) -> ()`](DshApiClient::update_secret)
 
 #[allow(unused_imports)]
 use crate::types::Empty;
@@ -25,11 +25,11 @@ use crate::{DshApiClient, DshApiResult};
 /// * [`create_secret(secret) -> ()`](DshApiClient::create_secret)
 /// * [`delete_secret(secret_id) -> ()`](DshApiClient::delete_secret)
 /// * [`get_secret(secret_id) -> ByteStream`](DshApiClient::get_secret)
-/// * [`get_secret_actual(secret_id) -> Empty`](DshApiClient::get_secret_actual)
+/// * [`get_secret_actual_configuration(secret_id) -> Empty`](DshApiClient::get_secret_actual_configuration)
 /// * [`get_secret_allocation_status(secret_id) -> AllocationStatus`](DshApiClient::get_secret_allocation_status)
 /// * [`get_secret_configuration(secret_id) -> Empty`](DshApiClient::get_secret_configuration)
 /// * [`get_secret_ids() -> Vec<String>`](DshApiClient::get_secret_ids)
-/// * [`update_secret(secret_id) -> ()`](DshApiClient::update_secret)
+/// * [`update_secret(secret_id, secret) -> ()`](DshApiClient::update_secret)
 impl DshApiClient<'_> {
   /// # Create secret
   ///
@@ -102,7 +102,7 @@ impl DshApiClient<'_> {
   /// ## Returns
   /// * `Ok<`[`Empty`]`>` - indicates that secret is ok, but the actual return value will be empty
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
-  pub async fn get_secret_actual(&self, secret_id: &str) -> DshApiResult<Empty> {
+  pub async fn get_secret_actual_configuration(&self, secret_id: &str) -> DshApiResult<Empty> {
     self
       .process(
         self
