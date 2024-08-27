@@ -4,33 +4,38 @@
 
 ### _Processor_
 
-A _Processor_ is an abstraction of a service that can be deployed to the DSH platform.
-By following this abstraction, all types of _Processors_ can be treated exactly the same,
+A _Processor_ is an abstraction of all data processing components under control of Trifonius.
+Following this abstraction, all processors can be treated exactly the same,
 e.g. all _Processors_ have `deploy()`, `start()`, `stop()` and `undeploy()` methods.
 Also, all _Processors_ can describe their capabilities and required instance parameters
-in the same way.
+in the same way, and describe how they can be connected to _Resources_ or other _Processors_.
+
+### _ProcessorTechnology_
+
+A _ProcessorTechnology_ is a technical solution by which Trifonius can realize the data _Processor_
+components. For example, the `dsh-service` processor technology supports the application
+of DSH containers on a DSH platform.
 
 ### _ProcessorRealization_
 
-_Processors_ need to be configured before they can be used.
-Typically, this is done by composing a configuration file.
-A _Processor_ together with its configuration yields a _ProcessorRealization_.
+A _ProcessorRealization_ defines how one specific component from a _ProcessorTechnology_
+can be used by Trifonius.
+Typically, this is done by composing a configuration file that further defines how a
+technology component (e.g. a DSH container) can be utilized.
+A _ProcessorTechnology_ together with its configuration yields a _ProcessorRealization_.
 These _ProcessorRealizations_ show up in the Trifonius user interface,
 where they can be selected and where all the required deployment parameters can be set.
 Also, the junctions (which connect a _Processor_ to the _Resources_) need to be defined.
 
-The configuration must specify things like,
+The configuration must specify things like
 
-* type, id, label, description and version for this _ProcessorRealization_,
+* technology, realization type, description and version for this _ProcessorRealization_,
 * inbound and outbound junctions, via which a _Processor_ can consume or produce its data,
 * deployment parameters, that the _Pipeline_ designer must provide when using this
   _ProcessorRealization_ in a _Pipeline_,
 * metadata and links that are relevant for this _ProcessorRealization_,
 * deployment _Profiles_,
 * parameters that are specific for this _ProcessorRealization_.
-
-A _ProcessorRealization_ has a one-to-one relation with a technical solution to deploy services on
-the DSH.
 
 ### _ProcessorInstance_
 
@@ -39,9 +44,9 @@ the _Pipeline_ designer must provide values for all required deployment paramete
 connect the junctions of the _ProcessorRealization_ to compatible _ResourceInstances_
 and select the _Profile_ to be used.
 The _ProcessorRealization_ together with these values yields a _ProcessorInstance_.
-_ProcessorInstances_ can only exist in the context of a _PipelineInstance_.
-Operations on the _PipelineInstance_, like `start()` or `stop()`,
-will result in operations on the _ProcessorInstances_ that constitute the _PipelineInstance_.
+_ProcessorInstances_ can only exist in the context of a _Pipeline_.
+Operations on the _Pipeline_, like `start()` or `stop()`,
+will result in operations on the _ProcessorInstances_ that constitute the _Pipeline_.
 
 ### Diagram
 
@@ -153,9 +158,9 @@ can be deployed via Trifonius.
 A `dsh-service` _Processor_ together with the configuration file yields a `ProcessorRealization`.
 Examples of `ProcessorRealizations` are:
 
-* `Greenbox Consent Filter`
-* `Regex Filter`
-* `Replicator`
+* `greenbox-consent-filter`
+* `egex-filter`
+* `replicator`
 
 ### `dsh-app` (_planned_)
 
@@ -171,6 +176,8 @@ A `dsh-app` _Processor_ together with the configuration file yields a `Processor
 
 ### _Resource_
 
+### _ResourceTechnology_
+
 ### _ResourceRealization_
 
 ### _ResourceInstance_
@@ -178,4 +185,3 @@ A `dsh-app` _Processor_ together with the configuration file yields a `Processor
 ## Pipelines
 
 ### _PipelineInstance_
-
