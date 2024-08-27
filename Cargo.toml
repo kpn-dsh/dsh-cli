@@ -11,5 +11,5 @@ authors = ["Wilbert Schelvis <wilbert.schelvis@kpn.com"]
 description = "Business logic for Trifonius project"
 edition = "2021"
 rust-version = "1.77"
-version = "0.0.6"
+version = "0.0.7"
 publish = ["artifactory"]
