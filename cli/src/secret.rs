@@ -7,78 +7,127 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiClient;
 
-use crate::command::SubjectCommand;
+use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table, allocation_status_to_table_row};
+use crate::subject::Subject;
 use crate::tabular::{make_tabular_with_headers, print_table};
 use crate::CommandResult;
 
-pub(crate) struct SecretCommand {}
+pub(crate) struct SecretSubject {}
+
+const SUBJECT_TARGET: &str = "secret";
 
 lazy_static! {
-  pub static ref SECRET_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(SecretCommand {});
+  pub static ref SECRET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SecretSubject {});
 }
 
 #[async_trait]
-impl SubjectCommand for SecretCommand {
+impl Subject for SecretSubject {
   fn subject(&self) -> &'static str {
-    "secret"
+    SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
     "Secret"
   }
 
-  fn about(&self) -> String {
+  fn subject_command_about(&self) -> String {
     "Show, manage and list DSH secrets.".to_string()
   }
 
-  fn long_about(&self) -> String {
-    "Show, manage and list secrets used on the DSH.".to_string()
+  fn subject_command_long_about(&self) -> String {
+    "Show, manage and list secrets used by the applications/services and apps on the DSH.".to_string()
   }
 
-  fn alias(&self) -> Option<&str> {
+  fn subject_command_name(&self) -> &str {
+    self.subject()
+  }
+
+  fn subject_command_alias(&self) -> Option<&str> {
     Some("s")
   }
 
-  fn list_flags(&self) -> &'static [FlagType] {
-    &[FlagType::All, FlagType::AllocationStatus, FlagType::Ids, FlagType::Usage]
+  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
+    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
+    capabilities.insert(CapabilityType::List, &SECRET_LIST_CAPABILITY);
+    capabilities.insert(CapabilityType::Show, &SECRET_SHOW_CAPABILITY);
+    capabilities
   }
+}
 
-  fn show_flags(&self) -> &'static [FlagType] {
-    &[FlagType::AllocationStatus, FlagType::Usage, FlagType::Value]
-  }
+lazy_static! {
+  pub static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::List,
+    command_about: "List secrets".to_string(),
+    command_long_about: Some("Lists all secrets used by the applications/services and apps on the DSH.".to_string()),
+    command_after_help: None,
+    command_after_long_help: None,
+    command_executors: vec![
+      (FlagType::All, &SecretListIds {}, None),
+      (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
+      (FlagType::Ids, &SecretListIds {}, None),
+      (FlagType::Usage, &SecretListUsage {}, None),
+    ],
+    default_command_executor: Some(&SecretListIds {}),
+    run_all_executors: true,
+    extra_arguments: vec![],
+    extra_flags: vec![],
+  });
+  pub static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::Show,
+    command_about: "Show secret configuration or value".to_string(),
+    command_long_about: None,
+    command_after_help: None,
+    command_after_long_help: None,
+    command_executors: vec![
+      (FlagType::AllocationStatus, &SecretShowAllocationStatus {}, None),
+      (FlagType::Usage, &SecretShowUsage {}, None),
+      (FlagType::Value, &SecretShowValue {}, None),
+    ],
+    default_command_executor: None,
+    run_all_executors: false,
+    extra_arguments: vec![],
+    extra_flags: vec![],
+  });
+}
 
-  async fn list_all(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.list_ids(matches, dsh_api_client).await
-  }
+struct SecretListAllocationStatus {}
 
-  async fn list_allocation_status(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+#[async_trait]
+impl CommandExecutor for SecretListAllocationStatus {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let secret_ids = dsh_api_client.get_secret_ids().await?;
     let allocation_statusses = futures::future::join_all(secret_ids.iter().map(|id| dsh_api_client.get_secret_allocation_status(id.as_str()))).await;
     let mut table = vec![];
     for (secret_id, secret_status) in secret_ids.iter().zip(allocation_statusses) {
       table.push(allocation_status_to_table_row(secret_id, secret_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(self.subject()), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
   }
+}
 
-  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.list_ids(matches, dsh_api_client).await
-  }
+struct SecretListIds {}
 
-  async fn list_ids(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+#[async_trait]
+impl CommandExecutor for SecretListIds {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let secret_ids = dsh_api_client.get_secret_ids().await?;
     for secret_id in secret_ids {
       println!("{}", secret_id)
     }
     Ok(())
   }
+}
 
-  async fn list_usages(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+struct SecretListUsage {}
+
+#[async_trait]
+impl CommandExecutor for SecretListUsage {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let applications = dsh_api_client.get_application_configurations().await?;
     let secret_ids = dsh_api_client.get_secret_ids().await?;
     let mut table: Vec<Vec<String>> = vec![];
@@ -99,21 +148,29 @@ impl SubjectCommand for SecretCommand {
     }
     Ok(())
   }
+}
 
-  async fn show_allocation_status(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let allocation_status = dsh_api_client.get_secret_allocation_status(target_id).await?;
-    let table = allocation_status_to_table(self.subject(), target_id, &allocation_status);
+struct SecretShowAllocationStatus {}
+
+#[async_trait]
+impl CommandExecutor for SecretShowAllocationStatus {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let secret_id = target.unwrap_or_else(|| unreachable!());
+    let allocation_status = dsh_api_client.get_secret_allocation_status(secret_id.as_str()).await?;
+    let table = allocation_status_to_table(SUBJECT_TARGET, secret_id.as_str(), &allocation_status);
     print_table(table, "", "  ", "");
     Ok(())
   }
+}
 
-  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.show_allocation_status(target_id, matches, dsh_api_client).await
-  }
+struct SecretShowUsage {}
 
-  async fn show_usage(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+#[async_trait]
+impl CommandExecutor for SecretShowUsage {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let secret_id = target.unwrap_or_else(|| unreachable!());
     let applications = dsh_api_client.get_application_configurations().await?;
-    let usage = applications_that_use_secret(target_id, &applications);
+    let usage = applications_that_use_secret(secret_id.as_str(), &applications);
     if !usage.is_empty() {
       let table: Vec<Vec<String>> = usage.iter().map(|(application_id, usage)| vec![application_id.clone(), usage.clone()]).collect();
       for line in make_tabular_with_headers(&["application", "usage"], table) {
@@ -124,9 +181,15 @@ impl SubjectCommand for SecretCommand {
     }
     Ok(())
   }
+}
 
-  async fn show_value(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let secret = dsh_api_client.get_secret(target_id).await?;
+struct SecretShowValue {}
+
+#[async_trait]
+impl CommandExecutor for SecretShowValue {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let secret_id = target.unwrap_or_else(|| unreachable!());
+    let secret = dsh_api_client.get_secret(secret_id.as_str()).await?;
     println!("{}", secret);
     Ok(())
   }

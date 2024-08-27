@@ -8,20 +8,25 @@ use std::sync::Arc;
 use clap::builder::styling;
 use clap::Command;
 
-use trifonius_dsh_api::DshApiClient;
+use trifonius_dsh_api::{DshApiClient, DshApiError};
 
+use crate::app::APP_SUBJECT;
+use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{set_verbosity_argument, verbosity_argument};
 use crate::bucket::BUCKET_SUBJECT;
+use crate::env::ENV_SUBJECT;
+use crate::manifest::MANIFEST_SUBJECT;
+use crate::processor::PROCESSOR_SUBJECT;
+use crate::secret::SECRET_SUBJECT;
 use crate::subject::{clap_subject_command, clap_subject_list_shortcut, Subject};
+use crate::topic::TOPIC_SUBJECT;
+use crate::vhost::VHOST_SUBJECT;
 
 mod app;
 mod application;
 mod arguments;
 mod bucket;
-// mod bucket2;
 mod capability;
-mod command;
-mod def_impl;
 mod env;
 mod flags;
 mod formatters;
@@ -52,7 +57,17 @@ async fn main() {
     .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
     .placeholder(styling::AnsiColor::Cyan.on_default());
 
-  let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![BUCKET_SUBJECT.as_ref()];
+  let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
+    APP_SUBJECT.as_ref(),
+    APPLICATION_SUBJECT.as_ref(),
+    BUCKET_SUBJECT.as_ref(),
+    ENV_SUBJECT.as_ref(),
+    MANIFEST_SUBJECT.as_ref(),
+    PROCESSOR_SUBJECT.as_ref(),
+    SECRET_SUBJECT.as_ref(),
+    TOPIC_SUBJECT.as_ref(),
+    VHOST_SUBJECT.as_ref(),
+  ];
 
   let mut subject_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
   let mut clap_commands: Vec<Command> = Vec::new();
@@ -104,22 +119,10 @@ async fn main() {
   }
 }
 
-// pub(crate) fn _to_command_error(error: DshApiError, subject_command: &dyn SubjectCommand) -> CommandResult {
-//   match error {
-//     DshApiError::NotAuthorized => Err("not authorized".to_string()),
-//     DshApiError::NotFound => Err(format!("{} not found", subject_command.subject())),
-//     DshApiError::Unexpected(error) => Err(format!("unexpected error, {}", error)),
-//   }
-// }
-
-// pub(crate) fn _to_command_error_with_id(error: DshApiError, subject_command: &dyn SubjectCommand, which: &str) -> CommandResult {
-//   match error {
-//     DshApiError::NotAuthorized => Err("not authorized".to_string()),
-//     DshApiError::NotFound => Err(format!("{} {} not found", subject_command.subject(), which)),
-//     DshApiError::Unexpected(error) => Err(format!("unexpected error, {}", error)),
-//   }
-// }
-
-// pub(crate) fn _to_command_error_missing_id(subject_command: &dyn SubjectCommand) -> CommandResult {
-//   Err(format!("missing {} id", subject_command.subject()))
-// }
+pub(crate) fn to_command_error_with_id(error: DshApiError, subject: &str, which: &str) -> CommandResult {
+  match error {
+    DshApiError::NotAuthorized => Err("not authorized".to_string()),
+    DshApiError::NotFound => Err(format!("{} {} not found", subject, which)),
+    DshApiError::Unexpected(error) => Err(format!("unexpected error, {}", error)),
+  }
+}

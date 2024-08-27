@@ -8,65 +8,74 @@ use trifonius_dsh_api::types::AppCatalogApp;
 use trifonius_dsh_api::DshApiClient;
 
 use crate::app::get_application_from_app;
-use crate::command::SubjectCommand;
+use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
+use crate::subject::Subject;
 use crate::tabular::make_tabular_with_headers;
 use crate::CommandResult;
 
-pub(crate) struct EnvCommand {}
+pub(crate) struct EnvSubject {}
+
+const SUBJECT_TARGET: &str = "env";
 
 lazy_static! {
-  pub static ref ENV_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(EnvCommand {});
+  pub static ref ENV_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(EnvSubject {});
 }
 
 #[async_trait]
-impl SubjectCommand for EnvCommand {
+impl Subject for EnvSubject {
   fn subject(&self) -> &'static str {
-    "env"
+    SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
     "Env"
   }
 
-  fn about(&self) -> String {
-    "Find environment variables.".to_string()
+  fn subject_command_about(&self) -> String {
+    "Find values used in configurations.".to_string()
   }
 
-  fn long_about(&self) -> String {
-    "Find environment".to_string()
+  fn subject_command_long_about(&self) -> String {
+    "Find values used in environment variables used to configure applications/services and apps deployed on the DSH.".to_string()
   }
 
-  fn alias(&self) -> Option<&str> {
+  fn subject_command_name(&self) -> &str {
+    self.subject()
+  }
+
+  fn subject_command_alias(&self) -> Option<&str> {
     Some("e")
   }
 
-  fn supports_find(&self) -> bool {
-    true
+  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
+    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
+    capabilities.insert(CapabilityType::Find, &ENV_FIND_CAPABILITY);
+    capabilities
   }
+}
 
-  fn supports_list(&self) -> bool {
-    false
-  }
+lazy_static! {
+  pub static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::Find,
+    command_about: "Find environment variable values".to_string(),
+    command_long_about: Some("Find values used in environment variables used to configure applications/services and apps deployed on the DSH.".to_string()),
+    command_after_help: None,
+    command_after_long_help: None,
+    command_executors: vec![(FlagType::App, &EnvFindInApps {}, None), (FlagType::Application, &EnvFindInApplications {}, None),],
+    default_command_executor: Some(&EnvFindInApplications {}),
+    run_all_executors: true,
+    extra_arguments: vec![],
+    extra_flags: vec![],
+  });
+}
 
-  fn supports_show(&self) -> bool {
-    false
-  }
+struct EnvFindInApps {}
 
-  fn find_flags(&self) -> &'static [FlagType] {
-    &[FlagType::All, FlagType::Apps, FlagType::Applications]
-  }
-
-  async fn find_all(&self, query: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.find_in_applications(query, matches, dsh_api_client).await?;
-    self.find_in_apps(query, matches, dsh_api_client).await
-  }
-
-  async fn find_default(&self, query: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.find_all(query, matches, dsh_api_client).await
-  }
-
-  async fn find_in_apps(&self, query: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+#[async_trait]
+impl CommandExecutor for EnvFindInApps {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let query = target.unwrap_or_else(|| unreachable!());
     let apps: &HashMap<String, AppCatalogApp> = &dsh_api_client.get_app_configurations().await?;
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     app_ids.sort();
@@ -77,7 +86,7 @@ impl SubjectCommand for EnvCommand {
         let mut keys: Vec<String> = application
           .env
           .iter()
-          .filter_map(|(key, value)| if query == value { Some(key.to_string()) } else { None })
+          .filter_map(|(key, value)| if &query == value { Some(key.to_string()) } else { None })
           .collect();
         if !keys.is_empty() {
           keys.sort();
@@ -90,8 +99,14 @@ impl SubjectCommand for EnvCommand {
     }
     Ok(())
   }
+}
 
-  async fn find_in_applications(&self, query: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+struct EnvFindInApplications {}
+
+#[async_trait]
+impl CommandExecutor for EnvFindInApplications {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let query = target.unwrap_or_else(|| unreachable!());
     let applications = &dsh_api_client.get_application_actual_configurations().await?;
     let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     application_ids.sort();
@@ -101,7 +116,7 @@ impl SubjectCommand for EnvCommand {
       let mut keys: Vec<String> = application
         .env
         .iter()
-        .filter_map(|(key, value)| if query == value { Some(key.to_string()) } else { None })
+        .filter_map(|(key, value)| if &query == value { Some(key.to_string()) } else { None })
         .collect();
       if !keys.is_empty() {
         keys.sort();

@@ -7,54 +7,108 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::{DshApiClient, DshApiResult};
 
-use crate::command::SubjectCommand;
+use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table, allocation_status_to_table_row};
 use crate::formatters::application::{application_to_default_vector, default_application_column_labels, default_application_table};
+use crate::subject::Subject;
 use crate::tabular::{make_tabular, make_tabular_with_headers, print_table, print_tabular};
-use crate::CommandResult;
+use crate::{to_command_error_with_id, CommandResult};
 
-pub(crate) struct ApplicationCommand {}
+pub(crate) struct ApplicationSubject {}
+
+const SUBJECT_TARGET: &str = "application";
 
 lazy_static! {
-  pub static ref APPLICATION_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(ApplicationCommand {});
+  pub static ref APPLICATION_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ApplicationSubject {});
 }
 
 #[async_trait]
-impl SubjectCommand for ApplicationCommand {
+impl Subject for ApplicationSubject {
   fn subject(&self) -> &'static str {
-    "application"
+    SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
     "Application"
   }
 
-  fn about(&self) -> String {
-    "Show, manage and list DSH applications.".to_string()
+  fn subject_command_about(&self) -> String {
+    "Show, manage and list DSH applications/services.".to_string()
   }
 
-  fn long_about(&self) -> String {
-    "Show, manage and list applications deployed on the DSH.".to_string()
+  fn subject_command_long_about(&self) -> String {
+    "Show, manage and list applications/services deployed on the DSH.".to_string()
   }
 
-  fn alias(&self) -> Option<&str> {
+  fn subject_command_name(&self) -> &str {
+    self.subject()
+  }
+
+  fn subject_command_alias(&self) -> Option<&str> {
     Some("a")
   }
 
-  fn list_flags(&self) -> &'static [FlagType] {
-    &[FlagType::All, FlagType::AllocationStatus, FlagType::Configuration, FlagType::Ids, FlagType::Tasks]
+  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
+    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
+    capabilities.insert(CapabilityType::List, &APPLICATION_LIST_CAPABILITY);
+    capabilities.insert(CapabilityType::Show, &APPLICATION_SHOW_CAPABILITY);
+    capabilities
   }
+}
 
-  fn show_flags(&self) -> &'static [FlagType] {
-    &[FlagType::All, FlagType::AllocationStatus, FlagType::Configuration, FlagType::Tasks]
-  }
+lazy_static! {
+  pub static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::List,
+    command_about: "List applications".to_string(),
+    command_long_about: Some("Lists all available DSH applications/services.".to_string()),
+    command_after_help: None,
+    command_after_long_help: None,
+    command_executors: vec![
+      (FlagType::All, &ApplicationListAll {}, None),
+      (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
+      (FlagType::Configuration, &ApplicationListConfiguration {}, None),
+      (FlagType::Ids, &ApplicationListIds {}, None),
+      (FlagType::Tasks, &ApplicationListTasks {}, None),
+    ],
+    default_command_executor: Some(&ApplicationListIds {}),
+    run_all_executors: true,
+    extra_arguments: vec![],
+    extra_flags: vec![],
+  });
+  pub static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::Show,
+    command_about: "Show application configuration".to_string(),
+    command_long_about: None,
+    command_after_help: None,
+    command_after_long_help: None,
+    command_executors: vec![
+      (FlagType::All, &ApplicationShowAll {}, None),
+      (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
+      (FlagType::Configuration, &ApplicationShowConfiguration {}, None),
+      (FlagType::Tasks, &ApplicationShowTasks {}, None),
+    ],
+    default_command_executor: Some(&ApplicationShowConfiguration {}),
+    run_all_executors: false,
+    extra_arguments: vec![],
+    extra_flags: vec![],
+  });
+}
 
-  async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+struct ApplicationListAll {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationListAll {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     print_applications(&dsh_api_client.get_application_actual_configurations().await?)
   }
+}
 
-  async fn list_allocation_status(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+struct ApplicationListAllocationStatus {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationListAllocationStatus {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let application_ids = dsh_api_client.get_application_ids().await?;
     let allocation_statuses = futures::future::join_all(
       application_ids
@@ -66,29 +120,40 @@ impl SubjectCommand for ApplicationCommand {
     for (id, allocation_status) in application_ids.iter().zip(allocation_statuses) {
       table.push(allocation_status_to_table_row(id, allocation_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(self.subject()), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
   }
+}
 
-  async fn list_configuration(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+struct ApplicationListConfiguration {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationListConfiguration {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     print_applications(&dsh_api_client.get_application_configurations().await?)
   }
+}
 
-  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.list_ids(matches, dsh_api_client).await
-  }
+struct ApplicationListIds {}
 
-  async fn list_ids(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+#[async_trait]
+impl CommandExecutor for ApplicationListIds {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let application_ids = dsh_api_client.get_application_ids().await?;
     for application_id in application_ids {
       println!("{}", application_id)
     }
     Ok(())
   }
+}
 
-  async fn list_tasks(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+struct ApplicationListTasks {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationListTasks {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let application_ids = dsh_api_client.get_application_ids_with_derived_tasks().await?;
     let tasks: Vec<DshApiResult<Vec<String>>> = futures::future::join_all(
       application_ids
@@ -123,51 +188,71 @@ impl SubjectCommand for ApplicationCommand {
     }
     Ok(())
   }
+}
 
-  async fn show_all(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    match dsh_api_client.get_application_actual_configuration(target_id).await {
+struct ApplicationShowAll {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationShowAll {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    match dsh_api_client.get_application_actual_configuration(application_id.as_str()).await {
       Ok(application) => {
-        let table = default_application_table(target_id, &application);
+        let table = default_application_table(application_id.as_str(), &application);
         let tabular = make_tabular(table, "", "  ", "");
         print_tabular("", &tabular);
         Ok(())
       }
-      Err(error) => self.to_command_error_with_id(error, target_id),
+      Err(error) => to_command_error_with_id(error, SUBJECT_TARGET, application_id.as_str()),
     }
   }
+}
 
-  async fn show_allocation_status(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let allocation_status = dsh_api_client.get_application_allocation_status(target_id).await?;
-    let table = allocation_status_to_table(self.subject(), target_id, &allocation_status);
+struct ApplicationShowAllocationStatus {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationShowAllocationStatus {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    let allocation_status = dsh_api_client.get_application_allocation_status(application_id.as_str()).await?;
+    let table = allocation_status_to_table(SUBJECT_TARGET, application_id.as_str(), &allocation_status);
     print_table(table, "", "  ", "");
     Ok(())
   }
+}
 
-  async fn show_configuration(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let application = dsh_api_client.get_application_configuration(target_id).await?;
-    let table = default_application_table(target_id, &application);
+struct ApplicationShowConfiguration {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationShowConfiguration {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    let application = dsh_api_client.get_application_configuration(application_id.as_str()).await?;
+    let table = default_application_table(application_id.as_str(), &application);
     let tabular = make_tabular(table, "", "  ", "");
     print_tabular("", &tabular);
     Ok(())
   }
+}
 
-  async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.show_configuration(target_id, matches, dsh_api_client).await
-  }
+struct ApplicationShowTasks {}
 
-  async fn show_tasks(&self, target_id: &str, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let task_ids = dsh_api_client.get_application_derived_task_ids(target_id).await?;
+#[async_trait]
+impl CommandExecutor for ApplicationShowTasks {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    let task_ids = dsh_api_client.get_application_derived_task_ids(application_id.as_str()).await?;
     let allocation_statuses = futures::future::join_all(
       task_ids
         .iter()
-        .map(|task_id| dsh_api_client.get_application_task_allocation_status(target_id, task_id.as_str())),
+        .map(|task_id| dsh_api_client.get_application_task_allocation_status(application_id.as_str(), task_id.as_str())),
     )
     .await;
     let mut table = vec![];
     for (task_id, allocation_status) in task_ids.iter().zip(allocation_statuses) {
       table.push(allocation_status_to_table_row(task_id, allocation_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(self.subject()), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())

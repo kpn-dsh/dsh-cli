@@ -70,7 +70,7 @@ pub(crate) fn query_argument(long_help: Option<&str>) -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("QUERY")
-    .help(format!("Query"));
+    .help("Query");
   if let Some(long_help) = long_help {
     query_argument = query_argument.long_help(long_help.to_string())
   }

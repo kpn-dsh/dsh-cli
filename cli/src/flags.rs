@@ -2,15 +2,14 @@ use clap::{Arg, ArgAction};
 
 use crate::flags::FlagType::*;
 use crate::subject::Subject;
-use crate::CommandResult;
 
 #[derive(Debug)]
 pub(crate) enum FlagType {
   Actual,
   All,
   AllocationStatus,
-  Applications,
-  Apps,
+  App,
+  Application,
   Configuration,
   Ids,
   Tasks,
@@ -24,8 +23,8 @@ impl FlagType {
       Actual => "actual-flag",
       All => "all-flag",
       AllocationStatus => "status-flag",
-      Applications => "applications-flag",
-      Apps => "apps-flag",
+      App => "app-flag",
+      Application => "application-flag",
       Configuration => "configuration-flag",
       Ids => "ids-flag",
       Tasks => "tasks-flag",
@@ -39,8 +38,8 @@ impl FlagType {
       Actual => "actual",
       All => "all",
       AllocationStatus => "status",
-      Applications => "application",
-      Apps => "app",
+      App => "app",
+      Application => "application",
       Configuration => "configuration",
       Ids => "ids",
       Tasks => "tasks",
@@ -54,18 +53,14 @@ impl FlagType {
       Actual => None,
       All => Some('a'),
       AllocationStatus => Some('s'),
-      Applications => None,
-      Apps => None,
+      App => None,
+      Application => None,
       Configuration => Some('c'),
       Ids => Some('i'),
       Tasks => None,
       Usage => Some('u'),
       Value => Some('v'),
     }
-  }
-
-  pub(crate) fn option_not_available(&self) -> CommandResult {
-    Err(format!("option --{} not available", &self.option()))
   }
 }
 
@@ -74,8 +69,8 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
     Actual => actual_flag(subject, long_help),
     All => all_flag(subject, long_help),
     AllocationStatus => allocation_status_flag(subject, long_help),
-    Applications => applications_flag(subject, long_help),
-    Apps => apps_flag(subject, long_help),
+    App => app_flag(subject, long_help),
+    Application => application_flag(subject, long_help),
     Configuration => configuration_flag(subject, long_help),
     Ids => ids_flag(subject, long_help),
     Tasks => tasks_flag(subject, long_help),
@@ -101,13 +96,13 @@ fn allocation_status_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Ar
   )
 }
 
-fn apps_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Apps, subject, format!("Include apps related to this {}.", subject.subject()).as_str(), long_help)
+fn app_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(App, subject, format!("Include apps related to this {}.", subject.subject()).as_str(), long_help)
 }
 
-fn applications_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+fn application_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(
-    Applications,
+    Application,
     subject,
     format!("Include applications related to this {}.", subject.subject()).as_str(),
     long_help,

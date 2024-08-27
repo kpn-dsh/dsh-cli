@@ -3,9 +3,8 @@ use clap::{Arg, ArgMatches, Command};
 
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT};
+use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT, TARGET_ARGUMENT};
 use crate::capability::CapabilityType::*;
-use crate::command::TARGET_ARGUMENT;
 use crate::flags::{create_flag, FlagType};
 use crate::subject::Subject;
 use crate::CommandResult;
@@ -149,8 +148,8 @@ pub(crate) struct DeclarativeCapability<'a> {
   pub(crate) command_long_about: Option<String>,
   pub(crate) command_after_help: Option<String>,
   pub(crate) command_after_long_help: Option<String>,
-  pub(crate) command_executors: Vec<(FlagType, Box<&'a (dyn CommandExecutor + Send + Sync)>, Option<&'a str>)>,
-  pub(crate) default_command_executor: Option<Box<&'a (dyn CommandExecutor + Send + Sync)>>,
+  pub(crate) command_executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<&'a str>)>,
+  pub(crate) default_command_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
   pub(crate) run_all_executors: bool,
   pub(crate) extra_arguments: Vec<Arg>,
   pub(crate) extra_flags: Vec<Arg>,
@@ -198,17 +197,24 @@ impl Capability for DeclarativeCapability<'_> {
   }
 
   async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let mut matching_flag_found = false;
-    for (flag_type, executor, _) in &self.command_executors {
-      if matches.get_flag(flag_type.id()) {
-        matching_flag_found = true;
-        if !self.run_all_executors {
+    let mut at_least_one_executed = false;
+    if self.run_all_executors {
+      for (flag_type, executor, _) in &self.command_executors {
+        if matches.get_flag(flag_type.id()) {
+          executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await?;
+          at_least_one_executed = true;
+        }
+      }
+    } else {
+      for (flag_type, executor, _) in &self.command_executors {
+        if matches.get_flag(flag_type.id()) {
+          executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await?;
+          at_least_one_executed = true;
           break;
         }
-        executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await?;
       }
     }
-    if !matching_flag_found {
+    if !at_least_one_executed {
       if let Some(ref default_executor) = self.default_command_executor {
         default_executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await
       } else {
@@ -219,45 +225,3 @@ impl Capability for DeclarativeCapability<'_> {
     }
   }
 }
-
-// impl DeclarativeCapability<'_> {
-//   pub(crate) fn new(capability_type: CapabilityType, about: String) -> Self {
-//     Self {
-//       capability_type,
-//       command_about: about,
-//       command_long_about: None,
-//       command_after_help: None,
-//       command_after_long_help: None,
-//       command_executors: vec![],
-//       default_command_executor: None,
-//       run_all_executors: false,
-//       extra_arguments: vec![],
-//       extra_flags: vec![],
-//     }
-//   }
-//
-//   pub(crate) fn set_long_about(&mut self, long_about: String) -> &Self {
-//     self.command_long_about = Some(long_about);
-//     self
-//   }
-//
-//   pub(crate) fn set_after_help(&mut self, after_help: String) -> &Self {
-//     self.command_after_help = Some(after_help);
-//     self
-//   }
-//
-//   pub(crate) fn set_after_long_help(&mut self, after_long_help: String) -> &Self {
-//     self.command_after_long_help = Some(after_long_help);
-//     self
-//   }
-//
-//   pub(crate) fn add_extra_argument(&mut self, extra_argument: Arg) -> &Self {
-//     self.extra_arguments.push(extra_argument);
-//     self
-//   }
-//
-//   pub(crate) fn add_extra_flag(&mut self, flag: Arg) -> &Self {
-//     self.extra_flags.push(flag);
-//     self
-//   }
-// }

@@ -61,15 +61,15 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List buckets".to_string(),
     command_long_about: Some("Lists all available buckets.".to_string()),
-    command_after_help: Some("".to_string()),
-    command_after_long_help: Some("".to_string()),
+    command_after_help: None,
+    command_after_long_help: None,
     command_executors: vec![
-      (FlagType::All, Box::new(&ListAll {}), None),
-      (FlagType::AllocationStatus, Box::new(&ListAllocationStatus {}), None),
-      (FlagType::Configuration, Box::new(&ListConfiguration {}), None),
-      (FlagType::Ids, Box::new(&ListIds {}), None),
+      (FlagType::All, &BucketListAll {}, None),
+      (FlagType::AllocationStatus, &BucketListAllocationStatus {}, None),
+      (FlagType::Configuration, &BucketListConfiguration {}, None),
+      (FlagType::Ids, &BucketListIds {}, None),
     ],
-    default_command_executor: Some(Box::new(&ListIds {})),
+    default_command_executor: Some(&BucketListIds {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![],
@@ -77,21 +77,21 @@ lazy_static! {
   pub static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
     command_about: "Show bucket configuration".to_string(),
-    command_long_about: Some("".to_string()),
-    command_after_help: Some("".to_string()),
-    command_after_long_help: Some("".to_string()),
-    command_executors: vec![(FlagType::All, Box::new(&ShowAll {}), None), (FlagType::AllocationStatus, Box::new(&ShowAllocationStatus {}), None),],
-    default_command_executor: Some(Box::new(&ShowAll {})),
+    command_long_about: None,
+    command_after_help: None,
+    command_after_long_help: None,
+    command_executors: vec![(FlagType::All, &BucketShowAll {}, None), (FlagType::AllocationStatus, &BucketShowAllocationStatus {}, None),],
+    default_command_executor: Some(&BucketShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
     extra_flags: vec![],
   });
 }
 
-struct ListAll {}
+struct BucketListAll {}
 
 #[async_trait]
-impl CommandExecutor for ListAll {
+impl CommandExecutor for BucketListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
     let bucket_statuses = futures::future::join_all(bucket_ids.iter().map(|id| dsh_api_client.get_bucket(id.as_str()))).await;
@@ -106,10 +106,10 @@ impl CommandExecutor for ListAll {
   }
 }
 
-struct ListAllocationStatus {}
+struct BucketListAllocationStatus {}
 
 #[async_trait]
-impl CommandExecutor for ListAllocationStatus {
+impl CommandExecutor for BucketListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
     let allocation_statuses = futures::future::join_all(bucket_ids.iter().map(|bucket_id| dsh_api_client.get_bucket_allocation_status(bucket_id))).await;
@@ -124,10 +124,10 @@ impl CommandExecutor for ListAllocationStatus {
   }
 }
 
-struct ListConfiguration {}
+struct BucketListConfiguration {}
 
 #[async_trait]
-impl CommandExecutor for ListConfiguration {
+impl CommandExecutor for BucketListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
     let buckets = futures::future::join_all(bucket_ids.iter().map(|id| dsh_api_client.get_bucket_configuration(id.as_str()))).await;
@@ -142,10 +142,10 @@ impl CommandExecutor for ListConfiguration {
   }
 }
 
-struct ListIds {}
+struct BucketListIds {}
 
 #[async_trait]
-impl CommandExecutor for ListIds {
+impl CommandExecutor for BucketListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
     for bucket_id in bucket_ids {
@@ -155,23 +155,25 @@ impl CommandExecutor for ListIds {
   }
 }
 
-struct ShowAll {}
+struct BucketShowAll {}
 
 #[async_trait]
-impl CommandExecutor for ShowAll {
-  async fn execute(&self, argument: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let bucket = dsh_api_client.get_bucket(argument.unwrap().as_str()).await?;
+impl CommandExecutor for BucketShowAll {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let bucket_id = target.unwrap_or_else(|| unreachable!());
+    let bucket = dsh_api_client.get_bucket(bucket_id.as_str()).await?;
     println!("{:?}", bucket);
     Ok(())
   }
 }
 
-struct ShowAllocationStatus {}
+struct BucketShowAllocationStatus {}
 
 #[async_trait]
-impl CommandExecutor for ShowAllocationStatus {
-  async fn execute(&self, argument: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let allocation_status = dsh_api_client.get_bucket_allocation_status(argument.unwrap().as_str()).await?;
+impl CommandExecutor for BucketShowAllocationStatus {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+    let bucket_id = target.unwrap_or_else(|| unreachable!());
+    let allocation_status = dsh_api_client.get_bucket_allocation_status(bucket_id.as_str()).await?;
     println!("{}", serde_json::to_string_pretty(&allocation_status).unwrap());
     Ok(())
   }

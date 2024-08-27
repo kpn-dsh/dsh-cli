@@ -7,8 +7,9 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiClient;
 
-use crate::command::SubjectCommand;
+use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
+use crate::subject::Subject;
 use crate::tabular::make_tabular_with_headers;
 use crate::CommandResult;
 
@@ -18,43 +19,67 @@ const TRIFONIUS_PROCESSOR_NAME: &str = "TRIFONIUS_PROCESSOR_NAME";
 const TRIFONIUS_PROCESSOR_TYPE: &str = "TRIFONIUS_PROCESSOR_TYPE";
 const TRIFONIUS_SERVICE_NAME: &str = "TRIFONIUS_SERVICE_NAME";
 
-pub(crate) struct ProcessorCommand {}
+pub(crate) struct ProcessorSubject {}
+
+const SUBJECT_TARGET: &str = "processor";
 
 lazy_static! {
-  pub static ref PROCESSOR_COMMAND: Box<(dyn SubjectCommand + Send + Sync)> = Box::new(ProcessorCommand {});
+  pub static ref PROCESSOR_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ProcessorSubject {});
 }
 
 #[async_trait]
-impl SubjectCommand for ProcessorCommand {
+impl Subject for ProcessorSubject {
   fn subject(&self) -> &'static str {
-    "processor"
+    SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
     "Processor"
   }
 
-  fn about(&self) -> String {
+  fn subject_command_about(&self) -> String {
     "Show, manage and list Trifonius processors.".to_string()
   }
 
-  fn long_about(&self) -> String {
-    "Show, manage and list Trifonius processor.".to_string()
+  fn subject_command_long_about(&self) -> String {
+    "Show, manage and list Trifonius processors.".to_string()
   }
 
-  fn alias(&self) -> Option<&str> {
+  fn subject_command_name(&self) -> &str {
+    self.subject()
+  }
+
+  fn subject_command_alias(&self) -> Option<&str> {
     Some("p")
   }
 
-  fn supports_show(&self) -> bool {
-    false
+  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
+    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
+    capabilities.insert(CapabilityType::List, &PROCESSORS_LIST_CAPABILITY);
+    capabilities
   }
+}
 
-  fn list_flags(&self) -> &'static [FlagType] {
-    &[FlagType::All]
-  }
+lazy_static! {
+  pub static ref PROCESSORS_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::List,
+    command_about: "List Trifonius processors".to_string(),
+    command_long_about: Some("Lists all available Trifonius processors.".to_string()),
+    command_after_help: None,
+    command_after_long_help: None,
+    command_executors: vec![(FlagType::All, &ListAll {}, None),],
+    default_command_executor: Some(&ListAll {}),
+    run_all_executors: true,
+    extra_arguments: vec![],
+    extra_flags: vec![],
+  });
+}
 
-  async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+struct ListAll {}
+
+#[async_trait]
+impl CommandExecutor for ListAll {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let applications = dsh_api_client.get_application_configurations().await?;
     let mut table: Vec<Vec<String>> = vec![];
     for (application_id, application) in applications {
@@ -83,10 +108,6 @@ impl SubjectCommand for ProcessorCommand {
       println!("{}", line)
     }
     Ok(())
-  }
-
-  async fn list_default(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    self.list_all(matches, dsh_api_client).await
   }
 }
 
