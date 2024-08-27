@@ -198,20 +198,6 @@ impl DshApiClient<'_> {
   /// * `Ok<Vec<String>>` - vector containing names of all derived tasks for the application
   /// * `Err<`[`DshApiError`]`>` - when the request could not be processed by the DSH
   pub async fn get_application_derived_task_ids(&self, application_id: &str) -> DshApiResult<Vec<String>> {
-    // let mut task_ids: Vec<String> = self
-    //   .process(
-    //     self
-    //       .generated_client
-    //       .application_get_by_tenant_task_by_appid(self.tenant_name(), application_id, self.token())
-    //       .await,
-    //   )?
-    //   .1
-    //   // .map(|result| result.1)
-    //   .map(|task_id| task_id.to_string())
-    //   .collect();
-    // task_ids.sort();
-    // Ok(task_ids)
-
     let mut task_ids: Vec<String> = self
       .process(
         self
