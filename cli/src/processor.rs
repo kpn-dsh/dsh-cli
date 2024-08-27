@@ -21,7 +21,7 @@ const TRIFONIUS_SERVICE_NAME: &str = "TRIFONIUS_SERVICE_NAME";
 
 pub(crate) struct ProcessorSubject {}
 
-const SUBJECT_TARGET: &str = "processor";
+const PROCESSOR_SUBJECT_TARGET: &str = "processor";
 
 lazy_static! {
   pub static ref PROCESSOR_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ProcessorSubject {});
@@ -30,7 +30,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for ProcessorSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    PROCESSOR_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {

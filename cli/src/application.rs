@@ -17,7 +17,7 @@ use crate::{to_command_error_with_id, CommandResult};
 
 pub(crate) struct ApplicationSubject {}
 
-const SUBJECT_TARGET: &str = "application";
+const APPLICATION_SUBJECT_TARGET: &str = "application";
 
 lazy_static! {
   pub static ref APPLICATION_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ApplicationSubject {});
@@ -26,7 +26,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for ApplicationSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    APPLICATION_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
@@ -120,7 +120,7 @@ impl CommandExecutor for ApplicationListAllocationStatus {
     for (id, allocation_status) in application_ids.iter().zip(allocation_statuses) {
       table.push(allocation_status_to_table_row(id, allocation_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(APPLICATION_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
@@ -203,7 +203,7 @@ impl CommandExecutor for ApplicationShowAll {
         print_tabular("", &tabular);
         Ok(())
       }
-      Err(error) => to_command_error_with_id(error, SUBJECT_TARGET, application_id.as_str()),
+      Err(error) => to_command_error_with_id(error, APPLICATION_SUBJECT_TARGET, application_id.as_str()),
     }
   }
 }
@@ -215,7 +215,7 @@ impl CommandExecutor for ApplicationShowAllocationStatus {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let application_id = target.unwrap_or_else(|| unreachable!());
     let allocation_status = dsh_api_client.get_application_allocation_status(application_id.as_str()).await?;
-    let table = allocation_status_to_table(SUBJECT_TARGET, application_id.as_str(), &allocation_status);
+    let table = allocation_status_to_table(APPLICATION_SUBJECT_TARGET, application_id.as_str(), &allocation_status);
     print_table(table, "", "  ", "");
     Ok(())
   }
@@ -252,7 +252,7 @@ impl CommandExecutor for ApplicationShowTasks {
     for (task_id, allocation_status) in task_ids.iter().zip(allocation_statuses) {
       table.push(allocation_status_to_table_row(task_id, allocation_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(APPLICATION_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())

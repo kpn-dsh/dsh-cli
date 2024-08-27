@@ -16,7 +16,7 @@ use crate::CommandResult;
 
 pub(crate) struct SecretSubject {}
 
-const SUBJECT_TARGET: &str = "secret";
+const SECRET_SUBJECT_TARGET: &str = "secret";
 
 lazy_static! {
   pub static ref SECRET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SecretSubject {});
@@ -25,7 +25,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for SecretSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    SECRET_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
@@ -103,7 +103,7 @@ impl CommandExecutor for SecretListAllocationStatus {
     for (secret_id, secret_status) in secret_ids.iter().zip(allocation_statusses) {
       table.push(allocation_status_to_table_row(secret_id, secret_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SECRET_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
@@ -157,7 +157,7 @@ impl CommandExecutor for SecretShowAllocationStatus {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     let allocation_status = dsh_api_client.get_secret_allocation_status(secret_id.as_str()).await?;
-    let table = allocation_status_to_table(SUBJECT_TARGET, secret_id.as_str(), &allocation_status);
+    let table = allocation_status_to_table(SECRET_SUBJECT_TARGET, secret_id.as_str(), &allocation_status);
     print_table(table, "", "  ", "");
     Ok(())
   }

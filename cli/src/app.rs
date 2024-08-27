@@ -18,7 +18,7 @@ use crate::CommandResult;
 
 pub(crate) struct AppSubject {}
 
-const SUBJECT_TARGET: &str = "app";
+const APP_SUBJECT_TARGET: &str = "app";
 
 lazy_static! {
   pub static ref APP_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(AppSubject {});
@@ -27,7 +27,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for AppSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    APP_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
@@ -101,7 +101,7 @@ impl CommandExecutor for AppListAllocationStatus {
     for (app_id, allocation_status) in app_ids.iter().zip(allocation_statuses) {
       table.push(allocation_status_to_table_row(app_id, allocation_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(APP_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())

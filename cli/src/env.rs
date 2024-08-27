@@ -16,7 +16,7 @@ use crate::CommandResult;
 
 pub(crate) struct EnvSubject {}
 
-const SUBJECT_TARGET: &str = "env";
+const ENV_SUBJECT_TARGET: &str = "env";
 
 lazy_static! {
   pub static ref ENV_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(EnvSubject {});
@@ -25,7 +25,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for EnvSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    ENV_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {

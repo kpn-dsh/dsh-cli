@@ -17,7 +17,7 @@ use crate::CommandResult;
 
 pub(crate) struct TopicSubject {}
 
-const SUBJECT_TARGET: &str = "topic";
+const TOPIC_SUBJECT_TARGET: &str = "topic";
 
 lazy_static! {
   pub static ref TOPIC_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TopicSubject {});
@@ -26,7 +26,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for TopicSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    TOPIC_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
@@ -106,7 +106,7 @@ impl CommandExecutor for TopicListAll {
       let topic_status = dsh_api_client.get_topic(topic_id).await?;
       table.push(topic_status_to_table_row(topic_id, &topic_status));
     }
-    for line in make_tabular_with_headers(&topic_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&topic_status_table_column_labels(TOPIC_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
@@ -124,7 +124,7 @@ impl CommandExecutor for TopicListAllocationStatus {
     for (topic_id, topic_status) in topic_ids.iter().zip(allocation_statuses) {
       table.push(allocation_status_to_table_row(topic_id, topic_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(TOPIC_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
@@ -142,7 +142,7 @@ impl CommandExecutor for TopicListConfiguration {
       let topic = dsh_api_client.get_topic_configuration(topic_id).await?;
       table.push(topic_configuration_to_table_row(topic_id, &topic));
     }
-    for line in make_tabular_with_headers(&topic_configuration_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&topic_configuration_table_column_labels(TOPIC_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())

@@ -16,7 +16,7 @@ use crate::CommandResult;
 
 pub(crate) struct VhostSubject {}
 
-const SUBJECT_TARGET: &str = "vhost";
+const VHOST_SUBJECT_TARGET: &str = "vhost";
 
 lazy_static! {
   pub static ref VHOST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(VhostSubject {});
@@ -25,7 +25,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for VhostSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    VHOST_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {

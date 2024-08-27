@@ -18,7 +18,7 @@ use crate::CommandResult;
 
 pub(crate) struct ManifestSubject {}
 
-const SUBJECT_TARGET: &str = "manifest";
+const MANIFEST_SUBJECT_TARGET: &str = "manifest";
 
 lazy_static! {
   pub static ref MANIFEST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ManifestSubject {});
@@ -27,7 +27,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for ManifestSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    MANIFEST_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {

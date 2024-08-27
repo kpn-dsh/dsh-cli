@@ -16,7 +16,7 @@ use crate::CommandResult;
 
 pub(crate) struct BucketSubject {}
 
-const SUBJECT_TARGET: &str = "bucket";
+const BUCKET_SUBJECT_TARGET: &str = "bucket";
 
 lazy_static! {
   pub static ref BUCKET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(BucketSubject {});
@@ -25,7 +25,7 @@ lazy_static! {
 #[async_trait]
 impl Subject for BucketSubject {
   fn subject(&self) -> &'static str {
-    SUBJECT_TARGET
+    BUCKET_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
@@ -99,7 +99,7 @@ impl CommandExecutor for BucketListAll {
     for (bucket_id, bucket_status) in bucket_ids.iter().zip(bucket_statuses) {
       table.push(bucket_status_to_table_row(bucket_id, bucket_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&bucket_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&bucket_status_table_column_labels(BUCKET_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
@@ -117,7 +117,7 @@ impl CommandExecutor for BucketListAllocationStatus {
     for (bucket_id, allocation_status) in bucket_ids.iter().zip(allocation_statuses) {
       table.push(allocation_status_to_table_row(bucket_id, allocation_status.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&allocation_status_table_column_labels(BUCKET_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
@@ -135,7 +135,7 @@ impl CommandExecutor for BucketListConfiguration {
     for (bucket_id, bucket) in bucket_ids.iter().zip(buckets) {
       table.push(bucket_to_table_row(bucket_id, bucket.ok().as_ref()));
     }
-    for line in make_tabular_with_headers(&bucket_table_column_labels(SUBJECT_TARGET), table) {
+    for line in make_tabular_with_headers(&bucket_table_column_labels(BUCKET_SUBJECT_TARGET), table) {
       println!("{}", line)
     }
     Ok(())
