@@ -6,6 +6,7 @@ use std::str::Utf8Error;
 
 use dsh_sdk::RestTokenFetcher;
 use reqwest::Error as ReqwestError;
+use serde_json::Error as SerdeJsonError;
 
 pub use crate::generated::types;
 use crate::generated::Client as GeneratedClient;
@@ -87,6 +88,12 @@ impl Display for DshApiError {
       DshApiError::NotFound => write!(f, "not found"),
       DshApiError::Unexpected(message) => write!(f, "unexpected error ({})", message),
     }
+  }
+}
+
+impl From<SerdeJsonError> for DshApiError {
+  fn from(error: SerdeJsonError) -> Self {
+    DshApiError::Unexpected(error.to_string())
   }
 }
 
