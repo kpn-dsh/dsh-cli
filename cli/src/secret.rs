@@ -7,8 +7,8 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::Flag;
 use crate::command::SubjectCommand;
+use crate::flags::FlagType;
 use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table, allocation_status_to_table_row};
 use crate::tabular::{make_tabular_with_headers, print_table};
 use crate::CommandResult;
@@ -41,12 +41,12 @@ impl SubjectCommand for SecretCommand {
     Some("s")
   }
 
-  fn list_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::AllocationStatus, Flag::Ids, Flag::Usage]
+  fn list_flags(&self) -> &'static [FlagType] {
+    &[FlagType::All, FlagType::AllocationStatus, FlagType::Ids, FlagType::Usage]
   }
 
-  fn show_flags(&self) -> &'static [Flag] {
-    &[Flag::AllocationStatus, Flag::Usage, Flag::Value]
+  fn show_flags(&self) -> &'static [FlagType] {
+    &[FlagType::AllocationStatus, FlagType::Usage, FlagType::Value]
   }
 
   async fn list_all(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {

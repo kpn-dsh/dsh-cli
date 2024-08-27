@@ -7,8 +7,8 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::{DshApiClient, DshApiResult};
 
-use crate::arguments::Flag;
 use crate::command::SubjectCommand;
+use crate::flags::FlagType;
 use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table, allocation_status_to_table_row};
 use crate::formatters::application::{application_to_default_vector, default_application_column_labels, default_application_table};
 use crate::tabular::{make_tabular, make_tabular_with_headers, print_table, print_tabular};
@@ -42,12 +42,12 @@ impl SubjectCommand for ApplicationCommand {
     Some("a")
   }
 
-  fn list_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids, Flag::Tasks]
+  fn list_flags(&self) -> &'static [FlagType] {
+    &[FlagType::All, FlagType::AllocationStatus, FlagType::Configuration, FlagType::Ids, FlagType::Tasks]
   }
 
-  fn show_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Tasks]
+  fn show_flags(&self) -> &'static [FlagType] {
+    &[FlagType::All, FlagType::AllocationStatus, FlagType::Configuration, FlagType::Tasks]
   }
 
   async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {

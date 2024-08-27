@@ -5,8 +5,8 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue, Application};
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::Flag;
 use crate::command::SubjectCommand;
+use crate::flags::FlagType;
 use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table_row};
 use crate::formatters::app::{app_to_default_vector, default_app_column_labels};
 use crate::formatters::application::default_application_table;
@@ -41,12 +41,12 @@ impl SubjectCommand for AppCommand {
     "Show, manage and list apps deployed from the DSH App Catalog.".to_string()
   }
 
-  fn list_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::AllocationStatus, Flag::Configuration, Flag::Ids]
+  fn list_flags(&self) -> &'static [FlagType] {
+    &[FlagType::All, FlagType::AllocationStatus, FlagType::Configuration, FlagType::Ids]
   }
 
-  fn show_flags(&self) -> &'static [Flag] {
-    &[Flag::All]
+  fn show_flags(&self) -> &'static [FlagType] {
+    &[FlagType::All]
   }
 
   async fn list_all(&self, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {

@@ -7,8 +7,8 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::PortMapping;
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::Flag;
 use crate::command::SubjectCommand;
+use crate::flags::FlagType;
 use crate::tabular::make_tabular_with_headers;
 use crate::CommandResult;
 
@@ -45,8 +45,8 @@ impl SubjectCommand for VhostCommand {
     false
   }
 
-  fn show_flags(&self) -> &'static [Flag] {
-    &[Flag::Usage]
+  fn show_flags(&self) -> &'static [FlagType] {
+    &[FlagType::Usage]
   }
 
   async fn show_default(&self, target_id: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {

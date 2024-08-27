@@ -8,8 +8,8 @@ use trifonius_dsh_api::types::AppCatalogApp;
 use trifonius_dsh_api::DshApiClient;
 
 use crate::app::get_application_from_app;
-use crate::arguments::Flag;
 use crate::command::SubjectCommand;
+use crate::flags::FlagType;
 use crate::tabular::make_tabular_with_headers;
 use crate::CommandResult;
 
@@ -53,8 +53,8 @@ impl SubjectCommand for EnvCommand {
     false
   }
 
-  fn find_flags(&self) -> &'static [Flag] {
-    &[Flag::All, Flag::Apps, Flag::Applications]
+  fn find_flags(&self) -> &'static [FlagType] {
+    &[FlagType::All, FlagType::Apps, FlagType::Applications]
   }
 
   async fn find_all(&self, query: &str, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {

@@ -4,8 +4,8 @@ use clap::ArgMatches;
 
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::Flag;
 use crate::command::SubjectCommand;
+use crate::flags::FlagType;
 use crate::CommandResult;
 
 pub(crate) struct DefImplCommand {}
@@ -39,11 +39,11 @@ impl SubjectCommand for DefImplCommand {
     todo!()
   }
 
-  fn list_flags(&self) -> &'static [Flag] {
+  fn list_flags(&self) -> &'static [FlagType] {
     todo!()
   }
 
-  fn show_flags(&self) -> &'static [Flag] {
+  fn show_flags(&self) -> &'static [FlagType] {
     todo!()
   }
 

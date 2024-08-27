@@ -8,29 +8,27 @@ use std::sync::Arc;
 use clap::builder::styling;
 use clap::Command;
 
-use trifonius_dsh_api::{DshApiClient, DshApiError};
+use trifonius_dsh_api::DshApiClient;
 
-use crate::app::APP_COMMAND;
-use crate::application::APPLICATION_COMMAND;
 use crate::arguments::{set_verbosity_argument, verbosity_argument};
-use crate::bucket::BUCKET_COMMAND;
-use crate::command::SubjectCommand;
-use crate::env::ENV_COMMAND;
-use crate::processor::PROCESSOR_COMMAND;
-use crate::secret::SECRET_COMMAND;
-use crate::topic::TOPIC_COMMAND;
-use crate::vhost::VHOST_COMMAND;
+use crate::bucket::BUCKET_SUBJECT;
+use crate::subject::{clap_subject_command, clap_subject_list_shortcut, Subject};
 
 mod app;
 mod application;
 mod arguments;
 mod bucket;
+// mod bucket2;
+mod capability;
 mod command;
 mod def_impl;
 mod env;
+mod flags;
 mod formatters;
+mod manifest;
 mod processor;
 mod secret;
+mod subject;
 mod tabular;
 mod topic;
 mod vhost;
@@ -54,21 +52,20 @@ async fn main() {
     .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
     .placeholder(styling::AnsiColor::Cyan.on_default());
 
-  let subject_commands: Vec<&Box<dyn SubjectCommand + Send + Sync>> =
-    vec![&APP_COMMAND, &APPLICATION_COMMAND, &BUCKET_COMMAND, &ENV_COMMAND, &PROCESSOR_COMMAND, &SECRET_COMMAND, &TOPIC_COMMAND, &VHOST_COMMAND];
+  let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![BUCKET_SUBJECT.as_ref()];
 
-  let mut subject_command_registry: HashMap<String, &Box<dyn SubjectCommand + Send + Sync>> = HashMap::new();
-  let mut subject_command_shortcut_registry: HashMap<String, &Box<dyn SubjectCommand + Send + Sync>> = HashMap::new();
-
+  let mut subject_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
   let mut clap_commands: Vec<Command> = Vec::new();
 
-  for subject_command in subject_commands {
-    let (command_name, clap_command) = subject_command.create_command();
-    subject_command_registry.insert(command_name.to_string(), subject_command);
+  let mut subject_list_shortcut_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
+
+  for subject in subjects {
+    let (command_name, clap_command) = clap_subject_command(subject);
+    subject_registry.insert(command_name.to_string(), subject);
     clap_commands.push(clap_command);
-    if let Some((list_shortcut_command_name, list_shortcut_clap_command)) = subject_command.create_list_shortcut_command() {
-      subject_command_shortcut_registry.insert(list_shortcut_command_name.to_string(), subject_command);
-      clap_commands.push(list_shortcut_clap_command);
+    if let Some((list_shortcut_name, clap_list_shortcut)) = clap_subject_list_shortcut(subject) {
+      subject_list_shortcut_registry.insert(list_shortcut_name.to_string(), subject);
+      clap_commands.push(clap_list_shortcut);
     }
   }
 
@@ -93,36 +90,36 @@ async fn main() {
   let dsh_api_client = DshApiClient::default_client().await;
 
   let command_result = match matches.subcommand() {
-    Some((command_name, sub_matches)) => match subject_command_registry.get(command_name) {
-      Some(subject_command) => subject_command.run_command(sub_matches, &dsh_api_client).await,
-      None => match subject_command_shortcut_registry.get(command_name) {
-        Some(subject_command) => subject_command.run_list_shortcut(sub_matches, &dsh_api_client).await,
-        None => Err("unexpected error".to_string()),
+    Some((command_name, sub_matches)) => match subject_registry.get(command_name) {
+      Some(subject) => subject.execute_subject_command(sub_matches, &dsh_api_client).await,
+      None => match subject_list_shortcut_registry.get(command_name) {
+        Some(subject) => subject.execute_subject_list_shortcut(sub_matches, &dsh_api_client).await,
+        None => Err("unexpected error, list shortcut not found".to_string()),
       },
     },
-    None => Err("unexpected error".to_string()),
+    None => Err("unexpected error, no subcommand".to_string()),
   };
   if let Err(message) = command_result {
     println!("{}", message);
   }
 }
 
-pub(crate) fn _to_command_error(error: DshApiError, subject_command: &dyn SubjectCommand) -> CommandResult {
-  match error {
-    DshApiError::NotAuthorized => Err("not authorized".to_string()),
-    DshApiError::NotFound => Err(format!("{} not found", subject_command.subject())),
-    DshApiError::Unexpected(error) => Err(format!("unexpected error {}", error)),
-  }
-}
+// pub(crate) fn _to_command_error(error: DshApiError, subject_command: &dyn SubjectCommand) -> CommandResult {
+//   match error {
+//     DshApiError::NotAuthorized => Err("not authorized".to_string()),
+//     DshApiError::NotFound => Err(format!("{} not found", subject_command.subject())),
+//     DshApiError::Unexpected(error) => Err(format!("unexpected error, {}", error)),
+//   }
+// }
 
-pub(crate) fn to_command_error_with_id(error: DshApiError, subject_command: &dyn SubjectCommand, which: &str) -> CommandResult {
-  match error {
-    DshApiError::NotAuthorized => Err("not authorized".to_string()),
-    DshApiError::NotFound => Err(format!("{} {} not found", subject_command.subject(), which)),
-    DshApiError::Unexpected(error) => Err(format!("unexpected error {}", error)),
-  }
-}
+// pub(crate) fn _to_command_error_with_id(error: DshApiError, subject_command: &dyn SubjectCommand, which: &str) -> CommandResult {
+//   match error {
+//     DshApiError::NotAuthorized => Err("not authorized".to_string()),
+//     DshApiError::NotFound => Err(format!("{} {} not found", subject_command.subject(), which)),
+//     DshApiError::Unexpected(error) => Err(format!("unexpected error, {}", error)),
+//   }
+// }
 
-pub(crate) fn to_command_error_missing_id(subject_command: &dyn SubjectCommand) -> CommandResult {
-  Err(format!("missing {} id", subject_command.subject()))
-}
+// pub(crate) fn _to_command_error_missing_id(subject_command: &dyn SubjectCommand) -> CommandResult {
+//   Err(format!("missing {} id", subject_command.subject()))
+// }

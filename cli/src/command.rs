@@ -3,7 +3,7 @@ use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 
 use trifonius_dsh_api::{DshApiClient, DshApiError};
 
-use crate::arguments::Flag;
+use crate::flags::FlagType;
 use crate::CommandResult;
 
 pub(crate) const CREATE_SUBCOMMAND: &str = "create";
@@ -63,37 +63,37 @@ pub trait SubjectCommand {
   }
 
   // Default implementation
-  fn create_flags(&self) -> &'static [Flag] {
+  fn create_flags(&self) -> &'static [FlagType] {
     &[]
   }
 
   // Default implementation
-  fn delete_flags(&self) -> &'static [Flag] {
+  fn delete_flags(&self) -> &'static [FlagType] {
     &[]
   }
 
   // Default implementation
-  fn find_flags(&self) -> &'static [Flag] {
+  fn find_flags(&self) -> &'static [FlagType] {
     &[]
   }
 
   // Default implementation
-  fn list_flags(&self) -> &'static [Flag] {
+  fn list_flags(&self) -> &'static [FlagType] {
     &[]
   }
 
   // Default implementation
-  fn show_flags(&self) -> &'static [Flag] {
+  fn show_flags(&self) -> &'static [FlagType] {
     &[]
   }
 
   // Default implementation
-  fn update_flags(&self) -> &'static [Flag] {
+  fn update_flags(&self) -> &'static [FlagType] {
     &[]
   }
 
   async fn find_all(&self, _query: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::All.option_not_available()
+    FlagType::All.option_not_available()
   }
 
   // Default implementation
@@ -103,31 +103,31 @@ pub trait SubjectCommand {
 
   // Default implementation
   async fn find_in_apps(&self, _query: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Apps.option_not_available()
+    FlagType::Apps.option_not_available()
   }
 
   // Default implementation
   async fn find_in_applications(&self, _query: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Applications.option_not_available()
+    FlagType::Applications.option_not_available()
   }
 
   // Default implementation
   async fn find_in_tasks(&self, _query: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Tasks.option_not_available()
+    FlagType::Tasks.option_not_available()
   }
 
   async fn list_all(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::All.option_not_available()
+    FlagType::All.option_not_available()
   }
 
   // Default implementation
   async fn list_allocation_status(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::AllocationStatus.option_not_available()
+    FlagType::AllocationStatus.option_not_available()
   }
 
   // Default implementation
   async fn list_configuration(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Configuration.option_not_available()
+    FlagType::Configuration.option_not_available()
   }
 
   // Default implementation
@@ -137,42 +137,42 @@ pub trait SubjectCommand {
 
   // Default implementation
   async fn list_ids(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Ids.option_not_available()
+    FlagType::Ids.option_not_available()
   }
 
   // Default implementation
   async fn list_tasks(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Tasks.option_not_available()
+    FlagType::Tasks.option_not_available()
   }
 
   // Default implementation
   async fn list_usages(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Usage.option_not_available()
+    FlagType::Usage.option_not_available()
   }
 
   // Default implementation
   async fn list_values(&self, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Value.option_not_available()
+    FlagType::Value.option_not_available()
   }
 
   // Default implementation
   async fn show_all(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::All.option_not_available()
+    FlagType::All.option_not_available()
   }
 
   // Default implementation
   async fn show_allocation_status(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::AllocationStatus.option_not_available()
+    FlagType::AllocationStatus.option_not_available()
   }
 
   // Default implementation
   async fn show_configuration(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Configuration.option_not_available()
+    FlagType::Configuration.option_not_available()
   }
 
   // Default implementation
   async fn show_ids(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Ids.option_not_available()
+    FlagType::Ids.option_not_available()
   }
 
   // Default implementation
@@ -182,17 +182,17 @@ pub trait SubjectCommand {
 
   // Default implementation
   async fn show_tasks(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Tasks.option_not_available()
+    FlagType::Tasks.option_not_available()
   }
 
   // Default implementation
   async fn show_usage(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Usage.option_not_available()
+    FlagType::Usage.option_not_available()
   }
 
   // Default implementation
   async fn show_value(&self, _target_id: &str, _matches: &ArgMatches, _dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    Flag::Value.option_not_available()
+    FlagType::Value.option_not_available()
   }
 
   // Final
@@ -267,10 +267,10 @@ pub trait SubjectCommand {
         for flag in self.find_flags() {
           if matches.get_flag(flag.id()) {
             match flag {
-              Flag::All => self.find_all(query, matches, dsh_api_client).await?,
-              Flag::Apps => self.find_in_apps(query, matches, dsh_api_client).await?,
-              Flag::Applications => self.find_in_applications(query, matches, dsh_api_client).await?,
-              Flag::Tasks => self.find_in_tasks(query, matches, dsh_api_client).await?,
+              FlagType::All => self.find_all(query, matches, dsh_api_client).await?,
+              FlagType::Apps => self.find_in_apps(query, matches, dsh_api_client).await?,
+              FlagType::Applications => self.find_in_applications(query, matches, dsh_api_client).await?,
+              FlagType::Tasks => self.find_in_tasks(query, matches, dsh_api_client).await?,
               _ => {}
             }
             has_run = true;
@@ -292,13 +292,13 @@ pub trait SubjectCommand {
     for flag in self.list_flags() {
       if matches.get_flag(flag.id()) {
         match flag {
-          Flag::All => self.list_all(matches, dsh_api_client).await?,
-          Flag::AllocationStatus => self.list_allocation_status(matches, dsh_api_client).await?,
-          Flag::Configuration => self.list_configuration(matches, dsh_api_client).await?,
-          Flag::Ids => self.list_ids(matches, dsh_api_client).await?,
-          Flag::Tasks => self.list_tasks(matches, dsh_api_client).await?,
-          Flag::Usage => self.list_usages(matches, dsh_api_client).await?,
-          Flag::Value => self.list_values(matches, dsh_api_client).await?,
+          FlagType::All => self.list_all(matches, dsh_api_client).await?,
+          FlagType::AllocationStatus => self.list_allocation_status(matches, dsh_api_client).await?,
+          FlagType::Configuration => self.list_configuration(matches, dsh_api_client).await?,
+          FlagType::Ids => self.list_ids(matches, dsh_api_client).await?,
+          FlagType::Tasks => self.list_tasks(matches, dsh_api_client).await?,
+          FlagType::Usage => self.list_usages(matches, dsh_api_client).await?,
+          FlagType::Value => self.list_values(matches, dsh_api_client).await?,
           _ => {}
         }
         has_run = true;
@@ -324,13 +324,13 @@ pub trait SubjectCommand {
         for flag in self.show_flags() {
           if matches.get_flag(flag.id()) {
             match flag {
-              Flag::All => self.show_all(target_id, matches, dsh_api_client).await?,
-              Flag::AllocationStatus => self.show_allocation_status(target_id, matches, dsh_api_client).await?,
-              Flag::Configuration => self.show_configuration(target_id, matches, dsh_api_client).await?,
-              Flag::Ids => self.show_ids(target_id, matches, dsh_api_client).await?,
-              Flag::Tasks => self.show_tasks(target_id, matches, dsh_api_client).await?,
-              Flag::Usage => self.show_usage(target_id, matches, dsh_api_client).await?,
-              Flag::Value => self.show_value(target_id, matches, dsh_api_client).await?,
+              FlagType::All => self.show_all(target_id, matches, dsh_api_client).await?,
+              FlagType::AllocationStatus => self.show_allocation_status(target_id, matches, dsh_api_client).await?,
+              FlagType::Configuration => self.show_configuration(target_id, matches, dsh_api_client).await?,
+              FlagType::Ids => self.show_ids(target_id, matches, dsh_api_client).await?,
+              FlagType::Tasks => self.show_tasks(target_id, matches, dsh_api_client).await?,
+              FlagType::Usage => self.show_usage(target_id, matches, dsh_api_client).await?,
+              FlagType::Value => self.show_value(target_id, matches, dsh_api_client).await?,
               _ => {}
             }
             has_run = true;
@@ -346,27 +346,28 @@ pub trait SubjectCommand {
   }
 
   // Final
-  fn flag_arguments(&self, flags: &[Flag]) -> Vec<Arg> {
+  fn flag_arguments(&self, flags: &[FlagType]) -> Vec<Arg> {
     flags
       .iter()
       .map(|flag| match flag {
-        Flag::All => self.all_flag(),
-        Flag::AllocationStatus => self.allocation_status_flag(),
-        Flag::Applications => self.apps_flag(),
-        Flag::Apps => self.applications_flag(),
-        Flag::Configuration => self.configuration_flag(),
-        Flag::Ids => self.ids_flag(),
-        Flag::Tasks => self.tasks_flag(),
-        Flag::Usage => self.usage_flag(),
-        Flag::Value => self.value_flag(),
+        FlagType::Actual => todo!(),
+        FlagType::All => self.all_flag(),
+        FlagType::AllocationStatus => self.allocation_status_flag(),
+        FlagType::Applications => self.apps_flag(),
+        FlagType::Apps => self.applications_flag(),
+        FlagType::Configuration => self.configuration_flag(),
+        FlagType::Ids => self.ids_flag(),
+        FlagType::Tasks => self.tasks_flag(),
+        FlagType::Usage => self.usage_flag(),
+        FlagType::Value => self.value_flag(),
       })
       .collect()
   }
 
   // Final
   fn all_flag(&self) -> Arg {
-    Arg::new(Flag::All.id())
-      .long(Flag::All.option())
+    Arg::new(FlagType::All.id())
+      .long(FlagType::All.option())
       .short('a')
       .action(ArgAction::SetTrue)
       .help(format!("Show actual {}", self.subject()))
@@ -375,8 +376,8 @@ pub trait SubjectCommand {
 
   // Final
   fn allocation_status_flag(&self) -> Arg {
-    Arg::new(Flag::AllocationStatus.id())
-      .long(Flag::AllocationStatus.option())
+    Arg::new(FlagType::AllocationStatus.id())
+      .long(FlagType::AllocationStatus.option())
       .short('s')
       .action(ArgAction::SetTrue)
       .help(format!("Show {}'s allocation status", self.subject()))
@@ -385,8 +386,8 @@ pub trait SubjectCommand {
 
   // Final
   fn apps_flag(&self) -> Arg {
-    Arg::new(Flag::Apps.id())
-      .long(Flag::Apps.option())
+    Arg::new(FlagType::Apps.id())
+      .long(FlagType::Apps.option())
       .action(ArgAction::SetTrue)
       .help("Show apps")
       .long_help("Show app.")
@@ -394,8 +395,8 @@ pub trait SubjectCommand {
 
   // Final
   fn applications_flag(&self) -> Arg {
-    Arg::new(Flag::Applications.id())
-      .long(Flag::Applications.option())
+    Arg::new(FlagType::Applications.id())
+      .long(FlagType::Applications.option())
       .action(ArgAction::SetTrue)
       .help("Show applications")
       .long_help("Show applications.")
@@ -403,8 +404,8 @@ pub trait SubjectCommand {
 
   // Final
   fn configuration_flag(&self) -> Arg {
-    Arg::new(Flag::Configuration.id())
-      .long(Flag::Configuration.option())
+    Arg::new(FlagType::Configuration.id())
+      .long(FlagType::Configuration.option())
       .short('c')
       .action(ArgAction::SetTrue)
       .help(format!("Show {}'s configuration", self.subject()))
@@ -413,8 +414,8 @@ pub trait SubjectCommand {
 
   // Final
   fn ids_flag(&self) -> Arg {
-    Arg::new(Flag::Ids.id())
-      .long(Flag::Ids.option())
+    Arg::new(FlagType::Ids.id())
+      .long(FlagType::Ids.option())
       .short('i')
       .action(ArgAction::SetTrue)
       .help(format!("Show {}'s identifiers", self.subject()))
@@ -423,8 +424,8 @@ pub trait SubjectCommand {
 
   // Final
   fn tasks_flag(&self) -> Arg {
-    Arg::new(Flag::Tasks.id())
-      .long(Flag::Tasks.option())
+    Arg::new(FlagType::Tasks.id())
+      .long(FlagType::Tasks.option())
       .action(ArgAction::SetTrue)
       .help(format!("Show {}'s tasks", self.subject()))
       .long_help(format!("Show {}'s tasks information.", self.subject()))
@@ -432,8 +433,8 @@ pub trait SubjectCommand {
 
   // Final
   fn usage_flag(&self) -> Arg {
-    Arg::new(Flag::Usage.id())
-      .long(Flag::Usage.option())
+    Arg::new(FlagType::Usage.id())
+      .long(FlagType::Usage.option())
       .short('u')
       .action(ArgAction::SetTrue)
       .help(format!("Show {}'s usage", self.subject()))
@@ -442,8 +443,8 @@ pub trait SubjectCommand {
 
   // Final
   fn value_flag(&self) -> Arg {
-    Arg::new(Flag::Value.id())
-      .long(Flag::Value.option())
+    Arg::new(FlagType::Value.id())
+      .long(FlagType::Value.option())
       .short('v')
       .action(ArgAction::SetTrue)
       .help(format!("Show {}'s value", self.subject()))
@@ -527,7 +528,7 @@ pub trait SubjectCommand {
     match error {
       DshApiError::NotAuthorized => Err("not authorized".to_string()),
       DshApiError::NotFound => Err(format!("{} {} not found", &self.subject(), which)),
-      DshApiError::Unexpected(error) => Err(format!("unexpected error {}", error)),
+      DshApiError::Unexpected(error) => Err(format!("unexpected error, {}", error)),
     }
   }
 

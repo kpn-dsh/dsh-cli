@@ -7,8 +7,8 @@ use lazy_static::lazy_static;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiClient;
 
-use crate::arguments::Flag;
 use crate::command::SubjectCommand;
+use crate::flags::FlagType;
 use crate::tabular::make_tabular_with_headers;
 use crate::CommandResult;
 
@@ -50,8 +50,8 @@ impl SubjectCommand for ProcessorCommand {
     false
   }
 
-  fn list_flags(&self) -> &'static [Flag] {
-    &[Flag::All]
+  fn list_flags(&self) -> &'static [FlagType] {
+    &[FlagType::All]
   }
 
   async fn list_all(&self, _matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
