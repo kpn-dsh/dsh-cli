@@ -32,7 +32,7 @@ pub trait Subject {
         Ok(ref capability_type) => match self.capabilities().get(capability_type) {
           Some(capability) => {
             let arguments = capability_type.command_target_argument_ids();
-            let argument = arguments.get(0).and_then(|argument| matches.get_one::<String>(argument)).cloned();
+            let argument = arguments.first().and_then(|argument| matches.get_one::<String>(argument)).cloned();
             let sub_argument = arguments.get(1).and_then(|argument| matches.get_one::<String>(argument)).cloned();
             capability.execute_capability(argument, sub_argument, matches, dsh_api_client).await
           }
