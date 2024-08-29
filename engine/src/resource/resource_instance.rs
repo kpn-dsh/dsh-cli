@@ -9,7 +9,7 @@ use crate::resource::resource_realization::ResourceRealization;
 use crate::resource::ResourceName;
 
 #[async_trait]
-pub trait ResourceInstance {
+pub trait ResourceInstance: Send + Sync {
   /// # Returns the pipeline name of this `ResourceInstance`
   ///
   /// ## Returns

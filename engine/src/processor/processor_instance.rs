@@ -15,7 +15,7 @@ use crate::resource::ResourceIdentifier;
 
 /// Defines the behavior of a Trifonius `ProcessorInstance`
 #[async_trait]
-pub trait ProcessorInstance {
+pub trait ProcessorInstance: Send + Sync {
   /// # Deploy this `ProcessorInstance`
   ///
   /// ## Parameters

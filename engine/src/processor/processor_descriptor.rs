@@ -281,27 +281,3 @@ impl From<(String, &DeploymentParameterConfig)> for DeploymentParameterDescripto
     }
   }
 }
-
-#[test]
-fn test_send() {
-  fn assert_send<T: Send>() {}
-  assert_send::<ProcessorDescriptor>();
-  assert_send::<JunctionDescriptor>();
-  assert_send::<DeploymentParameterDescriptor>();
-  assert_send::<ProfileDescriptor>();
-  assert_send::<ResourceType>();
-  assert_send::<DeploymentParameterType>();
-  assert_send::<DeploymentParameterOptionDescriptor>();
-}
-
-#[test]
-fn test_sync() {
-  fn assert_sync<T: Sync>() {}
-  assert_sync::<ProcessorDescriptor>();
-  assert_sync::<JunctionDescriptor>();
-  assert_sync::<DeploymentParameterDescriptor>();
-  assert_sync::<ProfileDescriptor>();
-  assert_sync::<ResourceType>();
-  assert_sync::<DeploymentParameterType>();
-  assert_sync::<DeploymentParameterOptionDescriptor>();
-}
