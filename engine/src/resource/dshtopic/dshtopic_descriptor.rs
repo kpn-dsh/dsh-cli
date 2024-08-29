@@ -1,6 +1,8 @@
-use crate::resource::dsh_topic::DshTopicType;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+
+use serde::{Deserialize, Serialize};
+
+use crate::resource::dshtopic::DshTopicType;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DshTopicDescriptor {

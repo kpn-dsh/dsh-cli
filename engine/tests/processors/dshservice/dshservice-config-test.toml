@@ -1,5 +1,5 @@
 [processor]
-type = "dsh-service"
+type = "dshservice"
 id = "test"
 label = "Test DSH Service"
 description = "Test profiles"
@@ -18,14 +18,14 @@ metadata = [
 [inbound-junctions.inbound-topic]
 label = "Test inbound topic"
 description = "Test inbound topic description"
-allowed-resource-types = ["dsh-topic"]
+allowed-resource-types = ["dshtopic"]
 
 [outbound-junctions.outbound-topic]
 label = "Test outbound topic"
 description = "Test outbound topic description"
 minimum-number-of-resources = 1
 maximum-number-of-resources = 2
-allowed-resource-types = ["dsh-topic"]
+allowed-resource-types = ["dshtopic"]
 
 [deploy]
 parameters = [
@@ -46,14 +46,14 @@ parameters = [
 ping = { host = { type = "value", value = "127.0.0.1" }, timeout-millis = 3000 }
 http-response-status = { endpoint = { type = "value", value = "www.kpn.com" }, accepted-response-status = [200, 202, 204], timeout-millis = 3000 }
 
-[dsh-service]
+[dshservice]
 
 image = "test-image:0.1.2-SNAPSHOT"
 needs-token = true
 single-instance = false
 spread-group = "SPREAD_GROUP"
 
-[dsh-service.exposed-ports.3000]
+[dshservice.exposed-ports.3000]
 vhost = "{ vhost('your-vhost-name','a-zone') }"
 auth = "app-realm:admin:$1$EZsDrd93$7g2osLFOay4.TzDgGo9bF/"
 mode = "http"
@@ -61,30 +61,30 @@ whitelist = "0.0.0.0 127.0.0.1"
 paths = ["/abc"]
 service-group = "mygroup"
 
-[dsh-service.health-check]
+[dshservice.health-check]
 protocol = "http"
 port = 8080
 path = "/healthpath"
 
-[dsh-service.metrics]
+[dshservice.metrics]
 port = 9095
 path = "/metrics"
 
-[[dsh-service.secrets]]
+[[dshservice.secrets]]
 name = "secret_name"
 injections = [{ env = "SECRET" }]
 
-[dsh-service.volumes]
+[dshservice.volumes]
 "/volume_path" = "{ volume('correct_volume_name') }"
 
-[dsh-service.environment-variables]
-DSH_SERVICE_ENV_VAR1 = { type = "deployment-parameter", id = "bool1" }
-DSH_SERVICE_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
-DSH_SERVICE_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
-DSH_SERVICE_ENV_VAR4 = { type = "template", value = "value4${TENANT}" }
-DSH_SERVICE_ENV_VAR5 = { type = "value", value = "value5" }
+[dshservice.environment-variables]
+DSHSERVICE_ENV_VAR1 = { type = "deployment-parameter", id = "bool1" }
+DSHSERVICE_ENV_VAR2 = { type = "inbound-junction", id = "inbound-topic" }
+DSHSERVICE_ENV_VAR3 = { type = "outbound-junction", id = "outbound-topic" }
+DSHSERVICE_ENV_VAR4 = { type = "template", value = "value4${TENANT}" }
+DSHSERVICE_ENV_VAR5 = { type = "value", value = "value5" }
 
-[[dsh-service.profiles]]
+[[dshservice.profiles]]
 id = "profile-1"
 label = "Profile 1"
 description = "Profile 1"
@@ -97,7 +97,7 @@ environment-variables.PROFILE1_ENV_VAR3 = { type = "outbound-junction", id = "ou
 environment-variables.PROFILE1_ENV_VAR4 = { type = "template", value = "value14${TENANT}" }
 environment-variables.PROFILE1_ENV_VAR5 = { type = "value", value = "value15" }
 
-[[dsh-service.profiles]]
+[[dshservice.profiles]]
 id = "profile-2"
 label = "Profile 2"
 description = "Profile 2"

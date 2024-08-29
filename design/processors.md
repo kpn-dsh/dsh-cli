@@ -9,7 +9,7 @@ A Trifonius processor is
 
 ## DSH Service processors
 
-`ProcessorType`: `dsh-service`
+`ProcessorType`: `dshservice`
 
 ### Greenbox consent filter
 
@@ -31,4 +31,4 @@ A Trifonius processor is
 
 ## DSH App processors
 
-`ProcessorType`: `dsh-app`
+`ProcessorType`: `dshapp`

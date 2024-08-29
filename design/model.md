@@ -13,7 +13,7 @@ in the same way, and describe how they can be connected to _Resources_ or other 
 ### _ProcessorTechnology_
 
 A _ProcessorTechnology_ is a technical solution by which Trifonius can realize the data _Processor_
-components. For example, the `dsh-service` processor technology supports the application
+components. For example, the `dshservice` processor technology supports the application
 of DSH containers on a DSH platform.
 
 ### _ProcessorRealization_
@@ -60,17 +60,17 @@ classDiagram
         ProcessorDescriptor descriptor()*
     }
     class DshServiceProcessor {
-        type = dsh-service
+        type = dshservice
         DshServiceConfiguration configuration*
     }
     Processor <|-- DshServiceProcessor
     class DshAppProcessor {
-        type = dsh-app
+        type = dshapp
         DshAppConfiguration configuration*
     }
     Processor <|-- DshAppProcessor
     class ConsentFilterRealization[":DshServiceProcessorRealization"] {
-        type = dsh-service
+        type = dshservice
         id = greenbox-consent-filter
         configured junctions
         configure deployment parameters
@@ -78,7 +78,7 @@ classDiagram
     }
     DshServiceProcessor <|.. ConsentFilterRealization
     class ReplicatorRealization[":DshServiceProcessorRealization"] {
-        type = dsh-service
+        type = dshservice
         id = replicator
         configured junctions
         configure deployment parameters
@@ -86,7 +86,7 @@ classDiagram
     }
     DshServiceProcessor <|.. ReplicatorRealization
     class Kafka2KafkaRealization[":DshAppProcessorRealization"] {
-        type = dsh-app
+        type = dshapp
         id = kafka-2-kafka
         configured junctions
         configure deployment parameters
@@ -139,38 +139,38 @@ classDiagram
 
 ### Supported _Processors_
 
-At this time the only supported type of _Processor_ is the `dsh-service`,
+At this time the only supported type of _Processor_ is the `dshservice`,
 which enables the deployment of containers from the container registry (Harbor) to the DSH.
-The _Processor_ type `dsh-app` is planned and will allow deployment of Apps
+The _Processor_ type `dshapp` is planned and will allow deployment of Apps
 from the App Catalog. Possible new `Processor` types could for example support
 the deployment of Flink jobs.
 
-### `dsh-service`
+### `dshservice`
 
-A `dsh-service` _Processor_ enables the deployment of containers from the container registry
+A `dshservice` _Processor_ enables the deployment of containers from the container registry
 (Harbor) to the DSH.
 The process of designing, developing and pushing the containers to the registry
 is typically not part of the Trifonius workflow.
 As far as Trifonius is concerned, these containers are already there,
-and they are merely made available to Trifonius by composing a `dsh-service`
+and they are merely made available to Trifonius by composing a `dshservice`
 configuration file, which specifies how a container in the registry
 can be deployed via Trifonius.
-A `dsh-service` _Processor_ together with the configuration file yields a `ProcessorRealization`.
+A `dshservice` _Processor_ together with the configuration file yields a `ProcessorRealization`.
 Examples of `ProcessorRealizations` are:
 
 * `greenbox-consent-filter`
 * `egex-filter`
 * `replicator`
 
-### `dsh-app` (_planned_)
+### `dshapp` (_planned_)
 
-A `dsh-app` _Processor_ enables the deployment of apps from the DSH App Catalog to the DSH.
+A `dshapp` _Processor_ enables the deployment of apps from the DSH App Catalog to the DSH.
 The process of designing, developing and publishing the apps to the catalog
 is typically not part of the Trifonius workflow.
 As far as Trifonius is concerned, these apps are already there,
-and they are merely made available to Trifonius by composing a `dsh-app`
+and they are merely made available to Trifonius by composing a `dshapp`
 configuration file, which specifies how an app in the catalog can be deployed via Trifonius.
-A `dsh-app` _Processor_ together with the configuration file yields a `ProcessorRealization`.
+A `dshapp` _Processor_ together with the configuration file yields a `ProcessorRealization`.
 
 ## Resources
 

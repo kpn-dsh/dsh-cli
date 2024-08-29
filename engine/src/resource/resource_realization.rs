@@ -1,10 +1,10 @@
 #![allow(clippy::module_inception)]
 
 use crate::engine_target::EngineTarget;
-use crate::pipeline::PipelineName;
+use crate::pipeline::PipelineId;
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_instance::ResourceInstance;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceName, ResourceType};
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, ResourceType};
 
 pub trait ResourceRealization<'a> {
   /// # Get this `ResourceRealization`s descriptor
@@ -17,7 +17,7 @@ pub trait ResourceRealization<'a> {
   ///
   /// ## Returns
   /// * This `ResourceRealization`s id.
-  fn id(&self) -> &ResourceId;
+  fn id(&self) -> &ResourceRealizationId;
 
   /// # Get this `ResourceRealization`s `ResourceIdentifier`
   ///
@@ -36,18 +36,18 @@ pub trait ResourceRealization<'a> {
   /// # Create a `ResourceInstance` from this `ResourceRealization`
   ///
   /// ## Parameters
-  /// * `pipeline_name`         - Pipeline name wrapped in a `Some` when the created
-  ///                             `ResourceInstance` is part of a _Pipeline_,
-  ///                             `None` when it is not.
-  /// * `resource_name`         - Resource name.
+  /// * `pipeline_id` - Pipeline id wrapped in a `Some` when the created
+  ///                   `ResourceInstance` is part of a _Pipeline_,
+  ///                   `None` when it is not.
+  /// * `resource_id` - Resource name.
   /// * `target_client_factory` - Target client factory.
   ///
   /// ## Returns
   /// * The created `ResourceInstance`.
   fn resource_instance(
     &'a self,
-    pipeline_name: Option<&'a PipelineName>,
-    resource_name: &'a ResourceName,
+    pipeline_id: Option<&'a PipelineId>,
+    resource_id: &'a ResourceId,
     engine_target: &'a EngineTarget,
   ) -> Result<Box<dyn ResourceInstance + 'a>, String>;
 

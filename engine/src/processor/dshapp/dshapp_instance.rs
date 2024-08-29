@@ -6,22 +6,22 @@ use async_trait::async_trait;
 use log::{debug, error};
 
 use crate::engine_target::EngineTarget;
-use crate::pipeline::PipelineName;
-use crate::processor::dsh_app::dsh_app_realization::DshAppRealization;
-use crate::processor::dsh_app::DshAppName;
+use crate::pipeline::PipelineId;
+use crate::processor::dshapp::dshapp_realization::DshAppRealization;
+use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{JunctionId, ParameterId, ProcessorName, ProfileId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
+use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
 pub struct DshAppInstance<'a> {
-  pipeline_name: Option<PipelineName>,
-  processor_name: ProcessorName,
-  dsh_app_name: DshAppName,
+  pipeline_id: Option<PipelineId>,
+  processor_id: ProcessorId,
+  dshapp_name: DshAppName,
   processor_realization: &'a DshAppRealization<'a>,
   engine_target: &'a EngineTarget<'a>,
   resource_registry: &'a ResourceRegistry<'a>,
@@ -29,16 +29,16 @@ pub struct DshAppInstance<'a> {
 
 impl<'a> DshAppInstance<'a> {
   pub fn create(
-    pipeline_name: Option<&PipelineName>,
-    processor_name: &ProcessorName,
+    pipeline_id: Option<&PipelineId>,
+    processor_id: &ProcessorId,
     processor_realization: &'a DshAppRealization,
     engine_target: &'a EngineTarget,
     resource_registry: &'a ResourceRegistry,
   ) -> Result<Self, String> {
     Ok(Self {
-      pipeline_name: pipeline_name.cloned(),
-      processor_name: processor_name.clone(),
-      dsh_app_name: DshAppName::try_from((pipeline_name, processor_name))?,
+      pipeline_id: pipeline_id.cloned(),
+      processor_id: processor_id.clone(),
+      dshapp_name: DshAppName::try_from((pipeline_id, processor_id))?,
       processor_realization,
       engine_target,
       resource_registry,
@@ -70,12 +70,12 @@ impl ProcessorInstance for DshAppInstance<'_> {
           match direction {
             ResourceDirection::Inbound => {
               if resource_descriptor.readable {
-                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? })
+                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? })
               }
             }
             ResourceDirection::Outbound => {
               if resource_descriptor.writable {
-                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? })
+                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? })
               }
             }
           }
@@ -96,11 +96,11 @@ impl ProcessorInstance for DshAppInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>,
+    profile_id: Option<&ProcessorProfileId>,
   ) -> Result<(), String> {
     let dsh_deployment_config = self.processor_realization.dsh_deployment_config(
-      self.pipeline_name.as_ref(),
-      &self.processor_name,
+      self.pipeline_id.as_ref(),
+      &self.processor_id,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
@@ -110,7 +110,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
     debug!("dsh configuration file\n{:#?}", &dsh_deployment_config);
     // match &self.api_client.de target_client
     //   .client()
-    //   .application_put_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dsh_app_name, target_client.token(), &dsh_deployment_config)
+    //   .application_put_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dshapp_name, target_client.token(), &dsh_deployment_config)
     //   .await
     // {
     //   Ok(response) => {
@@ -140,11 +140,11 @@ impl ProcessorInstance for DshAppInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>,
+    profile_id: Option<&ProcessorProfileId>,
   ) -> Result<String, String> {
     let dsh_config = self.processor_realization.dsh_deployment_config(
-      self.pipeline_name.as_ref(),
-      &self.processor_name,
+      self.pipeline_id.as_ref(),
+      &self.processor_id,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
@@ -161,12 +161,12 @@ impl ProcessorInstance for DshAppInstance<'_> {
     }
   }
 
-  fn pipeline_name(&self) -> Option<&PipelineName> {
-    self.pipeline_name.as_ref()
+  fn pipeline_id(&self) -> Option<&PipelineId> {
+    self.pipeline_id.as_ref()
   }
 
-  fn processor_name(&self) -> &ProcessorName {
-    &self.processor_name
+  fn processor_id(&self) -> &ProcessorId {
+    &self.processor_id
   }
 
   async fn start(&self) -> Result<bool, String> {
@@ -176,7 +176,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
   async fn status(&self) -> Result<ProcessorStatus, String> {
     // match target_client
     //   .client()
-    //   .application_get_by_tenant_application_by_appid_status(target_client.tenant(), &self.dsh_app_name, target_client.token())
+    //   .application_get_by_tenant_application_by_appid_status(target_client.tenant(), &self.dshapp_name, target_client.token())
     //   .await
     // {
     //   Ok(response) => match response.status() {
@@ -205,7 +205,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
   async fn undeploy(&self) -> Result<bool, String> {
     // match target_client
     //   .client()
-    //   .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dsh_app_name, target_client.token())
+    //   .application_delete_by_tenant_application_by_appid_configuration(target_client.tenant(), &self.dshapp_name, target_client.token())
     //   .await
     // {
     //   Ok(response) => match response.status() {

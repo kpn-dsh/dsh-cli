@@ -5,14 +5,14 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::engine_target::EngineTarget;
-use crate::pipeline::PipelineName;
-use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
-use crate::resource::dsh_topic::dsh_topic_instance::DshTopicInstance;
-use crate::resource::dsh_topic::DshTopicType;
+use crate::pipeline::PipelineId;
+use crate::resource::dshtopic::dshtopic_descriptor::DshTopicDescriptor;
+use crate::resource::dshtopic::dshtopic_instance::DshTopicInstance;
+use crate::resource::dshtopic::DshTopicType;
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_instance::ResourceInstance;
 use crate::resource::resource_realization::ResourceRealization;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceName, ResourceType};
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, ResourceType};
 
 pub(crate) struct DshTopicRealization {
   pub(crate) resource_identifier: ResourceIdentifier,
@@ -56,7 +56,7 @@ impl DshTopicRealization {
         .app_domain(engine_target.tenant().name())
         .map(|domain| format!("https://eavesdropper.{}?topics={}", domain, topic_name)),
       data_catalog_url: None,
-      dsh_topic_descriptor: Some(DshTopicDescriptor {
+      dshtopic_descriptor: Some(DshTopicDescriptor {
         name: stream.name().to_string(),
         topic: topic_name,
         gateway_topic: gateway_topic_name,
@@ -75,7 +75,7 @@ impl DshTopicRealization {
         cluster: stream.cluster().to_string(),
       }),
     };
-    let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? };
+    let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? };
     Ok(DshTopicRealization { resource_identifier, resource_descriptor })
   }
 }
@@ -85,7 +85,7 @@ lazy_static! {
   static ref STREAM_NAME_REGEX: Regex = Regex::new("^[a-zA-Z0-9\\.\\-_]+$").unwrap();
 }
 
-fn resource_id_from_stream_name(stream_name: &str) -> Result<ResourceId, String> {
+fn resource_id_from_stream_name(stream_name: &str) -> Result<ResourceRealizationId, String> {
   if STREAM_NAME_REGEX.is_match(stream_name) {
     let parts: Vec<&str> = stream_name.split('.').collect();
     let id = if parts.len() == 2 {
@@ -108,7 +108,7 @@ fn resource_id_from_stream_name(stream_name: &str) -> Result<ResourceId, String>
     } else {
       id
     };
-    ResourceId::try_from(id)
+    ResourceRealizationId::try_from(id)
   } else {
     Err(format!("stream name {} contains invalid characters", stream_name))
   }
@@ -131,7 +131,7 @@ impl<'a> ResourceRealization<'a> for DshTopicRealization {
     &self.resource_identifier
   }
 
-  fn id(&self) -> &ResourceId {
+  fn id(&self) -> &ResourceRealizationId {
     &self.resource_identifier.id
   }
 
@@ -141,11 +141,11 @@ impl<'a> ResourceRealization<'a> for DshTopicRealization {
 
   fn resource_instance(
     &'a self,
-    pipeline_name: Option<&'a PipelineName>,
-    resource_name: &'a ResourceName,
+    pipeline_id: Option<&'a PipelineId>,
+    resource_id: &'a ResourceId,
     engine_target: &'a EngineTarget,
   ) -> Result<Box<dyn ResourceInstance + 'a>, String> {
-    match DshTopicInstance::create(pipeline_name, resource_name, self, engine_target) {
+    match DshTopicInstance::create(pipeline_id, resource_id, self, engine_target) {
       Ok(resource) => Ok(Box::new(resource)),
       Err(error) => Err(error),
     }

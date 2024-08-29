@@ -6,45 +6,44 @@ use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiTenant;
 
 use crate::engine_target::{from_tenant_to_template_mapping, EngineTarget, TemplateMapping};
-use crate::pipeline::PipelineName;
+use crate::pipeline::PipelineId;
 use crate::placeholder::PlaceHolder;
-use crate::processor::dsh_app::dsh_app_config::ProfileConfig;
-use crate::processor::dsh_app::dsh_app_instance::DshAppInstance;
-use crate::processor::dsh_app::DshAppName;
+use crate::processor::dshservice::dshservice_api::into_api_application;
+use crate::processor::dshservice::dshservice_config::ProfileConfig;
+use crate::processor::dshservice::dshservice_instance::DshServiceInstance;
+use crate::processor::dshservice::DshServiceName;
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType, ProfileId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorProfileId, ProcessorRealizationId, ProcessorType};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceType};
 
-// TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
-
-pub struct DshAppRealization<'a> {
+pub struct DshServiceRealization<'a> {
   processor_identifier: ProcessorIdentifier,
   pub(crate) processor_config: ProcessorConfig,
-  target_tenant: DshApiTenant,
+  dsh_api_tenant: DshApiTenant,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
-impl<'a> DshAppRealization<'a> {
-  pub fn create(processor_config: ProcessorConfig, target_tenant: DshApiTenant, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
-    Ok(DshAppRealization {
-      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshApp, id: ProcessorId::try_from(processor_config.processor.id.as_str())? },
+impl<'a> DshServiceRealization<'a> {
+  pub fn create(processor_config: ProcessorConfig, dsh_api_tenant: DshApiTenant, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
+    Ok(DshServiceRealization {
+      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())? },
       processor_config,
-      target_tenant,
+      dsh_api_tenant,
       resource_registry,
     })
   }
 }
 
-impl<'a> ProcessorRealization<'a> for DshAppRealization<'a> {
+impl<'a> ProcessorRealization<'a> for DshServiceRealization<'a> {
   fn descriptor(&self) -> ProcessorDescriptor {
     let profiles = self
       .processor_config
-      .dsh_app_specific_config
+      .dshservice_specific_config
       .as_ref()
       .unwrap()
       .profiles
@@ -53,10 +52,10 @@ impl<'a> ProcessorRealization<'a> for DshAppRealization<'a> {
       .collect::<Vec<ProfileDescriptor>>();
     self
       .processor_config
-      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(&self.target_tenant))
+      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(&self.dsh_api_tenant))
   }
 
-  fn id(&self) -> &ProcessorId {
+  fn id(&self) -> &ProcessorRealizationId {
     &self.processor_identifier.id
   }
 
@@ -70,30 +69,30 @@ impl<'a> ProcessorRealization<'a> for DshAppRealization<'a> {
 
   fn processor_instance(
     &'a self,
-    pipeline_name: Option<&PipelineName>,
-    processor_name: &ProcessorName,
-    engine_target: &'a EngineTarget,
+    pipeline_id: Option<&PipelineId>,
+    processor_id: &ProcessorId,
+    engine_target: &'a EngineTarget<'a>,
   ) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
-    match DshAppInstance::create(pipeline_name, processor_name, self, engine_target, self.resource_registry) {
+    match DshServiceInstance::create(pipeline_id, processor_id, self, engine_target, self.resource_registry) {
       Ok(processor) => Ok(Box::new(processor)),
       Err(error) => Err(error),
     }
   }
 
   fn processor_type(&self) -> ProcessorType {
-    ProcessorType::DshApp
+    ProcessorType::DshService
   }
 }
 
-impl DshAppRealization<'_> {
+impl DshServiceRealization<'_> {
   pub(crate) fn dsh_deployment_config(
     &self,
-    pipeline_name: Option<&PipelineName>,
-    processor_name: &ProcessorName,
+    pipeline_id: Option<&PipelineId>,
+    processor_id: &ProcessorId,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>,
+    profile_id: Option<&ProcessorProfileId>,
     user: String,
   ) -> Result<Application, String> {
     let inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
@@ -128,43 +127,44 @@ impl DshAppRealization<'_> {
       None => {}
     }
 
-    let dsh_app_specific_config = self.processor_config.dsh_app_specific_config.as_ref().unwrap();
+    let dshservice_specific_config = self.processor_config.dshservice_specific_config.as_ref().unwrap();
     let profile: ProfileConfig = match profile_id {
-      Some(pn) => match dsh_app_specific_config.profiles.iter().find(|p| p.id == pn.0) {
+      Some(pn) => match dshservice_specific_config.profiles.iter().find(|p| p.id == pn.0) {
         Some(p) => p.clone(),
         None => return Err(format!("profile '{}' is not defined", pn)),
       },
       None => {
-        if dsh_app_specific_config.profiles.is_empty() {
+        if dshservice_specific_config.profiles.is_empty() {
           return Err("no default profile defined".to_string());
-        } else if dsh_app_specific_config.profiles.len() == 1 {
-          dsh_app_specific_config.profiles.first().cloned().unwrap()
+        } else if dshservice_specific_config.profiles.len() == 1 {
+          dshservice_specific_config.profiles.first().cloned().unwrap()
         } else {
           return Err("unable to select default profile".to_string());
         }
       }
     };
-    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(&self.target_tenant);
-    template_mapping.insert(PlaceHolder::ProcessorId, self.processor_identifier.id.0.clone());
-    if let Some(pipeline_name) = pipeline_name {
-      template_mapping.insert(PlaceHolder::PipelineName, pipeline_name.to_string());
+    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(&self.dsh_api_tenant);
+    template_mapping.insert(PlaceHolder::ProcessorRealizationId, self.processor_identifier.id.0.clone());
+    if let Some(pipeline_name) = pipeline_id {
+      template_mapping.insert(PlaceHolder::PipelineId, pipeline_name.to_string());
     }
-    template_mapping.insert(PlaceHolder::ProcessorName, processor_name.to_string());
-    let dsh_app_name = DshAppName::try_from((pipeline_name, processor_name))?;
-    template_mapping.insert(PlaceHolder::ServiceName, dsh_app_name.to_string());
-    template_mapping.insert(PlaceHolder::DshAppName, dsh_app_name.to_string());
-    // let api_application = into_api_application(
-    //   todo!(),
-    //   dsh_app_specific_config,
-    //   &inbound_junction_topics,
-    //   &outbound_junction_topics,
-    //   &validated_parameters,
-    //   &profile,
-    //   user,
-    //   &template_mapping,
-    // )?;
-    // Ok(api_application)
-    todo!()
+    template_mapping.insert(PlaceHolder::ProcessorId, processor_id.to_string());
+    let dsh_service_name = DshServiceName::try_from((pipeline_id, processor_id))?;
+    template_mapping.insert(PlaceHolder::ServiceName, dsh_service_name.to_string());
+    template_mapping.insert(PlaceHolder::DshServiceName, dsh_service_name.to_string());
+    let api_application = into_api_application(
+      pipeline_id,
+      processor_id,
+      &dsh_service_name,
+      dshservice_specific_config,
+      &inbound_junction_topics,
+      &outbound_junction_topics,
+      &validated_parameters,
+      &profile,
+      user,
+      &template_mapping,
+    )?;
+    Ok(api_application)
   }
 
   fn junction_topics(
@@ -203,8 +203,8 @@ impl DshAppRealization<'_> {
           let mut topics = Vec::<String>::new();
           for resource_id in junction_resource_ids {
             match self.resource_registry.resource_realization_by_identifier(resource_id) {
-              Some(resource) => match &resource.descriptor().dsh_topic_descriptor {
-                Some(dsh_topic_descriptor) => topics.push(dsh_topic_descriptor.topic.to_string()),
+              Some(resource) => match &resource.descriptor().dshtopic_descriptor {
+                Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
                 None => unreachable!(),
               },
               None => {

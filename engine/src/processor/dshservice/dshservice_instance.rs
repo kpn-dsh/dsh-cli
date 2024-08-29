@@ -8,19 +8,19 @@ use trifonius_dsh_api::DshApiClient;
 use trifonius_dsh_api::DshApiError;
 
 use crate::engine_target::EngineTarget;
-use crate::pipeline::PipelineName;
-use crate::processor::dsh_service::dsh_service_realization::DshServiceRealization;
-use crate::processor::dsh_service::DshServiceName;
+use crate::pipeline::PipelineId;
+use crate::processor::dshservice::dshservice_realization::DshServiceRealization;
+use crate::processor::dshservice::DshServiceName;
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{JunctionId, ParameterId, ProcessorName, ProfileId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceType};
+use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
 
 pub struct DshServiceInstance<'a> {
-  pipeline_name: Option<PipelineName>,
-  processor_name: ProcessorName,
+  pipeline_id: Option<PipelineId>,
+  processor_id: ProcessorId,
   dsh_service_name: DshServiceName,
   processor_realization: &'a DshServiceRealization<'a>,
   engine_target: &'a EngineTarget<'a>,
@@ -29,16 +29,16 @@ pub struct DshServiceInstance<'a> {
 
 impl<'a> DshServiceInstance<'a> {
   pub fn create(
-    pipeline_name: Option<&PipelineName>,
-    processor_name: &ProcessorName,
+    pipeline_id: Option<&PipelineId>,
+    processor_id: &ProcessorId,
     processor_realization: &'a DshServiceRealization,
     engine_target: &'a EngineTarget<'a>,
     resource_registry: &'a ResourceRegistry,
   ) -> Result<Self, String> {
     Ok(Self {
-      pipeline_name: pipeline_name.cloned(),
-      processor_name: processor_name.clone(),
-      dsh_service_name: DshServiceName::try_from((pipeline_name, processor_name))?,
+      pipeline_id: pipeline_id.cloned(),
+      processor_id: processor_id.clone(),
+      dsh_service_name: DshServiceName::try_from((pipeline_id, processor_id))?,
       processor_realization,
       engine_target,
       resource_registry,
@@ -70,12 +70,12 @@ impl ProcessorInstance for DshServiceInstance<'_> {
           match direction {
             ResourceDirection::Inbound => {
               if resource_descriptor.readable {
-                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? })
+                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? })
               }
             }
             ResourceDirection::Outbound => {
               if resource_descriptor.writable {
-                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceId::try_from(resource_descriptor.id.as_str())? })
+                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? })
               }
             }
           }
@@ -96,11 +96,11 @@ impl ProcessorInstance for DshServiceInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>,
+    profile_id: Option<&ProcessorProfileId>,
   ) -> Result<(), String> {
     let dsh_application_config = self.processor_realization.dsh_deployment_config(
-      self.pipeline_name.as_ref(),
-      &self.processor_name,
+      self.pipeline_id.as_ref(),
+      &self.processor_id,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
@@ -121,11 +121,11 @@ impl ProcessorInstance for DshServiceInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>,
+    profile_id: Option<&ProcessorProfileId>,
   ) -> Result<String, String> {
     let dsh_application_config = self.processor_realization.dsh_deployment_config(
-      self.pipeline_name.as_ref(),
-      &self.processor_name,
+      self.pipeline_id.as_ref(),
+      &self.processor_id,
       inbound_junctions,
       outbound_junctions,
       deploy_parameters,
@@ -138,12 +138,12 @@ impl ProcessorInstance for DshServiceInstance<'_> {
     }
   }
 
-  fn pipeline_name(&self) -> Option<&PipelineName> {
-    self.pipeline_name.as_ref()
+  fn pipeline_id(&self) -> Option<&PipelineId> {
+    self.pipeline_id.as_ref()
   }
 
-  fn processor_name(&self) -> &ProcessorName {
-    &self.processor_name
+  fn processor_id(&self) -> &ProcessorId {
+    &self.processor_id
   }
 
   async fn start(&self) -> Result<bool, String> {

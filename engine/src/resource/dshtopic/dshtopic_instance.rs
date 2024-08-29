@@ -1,38 +1,38 @@
 use async_trait::async_trait;
 
 use crate::engine_target::EngineTarget;
-use crate::pipeline::PipelineName;
-use crate::resource::dsh_topic::dsh_topic_realization::DshTopicRealization;
+use crate::pipeline::PipelineId;
+use crate::resource::dshtopic::dshtopic_realization::DshTopicRealization;
 use crate::resource::resource_instance::{ResourceInstance, ResourceStatus};
 use crate::resource::resource_realization::ResourceRealization;
-use crate::resource::ResourceName;
+use crate::resource::ResourceId;
 
 pub(crate) struct DshTopicInstance<'a> {
-  pipeline_name: Option<&'a PipelineName>,
-  resource_name: &'a ResourceName,
+  pipeline_id: Option<&'a PipelineId>,
+  resource_id: &'a ResourceId,
   resource_realization: &'a DshTopicRealization,
   engine_target: &'a EngineTarget<'a>,
 }
 
 impl<'a> DshTopicInstance<'a> {
   pub(crate) fn create(
-    pipeline_name: Option<&'a PipelineName>,
-    resource_name: &'a ResourceName,
+    pipeline_id: Option<&'a PipelineId>,
+    resource_id: &'a ResourceId,
     resource_realization: &'a DshTopicRealization,
     engine_target: &'a EngineTarget,
   ) -> Result<Self, String> {
-    Ok(Self { pipeline_name, resource_name, resource_realization, engine_target })
+    Ok(Self { pipeline_id, resource_id, resource_realization, engine_target })
   }
 }
 
 #[async_trait]
 impl ResourceInstance for DshTopicInstance<'_> {
-  fn pipeline_name(&self) -> Option<&PipelineName> {
-    self.pipeline_name
+  fn pipeline_id(&self) -> Option<&PipelineId> {
+    self.pipeline_id
   }
 
-  fn resource_name(&self) -> &ResourceName {
-    self.resource_name
+  fn resource_id(&self) -> &ResourceId {
+    self.resource_id
   }
 
   fn resource_realization(&self) -> &dyn ResourceRealization {
@@ -42,7 +42,7 @@ impl ResourceInstance for DshTopicInstance<'_> {
   async fn status(&self) -> Result<ResourceStatus, String> {
     match get_topic_status(
       self.engine_target,
-      &self.resource_realization.descriptor().dsh_topic_descriptor.as_ref().unwrap().topic,
+      &self.resource_realization.descriptor().dshtopic_descriptor.as_ref().unwrap().topic,
     )
     .await?
     {

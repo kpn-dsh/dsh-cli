@@ -1,5 +1,5 @@
 [processor]
-type = "dsh-service"
+type = "dshservice"
 id = "replicator"
 label = "Topic replicator"
 description = "Replicates records from one Kafka topic to another. Allows multiple inbound and outbound topics."
@@ -14,14 +14,14 @@ label = "Source topics"
 description = "Kafka topic that the replicator will consume from."
 minimum-number-of-resources = 1
 maximum-number-of-resources = 5
-allowed-resource-types = ["dsh-topic"]
+allowed-resource-types = ["dshtopic"]
 
 [outbound-junctions.outbound-kafka-topic]
 label = "Sink topics"
 description = "Kafka topic that the replicator will produce to."
 minimum-number-of-resources = 1
 maximum-number-of-resources = 5
-allowed-resource-types = ["dsh-topic"]
+allowed-resource-types = ["dshtopic"]
 
 [[deploy.parameters]]
 type = "boolean"
@@ -40,19 +40,19 @@ options = [
     { id = "latest", label = "End", description = "Start reading at the end of the topic." },
 ]
 
-[dsh-service]
+[dshservice]
 image = 'registry.cp.kpn-dsh.com/greenbox-dev/replicator:0.0.1-SNAPSHOT'
 needs-token = true
 single-instance = false
 
-[dsh-service.environment-variables]
+[dshservice.environment-variables]
 KAFKA_SOURCE_TOPIC = { type = "inbound-junction", id = "inbound-kafka-topic" }
 KAFKA_TARGET_TOPIC = { type = "outbound-junction", id = "outbound-kafka-topic" }
 KAFKA_AUTO_OFFSET_RESET = { type = "deployment-parameter", id = "kafka-offset-reset" }
 KAFKA_CONSUMER_GROUP_TYPE = { type = "value", value = "SHARED" }
 METRICS_ENABLED = { type = "deployment-parameter", id = "metrics-enabled" }
 
-[[dsh-service.profiles]]
+[[dshservice.profiles]]
 id = "minimal"
 label = "10K records per minute"
 description = "Minimal profile to handle 0 to 10k records per minute."
@@ -64,7 +64,7 @@ environment-variables.KAFKA_PRODUCER_BATCH_NUM_MESSAGES = { type = "value", valu
 environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_MESSAGES = { type = "value", value = "1000" }
 environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_KBYTES = { type = "value", value = "40000" }
 
-[[dsh-service.profiles]]
+[[dshservice.profiles]]
 id = "medium"
 label = "100K records per minute"
 description = "Medium profile to handle 10k to 100k records per minute."
@@ -76,7 +76,7 @@ environment-variables.KAFKA_PRODUCER_BATCH_NUM_MESSAGES = { type = "value", valu
 environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_MESSAGES = { type = "value", value = "1250" }
 environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_KBYTES = { type = "value", value = "80000" }
 
-[[dsh-service.profiles]]
+[[dshservice.profiles]]
 id = "maximal"
 label = "1 Million records per minute"
 description = "Maximal profile to handle 1 million maximum records per minute."

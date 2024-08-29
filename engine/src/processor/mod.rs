@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{config_dir_name, identifier};
 
-pub mod dsh_app;
-pub mod dsh_service;
+pub mod dshapp;
+pub mod dshservice;
 pub mod processor_config;
 pub mod processor_descriptor;
 pub mod processor_instance;
@@ -16,50 +16,50 @@ pub mod processor_registry;
 
 #[derive(Clone, Debug, Deserialize, Hash, Eq, PartialEq, Serialize)]
 pub enum ProcessorType {
-  #[serde(rename = "dsh-app")]
+  #[serde(rename = "dshapp")]
   DshApp,
-  #[serde(rename = "dsh-service")]
+  #[serde(rename = "dshservice")]
   DshService,
 }
 
 identifier!(
   "processor",
   JunctionId,
-  "junction identifier",
-  "^[a-z][a-z0-9-]{0,39}$",
+  "junction id",
+  "^[a-z][a-z0-9-]{0,49}$",
   "valid-junction-id",
   "invalid_junction_id"
 );
 identifier!(
   "processor",
   ParameterId,
-  "parameter identifier",
-  "^[a-z][a-z0-9-]{0,39}$",
+  "parameter id",
+  "^[a-z][a-z0-9-]{0,49}$",
   "valid-parameter-id",
   "invalid_parameter_id"
 );
 identifier!(
   "processor",
-  ProcessorId,
-  "processor identifier",
-  "^[a-z][a-z0-9-]{0,39}$",
-  "valid-processor-id",
-  "invalid_processor_id"
+  ProcessorRealizationId,
+  "processor realization id",
+  "^[a-z][a-z0-9-]{0,49}$",
+  "valid-processor-realization-id",
+  "invalid_processor_realization_id"
 );
-identifier!("processor", ProcessorName, "processor name", "^[a-z][a-z0-9]{0,17}$", "validname", "invalid-name");
+identifier!("processor", ProcessorId, "processor id", "^[a-z][a-z0-9]{0,17}$", "validid", "invalid-id");
 identifier!(
   "processor",
-  ProfileId,
-  "profile identifier",
-  "^[a-z][a-z0-9-]{0,39}$",
-  "valid-profile-id",
-  "invalid_profile_id"
+  ProcessorProfileId,
+  "processor profile id",
+  "^[a-z][a-z0-9-]{0,49}$",
+  "valid-processor-profile-id",
+  "invalid_processor_profile_id"
 );
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ProcessorIdentifier {
   pub processor_type: ProcessorType,
-  pub id: ProcessorId,
+  pub id: ProcessorRealizationId,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -71,8 +71,8 @@ pub struct JunctionIdentifier {
 impl Display for ProcessorType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
-      ProcessorType::DshApp => write!(f, "dsh-app"),
-      ProcessorType::DshService => write!(f, "dsh-service"),
+      ProcessorType::DshApp => write!(f, "dshapp"),
+      ProcessorType::DshService => write!(f, "dshservice"),
     }
   }
 }
@@ -94,7 +94,7 @@ impl ProcessorType {
 }
 
 impl ProcessorIdentifier {
-  pub fn new(processor_type: ProcessorType, id: ProcessorId) -> Self {
+  pub fn new(processor_type: ProcessorType, id: ProcessorRealizationId) -> Self {
     ProcessorIdentifier { processor_type, id }
   }
 }

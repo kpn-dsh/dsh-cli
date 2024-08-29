@@ -2,4 +2,4 @@
 
 ## DSH Topic Resources
 
-`ResourceType`: `dsh-topic`
+`ResourceType`: `dshtopic`

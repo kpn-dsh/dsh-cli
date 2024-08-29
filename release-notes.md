@@ -1,5 +1,13 @@
 # Release notes
 
+## Version 0.0.7
+
+#### New Features
+
+* New naming schema in API.
+
+#### Bugfixes and Improvements
+
 ## Version 0.0.6
 
 #### New Features

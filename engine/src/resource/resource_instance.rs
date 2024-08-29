@@ -4,23 +4,23 @@ use std::fmt::{Display, Formatter};
 
 use async_trait::async_trait;
 
-use crate::pipeline::PipelineName;
+use crate::pipeline::PipelineId;
 use crate::resource::resource_realization::ResourceRealization;
-use crate::resource::ResourceName;
+use crate::resource::ResourceId;
 
 #[async_trait]
 pub trait ResourceInstance: Send + Sync {
-  /// # Returns the pipeline name of this `ResourceInstance`
+  /// # Returns the pipeline id of this `ResourceInstance`
   ///
   /// ## Returns
-  /// * The optional `PipelineName` of this `ResourceInstance`.
-  fn pipeline_name(&self) -> Option<&PipelineName>;
+  /// * The optional `PipelineId` of this `ResourceInstance`.
+  fn pipeline_id(&self) -> Option<&PipelineId>;
 
-  /// # Returns the resource name of this `ResourceInstance`
+  /// # Returns the resource id of this `ResourceInstance`
   ///
   /// ## Returns
-  /// * The `ResourceName` of this `ResourceInstance`.
-  fn resource_name(&self) -> &ResourceName;
+  /// * The `ResourceId` of this `ResourceInstance`.
+  fn resource_id(&self) -> &ResourceId;
 
   /// # Returns the `ResourceRealizaton` from this `ResourceInstance`
   ///

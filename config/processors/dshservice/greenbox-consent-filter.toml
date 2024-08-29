@@ -1,5 +1,5 @@
 [processor]
-type = "dsh-service"
+type = "dshservice"
 id = "greenbox-consent-filter"
 label = "Greenbox Consent Filter"
 description = "Record processor filters records based on customer consent"
@@ -12,13 +12,13 @@ viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
 [inbound-junctions.inbound-kafka-topic]
 label = "Source topics"
 description = "Kafka topic that the consent filter dsh service will consume from. This topic must use strings for its record keys."
-allowed-resource-types = ["dsh-topic"]
+allowed-resource-types = ["dshtopic"]
 # TODO Filters: schema available, whitelist in config, blacklist in config, mqtt/http gateway
 
 [outbound-junctions.outbound-kafka-topic]
 label = "Sink topics"
 description = "Kafka topic that the consent filter dsh service will produce to."
-allowed-resource-types = ["dsh-topic"]
+allowed-resource-types = ["dshtopic"]
 
 
 [[deploy.parameters]]
@@ -56,18 +56,18 @@ label = "Mitigation strategy"
 description = "Mitigation strategy to be applied to records for customers that gave no consent."
 options = ["anonymize", "block", "clip"]
 
-[dsh-service]
+[dshservice]
 image = 'registry.cp.kpn-dsh.com/${TENANT}/greenbox-consent-filter:0.2.7-SNAPSHOT'
 needs-token = true
 single-instance = false
 
-[[dsh-service.secrets]]
+[[dshservice.secrets]]
 name = "greenbox_backend_password"
 injections = [{ env = "GREENBOX_BACKEND_PASSWORD" }]
 
 # TODO Solution for group id
 
-[dsh-service.environment-variables]
+[dshservice.environment-variables]
 CLASSIFICATION_IDENTIFIER = { type = "value", value = "org.kpn.greenbox.ri:ReferenceSchemaAvro:1.0.0" }
 COMPLIANCY_AGENT = { type = "deployment-parameter", id = "compliancy-agent" }
 CONSUMER_GROUP_ID = { type = "template", value = "${TENANT}_${RANDOM}_grpid" }
@@ -89,7 +89,7 @@ LOG_LEVEL_GREENBOX = { type = "value", value = "info" }
 MITIGATION_STRATEGY = { type = "deployment-parameter", id = "mitigation-strategy" }
 PRODUCER_TOPIC = { type = "outbound-junction", id = "outbound-kafka-topic" }
 
-[[dsh-service.profiles]]
+[[dshservice.profiles]]
 id = "minimal"
 label = "Minimal"
 description = "Minimal profile for small amounts of data"
@@ -97,7 +97,7 @@ cpus = 0.25
 instances = 1
 mem = 256
 
-[[dsh-service.profiles]]
+[[dshservice.profiles]]
 id = "maximal"
 label = "Maximal"
 description = "Maximal profile for large amounts of data"

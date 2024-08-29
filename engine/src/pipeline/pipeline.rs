@@ -4,12 +4,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::pipeline::PipelineName;
-use crate::processor::{JunctionIdentifier, ParameterId, ProcessorIdentifier, ProcessorName, ProfileId};
+use crate::pipeline::PipelineId;
+use crate::processor::{JunctionIdentifier, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorProfileId};
 use crate::resource::ResourceIdentifier;
 
 pub struct Pipeline {
-  name: PipelineName,
+  id: PipelineId,
   resources: Vec<PipelineResource>,
   processors: Vec<PipelineProcessor>,
   junctions: Vec<PipelineJunction>,
@@ -23,9 +23,9 @@ pub struct PipelineResource {
 
 pub struct PipelineProcessor {
   processor: ProcessorIdentifier,
-  name: ProcessorName,
+  name: ProcessorId,
   parameters: HashMap<ParameterId, String>,
-  profile_id: Option<ProfileId>,
+  profile_id: Option<ProcessorProfileId>,
 }
 
 pub struct PipelineJunction {

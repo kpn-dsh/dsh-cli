@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::identifier;
 
-pub mod dsh_topic;
+pub mod dshtopic;
 pub mod resource_descriptor;
 pub mod resource_instance;
 pub mod resource_realization;
@@ -14,33 +14,33 @@ pub mod resource_registry;
 
 identifier!(
   "resource",
-  ResourceId,
-  "resource id",
-  "^[a-z][a-z0-9_-]{1,50}$",
-  "valid_resource_id",
-  "invalid.resource.id"
+  ResourceRealizationId,
+  "resource realization id",
+  "^[a-z][a-z0-9_-]{1,49}$",
+  "valid_resource_realization_id",
+  "invalid.resource.realization.id"
 );
-identifier!("resource", ResourceName, "resource name", "^[a-z][a-z0-9]{0,17}$", "validname", "invalid-name");
+identifier!("resource", ResourceId, "resource id", "^[a-z][a-z0-9]{0,17}$", "validid", "invalid-id");
 
 #[derive(Clone, Debug, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub enum ResourceType {
-  // #[serde(rename = "dsh-gateway")]
+  // #[serde(rename = "dshgateway")]
   // DshGateway,
-  #[serde(rename = "dsh-topic")]
+  #[serde(rename = "dshtopic")]
   DshTopic,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
 pub struct ResourceIdentifier {
   pub resource_type: ResourceType,
-  pub id: ResourceId,
+  pub id: ResourceRealizationId,
 }
 
 impl Display for ResourceType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
-      // ResourceType::DshGateway => write!(f, "dsh-gateway"),
-      ResourceType::DshTopic => write!(f, "dsh-topic"),
+      // ResourceType::DshGateway => write!(f, "dshgateway"),
+      ResourceType::DshTopic => write!(f, "dshtopic"),
     }
   }
 }

@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use trifonius_dsh_api::types::AppCatalogApp as ApiAppCatalogApp;
 
 use crate::engine_target::{template_resolver, TemplateMapping};
-use crate::processor::dsh_app::dsh_app_config::{DshAppSpecificConfig, ProfileConfig};
-use crate::processor::dsh_app::DshAppName;
+use crate::processor::dshapp::dshapp_config::{DshAppSpecificConfig, ProfileConfig};
+use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_config::VariableType;
 use crate::processor::JunctionId;
 
@@ -12,7 +12,7 @@ const TRIFONIUS_PREFIX: &str = "TRIFONIUS";
 
 pub fn into_api_app_catalog(
   app_name: &DshAppName,
-  dsh_app_specific_config: &DshAppSpecificConfig,
+  dshapp_specific_config: &DshAppSpecificConfig,
   inbound_junctions: &HashMap<JunctionId, String>,
   outbound_junctions: &HashMap<JunctionId, String>,
   parameters: &HashMap<String, String>, // TODO ParameterId?
@@ -22,7 +22,7 @@ pub fn into_api_app_catalog(
 ) -> Result<ApiAppCatalogApp, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
   environment_variables.insert(format!("{}_APP_NAME", TRIFONIUS_PREFIX), app_name.to_string());
-  if let Some(ref configured_environment_variables) = dsh_app_specific_config.environment_variables {
+  if let Some(ref configured_environment_variables) = dshapp_specific_config.environment_variables {
     for (configured_environment_variable, variable) in configured_environment_variables.clone() {
       match variable.typ {
         VariableType::InboundJunction => match variable.id {

@@ -3,10 +3,10 @@
 #![allow(clippy::module_inception)]
 
 use crate::engine_target::EngineTarget;
-use crate::pipeline::PipelineName;
+use crate::pipeline::PipelineId;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_instance::ProcessorInstance;
-use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorName, ProcessorType};
+use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
 
 /// Defines the behavior of a Trifonius `ProcessorRealization`
 pub trait ProcessorRealization<'a> {
@@ -20,7 +20,7 @@ pub trait ProcessorRealization<'a> {
   ///
   /// ## Returns
   /// * This `ProcessorRealization`s id.
-  fn id(&self) -> &ProcessorId;
+  fn id(&self) -> &ProcessorRealizationId;
 
   /// # Get this `ProcessorRealization`s `ProcessorIdentifier`
   ///
@@ -39,20 +39,16 @@ pub trait ProcessorRealization<'a> {
   /// # Create a `ProcessorInstance` from this `ProcessorRealization`
   ///
   /// ## Parameters
-  /// * `pipeline_name`         - Pipeline name wrapped in a `Some` when the created
-  ///                             `ProcessorInstance` is part of a _Pipeline_,
-  ///                             `None` when it is not.
-  /// * `processor_name`        - Processor name.
+  /// * `pipeline_id` - Pipeline id wrapped in a `Some` when the created
+  ///                   `ProcessorInstance` is part of a _Pipeline_,
+  ///                   `None` when it is not.
+  /// * `processor_id` - Processor id.
   /// * `target_client_factory` - Target client factory.
   ///
   /// ## Returns
   /// * The created `ProcessorInstance`.
-  fn processor_instance(
-    &'a self,
-    pipeline_name: Option<&PipelineName>,
-    processor_name: &ProcessorName,
-    engine_target: &'a EngineTarget,
-  ) -> Result<Box<dyn ProcessorInstance + 'a>, String>;
+  fn processor_instance(&'a self, pipeline_id: Option<&PipelineId>, processor_id: &ProcessorId, engine_target: &'a EngineTarget)
+    -> Result<Box<dyn ProcessorInstance + 'a>, String>;
 
   /// # Get this `ProcessorRealization`s type
   ///

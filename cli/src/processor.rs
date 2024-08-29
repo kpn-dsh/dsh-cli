@@ -13,10 +13,10 @@ use crate::subject::Subject;
 use crate::tabular::make_tabular_with_headers;
 use crate::CommandResult;
 
-const TRIFONIUS_PIPELINE_NAME: &str = "TRIFONIUS_PIPELINE_NAME";
+const TRIFONIUS_PIPELINE_ID: &str = "TRIFONIUS_PIPELINE_ID";
+const TRIFONIUS_PROCESSOR_REALIZATION_ID: &str = "TRIFONIUS_PROCESSOR_REALIZATION_ID";
 const TRIFONIUS_PROCESSOR_ID: &str = "TRIFONIUS_PROCESSOR_ID";
-const TRIFONIUS_PROCESSOR_NAME: &str = "TRIFONIUS_PROCESSOR_NAME";
-const TRIFONIUS_PROCESSOR_TYPE: &str = "TRIFONIUS_PROCESSOR_TYPE";
+const TRIFONIUS_PROCESSOR_TECHNOLOGY: &str = "TRIFONIUS_PROCESSOR_TECHNOLOGY";
 const TRIFONIUS_SERVICE_NAME: &str = "TRIFONIUS_SERVICE_NAME";
 
 pub(crate) struct ProcessorSubject {}
@@ -86,10 +86,10 @@ impl CommandExecutor for ListAll {
       if let Some(trifonius_parameters) = find_trifonius_parameters(&application) {
         let parameters = vec![
           application_id,
-          trifonius_parameters.get(TRIFONIUS_PIPELINE_NAME).cloned().unwrap_or("-".to_string()),
-          trifonius_parameters.get(TRIFONIUS_PROCESSOR_NAME).cloned().unwrap_or("-".to_string()),
-          trifonius_parameters.get(TRIFONIUS_PROCESSOR_TYPE).cloned().unwrap_or("-".to_string()),
+          trifonius_parameters.get(TRIFONIUS_PIPELINE_ID).cloned().unwrap_or("-".to_string()),
           trifonius_parameters.get(TRIFONIUS_PROCESSOR_ID).cloned().unwrap_or("-".to_string()),
+          trifonius_parameters.get(TRIFONIUS_PROCESSOR_TECHNOLOGY).cloned().unwrap_or("-".to_string()),
+          trifonius_parameters.get(TRIFONIUS_PROCESSOR_REALIZATION_ID).cloned().unwrap_or("-".to_string()),
           trifonius_parameters.get(TRIFONIUS_SERVICE_NAME).cloned().unwrap_or("-".to_string()),
           application.exposed_ports.keys().map(|k| k.to_string()).collect::<Vec<String>>().join(","),
           application.cpus.to_string(),
@@ -113,17 +113,17 @@ impl CommandExecutor for ListAll {
 
 fn find_trifonius_parameters(application: &Application) -> Option<HashMap<&'static str, String>> {
   let mut parameters: HashMap<&'static str, String> = HashMap::new();
-  if let Some(pipeline_name) = application.env.get(TRIFONIUS_PIPELINE_NAME) {
-    parameters.insert(TRIFONIUS_PIPELINE_NAME, pipeline_name.to_string());
+  if let Some(pipeline_id) = application.env.get(TRIFONIUS_PIPELINE_ID) {
+    parameters.insert(TRIFONIUS_PIPELINE_ID, pipeline_id.to_string());
   }
-  if let Some(processor_name) = application.env.get(TRIFONIUS_PROCESSOR_ID) {
-    parameters.insert(TRIFONIUS_PROCESSOR_ID, processor_name.to_string());
+  if let Some(processor_realization) = application.env.get(TRIFONIUS_PROCESSOR_REALIZATION_ID) {
+    parameters.insert(TRIFONIUS_PROCESSOR_REALIZATION_ID, processor_realization.to_string());
   }
-  if let Some(processor_name) = application.env.get(TRIFONIUS_PROCESSOR_NAME) {
-    parameters.insert(TRIFONIUS_PROCESSOR_NAME, processor_name.to_string());
+  if let Some(processor_id) = application.env.get(TRIFONIUS_PROCESSOR_ID) {
+    parameters.insert(TRIFONIUS_PROCESSOR_ID, processor_id.to_string());
   }
-  if let Some(processor_name) = application.env.get(TRIFONIUS_PROCESSOR_TYPE) {
-    parameters.insert(TRIFONIUS_PROCESSOR_TYPE, processor_name.to_string());
+  if let Some(processor_technology) = application.env.get(TRIFONIUS_PROCESSOR_TECHNOLOGY) {
+    parameters.insert(TRIFONIUS_PROCESSOR_TECHNOLOGY, processor_technology.to_string());
   }
   if let Some(service_name) = application.env.get(TRIFONIUS_SERVICE_NAME) {
     parameters.insert(TRIFONIUS_SERVICE_NAME, service_name.to_string());

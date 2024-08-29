@@ -8,9 +8,9 @@ use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
 
-use crate::pipeline::PipelineName;
+use crate::pipeline::PipelineId;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{JunctionId, ParameterId, ProcessorName, ProfileId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
 use crate::resource::ResourceIdentifier;
 
 /// Defines the behavior of a Trifonius `ProcessorInstance`
@@ -32,7 +32,7 @@ pub trait ProcessorInstance: Send + Sync {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>, // TODO Move this to start() method
+    profile_id: Option<&ProcessorProfileId>, // TODO Move this to start() method
   ) -> Result<(), String>;
 
   /// # Dry-run for deployment of this `ProcessorInstance`
@@ -55,7 +55,7 @@ pub trait ProcessorInstance: Send + Sync {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProfileId>, // TODO Move this to start() method
+    profile_id: Option<&ProcessorProfileId>, // TODO Move this to start() method
   ) -> Result<String, String>;
 
   /// # Get the resources compatible with this `ProcessorInstance`
@@ -69,17 +69,17 @@ pub trait ProcessorInstance: Send + Sync {
   /// * `Err(msg)`                   - when the list could not be composed.
   async fn compatible_resources(&self, junction_id: &JunctionId) -> Result<Vec<ResourceIdentifier>, String>;
 
-  /// # Returns the pipeline name of this `ProcessorInstance`
+  /// # Returns the pipeline id of this `ProcessorInstance`
   ///
   /// ## Returns
-  /// * The optional `PipelineName` of this `ProcessorInstance`.
-  fn pipeline_name(&self) -> Option<&PipelineName>;
+  /// * The optional `PipelineId` of this `ProcessorInstance`.
+  fn pipeline_id(&self) -> Option<&PipelineId>;
 
-  /// # Returns the processor name of this `ProcessorInstance`
+  /// # Returns the processor id of this `ProcessorInstance`
   ///
   /// ## Returns
-  /// * The `ProcessorName` of this `ProcessorInstance`.
-  fn processor_name(&self) -> &ProcessorName;
+  /// * The `ProcessorId` of this `ProcessorInstance`.
+  fn processor_id(&self) -> &ProcessorId;
 
   /// # Returns the `ProcessorRealizaton` for this `ProcessorInstance`
   ///
@@ -145,9 +145,9 @@ impl Display for ProcessorStatus {
   }
 }
 
-pub fn service_name(pipeline_name: Option<&PipelineName>, processor_name: &ProcessorName) -> String {
-  match pipeline_name {
-    Some(pipeline_name) => format!("{}-{}", pipeline_name, processor_name),
-    None => processor_name.to_string(),
+pub fn service_name(pipeline_id: Option<&PipelineId>, processor_id: &ProcessorId) -> String {
+  match pipeline_id {
+    Some(pipeline_name) => format!("{}-{}", pipeline_name, processor_id),
+    None => processor_id.to_string(),
   }
 }

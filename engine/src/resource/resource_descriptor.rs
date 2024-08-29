@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-use crate::resource::dsh_topic::dsh_topic_descriptor::DshTopicDescriptor;
+use crate::resource::dshtopic::dshtopic_descriptor::DshTopicDescriptor;
 use crate::resource::ResourceType;
 
 #[derive(Deserialize, Serialize)]
@@ -61,8 +61,8 @@ pub struct ResourceDescriptor {
   pub viewer_url: Option<String>,
   #[serde(rename = "data-catalog-url", skip_serializing_if = "Option::is_none")]
   pub data_catalog_url: Option<String>,
-  #[serde(rename = "dsh-topic-descriptor", skip_serializing_if = "Option::is_none")]
-  pub dsh_topic_descriptor: Option<DshTopicDescriptor>,
+  #[serde(rename = "dshtopic-descriptor", skip_serializing_if = "Option::is_none")]
+  pub dshtopic_descriptor: Option<DshTopicDescriptor>,
 }
 
 impl Display for ResourceDescriptor {
@@ -93,8 +93,8 @@ impl Display for ResourceDescriptor {
     if let Some(ref url) = self.viewer_url {
       write!(f, "\n  viewer url: {}", url)?
     }
-    if let Some(ref dsh_topic_descriptor) = self.dsh_topic_descriptor {
-      std::fmt::Display::fmt(&dsh_topic_descriptor, f)?
+    if let Some(ref dshtopic_descriptor) = self.dshtopic_descriptor {
+      std::fmt::Display::fmt(&dshtopic_descriptor, f)?
     }
     Ok(())
   }

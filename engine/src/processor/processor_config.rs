@@ -9,10 +9,10 @@ use toml::de::Error;
 
 use crate::engine_target::{template_resolver, validate_template, TemplateMapping};
 use crate::placeholder::PlaceHolder;
-use crate::processor::dsh_app::dsh_app_config::DshAppSpecificConfig;
-use crate::processor::dsh_service::dsh_service_config::DshServiceSpecificConfig;
+use crate::processor::dshapp::dshapp_config::DshAppSpecificConfig;
+use crate::processor::dshservice::dshservice_config::DshServiceSpecificConfig;
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorType};
+use crate::processor::{JunctionId, ParameterId, ProcessorRealizationId, ProcessorType};
 use crate::resource::ResourceType;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -25,10 +25,10 @@ pub struct ProcessorConfig {
   pub deploy: Option<DeployConfig>,
   #[serde(rename = "health-check")]
   pub health_check: Option<HealthCheck>,
-  #[serde(rename = "dsh-app")]
-  pub dsh_app_specific_config: Option<DshAppSpecificConfig>,
-  #[serde(rename = "dsh-service")]
-  pub dsh_service_specific_config: Option<DshServiceSpecificConfig>,
+  #[serde(rename = "dshapp")]
+  pub dshapp_specific_config: Option<DshAppSpecificConfig>,
+  #[serde(rename = "dshservice")]
+  pub dshservice_specific_config: Option<DshServiceSpecificConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -161,7 +161,7 @@ impl ProcessorConfig {
         self.processor.processor_type, processor_type
       ));
     }
-    if !ProcessorId::is_valid(&self.processor.id) {
+    if !ProcessorRealizationId::is_valid(&self.processor.id) {
       return Err(format!(
         "illegal {} name (must be between 1 and 20 characters long and may contain only lowercase alphabetical characters and digits)",
         processor_type

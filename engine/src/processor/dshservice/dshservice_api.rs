@@ -6,13 +6,13 @@ use trifonius_dsh_api::types::{
 };
 
 use crate::engine_target::{template_resolver, TemplateMapping};
-use crate::pipeline::PipelineName;
-use crate::processor::dsh_service::dsh_service_config::{
+use crate::pipeline::PipelineId;
+use crate::processor::dshservice::dshservice_config::{
   DshServiceSpecificConfig, HealthCheckConfig, HealthCheckProtocol, MetricsConfig, PortMappingConfig, PortMappingTls, ProfileConfig, SecretConfig,
 };
-use crate::processor::dsh_service::DshServiceName;
+use crate::processor::dshservice::DshServiceName;
 use crate::processor::processor_config::VariableType;
-use crate::processor::{JunctionId, ProcessorName, ProcessorType};
+use crate::processor::{JunctionId, ProcessorId, ProcessorType};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
   fn from(value: ApiHealthCheck) -> Self {
@@ -114,13 +114,11 @@ impl From<SecretConfig> for ApiApplicationSecret {
   }
 }
 
-const TRIFONIUS_PREFIX: &str = "TRIFONIUS";
-
 pub fn into_api_application(
-  pipeline_name: Option<&PipelineName>,
-  processor_name: &ProcessorName,
+  pipeline_id: Option<&PipelineId>,
+  processor_id: &ProcessorId,
   service_name: &DshServiceName,
-  dsh_service_specific_config: &DshServiceSpecificConfig,
+  dshservice_specific_config: &DshServiceSpecificConfig,
   inbound_junctions: &HashMap<JunctionId, String>,
   outbound_junctions: &HashMap<JunctionId, String>,
   parameters: &HashMap<String, String>, // TODO ParameterId?
@@ -129,14 +127,14 @@ pub fn into_api_application(
   template_mapping: &TemplateMapping,
 ) -> Result<ApiApplication, String> {
   let mut environment_variables: HashMap<String, String> = HashMap::new();
-  if let Some(pipeline_name) = pipeline_name {
-    environment_variables.insert(format!("{}_PIPELINE_NAME", TRIFONIUS_PREFIX), pipeline_name.to_string());
+  if let Some(pipeline_id) = pipeline_id {
+    environment_variables.insert("TRIFONIUS_PIPELINE_ID".to_string(), pipeline_id.to_string());
   }
-  environment_variables.insert(format!("{}_PROCESSOR_NAME", TRIFONIUS_PREFIX), processor_name.to_string());
-  environment_variables.insert(format!("{}_PROCESSOR_TYPE", TRIFONIUS_PREFIX), ProcessorType::DshService.to_string());
-  environment_variables.insert(format!("{}_PROCESSOR_ID", TRIFONIUS_PREFIX), "TODO".to_string());
-  environment_variables.insert(format!("{}_SERVICE_NAME", TRIFONIUS_PREFIX), service_name.to_string());
-  if let Some(ref configured_environment_variables) = dsh_service_specific_config.environment_variables {
+  environment_variables.insert("TRIFONIUS_PROCESSOR_ID".to_string(), processor_id.to_string());
+  environment_variables.insert("TRIFONIUS_PROCESSOR_TECHNOLOGY".to_string(), ProcessorType::DshService.to_string());
+  environment_variables.insert("TRIFONIUS_PROCESSOR_REALIZATION_ID".to_string(), "TODO".to_string());
+  environment_variables.insert("TRIFONIUS_SERVICE_NAME".to_string(), service_name.to_string());
+  if let Some(ref configured_environment_variables) = dshservice_specific_config.environment_variables {
     for (configured_environment_variable, variable) in configured_environment_variables.clone() {
       match variable.typ {
         VariableType::InboundJunction => match variable.id {
@@ -201,29 +199,29 @@ pub fn into_api_application(
   let api_application = ApiApplication {
     cpus: profile.cpus,
     env: environment_variables,
-    exposed_ports: match dsh_service_specific_config.exposed_ports {
+    exposed_ports: match dshservice_specific_config.exposed_ports {
       Some(ref m) => m
         .iter()
         .map(|e| (e.0.clone(), Into::<ApiPortMapping>::into(e.1.clone())))
         .collect::<HashMap<String, ApiPortMapping>>(),
       None => HashMap::new(),
     },
-    health_check: dsh_service_specific_config.health_check.as_ref().map(|hc| ApiHealthCheck::from(hc.clone())),
-    image: template_resolver(dsh_service_specific_config.image.as_str(), template_mapping)?,
+    health_check: dshservice_specific_config.health_check.as_ref().map(|hc| ApiHealthCheck::from(hc.clone())),
+    image: template_resolver(dshservice_specific_config.image.as_str(), template_mapping)?,
     instances: profile.instances,
     mem: profile.mem,
-    metrics: dsh_service_specific_config.metrics.clone().map(|m| m.into()),
-    needs_token: dsh_service_specific_config.needs_token,
+    metrics: dshservice_specific_config.metrics.clone().map(|m| m.into()),
+    needs_token: dshservice_specific_config.needs_token,
     readable_streams: vec![],
-    secrets: match dsh_service_specific_config.secrets {
+    secrets: match dshservice_specific_config.secrets {
       Some(ref ss) => ss.iter().map(|s| Into::<ApiApplicationSecret>::into(s.clone())).collect(),
       None => vec![],
     },
-    single_instance: dsh_service_specific_config.single_instance,
-    spread_group: dsh_service_specific_config.spread_group.clone(),
+    single_instance: dshservice_specific_config.single_instance,
+    spread_group: dshservice_specific_config.spread_group.clone(),
     topics: vec![],
     user,
-    volumes: match dsh_service_specific_config.volumes {
+    volumes: match dshservice_specific_config.volumes {
       Some(ref vs) => vs
         .iter()
         .map(|e| (e.0.clone(), ApiApplicationVolumes { name: e.1.clone() }))

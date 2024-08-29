@@ -2,10 +2,10 @@ use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-pub(crate) mod dsh_topic_descriptor;
-mod dsh_topic_instance;
-mod dsh_topic_realization;
-pub(crate) mod dsh_topic_registry;
+pub(crate) mod dshtopic_descriptor;
+mod dshtopic_instance;
+mod dshtopic_realization;
+pub(crate) mod dshtopic_registry;
 
 const INTERNAL: &str = "internal";
 const SCRATCH: &str = "scratch";
