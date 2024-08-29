@@ -45,10 +45,10 @@ impl Subject for ManifestSubject {
     self.subject()
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
-    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
-    capabilities.insert(CapabilityType::List, &MANIFEST_LIST_CAPABILITY);
-    capabilities.insert(CapabilityType::Show, &MANIFEST_SHOW_CAPABILITY);
+  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
+    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    capabilities.insert(CapabilityType::List, MANIFEST_LIST_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::Show, MANIFEST_SHOW_CAPABILITY.as_ref());
     capabilities
   }
 }

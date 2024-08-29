@@ -53,9 +53,9 @@ impl Subject for ProcessorSubject {
     Some("p")
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
-    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
-    capabilities.insert(CapabilityType::List, &PROCESSORS_LIST_CAPABILITY);
+  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
+    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    capabilities.insert(CapabilityType::List, PROCESSORS_LIST_CAPABILITY.as_ref());
     capabilities
   }
 }

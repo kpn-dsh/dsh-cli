@@ -24,7 +24,7 @@ pub trait Subject {
     None
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>>;
+  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)>;
 
   async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &'a DshApiClient<'_>) -> CommandResult {
     match matches.subcommand() {

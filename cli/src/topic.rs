@@ -49,10 +49,10 @@ impl Subject for TopicSubject {
     Some("t")
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
-    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
-    capabilities.insert(CapabilityType::List, &TOPIC_LIST_CAPABILITY);
-    capabilities.insert(CapabilityType::Show, &TOPIC_SHOW_CAPABILITY);
+  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
+    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    capabilities.insert(CapabilityType::List, TOPIC_LIST_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::Show, TOPIC_SHOW_CAPABILITY.as_ref());
     capabilities
   }
 }

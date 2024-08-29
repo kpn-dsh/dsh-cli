@@ -48,10 +48,10 @@ impl Subject for SecretSubject {
     Some("s")
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
-    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
-    capabilities.insert(CapabilityType::List, &SECRET_LIST_CAPABILITY);
-    capabilities.insert(CapabilityType::Show, &SECRET_SHOW_CAPABILITY);
+  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
+    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    capabilities.insert(CapabilityType::List, SECRET_LIST_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::Show, SECRET_SHOW_CAPABILITY.as_ref());
     capabilities
   }
 }

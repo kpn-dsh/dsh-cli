@@ -48,9 +48,9 @@ impl Subject for EnvSubject {
     Some("e")
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> {
-    let mut capabilities: HashMap<CapabilityType, &Box<(dyn Capability + Send + Sync)>> = HashMap::new();
-    capabilities.insert(CapabilityType::Find, &ENV_FIND_CAPABILITY);
+  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
+    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    capabilities.insert(CapabilityType::Find, ENV_FIND_CAPABILITY.as_ref());
     capabilities
   }
 }
