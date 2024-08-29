@@ -2,8 +2,7 @@
 
 #![allow(clippy::module_inception)]
 
-use trifonius_dsh_api::DshApiClientFactory;
-
+use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineName;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_instance::ProcessorInstance;
@@ -52,7 +51,7 @@ pub trait ProcessorRealization<'a> {
     &'a self,
     pipeline_name: Option<&PipelineName>,
     processor_name: &ProcessorName,
-    client_factory: &'a DshApiClientFactory,
+    engine_target: &'a EngineTarget,
   ) -> Result<Box<dyn ProcessorInstance + 'a>, String>;
 
   /// # Get this `ProcessorRealization`s type

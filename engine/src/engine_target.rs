@@ -42,6 +42,10 @@ lazy_static! {
 }
 
 impl<'a> EngineTarget<'a> {
+  pub fn default_engine_target() -> &'static EngineTarget<'a> {
+    &DEFAULT_ENGINE_TARGET
+  }
+
   pub fn create(dsh_api_client_factory: &'a DshApiClientFactory) -> Result<Self, String> {
     Ok(EngineTarget { dsh_api_client_factory, tenant: dsh_api_client_factory.tenant() })
   }

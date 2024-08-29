@@ -66,7 +66,7 @@ impl<'a> ProcessorRegistry<'a> {
   ) -> Option<Result<Box<dyn ProcessorInstance + 'a>, String>> {
     self
       .processor_realization(processor_type, processor_id)
-      .map(|realization| realization.processor_instance(pipeline_name, processor_name, self.engine_target.dsh_api_client_factory))
+      .map(|realization| realization.processor_instance(pipeline_name, processor_name, self.engine_target))
   }
 
   pub fn processor_instance_by_identifier(

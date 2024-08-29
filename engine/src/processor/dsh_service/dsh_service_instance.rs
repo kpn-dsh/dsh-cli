@@ -4,9 +4,10 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 
+use trifonius_dsh_api::DshApiClient;
 use trifonius_dsh_api::DshApiError;
-use trifonius_dsh_api::{DshApiClient, DshApiClientFactory};
 
+use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineName;
 use crate::processor::dsh_service::dsh_service_realization::DshServiceRealization;
 use crate::processor::dsh_service::DshServiceName;
@@ -22,7 +23,7 @@ pub struct DshServiceInstance<'a> {
   processor_name: ProcessorName,
   dsh_service_name: DshServiceName,
   processor_realization: &'a DshServiceRealization<'a>,
-  client_factory: &'a DshApiClientFactory,
+  engine_target: &'a EngineTarget<'a>,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
@@ -31,7 +32,7 @@ impl<'a> DshServiceInstance<'a> {
     pipeline_name: Option<&PipelineName>,
     processor_name: &ProcessorName,
     processor_realization: &'a DshServiceRealization,
-    client_factory: &'a DshApiClientFactory,
+    engine_target: &'a EngineTarget<'a>,
     resource_registry: &'a ResourceRegistry,
   ) -> Result<Self, String> {
     Ok(Self {
@@ -39,7 +40,7 @@ impl<'a> DshServiceInstance<'a> {
       processor_name: processor_name.clone(),
       dsh_service_name: DshServiceName::try_from((pipeline_name, processor_name))?,
       processor_realization,
-      client_factory,
+      engine_target,
       resource_registry,
     })
   }
@@ -104,9 +105,9 @@ impl ProcessorInstance for DshServiceInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.client_factory.user().to_string(),
+      self.engine_target.tenant.user().to_string(),
     )?;
-    let client: DshApiClient = self.client_factory.client().await?;
+    let client: DshApiClient = self.engine_target.dsh_api_client().await?;
     match client.create_application(&self.dsh_service_name, dsh_application_config).await {
       Ok(()) => Ok(()),
       Err(DshApiError::NotFound) => Err(format!("unexpected NotFound response when deploying service {}", &self.dsh_service_name)),
@@ -129,7 +130,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.client_factory.user().to_string(),
+      self.engine_target.tenant().user().to_string(),
     )?;
     match serde_json::to_string_pretty(&dsh_application_config) {
       Ok(config) => Ok(config),
@@ -150,7 +151,13 @@ impl ProcessorInstance for DshServiceInstance<'_> {
   }
 
   async fn status(&self) -> Result<ProcessorStatus, String> {
-    match self.client_factory.client().await?.get_application_allocation_status(&self.dsh_service_name).await {
+    match self
+      .engine_target
+      .dsh_api_client()
+      .await?
+      .get_application_allocation_status(&self.dsh_service_name)
+      .await
+    {
       Ok(status) => {
         if status.provisioned {
           Ok(ProcessorStatus { deployed: true, up: Some(true) })
@@ -172,7 +179,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
   }
 
   async fn undeploy(&self) -> Result<bool, String> {
-    match self.client_factory.client().await?.delete_application(&self.dsh_service_name).await {
+    match self.engine_target.dsh_api_client().await?.delete_application(&self.dsh_service_name).await {
       Ok(()) => Ok(true),
       Err(DshApiError::NotFound) => Ok(false),
       Err(DshApiError::NotAuthorized) => Ok(false),

@@ -5,8 +5,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use log::{debug, error};
 
-use trifonius_dsh_api::DshApiClientFactory;
-
+use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineName;
 use crate::processor::dsh_app::dsh_app_realization::DshAppRealization;
 use crate::processor::dsh_app::DshAppName;
@@ -24,7 +23,7 @@ pub struct DshAppInstance<'a> {
   processor_name: ProcessorName,
   dsh_app_name: DshAppName,
   processor_realization: &'a DshAppRealization<'a>,
-  client_factory: &'a DshApiClientFactory,
+  engine_target: &'a EngineTarget<'a>,
   resource_registry: &'a ResourceRegistry<'a>,
 }
 
@@ -33,7 +32,7 @@ impl<'a> DshAppInstance<'a> {
     pipeline_name: Option<&PipelineName>,
     processor_name: &ProcessorName,
     processor_realization: &'a DshAppRealization,
-    client_factory: &'a DshApiClientFactory,
+    engine_target: &'a EngineTarget,
     resource_registry: &'a ResourceRegistry,
   ) -> Result<Self, String> {
     Ok(Self {
@@ -41,7 +40,7 @@ impl<'a> DshAppInstance<'a> {
       processor_name: processor_name.clone(),
       dsh_app_name: DshAppName::try_from((pipeline_name, processor_name))?,
       processor_realization,
-      client_factory,
+      engine_target,
       resource_registry,
     })
   }
@@ -106,7 +105,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.client_factory.user().to_string(),
+      self.engine_target.tenant.user().to_string(),
     )?;
     debug!("dsh configuration file\n{:#?}", &dsh_deployment_config);
     // match &self.api_client.de target_client
@@ -150,7 +149,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.client_factory.user().to_string(),
+      self.engine_target.tenant.user().to_string(),
     )?;
     debug!("dsh configuration file\n{:#?}", &dsh_config);
     match serde_json::to_string_pretty(&dsh_config) {

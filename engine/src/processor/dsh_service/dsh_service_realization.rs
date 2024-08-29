@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 
 use trifonius_dsh_api::types::Application;
-use trifonius_dsh_api::{DshApiClientFactory, DshApiTenant};
+use trifonius_dsh_api::DshApiTenant;
 
-use crate::engine_target::{from_tenant_to_template_mapping, TemplateMapping};
+use crate::engine_target::{from_tenant_to_template_mapping, EngineTarget, TemplateMapping};
 use crate::pipeline::PipelineName;
 use crate::placeholder::PlaceHolder;
 use crate::processor::dsh_service::dsh_service_api::into_api_application;
@@ -71,9 +71,9 @@ impl<'a> ProcessorRealization<'a> for DshServiceRealization<'a> {
     &'a self,
     pipeline_name: Option<&PipelineName>,
     processor_name: &ProcessorName,
-    client_factory: &'a DshApiClientFactory,
+    engine_target: &'a EngineTarget<'a>,
   ) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
-    match DshServiceInstance::create(pipeline_name, processor_name, self, client_factory, self.resource_registry) {
+    match DshServiceInstance::create(pipeline_name, processor_name, self, engine_target, self.resource_registry) {
       Ok(processor) => Ok(Box::new(processor)),
       Err(error) => Err(error),
     }
