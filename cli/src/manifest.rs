@@ -3,17 +3,16 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
-use serde_json::{from_str, Value};
+use serde_json::{from_str, Map, Value};
 
-use trifonius_dsh_api::types::{AppCatalogAppResourcesValue, AppCatalogManifest};
+use trifonius_dsh_api::types::AppCatalogManifest;
 use trifonius_dsh_api::DshApiClient;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::app::{app_to_default_vector, default_app_column_labels};
-use crate::formatters::application::default_application_table;
 use crate::subject::Subject;
-use crate::tabular::{make_tabular_with_headers, print_table};
+use crate::tabular::make_tabular_with_headers;
 use crate::CommandResult;
 
 pub(crate) struct ManifestSubject {}
@@ -167,42 +166,106 @@ struct ManifestShowAll {}
 impl CommandExecutor for ManifestShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
-    let app = dsh_api_client.get_app_configuration(manifest_id.as_str()).await?;
-    println!("name:                 {}", app.name);
-    println!("manifest urn:         {}", app.manifest_urn);
-    println!("configuration:        {}", app.configuration.clone().unwrap_or("none".to_string()));
-    for (resource_name, resource) in &app.resources {
-      match resource {
-        AppCatalogAppResourcesValue::Application(application) => {
-          println!("resource/application: {}", resource_name);
-          print_table(default_application_table(app.name.as_str(), application), "  ", "  ", "");
-        }
-        AppCatalogAppResourcesValue::Bucket(bucket) => {
-          println!("resource/bucket:      {}", resource_name);
-          println!("  {:?}", bucket)
-        }
-        AppCatalogAppResourcesValue::Certificate(certificate) => {
-          println!("resource/certificate: {}", resource_name);
-          println!("  {:?}", certificate)
-        }
-        AppCatalogAppResourcesValue::Secret(secret) => {
-          println!("resource/secret:      {}", resource_name);
-          println!("  {:?}", secret)
-        }
-        AppCatalogAppResourcesValue::Topic(topic) => {
-          println!("resource/topic:       {}", resource_name);
-          println!("  {:?}", topic)
-        }
-        AppCatalogAppResourcesValue::Vhost(vhost) => {
-          println!("resource/vhost:       {}", resource_name);
-          println!("  {:?}", vhost)
-        }
-        AppCatalogAppResourcesValue::Volume(volume) => {
-          println!("resource/volume:      {}", resource_name);
-          println!("  {:?}", volume)
-        }
+    let all_manifests: Vec<AppCatalogManifest> = dsh_api_client.get_app_catalog_manifests().await?;
+    let all_values: Vec<Map<String, Value>> = all_manifests
+      .iter()
+      .map(|manifest| from_str::<Value>(manifest.payload.as_str()).expect("").as_object().unwrap().clone())
+      .collect();
+
+    for map in all_values {
+      println!("{}", map.get(ID).unwrap().as_str().unwrap());
+      if map.get(ID).unwrap().as_str().unwrap() == manifest_id {
+        println!(">>>>>>>>>>>>>>>>>> found");
       }
     }
+
+    // for manifest in &all_manifests {
+    //   let map = from_str::<Value>(manifest.payload.as_str()).expect("").as_object().unwrap().clone();
+    //   println!("{}", map.get(ID).unwrap().as_str().unwrap());
+    //   if map.get(ID).unwrap().as_str().unwrap() == manifest_id {
+    //     println!(">>>>>>>>>>>>>>>>>> found");
+    //   }
+    // }
+    //
+    // let manifests: Vec<AppCatalogManifest> = all_manifests.iter().filter(|manifest| {
+    //   let map = from_str::<Value>(manifest.payload.as_str()).expect("").as_object().unwrap().clone();
+    //   // println!("{}", map.get(ID).unwrap().as_str().unwrap());
+    //   map.get(ID).unwrap().as_str().unwrap() == manifest_id
+    // }).collect();
+
+    //
+    // let manifests: Vec<&Map<String, Value>> = all_manifests
+    //   .iter()
+    //   .map(|manifest| from_str::<Value>(&manifest.payload.as_str()).expect("").as_object().unwrap())
+    //   .collect();
+    // // object.get(ID).unwrap().as_str().unwrap() == manifest_id
+    //
+    // for m in manifests {
+    //   println!("{:?}", m.get(ID))
+    // }
+
+    // for (index, manifest) in manifests.iter().enumerate() {
+    //   let payload = &manifest.payload;
+    //   let des = from_str::<Value>(payload.as_str()).unwrap();
+    //   let object = des.as_object().unwrap();
+    //
+    //   // println!("--------------------------------------- {}", index);
+    //   // println!("api version    {}", object.get(API_VERSION).unwrap());
+    //   // println!("configuration  {}", object.get(CONFIGURATION).unwrap());
+    //   // println!("contact        {}", object.get(CONTACT).unwrap());
+    //   // println!("description    {}", object.get(DESCRIPTION).unwrap());
+    //   println!(
+    //     "{}  {}  {}  {}",
+    //     index,
+    //     object.get(ID).unwrap().as_str().unwrap(),
+    //     object.get(VERSION).unwrap().as_str().unwrap(),
+    //     object.get(API_VERSION).unwrap().as_str().unwrap()
+    //   );
+    //   // println!("kind           {}", object.get(KIND).unwrap());
+    //   // println!("more info      {}", object.get(MORE_INFO).unwrap());
+    //   // println!("name           {}", object.get(NAME).unwrap());
+    //   // println!("resources      {}", object.get(RESOURCES).unwrap());
+    //   // println!("vendor         {}", object.get(VENDOR).unwrap());
+    //   // println!("version        {}", object.get(VERSION).unwrap());
+    // }
     Ok(())
+
+    // let app = dsh_api_client.get_app_configuration(manifest_id.as_str()).await?;
+    // println!("name:                 {}", app.name);
+    // println!("manifest urn:         {}", app.manifest_urn);
+    // println!("configuration:        {}", app.configuration.clone().unwrap_or("none".to_string()));
+    // for (resource_name, resource) in &app.resources {
+    //   match resource {
+    //     AppCatalogAppResourcesValue::Application(application) => {
+    //       println!("resource/application: {}", resource_name);
+    //       print_table(default_application_table(app.name.as_str(), application), "  ", "  ", "");
+    //     }
+    //     AppCatalogAppResourcesValue::Bucket(bucket) => {
+    //       println!("resource/bucket:      {}", resource_name);
+    //       println!("  {:?}", bucket)
+    //     }
+    //     AppCatalogAppResourcesValue::Certificate(certificate) => {
+    //       println!("resource/certificate: {}", resource_name);
+    //       println!("  {:?}", certificate)
+    //     }
+    //     AppCatalogAppResourcesValue::Secret(secret) => {
+    //       println!("resource/secret:      {}", resource_name);
+    //       println!("  {:?}", secret)
+    //     }
+    //     AppCatalogAppResourcesValue::Topic(topic) => {
+    //       println!("resource/topic:       {}", resource_name);
+    //       println!("  {:?}", topic)
+    //     }
+    //     AppCatalogAppResourcesValue::Vhost(vhost) => {
+    //       println!("resource/vhost:       {}", resource_name);
+    //       println!("  {:?}", vhost)
+    //     }
+    //     AppCatalogAppResourcesValue::Volume(volume) => {
+    //       println!("resource/volume:      {}", resource_name);
+    //       println!("  {:?}", volume)
+    //     }
+    //   }
+    // }
+    // Ok(())
   }
 }
