@@ -32,11 +32,11 @@ pub(crate) enum CapabilityType {
 
 pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 8] = [Create, Delete, Find, List, Show, Start, Stop, Update];
 
-impl TryFrom<&String> for CapabilityType {
+impl TryFrom<&str> for CapabilityType {
   type Error = String;
 
-  fn try_from(value: &String) -> Result<Self, Self::Error> {
-    match value.as_str() {
+  fn try_from(value: &str) -> Result<Self, Self::Error> {
+    match value {
       CREATE => Ok(Create),
       DELETE => Ok(Delete),
       FIND => Ok(Find),
@@ -46,22 +46,6 @@ impl TryFrom<&String> for CapabilityType {
       STOP => Ok(Stop),
       UPDATE => Ok(Update),
       _ => Err(format!("unrecognized capability type {}", value)),
-    }
-  }
-}
-
-impl From<&str> for CapabilityType {
-  fn from(value: &str) -> Self {
-    match value {
-      CREATE => Create,
-      DELETE => Delete,
-      FIND => Find,
-      LIST => List,
-      SHOW => Show,
-      START => Start,
-      STOP => Stop,
-      UPDATE => Update,
-      _ => panic!("unrecognized capability type {}", value),
     }
   }
 }
@@ -215,7 +199,7 @@ impl Capability for DeclarativeCapability<'_> {
       }
     }
     if !at_least_one_executed {
-      if let Some(ref default_executor) = self.default_command_executor {
+      if let Some(default_executor) = self.default_command_executor {
         default_executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await
       } else {
         Ok(())
