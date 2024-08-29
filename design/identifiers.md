@@ -1,5 +1,116 @@
 # Technologies, realizations and identifiers
 
+## Glossary
+
+<table>
+    <tr style="vertical-align: top;">
+        <th>term</th>
+        <th>description</th>
+        <th>examples</th>
+        <th>unique id</th>
+    </tr>
+    <tr style="vertical-align: top;">
+        <td><em>Processor</em></td>
+        <td>
+            A Trifonius <em>Pipeline</em> is a set of collaborating <em>Processor</em>s and/or 
+            <em>Resource</em>s, together with a specification how these components are 
+            connected together and how they are configured.
+            A deployed and started <em>Pipeline</em> can realize a requested capability.
+        </td>
+        <td><code>itv-pipeline</code></td>
+        <td><code>PipelineId</code></td>
+    </tr>
+    <tr style="vertical-align: top;">
+        <td><em>Processor Technology</em></td>
+        <td>
+            A <em>Processor Technology</em> is a technical solution
+            for the realization of a Trifonius <em>Processor</em>.
+            Examples are DSH services or apps from the DSH App Catalog.
+            Support for more technology solutions will be added later,
+            e.g. Flink, Polars, Nifi, et cetera.
+        </td>
+        <td><code>dsh-app</code><br/><code>dsh-service</code></td>
+        <td><code>ProcessorTechnology</code></td>
+    </tr>
+    <tr style="vertical-align: top;">
+        <td><em>Processor Realization</em></td>
+        <td>
+            A <em>Processor Realization</em> is a <em>Processor</em> 
+            that is available for use by Trifonius, 
+            and will show up in the <em>Processor</em> catalog or registry.
+            A <em>Processor Realization</em> is always implemented using a technical solution 
+            based on one of the <em>Processor Technology</em>s, 
+            e.g. a container in the DSH Registry. 
+            A <em>Processor Realization</em> is usually realized by building and deploying 
+            a technical component based on the <em>Processor Technology</em> and 
+            by specifying its behavior, characteristics and deployment requirements
+            in a configuration file.
+        </td>
+        <td><code>replicator</code></td>
+        <td><code>ProcessorRealizationId</code><br/>+ <code>Version</code></td>
+    </tr>
+    <tr style="vertical-align: top;">
+        <td><em>Processor Instance</em></td>
+        <td>
+            A <em>Processor Instance</em> is a configured <em>Processor Realization</em> 
+            used in a <em>Pipeline</em>.
+            In order to use the <em>Processor Realization</em>, 
+            the <em>Pipeline</em> must assign the instance a <code>ProcessorInstanceId</code>,
+            which must be unique in the scope of the <em>Pipeline</em>. 
+            The <em>Pipeline</em> must also specify all the deployment requirements 
+            of the <em>Processor Realization</em>, and provide a human friendly name.
+        </td>
+        <td><code>itv-replicator</code></td>
+        <td><code>ProcessorInstanceId</code></td>
+    </tr>
+    <tr style="vertical-align: top;">
+        <td><em>Resource Technology</em></td>
+        <td>
+            A <em>Resource Technology</em> is the technical solution
+            which implements a source/sink resource that is available to the Trifonius 
+            <em>Processor</em>s. 
+            At this time the only available <em>Resource Technology</em> 
+            are the Kafka topics managed by the DSH.
+            Support for more technology solutions will be added later,
+            e.g. S3 buckets, databases, web-services, et cetera.
+        </td>
+        <td><code>dsh-topic</code></td>
+        <td><code>ResourceTechnology</code></td>
+    </tr>
+    <tr style="vertical-align: top;">
+        <td><em>Resource Realization</em></td>
+        <td>
+            A <em>Resource Realization</em> is a source/sink resource 
+            that is available for use by Trifonius, 
+            and will show up in the <em>Resource</em> catalog or registry.
+            A <em>Resource Realization</em> is always implemented using a technical solution 
+            based on one of the <em>Resource Technology</em>s, 
+            e.g. a Kafka topic managed by DSH.
+            The set of available <em>Processor Realization</em>s typically 
+            originates outside Trifonius, and is defined by the current installed base 
+            of the <em>Technical Resource</em>. 
+            E.g., the set of <em>Resource</em>s for the <em>Technology Resource</em> 
+            <code>dsh-topic</code> consists of the set of Kafka topics accessible to the tenant.
+        </td>
+        <td><code>stb-status</code></td>
+        <td><code>ResourceRealizationId</code><br/> + <code>Version</code> (optional)</td>
+    </tr>
+    <tr style="vertical-align: top;">
+        <td><em>Resource Instance</em></td>
+        <td>
+            A <em>Resource Instance</em> is a configured <em>Resource Realization</em> 
+            used in a <em>Pipeline</em>.
+            In order to use the <em>Resource Realization</em>, 
+            the <em>Pipeline</em> must assign the instance a <code>ResourceInstanceId</code>,
+            which must be unique in the scope of the <em>Pipeline</em>.
+            The <em>Pipeline</em> must also specify all the deployment requirements 
+            of the <em>Resource Realization</em> (if any), and provide a human friendly name.
+        </td>
+        <td><code>status-topic</code></td>
+        <td><code>ResourceInstanceId</code></td>
+    </tr>
+</table>
+
 * Pipelines
     * `PipelineId` - Uniquely identifies a pipeline.
     * `PipelineName` - Human friendly name of a pipeline.
@@ -16,7 +127,7 @@
     * `ProcessorName` - Human friendly name of the use of a processor in the definition of a
       pipeline.
 * Resources
-    * `Resource Technology` - Identifies the technical solutions that realize resources.
+    * `ResourceTechnology` - Identifies the technical solutions that realize resources.
     * `ResourceRealization` - Identifies a specific realization of a resource,
       based on a specific resource technology.
     * `ResourceId` - Identifies the definition/use of a resource realization
