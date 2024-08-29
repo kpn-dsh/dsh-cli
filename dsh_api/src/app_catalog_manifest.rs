@@ -4,12 +4,14 @@
 //!
 //! * [`get_app_catalog_manifests() -> Vec<AppCatalogManifest>`](DshApiClient::get_app_catalog_manifests)
 
+use std::collections::{HashMap, HashSet};
+
+use serde_json::{from_str, Value};
+
 use crate::types::AppCatalogManifest;
 #[allow(unused_imports)]
 use crate::DshApiError;
 use crate::{DshApiClient, DshApiResult};
-use serde_json::{from_str, Value};
-use std::collections::{HashMap, HashSet};
 
 pub const API_VERSION: &str = "apiVersion";
 pub const CONFIGURATION: &str = "configuration";
