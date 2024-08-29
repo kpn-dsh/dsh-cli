@@ -33,6 +33,17 @@
       "partitioner": "default-partitioner",
       "partitioningDepth": 0,
       "canRetain": false
+    },
+    "scratch.keyring-codomain-values-property-violations-dev": {
+      "name": "scratch.keyring-codomain-values-property-violations-dev",
+      "cluster": "/tt",
+      "read": "scratch.keyring-codomain-values-property-violations-dev.greenbox-dev",
+      "write": "scratch.keyring-codomain-values-property-violations-dev.greenbox-dev",
+      "partitions": 1,
+      "replication": 3,
+      "partitioner": "default-partitioner",
+      "partitioningDepth": 0,
+      "canRetain": false
     }
   },
   "private_consumer_groups": [],
