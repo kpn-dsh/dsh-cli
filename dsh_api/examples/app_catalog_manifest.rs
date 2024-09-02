@@ -1,11 +1,13 @@
 use serde_json::de::from_str;
 use serde_json::Value;
+
+use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use trifonius_dsh_api::types::AppCatalogManifest;
-use trifonius_dsh_api::DshApiClient;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-  let client = DshApiClient::default_client().await;
+  let client_factory = DshApiClientFactory::default();
+  let client = client_factory.client().await?;
 
   let manifests: Vec<AppCatalogManifest> = client.get_app_catalog_manifests().await?;
 

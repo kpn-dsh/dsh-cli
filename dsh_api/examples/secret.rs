@@ -1,5 +1,5 @@
+use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use trifonius_dsh_api::types::{AllocationStatus, Empty};
-use trifonius_dsh_api::DshApiClient;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -10,7 +10,8 @@ async fn main() -> Result<(), String> {
   // let secret = client.delete_secret(secret_id).await?;
   // let secret = client.update_secret(secret_id).await?;
 
-  let client = DshApiClient::default_client().await;
+  let client_factory = DshApiClientFactory::default();
+  let client = client_factory.client().await?;
 
   let mut secrets: Vec<String> = client.get_secret_ids().await?;
   secrets.sort();

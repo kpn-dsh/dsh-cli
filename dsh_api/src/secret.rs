@@ -11,12 +11,13 @@
 //! * [`get_secret_ids() -> Vec<String>`](DshApiClient::get_secret_ids)
 //! * [`update_secret(secret_id, secret) -> ()`](DshApiClient::update_secret)
 
+use crate::dsh_api_client::DshApiClient;
 #[allow(unused_imports)]
 use crate::types::Empty;
 use crate::types::{AllocationStatus, Secret};
 #[allow(unused_imports)]
 use crate::DshApiError;
-use crate::{DshApiClient, DshApiResult};
+use crate::DshApiResult;
 
 /// # Manage secrets
 ///

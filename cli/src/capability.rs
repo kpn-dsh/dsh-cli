@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 
-use trifonius_dsh_api::DshApiClient;
+use trifonius_dsh_api::dsh_api_client::DshApiClient;
 
 use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT, TARGET_ARGUMENT};
 use crate::capability::CapabilityType::*;

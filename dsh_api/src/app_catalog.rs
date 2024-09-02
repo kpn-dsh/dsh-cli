@@ -9,12 +9,13 @@
 //! * [`get_app_configurations() -> HashMap<String, AppCatalogApp>`](DshApiClient::get_app_configurations)
 //! * [`get_app_ids() -> Vec<String>`](DshApiClient::get_app_ids)
 
+use crate::dsh_api_client::DshApiClient;
 use std::collections::HashMap;
 
 use crate::types::AppCatalogApp;
 #[allow(unused_imports)]
 use crate::DshApiError;
-use crate::{DshApiClient, DshApiResult};
+use crate::DshApiResult;
 
 /// # Manage apps in the App Catalog
 ///

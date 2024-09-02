@@ -7,10 +7,11 @@
 //! * [`get_app_catalog_app_allocation_status(app_catalog_id) -> AllocationStatus`](DshApiClient::get_app_catalog_app_allocation_status)
 //! * [`get_app_catalog_app_configuration(app_catalog_id) -> AppCatalogAppConfiguration`](DshApiClient::get_app_catalog_app_configuration)
 
+use crate::dsh_api_client::DshApiClient;
 use crate::types::{AllocationStatus, AppCatalogAppConfiguration};
 #[allow(unused_imports)]
 use crate::DshApiError;
-use crate::{DshApiClient, DshApiResult};
+use crate::DshApiResult;
 
 /// # Manage the App Catalog
 ///

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
 
-use trifonius_dsh_api::DshApiClient;
+use trifonius_dsh_api::dsh_api_client::DshApiClient;
 
 use crate::capability::{Capability, CapabilityType, ALL_CAPABILITY_TYPES};
 use crate::CommandResult;

@@ -1,5 +1,6 @@
 //! Defines DSH platforms and their properties
 
+use std::env;
 use std::fmt::{Display, Formatter};
 
 use dsh_sdk::Platform as SdkPlatform;
@@ -113,5 +114,17 @@ impl DshPlatform {
 
   pub fn endpoint_rest_access_token(&self) -> String {
     SdkPlatform::from(self).endpoint_rest_access_token().to_string()
+  }
+}
+
+impl Default for DshPlatform {
+  fn default() -> Self {
+    match env::var("TRIFONIUS_TARGET_PLATFORM") {
+      Ok(platform_name) => match DshPlatform::try_from(platform_name.as_str()) {
+        Ok(platform) => platform,
+        Err(_) => panic!("invalid platform name {}", platform_name),
+      },
+      Err(_) => panic!("environment variable TRIFONIUS_TARGET_PLATFORM not set"),
+    }
   }
 }

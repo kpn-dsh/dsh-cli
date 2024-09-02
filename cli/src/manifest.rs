@@ -5,8 +5,8 @@ use clap::ArgMatches;
 use lazy_static::lazy_static;
 use serde_json::{from_str, Map, Value};
 
+use trifonius_dsh_api::dsh_api_client::DshApiClient;
 use trifonius_dsh_api::types::AppCatalogManifest;
-use trifonius_dsh_api::DshApiClient;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;

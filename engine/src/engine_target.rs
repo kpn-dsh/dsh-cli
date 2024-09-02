@@ -5,49 +5,39 @@ use rand::Rng;
 use regex::Regex;
 use uuid::Uuid;
 
+use trifonius_dsh_api::dsh_api_client::DshApiClient;
+use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use trifonius_dsh_api::dsh_api_tenant::DshApiTenant;
 use trifonius_dsh_api::platform::DshPlatform;
-use trifonius_dsh_api::{DshApiClient, DshApiClientFactory, DshApiTenant};
 
 use crate::placeholder::PlaceHolder;
 
-#[derive(Debug)]
-pub struct EngineTarget<'a> {
-  pub(crate) dsh_api_client_factory: &'a DshApiClientFactory,
-  pub(crate) tenant: &'a DshApiTenant,
+#[derive(Debug, Default)]
+pub struct EngineTarget {
+  pub(crate) dsh_api_client_factory: DshApiClientFactory,
 }
 
-impl EngineTarget<'_> {
+impl EngineTarget {
   pub fn platform(&self) -> &DshPlatform {
-    self.tenant.platform()
+    self.dsh_api_client_factory.tenant().platform()
   }
 
   pub fn tenant(&self) -> &DshApiTenant {
-    self.tenant
+    self.dsh_api_client_factory.tenant()
   }
 
   pub fn tenant_name(&self) -> &str {
-    self.tenant.name()
+    self.dsh_api_client_factory.tenant().name()
   }
 
   pub fn user(&self) -> &str {
-    self.tenant.user()
+    self.dsh_api_client_factory.tenant().user()
   }
 }
 
-lazy_static! {
-  pub static ref DEFAULT_ENGINE_TARGET: EngineTarget<'static> = {
-    let dsh_api_client_factory = &DshApiClientFactory::default_factory();
-    EngineTarget { dsh_api_client_factory, tenant: dsh_api_client_factory.tenant() }
-  };
-}
-
-impl<'a> EngineTarget<'a> {
-  pub fn default_engine_target() -> &'static EngineTarget<'a> {
-    &DEFAULT_ENGINE_TARGET
-  }
-
-  pub fn create(dsh_api_client_factory: &'a DshApiClientFactory) -> Result<Self, String> {
-    Ok(EngineTarget { dsh_api_client_factory, tenant: dsh_api_client_factory.tenant() })
+impl EngineTarget {
+  pub fn create(dsh_api_client_factory: DshApiClientFactory) -> Result<Self, String> {
+    Ok(EngineTarget { dsh_api_client_factory })
   }
 
   pub async fn dsh_api_client(&self) -> Result<DshApiClient, String> {

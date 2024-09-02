@@ -16,12 +16,13 @@
 //! * [`get_application_task_allocation_status(application_id, task_id) -> AllocationStatus`](DshApiClient::get_application_task_allocation_status)
 //! * [`get_application_task_state(application_id, task_id) -> Task`](DshApiClient::get_application_task_state)
 
+use crate::dsh_api_client::DshApiClient;
 use std::collections::HashMap;
 
 use crate::types::{AllocationStatus, Application, Task, TaskStatus};
 #[allow(unused_imports)]
 use crate::DshApiError;
-use crate::{DshApiClient, DshApiResult};
+use crate::DshApiResult;
 
 /// # Manage applications
 ///

@@ -1,11 +1,12 @@
+use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use trifonius_dsh_api::types::{AllocationStatus, Bucket, BucketStatus};
-use trifonius_dsh_api::DshApiClient;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
   let bucket_id = "schema-registry";
 
-  let client = DshApiClient::default_client().await;
+  let client_factory = DshApiClientFactory::default();
+  let client = client_factory.client().await?;
 
   // let bucket = client.delete_bucket(bucket_id).await?;
   // let bucket = client.update_bucket(bucket_id).await?;

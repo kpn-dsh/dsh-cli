@@ -10,10 +10,11 @@
 //! * [`get_bucket_configuration(bucket_id) -> Bucket`](DshApiClient::get_bucket_configuration)
 //! * [`get_bucket_ids(&self) -> Vec<String>`](DshApiClient::get_bucket_ids)
 
+use crate::dsh_api_client::DshApiClient;
 use crate::types::{AllocationStatus, Bucket, BucketStatus};
 #[allow(unused_imports)]
 use crate::DshApiError;
-use crate::{DshApiClient, DshApiResult};
+use crate::DshApiResult;
 
 /// # Manage buckets
 ///

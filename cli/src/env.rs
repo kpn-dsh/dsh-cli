@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
 
+use trifonius_dsh_api::dsh_api_client::DshApiClient;
 use trifonius_dsh_api::types::AppCatalogApp;
-use trifonius_dsh_api::DshApiClient;
 
 use crate::app::get_application_from_app;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
