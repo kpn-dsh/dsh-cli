@@ -9,7 +9,6 @@ use std::fmt::{Debug, Display, Formatter};
 use async_trait::async_trait;
 
 use crate::pipeline::PipelineId;
-use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
 use crate::resource::ResourceIdentifier;
 
@@ -80,12 +79,6 @@ pub trait ProcessorInstance: Send + Sync {
   /// ## Returns
   /// * The `ProcessorId` of this `ProcessorInstance`.
   fn processor_id(&self) -> &ProcessorId;
-
-  /// # Returns the `ProcessorRealizaton` for this `ProcessorInstance`
-  ///
-  /// ## Returns
-  /// * The `ProcessorRealization` for this `ProcessorInstance`.
-  fn processor_realization(&self) -> &dyn ProcessorRealization;
 
   /// # Start this `ProcessorInstance`
   ///

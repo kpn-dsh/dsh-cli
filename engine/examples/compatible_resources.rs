@@ -1,13 +1,11 @@
 use trifonius_engine::processor::JunctionId;
 
-use crate::common::default_dshservice_instance;
-
 #[path = "common.rs"]
 mod common;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-  let dshservice_instance = default_dshservice_instance();
+  let dshservice_instance = crate::common::dshservice_instance();
 
   let inbound_kafka_topic = JunctionId::new("inbound-kafka-topic");
   let inbound_compatible_resources = dshservice_instance.compatible_resources(&inbound_kafka_topic).await;

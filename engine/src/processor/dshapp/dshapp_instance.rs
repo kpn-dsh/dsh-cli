@@ -5,15 +5,12 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use log::{debug, error};
 
-use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineId;
 use crate::processor::dshapp::dshapp_realization::DshAppRealization;
 use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
-use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
 use crate::resource::resource_descriptor::ResourceDirection;
-use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
@@ -22,26 +19,16 @@ pub struct DshAppInstance<'a> {
   pipeline_id: Option<PipelineId>,
   processor_id: ProcessorId,
   dshapp_name: DshAppName,
-  processor_realization: &'a DshAppRealization<'a>,
-  engine_target: &'a EngineTarget<'a>,
-  resource_registry: &'a ResourceRegistry<'a>,
+  processor_realization: &'a DshAppRealization,
 }
 
 impl<'a> DshAppInstance<'a> {
-  pub fn create(
-    pipeline_id: Option<&PipelineId>,
-    processor_id: &ProcessorId,
-    processor_realization: &'a DshAppRealization,
-    engine_target: &'a EngineTarget,
-    resource_registry: &'a ResourceRegistry,
-  ) -> Result<Self, String> {
+  pub fn create(pipeline_id: Option<PipelineId>, processor_id: ProcessorId, processor_realization: &'a DshAppRealization) -> Result<Self, String> {
     Ok(Self {
-      pipeline_id: pipeline_id.cloned(),
+      pipeline_id: pipeline_id.clone(),
       processor_id: processor_id.clone(),
-      dshapp_name: DshAppName::try_from((pipeline_id, processor_id))?,
+      dshapp_name: DshAppName::try_from((pipeline_id.as_ref(), &processor_id))?,
       processor_realization,
-      engine_target,
-      resource_registry,
     })
   }
 }
@@ -66,7 +53,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
     {
       let mut compatible_resources = Vec::<ResourceIdentifier>::new();
       for allowed_resource_type in &junction_config.allowed_resource_types {
-        for resource_descriptor in self.resource_registry.resource_descriptors_by_type(allowed_resource_type) {
+        for resource_descriptor in self.processor_realization.resource_registry.resource_descriptors_by_type(allowed_resource_type) {
           match direction {
             ResourceDirection::Inbound => {
               if resource_descriptor.readable {
@@ -87,10 +74,6 @@ impl ProcessorInstance for DshAppInstance<'_> {
     }
   }
 
-  fn processor_realization(&self) -> &dyn ProcessorRealization {
-    self.processor_realization
-  }
-
   async fn deploy(
     &self,
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
@@ -105,7 +88,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.engine_target.tenant.user().to_string(),
+      self.processor_realization.engine_target.tenant().user().to_string(),
     )?;
     debug!("dsh configuration file\n{:#?}", &dsh_deployment_config);
     // match &self.api_client.de target_client
@@ -149,7 +132,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.engine_target.tenant.user().to_string(),
+      self.processor_realization.engine_target.tenant().user().to_string(),
     )?;
     debug!("dsh configuration file\n{:#?}", &dsh_config);
     match serde_json::to_string_pretty(&dsh_config) {

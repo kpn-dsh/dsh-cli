@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use dsh_sdk::Properties;
 
@@ -12,12 +13,12 @@ pub(crate) struct DshTopicRealizationRegistry {
   dshtopic_realizations: HashMap<ResourceIdentifier, DshTopicRealization>,
 }
 
-impl<'a> DshTopicRealizationRegistry {
-  pub(crate) fn create(engine_target: &'a EngineTarget) -> Result<Self, String> {
+impl DshTopicRealizationRegistry {
+  pub(crate) fn create(engine_target: Arc<EngineTarget>) -> Result<Self, String> {
     let mut dshtopic_realizations: HashMap<ResourceIdentifier, DshTopicRealization> = HashMap::new();
     let dsh_properties: &Properties = Properties::get();
     for stream in dsh_properties.datastream().streams().values() {
-      let dshtopic_realization = DshTopicRealization::create(stream, engine_target)?;
+      let dshtopic_realization = DshTopicRealization::create(stream, engine_target.clone())?;
       dshtopic_realizations.insert(dshtopic_realization.resource_identifier.clone(), dshtopic_realization);
     }
     Ok(Self { dshtopic_realizations })

@@ -1,29 +1,26 @@
 use std::collections::HashMap;
 use std::fs;
+use std::sync::Arc;
 
-use trifonius_dsh_api::DshApiClientFactory;
-
-use crate::processor::dshservice::dshservice_config::read_dshservice_config;
+use crate::engine_target::EngineTarget;
 use crate::processor::dshservice::dshservice_realization::DshServiceRealization;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{processor_config_dir_name, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
 use crate::resource::resource_registry::ResourceRegistry;
 
-pub(crate) struct DshServiceRealizationRegistry<'a> {
-  dshservice_realizations: HashMap<ProcessorIdentifier, DshServiceRealization<'a>>,
+pub(crate) struct DshServiceRealizationRegistry {
+  dshservice_realizations: HashMap<ProcessorIdentifier, DshServiceRealization>,
 }
 
-impl<'a> DshServiceRealizationRegistry<'a> {
-  pub(crate) fn create<'b: 'a>(client_factory: &'a DshApiClientFactory, resource_registry: &'a ResourceRegistry) -> Result<DshServiceRealizationRegistry<'a>, String> {
-    let mut dshservice_realizations: HashMap<ProcessorIdentifier, DshServiceRealization<'a>> = HashMap::new();
+impl DshServiceRealizationRegistry {
+  pub(crate) fn create(engine_target: Arc<EngineTarget>, resource_registry: Arc<ResourceRegistry>) -> Result<DshServiceRealizationRegistry, String> {
+    let mut dshservice_realizations: HashMap<ProcessorIdentifier, DshServiceRealization> = HashMap::new();
     let paths = fs::read_dir(format!("{}/dshservice", processor_config_dir_name())).map_err(|error| error.to_string())?;
     for path in paths {
-      let file_name = path.unwrap().path().display().to_string();
-      let config = read_dshservice_config(&file_name)?;
-      let id = ProcessorRealizationId::try_from(config.processor.id.as_str())?;
-      let dshservice_realization = DshServiceRealization::create(config, client_factory.tenant().clone(), resource_registry)?;
-      dshservice_realizations.insert(ProcessorIdentifier { processor_type: ProcessorType::DshService, id }, dshservice_realization);
+      let config_file_name = path.unwrap().path().display().to_string();
+      let dshservice_realization = DshServiceRealization::create(config_file_name.as_str(), engine_target.clone(), resource_registry.clone())?;
+      dshservice_realizations.insert(dshservice_realization.processor_identifier.clone(), dshservice_realization);
     }
     Ok(Self { dshservice_realizations })
   }

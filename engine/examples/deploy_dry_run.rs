@@ -4,8 +4,6 @@ use trifonius_engine::processor::{JunctionId, ParameterId, ProcessorProfileId};
 use trifonius_engine::resource::ResourceType;
 use trifonius_engine::resource::{ResourceIdentifier, ResourceRealizationId};
 
-use crate::common::default_dshservice_instance;
-
 #[path = "common.rs"]
 mod common;
 
@@ -13,7 +11,7 @@ mod common;
 async fn main() -> Result<(), String> {
   env_logger::init();
 
-  let dshservice_instance = default_dshservice_instance();
+  let dshservice_instance = crate::common::dshservice_instance();
 
   let inbound_junction = JunctionId::new("inbound-kafka-topic");
   let inbound_resource_id = ResourceRealizationId::new("stream-reference-implementation-3p");

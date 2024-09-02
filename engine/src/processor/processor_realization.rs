@@ -2,14 +2,13 @@
 
 #![allow(clippy::module_inception)]
 
-use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineId;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
 
 /// Defines the behavior of a Trifonius `ProcessorRealization`
-pub trait ProcessorRealization<'a> {
+pub trait ProcessorRealization {
   /// # Get this `ProcessorRealization`s descriptor
   ///
   /// ## Returns
@@ -43,12 +42,10 @@ pub trait ProcessorRealization<'a> {
   ///                   `ProcessorInstance` is part of a _Pipeline_,
   ///                   `None` when it is not.
   /// * `processor_id` - Processor id.
-  /// * `target_client_factory` - Target client factory.
   ///
   /// ## Returns
   /// * The created `ProcessorInstance`.
-  fn processor_instance(&'a self, pipeline_id: Option<&PipelineId>, processor_id: &ProcessorId, engine_target: &'a EngineTarget)
-    -> Result<Box<dyn ProcessorInstance + 'a>, String>;
+  fn processor_instance<'a>(&'a self, pipeline_id: Option<PipelineId>, processor_id: ProcessorId) -> Result<Box<dyn ProcessorInstance + 'a>, String>;
 
   /// # Get this `ProcessorRealization`s type
   ///

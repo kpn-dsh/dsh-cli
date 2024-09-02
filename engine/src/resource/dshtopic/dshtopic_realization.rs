@@ -1,4 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Arc;
 
 use dsh_sdk::dsh::datastream::Stream;
 use lazy_static::lazy_static;
@@ -17,10 +18,11 @@ use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, Res
 pub(crate) struct DshTopicRealization {
   pub(crate) resource_identifier: ResourceIdentifier,
   resource_descriptor: ResourceDescriptor,
+  engine_target: Arc<EngineTarget>,
 }
 
 impl DshTopicRealization {
-  pub(crate) fn create(stream: &Stream, engine_target: &EngineTarget) -> Result<Self, String> {
+  pub(crate) fn create(stream: &Stream, engine_target: Arc<EngineTarget>) -> Result<Self, String> {
     let resource_id = resource_id_from_stream_name(stream.name())?;
     let topic_name = topic_name_from_stream(stream);
     let topic_type = DshTopicType::try_from_topic_name(topic_name.as_str())?;
@@ -76,7 +78,7 @@ impl DshTopicRealization {
       }),
     };
     let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? };
-    Ok(DshTopicRealization { resource_identifier, resource_descriptor })
+    Ok(DshTopicRealization { resource_identifier, resource_descriptor, engine_target })
   }
 }
 
@@ -122,7 +124,7 @@ fn topic_name_from_stream(stream: &Stream) -> String {
   }
 }
 
-impl<'a> ResourceRealization<'a> for DshTopicRealization {
+impl ResourceRealization for DshTopicRealization {
   fn descriptor(&self) -> ResourceDescriptor {
     self.resource_descriptor.clone()
   }
@@ -139,13 +141,8 @@ impl<'a> ResourceRealization<'a> for DshTopicRealization {
     &self.resource_descriptor.label
   }
 
-  fn resource_instance(
-    &'a self,
-    pipeline_id: Option<&'a PipelineId>,
-    resource_id: &'a ResourceId,
-    engine_target: &'a EngineTarget,
-  ) -> Result<Box<dyn ResourceInstance + 'a>, String> {
-    match DshTopicInstance::create(pipeline_id, resource_id, self, engine_target) {
+  fn resource_instance<'a>(&'a self, pipeline_id: Option<PipelineId>, resource_id: ResourceId) -> Result<Box<dyn ResourceInstance + 'a>, String> {
+    match DshTopicInstance::create(pipeline_id, resource_id, self, self.engine_target.clone()) {
       Ok(resource) => Ok(Box::new(resource)),
       Err(error) => Err(error),
     }

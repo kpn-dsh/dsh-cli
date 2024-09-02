@@ -1,14 +1,14 @@
 #![allow(clippy::module_inception)]
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use trifonius_dsh_api::types::Application;
-use trifonius_dsh_api::DshApiTenant;
 
 use crate::engine_target::{from_tenant_to_template_mapping, EngineTarget, TemplateMapping};
 use crate::pipeline::PipelineId;
 use crate::placeholder::PlaceHolder;
-use crate::processor::dshapp::dshapp_config::ProfileConfig;
+use crate::processor::dshapp::dshapp_config::{read_dshapp_config, ProfileConfig};
 use crate::processor::dshapp::dshapp_instance::DshAppInstance;
 use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
@@ -22,25 +22,26 @@ use crate::resource::{ResourceIdentifier, ResourceType};
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
-pub struct DshAppRealization<'a> {
+pub struct DshAppRealization {
   processor_identifier: ProcessorIdentifier,
   pub(crate) processor_config: ProcessorConfig,
-  target_tenant: DshApiTenant,
-  resource_registry: &'a ResourceRegistry<'a>,
+  pub(crate) engine_target: Arc<EngineTarget>,
+  pub(crate) resource_registry: Arc<ResourceRegistry>,
 }
 
-impl<'a> DshAppRealization<'a> {
-  pub fn create(processor_config: ProcessorConfig, target_tenant: DshApiTenant, resource_registry: &'a ResourceRegistry) -> Result<Self, String> {
+impl DshAppRealization {
+  pub fn create(config_file_name: &str, engine_target: Arc<EngineTarget>, resource_registry: Arc<ResourceRegistry>) -> Result<Self, String> {
+    let processor_config = read_dshapp_config(config_file_name)?;
     Ok(DshAppRealization {
       processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshApp, id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())? },
       processor_config,
-      target_tenant,
+      engine_target,
       resource_registry,
     })
   }
 }
 
-impl<'a> ProcessorRealization<'a> for DshAppRealization<'a> {
+impl ProcessorRealization for DshAppRealization {
   fn descriptor(&self) -> ProcessorDescriptor {
     let profiles = self
       .processor_config
@@ -53,7 +54,7 @@ impl<'a> ProcessorRealization<'a> for DshAppRealization<'a> {
       .collect::<Vec<ProfileDescriptor>>();
     self
       .processor_config
-      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(&self.target_tenant))
+      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(self.engine_target.tenant()))
   }
 
   fn id(&self) -> &ProcessorRealizationId {
@@ -68,13 +69,8 @@ impl<'a> ProcessorRealization<'a> for DshAppRealization<'a> {
     &self.processor_config.processor.label
   }
 
-  fn processor_instance(
-    &'a self,
-    pipeline_id: Option<&PipelineId>,
-    processor_id: &ProcessorId,
-    engine_target: &'a EngineTarget,
-  ) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
-    match DshAppInstance::create(pipeline_id, processor_id, self, engine_target, self.resource_registry) {
+  fn processor_instance<'a>(&'a self, pipeline_id: Option<PipelineId>, processor_id: ProcessorId) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
+    match DshAppInstance::create(pipeline_id, processor_id, self) {
       Ok(processor) => Ok(Box::new(processor)),
       Err(error) => Err(error),
     }
@@ -85,7 +81,7 @@ impl<'a> ProcessorRealization<'a> for DshAppRealization<'a> {
   }
 }
 
-impl DshAppRealization<'_> {
+impl DshAppRealization {
   pub(crate) fn dsh_deployment_config(
     &self,
     pipeline_id: Option<&PipelineId>,
@@ -144,7 +140,7 @@ impl DshAppRealization<'_> {
         }
       }
     };
-    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(&self.target_tenant);
+    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(self.engine_target.tenant());
     template_mapping.insert(PlaceHolder::ProcessorRealizationId, self.processor_identifier.id.0.clone());
     if let Some(pipeline_id) = pipeline_id {
       template_mapping.insert(PlaceHolder::PipelineId, pipeline_id.to_string());

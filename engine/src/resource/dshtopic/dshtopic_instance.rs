@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineId;
@@ -8,18 +9,18 @@ use crate::resource::resource_realization::ResourceRealization;
 use crate::resource::ResourceId;
 
 pub(crate) struct DshTopicInstance<'a> {
-  pipeline_id: Option<&'a PipelineId>,
-  resource_id: &'a ResourceId,
+  pipeline_id: Option<PipelineId>,
+  resource_id: ResourceId,
   resource_realization: &'a DshTopicRealization,
-  engine_target: &'a EngineTarget<'a>,
+  engine_target: Arc<EngineTarget>,
 }
 
 impl<'a> DshTopicInstance<'a> {
   pub(crate) fn create(
-    pipeline_id: Option<&'a PipelineId>,
-    resource_id: &'a ResourceId,
+    pipeline_id: Option<PipelineId>,
+    resource_id: ResourceId,
     resource_realization: &'a DshTopicRealization,
-    engine_target: &'a EngineTarget,
+    engine_target: Arc<EngineTarget>,
   ) -> Result<Self, String> {
     Ok(Self { pipeline_id, resource_id, resource_realization, engine_target })
   }
@@ -28,11 +29,11 @@ impl<'a> DshTopicInstance<'a> {
 #[async_trait]
 impl ResourceInstance for DshTopicInstance<'_> {
   fn pipeline_id(&self) -> Option<&PipelineId> {
-    self.pipeline_id
+    self.pipeline_id.as_ref()
   }
 
   fn resource_id(&self) -> &ResourceId {
-    self.resource_id
+    &self.resource_id
   }
 
   fn resource_realization(&self) -> &dyn ResourceRealization {
@@ -41,7 +42,7 @@ impl ResourceInstance for DshTopicInstance<'_> {
 
   async fn status(&self) -> Result<ResourceStatus, String> {
     match get_topic_status(
-      self.engine_target,
+      self.engine_target.as_ref(),
       &self.resource_realization.descriptor().dshtopic_descriptor.as_ref().unwrap().topic,
     )
     .await?
@@ -55,7 +56,7 @@ impl ResourceInstance for DshTopicInstance<'_> {
   }
 }
 
-async fn get_topic_status(_engine_target: &EngineTarget<'_>, _topic_name: &str) -> Result<Option<ResourceStatus>, String> {
+async fn get_topic_status(_engine_target: &EngineTarget, _topic_name: &str) -> Result<Option<ResourceStatus>, String> {
   // let target_client = engine_target.dsh_api_client_factory.client().await?;
   // match target_client
   //   .topic_get_by_tenant_topic_by_id_status(target_client.tenant(), topic_name, target_client.token())

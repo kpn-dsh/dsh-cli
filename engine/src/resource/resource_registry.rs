@@ -1,29 +1,22 @@
-use lazy_static::lazy_static;
+use std::sync::Arc;
 
-use crate::engine_target::{EngineTarget, DEFAULT_ENGINE_TARGET};
-use crate::pipeline::PipelineId;
+use crate::engine_target::EngineTarget;
 use crate::resource::dshtopic::dshtopic_registry::DshTopicRealizationRegistry;
 use crate::resource::resource_descriptor::{ResourceDescriptor, ResourceTypeDescriptor};
-use crate::resource::resource_instance::ResourceInstance;
 use crate::resource::resource_realization::ResourceRealization;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, ResourceType};
+use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
 
-lazy_static! {
-  pub static ref DEFAULT_RESOURCE_REGISTRY: ResourceRegistry<'static> = ResourceRegistry::default();
-}
-
-pub struct ResourceRegistry<'a> {
+pub struct ResourceRegistry {
   dshtopic_realization_registry: DshTopicRealizationRegistry,
-  engine_target: &'a EngineTarget<'a>,
 }
 
-impl<'a> ResourceRegistry<'a> {
+impl ResourceRegistry {
   pub fn new() -> Self {
     Self::default()
   }
 
-  pub fn create(engine_target: &'a EngineTarget) -> Result<ResourceRegistry<'a>, String> {
-    Ok(Self { dshtopic_realization_registry: DshTopicRealizationRegistry::create(engine_target)?, engine_target })
+  pub fn create(engine_target: Arc<EngineTarget>) -> Result<ResourceRegistry, String> {
+    Ok(Self { dshtopic_realization_registry: DshTopicRealizationRegistry::create(engine_target)? })
   }
 
   pub fn resource_types(&self) -> Vec<ResourceTypeDescriptor> {
@@ -40,27 +33,6 @@ impl<'a> ResourceRegistry<'a> {
     match resource_identifier.resource_type {
       ResourceType::DshTopic => self.dshtopic_realization_registry.dshtopic_realization_by_id(&resource_identifier.id),
     }
-  }
-
-  pub fn resource_instance(
-    &'a self,
-    resource_type: ResourceType,
-    resource_realization_id: &ResourceRealizationId,
-    pipeline_id: Option<&'a PipelineId>,
-    resource_id: &'a ResourceId,
-  ) -> Option<Result<Box<dyn ResourceInstance + 'a>, String>> {
-    self
-      .resource_realization(resource_type, resource_realization_id)
-      .map(|realization| realization.resource_instance(pipeline_id, resource_id, self.engine_target))
-  }
-
-  pub fn resource_instance_by_identifier(
-    &'a self,
-    resource_identifier: &ResourceIdentifier,
-    pipeline_id: Option<&'a PipelineId>,
-    resource_id: &'a ResourceId,
-  ) -> Option<Result<Box<dyn ResourceInstance + 'a>, String>> {
-    self.resource_instance(resource_identifier.resource_type.clone(), &resource_identifier.id, pipeline_id, resource_id)
   }
 
   pub fn resource_descriptor(&self, resource_type: ResourceType, resource_id: &ResourceRealizationId) -> Option<ResourceDescriptor> {
@@ -102,8 +74,8 @@ impl<'a> ResourceRegistry<'a> {
   }
 }
 
-impl Default for ResourceRegistry<'_> {
+impl Default for ResourceRegistry {
   fn default() -> Self {
-    Self::create(&DEFAULT_ENGINE_TARGET).expect("unable to create default resource registry")
+    Self::create(Arc::new(EngineTarget::default())).expect("unable to create default resource registry")
   }
 }
