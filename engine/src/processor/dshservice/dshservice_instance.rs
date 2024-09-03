@@ -17,10 +17,11 @@ use crate::processor::dshservice::dshservice_config::ProfileConfig;
 use crate::processor::dshservice::DshServiceName;
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
+use crate::ProfileId;
 
 pub struct DshServiceInstance<'a> {
   pipeline_id: Option<PipelineId>,
@@ -88,7 +89,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>,
+    profile_id: Option<&ProfileId>,
   ) -> Result<(), String> {
     let dsh_application_config = self.dsh_deployment_config(
       self.pipeline_id.as_ref(),
@@ -113,7 +114,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>,
+    profile_id: Option<&ProfileId>,
   ) -> Result<String, String> {
     let dsh_application_config = self.dsh_deployment_config(
       self.pipeline_id.as_ref(),
@@ -185,7 +186,7 @@ impl DshServiceInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>,
+    profile_id: Option<&ProfileId>,
     user: String,
   ) -> Result<Application, String> {
     let inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
@@ -222,7 +223,7 @@ impl DshServiceInstance<'_> {
 
     let dshservice_specific_config = self.processor_config.dshservice_specific_config.as_ref().unwrap();
     let profile: ProfileConfig = match profile_id {
-      Some(pn) => match dshservice_specific_config.profiles.iter().find(|p| p.id == pn.0) {
+      Some(pn) => match dshservice_specific_config.profiles.iter().find(|p| p.profile_id == pn.0) {
         Some(p) => p.clone(),
         None => return Err(format!("profile '{}' is not defined", pn)),
       },

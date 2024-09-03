@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::pipeline::PipelineId;
-use crate::processor::{JunctionIdentifier, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorProfileId};
+use crate::processor::{JunctionIdentifier, ParameterId, ProcessorId, ProcessorIdentifier};
 use crate::resource::ResourceIdentifier;
+use crate::ProfileId;
 
 pub struct Pipeline {
   id: PipelineId,
@@ -25,7 +26,7 @@ pub struct PipelineProcessor {
   processor: ProcessorIdentifier,
   name: ProcessorId,
   parameters: HashMap<ParameterId, String>,
-  profile_id: Option<ProcessorProfileId>,
+  profile_id: Option<ProfileId>,
 }
 
 pub struct PipelineJunction {

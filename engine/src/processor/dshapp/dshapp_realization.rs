@@ -15,10 +15,11 @@ use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorProfileId, ProcessorRealizationId, ProcessorTechnology};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceType};
+use crate::ProfileId;
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
@@ -92,7 +93,7 @@ impl DshAppRealization {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>,
+    profile_id: Option<&ProfileId>,
     user: String,
   ) -> Result<Application, String> {
     let inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
@@ -129,7 +130,7 @@ impl DshAppRealization {
 
     let dshapp_specific_config = self.processor_config.dshapp_specific_config.as_ref().unwrap();
     let profile: ProfileConfig = match profile_id {
-      Some(pn) => match dshapp_specific_config.profiles.iter().find(|p| p.id == pn.0) {
+      Some(pn) => match dshapp_specific_config.profiles.iter().find(|p| p.profile_id == pn.0) {
         Some(p) => p.clone(),
         None => return Err(format!("profile '{}' is not defined", pn)),
       },

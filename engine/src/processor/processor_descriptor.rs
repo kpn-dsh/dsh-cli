@@ -84,7 +84,7 @@ pub struct DeploymentParameterOptionDescriptor {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProfileDescriptor {
-  pub id: String,
+  pub profile_id: String,
   pub label: String,
   pub description: String,
   pub instances: Option<u64>,
@@ -208,7 +208,7 @@ impl Display for DeploymentParameterDescriptor {
 
 impl Display for ProfileDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{} ({}, {}", self.id, self.label, self.description)?;
+    write!(f, "{} ({}, {}", self.profile_id, self.label, self.description)?;
     if let Some(instances) = &self.instances {
       write!(f, ", instances: {}", instances)?;
     }

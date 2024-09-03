@@ -15,7 +15,7 @@ pub mod dshapp_realization;
 pub mod dshapp_registry;
 
 identifier!(
-  "processor::dshapp",
+  "trifonius_engine::processor::dshapp",
   DshAppName,
   "dsh app name",
   "^[a-z][a-z0-9]{0,17}(-[a-z][a-z0-9]{0,17})?$",
@@ -23,7 +23,7 @@ identifier!(
   "validname_validname"
 );
 identifier!(
-  "processor::dshservice",
+  "trifonius_engine::processor::dshservice",
   TaskId,
   "task identifier",
   "^[a-z0-9-._]{1,32}$",

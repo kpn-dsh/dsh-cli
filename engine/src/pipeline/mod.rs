@@ -13,7 +13,7 @@ pub mod pipeline_descriptor;
 pub mod pipeline_registry;
 
 identifier!(
-  "pipeline",
+  "trifonius_engine::pipeline",
   PipelineId,
   "pipeline id",
   "^[a-z][a-z0-9]{0,17}$",
@@ -21,7 +21,7 @@ identifier!(
   "invalid.pipeline.id"
 );
 identifier!(
-  "pipeline",
+  "trifonius_engine::pipeline",
   PipelineProcessorName,
   "pipeline-processor name",
   "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",
@@ -29,7 +29,7 @@ identifier!(
   "validname_validname"
 );
 identifier!(
-  "pipeline",
+  "trifonius_engine::pipeline",
   PipelineResourceName,
   "pipeline-resource name",
   "^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$",

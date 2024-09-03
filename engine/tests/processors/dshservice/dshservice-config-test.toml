@@ -85,7 +85,7 @@ DSHSERVICE_ENV_VAR4 = { type = "template", value = "value4${TENANT}" }
 DSHSERVICE_ENV_VAR5 = { type = "value", value = "value5" }
 
 [[dshservice.profiles]]
-id = "profile-1"
+profile-id = "profile-1"
 label = "Profile 1"
 description = "Profile 1"
 cpus = 1
@@ -98,7 +98,7 @@ environment-variables.PROFILE1_ENV_VAR4 = { type = "template", value = "value14$
 environment-variables.PROFILE1_ENV_VAR5 = { type = "value", value = "value15" }
 
 [[dshservice.profiles]]
-id = "profile-2"
+profile-id = "profile-2"
 label = "Profile 2"
 description = "Profile 2"
 cpus = 2

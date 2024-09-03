@@ -90,7 +90,7 @@ MITIGATION_STRATEGY = { type = "deployment-parameter", id = "mitigation-strategy
 PRODUCER_TOPIC = { type = "outbound-junction", id = "outbound-kafka-topic" }
 
 [[dshservice.profiles]]
-id = "minimal"
+profile-id = "minimal"
 label = "Minimal"
 description = "Minimal profile for small amounts of data"
 cpus = 0.25
@@ -98,7 +98,7 @@ instances = 1
 mem = 256
 
 [[dshservice.profiles]]
-id = "maximal"
+profile-id = "maximal"
 label = "Maximal"
 description = "Maximal profile for large amounts of data"
 cpus = 1

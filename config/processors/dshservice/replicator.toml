@@ -53,7 +53,7 @@ KAFKA_CONSUMER_GROUP_TYPE = { type = "value", value = "SHARED" }
 METRICS_ENABLED = { type = "deployment-parameter", id = "metrics-enabled" }
 
 [[dshservice.profiles]]
-id = "minimal"
+profile-id = "minimal"
 label = "10K records per minute"
 description = "Minimal profile to handle 0 to 10k records per minute."
 cpus = 0.1
@@ -65,7 +65,7 @@ environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_MESSAGES = { type = "va
 environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_KBYTES = { type = "value", value = "40000" }
 
 [[dshservice.profiles]]
-id = "medium"
+profile-id = "medium"
 label = "100K records per minute"
 description = "Medium profile to handle 10k to 100k records per minute."
 cpus = 0.1
@@ -77,7 +77,7 @@ environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_MESSAGES = { type = "va
 environment-variables.KAFKA_PRODUCER_QUEUE_BUFFERING_MAX_KBYTES = { type = "value", value = "80000" }
 
 [[dshservice.profiles]]
-id = "maximal"
+profile-id = "maximal"
 label = "1 Million records per minute"
 description = "Maximal profile to handle 1 million maximum records per minute."
 cpus = 0.2

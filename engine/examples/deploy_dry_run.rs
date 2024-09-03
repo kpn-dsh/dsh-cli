@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use trifonius_engine::processor::{JunctionId, ParameterId, ProcessorProfileId};
+use trifonius_engine::processor::{JunctionId, ParameterId};
 use trifonius_engine::resource::ResourceType;
 use trifonius_engine::resource::{ResourceIdentifier, ResourceRealizationId};
+use trifonius_engine::ProfileId;
 
 #[path = "common.rs"]
 mod common;
@@ -30,7 +31,7 @@ async fn main() -> Result<(), String> {
     (ParameterId::new("compliancy-agent"), "whitelist".to_string()),
     (ParameterId::new("mitigation-strategy"), "block".to_string()),
   ]);
-  let binding = Some(ProcessorProfileId::new("minimal"));
+  let binding = Some(ProfileId::new("minimal"));
   let profile_id = binding.as_ref();
 
   let config = dshservice_instance

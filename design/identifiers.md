@@ -28,7 +28,7 @@
             Typically the pipeline profile consists of the processor profiles and 
             resource profiles of the constituent processor and resource instances.
         </td>
-        <td><code>PipelineProfile</code></td>
+        <td><code>ProfileId</code></td>
         <td><code>log-level</code><br/><code>medium</code></td>
     </tr>
     <tr style="vertical-align: top;">
@@ -80,7 +80,7 @@
             A <em>Processor Profile</em> is a set of parameters that can alter 
             the runtime behavior of a processor without having to specify a new processor.
         </td>
-        <td><code>ProcessorProfile</code></td>
+        <td><code>ProfileId</code></td>
         <td><code>log-level</code><br/><code>medium</code></td>
     </tr>
     <tr style="vertical-align: top;">
@@ -137,7 +137,7 @@
             Note that since most resources will be not managed by Trifonius, 
             specifying a resource profile often makes no sense.
         </td>
-        <td><code>ResourceProfile</code></td>
+        <td><code>ProfileId</code></td>
         <td><code>log-level</code></td>
     </tr>
 </table>
@@ -149,7 +149,7 @@
       (together with a <code>PipelineVersion</code>).
     * `PipelineVersion` - Specifies a certain version of a pipeline.
     * `PipelineName` - Human friendly name of a pipeline.
-    * `PipelineProfile` - Specifies the profile that is used when a pipeline
+    * `ProfileId` - Specifies the profile that is used when a pipeline
       is deployed or started.
 * Processor ids
     * `ProcessorTechnology` - Identifies the technical solutions available
@@ -165,7 +165,7 @@
       in the scope of a pipeline.
     * `ProcessorName` - Human friendly name of an instance of a processor realization
       in the scope of a pipeline.
-    * `ProcessorProfile` - Specifies the profile that is used when a processor
+    * `ProfileId` - Specifies the profile that is used when a processor
       is deployed or started.
 * Resource ids
     * `ResourceTechnology` - Identifies the technical solutions that realize resources.
@@ -178,7 +178,7 @@
       in the scope of a pipeline.
     * `ResourceName` - Human friendly name of an instance of a resource realization
       in the scope of a pipeline.
-    * `ResourceProfile` - Specifies the profile that is used when a resource
+    * `ProfileId` - Specifies the profile that is used when a resource
       is deployed or started.
       Optional, because in many cases a profile doesn't make sense as resources
       are managed outside Trifonius (e.g. for DSH Kafka topics).
@@ -216,9 +216,9 @@ which will be used in the interaction with the pipeline designer and/or user.
 The `PipelineName` is defined by the pipeline designer and
 it can contain all utf-8 characters (although smileys et cetera should be avoided).
 
-### `PipelineProfile`
+### `ProfileId`
 
-A `PipelineProfile` identifies a deployment profile which enables to provide some
+A pipeline's `ProfileId` identifies a deployment profile which enables to provide some
 parameters of a pipeline (and its constituent processors and resources) at runtime,
 without having to define an entirely new pipeline.
 
@@ -312,9 +312,9 @@ For the representation of a processor to the pipeline designer or user
 via the frontend, the `ProcessorName` field can be used for a more
 user-friendly name.
 
-### `ProcessorProfile`
+### `ProfileId`
 
-A `ProcessorProfile` identifies a deployment profile which enables to provide some
+A processor's `ProfileId` identifies a deployment profile which enables to provide some
 parameters of a processor at runtime,
 without having to define an entirely new pipeline.
 
@@ -459,11 +459,6 @@ Therefor there are some strict syntactical restrictions on the ids.
         <td><code>^[a-z][a-z0-9]{0,17}-[a-z][a-z0-9]{0,17}$</code></td>
     </tr>
     <tr style="vertical-align: top;">
-        <td><code>PipelineProfile</code></td>
-        <td><code>1 - 50</code></td>
-        <td><code>^[a-z][a-z0-9-]{0,49}$</code></td>
-    </tr>
-    <tr style="vertical-align: top;">
         <td><code>PipelineVersion</code></td>
         <td></td>
         <td><code>(major, minor, patch)</code></td>
@@ -484,11 +479,6 @@ Therefor there are some strict syntactical restrictions on the ids.
         <td><code>utf-8</code></td>
     </tr>
     <tr style="vertical-align: top;">
-        <td><code>ProcessorProfile</code></td>
-        <td><code>1 - 50</code></td>
-        <td><code>^[a-z][a-z0-9-]{0,49}$</code></td>
-    </tr>
-    <tr style="vertical-align: top;">
         <td><code>ProcessorRealizationId</code></td>
         <td><code>1 - 50</code></td>
         <td><code>^[a-z][a-z0-9-]{0,49}$</code></td>
@@ -504,6 +494,11 @@ Therefor there are some strict syntactical restrictions on the ids.
         <td><code>(major, minor, patch)</code></td>
     </tr>
     <tr style="vertical-align: top;">
+        <td><code>ProfileId</code></td>
+        <td><code>1 - 50</code></td>
+        <td><code>^[a-z][a-z0-9-]{0,49}$</code></td>
+    </tr>
+    <tr style="vertical-align: top;">
         <td><code>ResourceId</code></td>
         <td><code>1 - 18</code></td>
         <td><code>^[a-z][a-z0-9]{0,17}$</code></td>
@@ -517,11 +512,6 @@ Therefor there are some strict syntactical restrictions on the ids.
         <td><code>ResourceName</code></td>
         <td><code>1 - 50</code></td>
         <td><code>utf-8</code></td>
-    </tr>
-    <tr style="vertical-align: top;">
-        <td><code>ResourceProfile</code></td>
-        <td><code>1 - 50</code></td>
-        <td><code>^[a-z][a-z0-9-]{0,49}$</code></td>
     </tr>
     <tr style="vertical-align: top;">
         <td><code>ResourceRealizationId</code></td>

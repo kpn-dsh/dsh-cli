@@ -13,14 +13,21 @@ pub mod resource_realization;
 pub mod resource_registry;
 
 identifier!(
-  "resource",
+  "trifonius_engine::resource",
   ResourceRealizationId,
   "resource realization id",
   "^[a-z][a-z0-9_-]{1,49}$",
   "valid_resource_realization_id",
   "invalid.resource.realization.id"
 );
-identifier!("resource", ResourceId, "resource id", "^[a-z][a-z0-9]{0,17}$", "validid", "invalid-id");
+identifier!(
+  "trifonius_engine::resource",
+  ResourceId,
+  "resource id",
+  "^[a-z][a-z0-9]{0,17}$",
+  "validid",
+  "invalid-id"
+);
 
 #[derive(Clone, Debug, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub enum ResourceType {

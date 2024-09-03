@@ -9,8 +9,9 @@ use std::fmt::{Debug, Display, Formatter};
 use async_trait::async_trait;
 
 use crate::pipeline::PipelineId;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId};
 use crate::resource::ResourceIdentifier;
+use crate::ProfileId;
 
 /// Defines the behavior of a Trifonius `ProcessorInstance`
 #[async_trait]
@@ -31,7 +32,7 @@ pub trait ProcessorInstance: Send + Sync {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>, // TODO Move this to start() method
+    profile_id: Option<&ProfileId>, // TODO Move this to start() method
   ) -> Result<(), String>;
 
   /// # Dry-run for deployment of this `ProcessorInstance`
@@ -54,7 +55,7 @@ pub trait ProcessorInstance: Send + Sync {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>, // TODO Move this to start() method
+    profile_id: Option<&ProfileId>, // TODO Move this to start() method
   ) -> Result<String, String>;
 
   /// # Get the resources compatible with this `ProcessorInstance`

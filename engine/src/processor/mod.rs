@@ -23,7 +23,7 @@ pub enum ProcessorTechnology {
 }
 
 identifier!(
-  "processor",
+  "trifonius_engine::processor",
   JunctionId,
   "junction id",
   "^[a-z][a-z0-9-]{0,49}$",
@@ -31,7 +31,7 @@ identifier!(
   "invalid_junction_id"
 );
 identifier!(
-  "processor",
+  "trifonius_engine::processor",
   ParameterId,
   "parameter id",
   "^[a-z][a-z0-9-]{0,49}$",
@@ -39,21 +39,20 @@ identifier!(
   "invalid_parameter_id"
 );
 identifier!(
-  "processor",
+  "trifonius_engine::processor",
   ProcessorRealizationId,
   "processor realization id",
   "^[a-z][a-z0-9-]{0,49}$",
   "valid-processor-realization-id",
   "invalid_processor_realization_id"
 );
-identifier!("processor", ProcessorId, "processor id", "^[a-z][a-z0-9]{0,17}$", "validid", "invalid-id");
 identifier!(
-  "processor",
-  ProcessorProfileId,
-  "processor profile id",
-  "^[a-z][a-z0-9-]{0,49}$",
-  "valid-processor-profile-id",
-  "invalid_processor_profile_id"
+  "trifonius_engine::processor",
+  ProcessorId,
+  "processor id",
+  "^[a-z][a-z0-9]{0,17}$",
+  "validid",
+  "invalid-id"
 );
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]

@@ -5,7 +5,8 @@ use serde::Deserialize;
 
 use crate::processor::processor_config::{read_processor_config, DeployConfig, ProcessorConfig, VariableConfig, VariableType};
 use crate::processor::processor_descriptor::ProfileDescriptor;
-use crate::processor::{ProcessorProfileId, ProcessorTechnology};
+use crate::processor::ProcessorTechnology;
+use crate::ProfileId;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DshAppSpecificConfig {
@@ -21,7 +22,8 @@ pub struct DshAppSpecificConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProfileConfig {
-  pub id: String,
+  #[serde(rename = "profile-id")]
+  pub profile_id: String,
   pub label: String,
   pub description: String,
   pub cpus: f64,
@@ -62,7 +64,7 @@ impl DshAppSpecificConfig {
       return Err("no profiles defined".to_string());
     } else {
       for profile in &self.profiles {
-        profile.validate(&profile.id)?
+        profile.validate(&profile.profile_id)?
       }
     }
     Ok(())
@@ -70,18 +72,18 @@ impl DshAppSpecificConfig {
 }
 
 impl ProfileConfig {
-  pub fn validate(&self, id: &str) -> Result<(), String> {
-    if !ProcessorProfileId::is_valid(&self.id) {
-      return Err(format!("profile has invalid identifier '{}'", id));
+  pub fn validate(&self, profile_id: &str) -> Result<(), String> {
+    if !ProfileId::is_valid(&self.profile_id) {
+      return Err(format!("profile has invalid identifier '{}'", profile_id));
     }
     if self.label.is_empty() {
-      return Err(format!("profile '{}' has empty label", id));
+      return Err(format!("profile '{}' has empty label", profile_id));
     }
     if self.description.is_empty() {
-      return Err(format!("profile '{}' has empty description", id));
+      return Err(format!("profile '{}' has empty description", profile_id));
     }
     if self.cpus < 0.1_f64 {
-      return Err(format!("profile '{}' has number of cpus smaller than 0.1", id));
+      return Err(format!("profile '{}' has number of cpus smaller than 0.1", profile_id));
     }
     Ok(())
   }
@@ -101,7 +103,7 @@ pub fn read_dshapp_config(config_file_name: &str) -> Result<ProcessorConfig, Str
 impl ProfileConfig {
   pub(crate) fn convert_to_descriptor(self: &ProfileConfig) -> ProfileDescriptor {
     ProfileDescriptor {
-      id: self.id.clone(),
+      profile_id: self.profile_id.clone(),
       label: self.label.clone(),
       description: self.description.clone(),
       instances: Some(self.instances),
@@ -353,7 +355,7 @@ fn read_dshapp_config_profile_proper_values() {
   let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshApp).unwrap();
   let dshapp_specific_config = config.dshapp_specific_config.as_ref().unwrap();
 
-  let profile1 = dshapp_specific_config.profiles.iter().find(|p| p.id == "profile-1").unwrap().clone();
+  let profile1 = dshapp_specific_config.profiles.iter().find(|p| p.profile_id == "profile-1").unwrap().clone();
   assert_eq!(profile1.description, "Profile 1");
   assert_eq!(profile1.cpus, 1.0);
   assert_eq!(profile1.mem, 1);

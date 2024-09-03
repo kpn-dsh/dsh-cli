@@ -9,9 +9,10 @@ use crate::pipeline::PipelineId;
 use crate::processor::dshapp::dshapp_realization::DshAppRealization;
 use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorProfileId};
+use crate::processor::{JunctionId, ParameterId, ProcessorId};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
+use crate::ProfileId;
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
@@ -79,7 +80,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>,
+    profile_id: Option<&ProfileId>,
   ) -> Result<(), String> {
     let dsh_deployment_config = self.processor_realization.dsh_deployment_config(
       self.pipeline_id.as_ref(),
@@ -123,7 +124,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
     inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
-    profile_id: Option<&ProcessorProfileId>,
+    profile_id: Option<&ProfileId>,
   ) -> Result<String, String> {
     let dsh_config = self.processor_realization.dsh_deployment_config(
       self.pipeline_id.as_ref(),
