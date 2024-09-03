@@ -21,17 +21,17 @@ impl<'a> DshAppRealizationRegistry {
       let config_file_name = path.unwrap().path().display().to_string();
       let dshapp_realization = DshAppRealization::create(config_file_name.as_str(), engine_target.clone(), resource_registry.clone())?;
       dshapp_realizations.insert(
-        ProcessorIdentifier { processor_technology: ProcessorTechnology::DshApp, id: dshapp_realization.id().clone() },
+        ProcessorIdentifier { processor_technology: ProcessorTechnology::DshApp, processor_realization_id: dshapp_realization.processor_realization_id().clone() },
         dshapp_realization,
       );
     }
     Ok(Self { dshapp_realizations })
   }
 
-  pub(crate) fn dshapp_realization_by_id(&'a self, id: &ProcessorRealizationId) -> Option<&(dyn ProcessorRealization + 'a)> {
+  pub(crate) fn dshapp_realization_by_id(&'a self, processor_realization_id: &ProcessorRealizationId) -> Option<&(dyn ProcessorRealization + 'a)> {
     match self
       .dshapp_realizations
-      .get(&ProcessorIdentifier { processor_technology: ProcessorTechnology::DshApp, id: id.clone() })
+      .get(&ProcessorIdentifier { processor_technology: ProcessorTechnology::DshApp, processor_realization_id: processor_realization_id.clone() })
     {
       Some(a) => Some(a),
       None => None,

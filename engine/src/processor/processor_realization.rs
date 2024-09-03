@@ -19,7 +19,7 @@ pub trait ProcessorRealization {
   ///
   /// ## Returns
   /// * This `ProcessorRealization`s id.
-  fn id(&self) -> &ProcessorRealizationId;
+  fn processor_realization_id(&self) -> &ProcessorRealizationId;
 
   /// # Get this `ProcessorRealization`s `ProcessorIdentifier`
   ///

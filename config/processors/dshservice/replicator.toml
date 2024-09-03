@@ -1,6 +1,6 @@
 [processor]
 processor-technology = "dshservice"
-id = "replicator"
+processor-realization-id = "replicator"
 label = "Topic replicator"
 description = "Replicates records from one Kafka topic to another. Allows multiple inbound and outbound topics."
 version = "0.0.1-SNAPSHOT"

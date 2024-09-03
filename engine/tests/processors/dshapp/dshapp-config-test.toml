@@ -1,6 +1,6 @@
 [processor]
 processor-technology = "dshapp"
-id = "test"
+processor-realization-id = "test"
 label = "Test DSH Service"
 description = "Test profiles"
 version = "0.1.2"

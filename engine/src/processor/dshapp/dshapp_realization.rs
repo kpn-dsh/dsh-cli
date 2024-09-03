@@ -35,7 +35,7 @@ impl DshAppRealization {
     Ok(DshAppRealization {
       processor_identifier: ProcessorIdentifier {
         processor_technology: ProcessorTechnology::DshApp,
-        id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())?,
+        processor_realization_id: ProcessorRealizationId::try_from(processor_config.processor.processor_realization_id.as_str())?,
       },
       processor_config,
       engine_target,
@@ -60,8 +60,8 @@ impl ProcessorRealization for DshAppRealization {
       .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(self.engine_target.tenant()))
   }
 
-  fn id(&self) -> &ProcessorRealizationId {
-    &self.processor_identifier.id
+  fn processor_realization_id(&self) -> &ProcessorRealizationId {
+    &self.processor_identifier.processor_realization_id
   }
 
   fn identifier(&self) -> &ProcessorIdentifier {
@@ -144,7 +144,7 @@ impl DshAppRealization {
       }
     };
     let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(self.engine_target.tenant());
-    template_mapping.insert(PlaceHolder::ProcessorRealizationId, self.processor_identifier.id.0.clone());
+    template_mapping.insert(PlaceHolder::ProcessorRealizationId, self.processor_identifier.processor_realization_id.0.clone());
     if let Some(pipeline_id) = pipeline_id {
       template_mapping.insert(PlaceHolder::PipelineId, pipeline_id.to_string());
     }

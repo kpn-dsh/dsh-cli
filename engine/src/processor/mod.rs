@@ -59,7 +59,7 @@ identifier!(
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ProcessorIdentifier {
   pub processor_technology: ProcessorTechnology,
-  pub id: ProcessorRealizationId,
+  pub processor_realization_id: ProcessorRealizationId,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -94,14 +94,14 @@ impl ProcessorTechnology {
 }
 
 impl ProcessorIdentifier {
-  pub fn new(processor_technology: ProcessorTechnology, id: ProcessorRealizationId) -> Self {
-    ProcessorIdentifier { processor_technology, id }
+  pub fn new(processor_technology: ProcessorTechnology, processor_realization_id: ProcessorRealizationId) -> Self {
+    ProcessorIdentifier { processor_technology, processor_realization_id }
   }
 }
 
 impl Display for ProcessorIdentifier {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}", self.processor_technology, self.id)
+    write!(f, "{}:{}", self.processor_technology, self.processor_realization_id)
   }
 }
 

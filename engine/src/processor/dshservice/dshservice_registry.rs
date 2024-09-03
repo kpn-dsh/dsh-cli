@@ -25,10 +25,10 @@ impl DshServiceRealizationRegistry {
     Ok(Self { dshservice_realizations })
   }
 
-  pub(crate) fn dshservice_realization_by_id(&self, id: &ProcessorRealizationId) -> Option<&dyn ProcessorRealization> {
+  pub(crate) fn dshservice_realization_by_id(&self, processor_realization_id: &ProcessorRealizationId) -> Option<&dyn ProcessorRealization> {
     match self
       .dshservice_realizations
-      .get(&ProcessorIdentifier { processor_technology: ProcessorTechnology::DshService, id: id.clone() })
+      .get(&ProcessorIdentifier { processor_technology: ProcessorTechnology::DshService, processor_realization_id: processor_realization_id.clone() })
     {
       Some(a) => Some(a),
       None => None,

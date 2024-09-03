@@ -237,7 +237,10 @@ impl DshServiceInstance<'_> {
       }
     };
     let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(self.engine_target.tenant());
-    template_mapping.insert(PlaceHolder::ProcessorRealizationId, self.processor_config.processor.id.clone());
+    template_mapping.insert(
+      PlaceHolder::ProcessorRealizationId,
+      self.processor_config.processor.processor_realization_id.clone(),
+    );
     if let Some(pipeline_name) = pipeline_id {
       template_mapping.insert(PlaceHolder::PipelineId, pipeline_name.to_string());
     }

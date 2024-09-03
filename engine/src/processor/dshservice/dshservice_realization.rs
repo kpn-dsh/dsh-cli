@@ -26,7 +26,7 @@ impl DshServiceRealization {
     Ok(DshServiceRealization {
       processor_identifier: ProcessorIdentifier {
         processor_technology: ProcessorTechnology::DshService,
-        id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())?,
+        processor_realization_id: ProcessorRealizationId::try_from(processor_config.processor.processor_realization_id.as_str())?,
       },
       processor_config,
       engine_target,
@@ -51,8 +51,8 @@ impl ProcessorRealization for DshServiceRealization {
       .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(self.engine_target.tenant()))
   }
 
-  fn id(&self) -> &ProcessorRealizationId {
-    &self.processor_identifier.id
+  fn processor_realization_id(&self) -> &ProcessorRealizationId {
+    &self.processor_identifier.processor_realization_id
   }
 
   fn identifier(&self) -> &ProcessorIdentifier {

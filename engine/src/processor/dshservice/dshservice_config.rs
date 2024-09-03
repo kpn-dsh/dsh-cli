@@ -238,7 +238,7 @@ fn read_dshservice_config_proper_values() {
   let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshService).unwrap();
 
   assert_eq!(config.processor.processor_technology, ProcessorTechnology::DshService);
-  assert_eq!(config.processor.id, "test");
+  assert_eq!(config.processor.processor_realization_id, "test");
   assert_eq!(config.processor.description, "Test profiles");
   assert_eq!(config.processor.version, Some("0.1.2".to_string()));
   assert_eq!(config.processor.icon, Some("ICON".to_string()));

@@ -35,7 +35,8 @@ pub struct ProcessorConfig {
 pub struct ProcessorGlobalConfig {
   #[serde(rename = "processor-technology")]
   pub processor_technology: ProcessorTechnology,
-  pub id: String,
+  #[serde(rename = "processor-realization-id")]
+  pub processor_realization_id: String,
   pub label: String,
   pub description: String,
   pub version: Option<String>,
@@ -161,7 +162,7 @@ impl ProcessorConfig {
         self.processor.processor_technology, processor_technology
       ));
     }
-    if !ProcessorRealizationId::is_valid(&self.processor.id) {
+    if !ProcessorRealizationId::is_valid(&self.processor.processor_realization_id) {
       return Err(format!(
         "illegal {} name (must be between 1 and 20 characters long and may contain only lowercase alphabetical characters and digits)",
         processor_technology
@@ -210,7 +211,7 @@ impl ProcessorConfig {
   pub(crate) fn convert_to_descriptor(&self, profiles: Vec<ProfileDescriptor>, mapping: &TemplateMapping) -> ProcessorDescriptor {
     ProcessorDescriptor {
       processor_technology: ProcessorTechnology::DshService,
-      id: self.processor.id.clone(),
+      id: self.processor.processor_realization_id.clone(),
       label: self.processor.label.clone(),
       description: self.processor.description.clone(),
       version: self.processor.version.clone(),
