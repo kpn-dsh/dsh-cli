@@ -6,7 +6,7 @@ use crate::engine_target::EngineTarget;
 use crate::processor::dshservice::dshservice_realization::DshServiceRealization;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{processor_config_dir_name, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
+use crate::processor::{processor_config_dir_name, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 use crate::resource::resource_registry::ResourceRegistry;
 
 pub(crate) struct DshServiceRealizationRegistry {
@@ -28,7 +28,7 @@ impl DshServiceRealizationRegistry {
   pub(crate) fn dshservice_realization_by_id(&self, id: &ProcessorRealizationId) -> Option<&dyn ProcessorRealization> {
     match self
       .dshservice_realizations
-      .get(&ProcessorIdentifier { processor_type: ProcessorType::DshService, id: id.clone() })
+      .get(&ProcessorIdentifier { processor_technology: ProcessorTechnology::DshService, id: id.clone() })
     {
       Some(a) => Some(a),
       None => None,

@@ -5,7 +5,7 @@ use crate::processor::dshapp::dshapp_registry::DshAppRealizationRegistry;
 use crate::processor::dshservice::dshservice_registry::DshServiceRealizationRegistry;
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
+use crate::processor::{ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 use crate::resource::resource_registry::ResourceRegistry;
 
 pub struct ProcessorRegistry {
@@ -26,30 +26,30 @@ impl ProcessorRegistry {
   }
 
   pub fn processor_types(&self) -> Vec<ProcessorTypeDescriptor> {
-    vec![ProcessorTypeDescriptor::from(&ProcessorType::DshApp), ProcessorTypeDescriptor::from(&ProcessorType::DshService)]
+    vec![ProcessorTypeDescriptor::from(&ProcessorTechnology::DshApp), ProcessorTypeDescriptor::from(&ProcessorTechnology::DshService)]
   }
 
-  pub fn processor_realization<'a>(&'a self, processor_type: ProcessorType, processor_id: &ProcessorRealizationId) -> Option<&(dyn ProcessorRealization + 'a)> {
-    match processor_type {
-      ProcessorType::DshApp => self.dshapp_realization_registry.dshapp_realization_by_id(processor_id),
-      ProcessorType::DshService => self.dshservice_realization_registry.dshservice_realization_by_id(processor_id),
+  pub fn processor_realization<'a>(&'a self, processor_technology: ProcessorTechnology, processor_id: &ProcessorRealizationId) -> Option<&(dyn ProcessorRealization + 'a)> {
+    match processor_technology {
+      ProcessorTechnology::DshApp => self.dshapp_realization_registry.dshapp_realization_by_id(processor_id),
+      ProcessorTechnology::DshService => self.dshservice_realization_registry.dshservice_realization_by_id(processor_id),
     }
   }
 
   pub fn processor_realization_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<&(dyn ProcessorRealization)> {
-    match processor_identifier.processor_type {
-      ProcessorType::DshApp => self.dshapp_realization_registry.dshapp_realization_by_id(&processor_identifier.id),
-      ProcessorType::DshService => self.dshservice_realization_registry.dshservice_realization_by_id(&processor_identifier.id),
+    match processor_identifier.processor_technology {
+      ProcessorTechnology::DshApp => self.dshapp_realization_registry.dshapp_realization_by_id(&processor_identifier.id),
+      ProcessorTechnology::DshService => self.dshservice_realization_registry.dshservice_realization_by_id(&processor_identifier.id),
     }
   }
 
-  pub fn processor_descriptor(&self, processor_type: ProcessorType, processor_id: &ProcessorRealizationId) -> Option<ProcessorDescriptor> {
-    match processor_type {
-      ProcessorType::DshApp => self
+  pub fn processor_descriptor(&self, processor_technology: ProcessorTechnology, processor_id: &ProcessorRealizationId) -> Option<ProcessorDescriptor> {
+    match processor_technology {
+      ProcessorTechnology::DshApp => self
         .dshapp_realization_registry
         .dshapp_realization_by_id(processor_id)
         .map(|realization| realization.descriptor()),
-      ProcessorType::DshService => self
+      ProcessorTechnology::DshService => self
         .dshservice_realization_registry
         .dshservice_realization_by_id(processor_id)
         .map(|realization| realization.descriptor()),
@@ -57,12 +57,12 @@ impl ProcessorRegistry {
   }
 
   pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<ProcessorDescriptor> {
-    match processor_identifier.processor_type {
-      ProcessorType::DshApp => self
+    match processor_identifier.processor_technology {
+      ProcessorTechnology::DshApp => self
         .dshapp_realization_registry
         .dshapp_realization_by_id(&processor_identifier.id)
         .map(|realization| realization.descriptor()),
-      ProcessorType::DshService => self
+      ProcessorTechnology::DshService => self
         .dshservice_realization_registry
         .dshservice_realization_by_id(&processor_identifier.id)
         .map(|realization| realization.descriptor()),
@@ -73,10 +73,10 @@ impl ProcessorRegistry {
     self.dshservice_realization_registry.dshservice_descriptors()
   }
 
-  pub fn processor_descriptors_by_type(&self, processor_type: ProcessorType) -> Vec<ProcessorDescriptor> {
-    match processor_type {
-      ProcessorType::DshApp => self.dshapp_realization_registry.dshapp_descriptors(),
-      ProcessorType::DshService => self.dshservice_realization_registry.dshservice_descriptors(),
+  pub fn processor_descriptors_by_type(&self, processor_technology: ProcessorTechnology) -> Vec<ProcessorDescriptor> {
+    match processor_technology {
+      ProcessorTechnology::DshApp => self.dshapp_realization_registry.dshapp_descriptors(),
+      ProcessorTechnology::DshService => self.dshservice_realization_registry.dshservice_descriptors(),
     }
   }
 
@@ -84,10 +84,10 @@ impl ProcessorRegistry {
     [self.dshapp_realization_registry.dshapp_identifiers(), self.dshservice_realization_registry.dshservice_identifiers()].concat()
   }
 
-  pub fn processor_identifiers_by_type(&self, processor_type: ProcessorType) -> Vec<&ProcessorIdentifier> {
-    match processor_type {
-      ProcessorType::DshApp => self.dshapp_realization_registry.dshapp_identifiers(),
-      ProcessorType::DshService => self.dshservice_realization_registry.dshservice_identifiers(),
+  pub fn processor_identifiers_by_type(&self, processor_technology: ProcessorTechnology) -> Vec<&ProcessorIdentifier> {
+    match processor_technology {
+      ProcessorTechnology::DshApp => self.dshapp_realization_registry.dshapp_identifiers(),
+      ProcessorTechnology::DshService => self.dshservice_realization_registry.dshservice_identifiers(),
     }
   }
 }

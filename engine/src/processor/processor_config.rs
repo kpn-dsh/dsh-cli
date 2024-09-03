@@ -12,7 +12,7 @@ use crate::placeholder::PlaceHolder;
 use crate::processor::dshapp::dshapp_config::DshAppSpecificConfig;
 use crate::processor::dshservice::dshservice_config::DshServiceSpecificConfig;
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
-use crate::processor::{JunctionId, ParameterId, ProcessorRealizationId, ProcessorType};
+use crate::processor::{JunctionId, ParameterId, ProcessorRealizationId, ProcessorTechnology};
 use crate::resource::ResourceType;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -33,8 +33,8 @@ pub struct ProcessorConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorGlobalConfig {
-  #[serde(rename = "type")]
-  pub processor_type: ProcessorType,
+  #[serde(rename = "processor-technology")]
+  pub processor_technology: ProcessorTechnology,
   pub id: String,
   pub label: String,
   pub description: String,
@@ -154,24 +154,24 @@ pub struct DeploymentParameterConfigOptionLabel {
 }
 
 impl ProcessorConfig {
-  fn validate(&self, processor_type: ProcessorType) -> Result<(), String> {
-    if self.processor.processor_type != processor_type {
+  fn validate(&self, processor_technology: ProcessorTechnology) -> Result<(), String> {
+    if self.processor.processor_technology != processor_technology {
       return Err(format!(
         "processor type '{}' doesn't match expected type '{}'",
-        self.processor.processor_type, processor_type
+        self.processor.processor_technology, processor_technology
       ));
     }
     if !ProcessorRealizationId::is_valid(&self.processor.id) {
       return Err(format!(
         "illegal {} name (must be between 1 and 20 characters long and may contain only lowercase alphabetical characters and digits)",
-        processor_type
+        processor_technology
       ));
     }
     if self.processor.description.is_empty() {
-      return Err(format!("{} description cannot be empty", processor_type));
+      return Err(format!("{} description cannot be empty", processor_technology));
     }
     if self.processor.version.clone().is_some_and(|ref version| version.is_empty()) {
-      return Err(format!("{} version cannot be empty", processor_type));
+      return Err(format!("{} version cannot be empty", processor_technology));
     }
     if let Some(ref url) = self.processor.more_info_url {
       validate_config_template(url, "more-info-url template")?
@@ -209,7 +209,7 @@ impl ProcessorConfig {
 
   pub(crate) fn convert_to_descriptor(&self, profiles: Vec<ProfileDescriptor>, mapping: &TemplateMapping) -> ProcessorDescriptor {
     ProcessorDescriptor {
-      processor_type: ProcessorType::DshService,
+      processor_technology: ProcessorTechnology::DshService,
       id: self.processor.id.clone(),
       label: self.processor.label.clone(),
       description: self.processor.description.clone(),
@@ -451,11 +451,11 @@ impl Display for DeploymentParameterConfig {
   }
 }
 
-pub fn read_processor_config(config_file_name: &str, processor_type: ProcessorType) -> Result<ProcessorConfig, String> {
-  debug!("read {} config file: {}", processor_type, config_file_name);
+pub fn read_processor_config(config_file_name: &str, processor_technology: ProcessorTechnology) -> Result<ProcessorConfig, String> {
+  debug!("read {} config file: {}", processor_technology, config_file_name);
   let processor_config = read_config::<ProcessorConfig>(config_file_name)?;
-  debug!("successfully read and parsed {} config file\n{:#?}", processor_type, processor_config);
-  processor_config.validate(processor_type)?;
+  debug!("successfully read and parsed {} config file\n{:#?}", processor_technology, processor_config);
+  processor_config.validate(processor_technology)?;
   debug!("successfully validated config");
   Ok(processor_config)
 }

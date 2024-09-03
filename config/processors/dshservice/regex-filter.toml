@@ -1,5 +1,5 @@
 [processor]
-type = "dshservice"
+processor-technology = "dshservice"
 id = "regex-filter"
 label = "Regex filter"
 description = "Retain records that (don't) match a regular expression. Filters can be applied on the key, value and/or headers. Supports Avro, JSON and plain text. In case of AVRO and JSON it supports to match on nested fields."

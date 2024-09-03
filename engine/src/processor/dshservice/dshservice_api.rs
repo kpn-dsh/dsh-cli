@@ -12,7 +12,7 @@ use crate::processor::dshservice::dshservice_config::{
 };
 use crate::processor::dshservice::DshServiceName;
 use crate::processor::processor_config::VariableType;
-use crate::processor::{JunctionId, ProcessorId, ProcessorType};
+use crate::processor::{JunctionId, ProcessorId, ProcessorTechnology};
 
 impl From<ApiHealthCheck> for HealthCheckConfig {
   fn from(value: ApiHealthCheck) -> Self {
@@ -131,7 +131,7 @@ pub fn into_api_application(
     environment_variables.insert("TRIFONIUS_PIPELINE_ID".to_string(), pipeline_id.to_string());
   }
   environment_variables.insert("TRIFONIUS_PROCESSOR_ID".to_string(), processor_id.to_string());
-  environment_variables.insert("TRIFONIUS_PROCESSOR_TECHNOLOGY".to_string(), ProcessorType::DshService.to_string());
+  environment_variables.insert("TRIFONIUS_PROCESSOR_TECHNOLOGY".to_string(), ProcessorTechnology::DshService.to_string());
   environment_variables.insert("TRIFONIUS_PROCESSOR_REALIZATION_ID".to_string(), "TODO".to_string());
   environment_variables.insert("TRIFONIUS_SERVICE_NAME".to_string(), service_name.to_string());
   if let Some(ref configured_environment_variables) = dshservice_specific_config.environment_variables {

@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use serde::{Deserialize, Serialize};
 
 use crate::processor::processor_config::{DeploymentParameterConfig, DeploymentParameterConfigOption, DeploymentParameterType, JunctionConfig};
-use crate::processor::ProcessorType;
+use crate::processor::ProcessorTechnology;
 use crate::resource::ResourceType;
 
 /// Describes a `Processor`
@@ -16,8 +16,8 @@ use crate::resource::ResourceType;
 /// to deploy a `Processor`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProcessorDescriptor {
-  #[serde(rename = "type")]
-  pub processor_type: ProcessorType,
+  #[serde(rename = "processor-technology")]
+  pub processor_technology: ProcessorTechnology,
   pub id: String,
   pub label: String,
   pub description: String,
@@ -94,21 +94,25 @@ pub struct ProfileDescriptor {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProcessorTypeDescriptor {
-  #[serde(rename = "type")]
-  pub processor_type: ProcessorType,
+  #[serde(rename = "processor-technology")]
+  pub processor_technology: ProcessorTechnology,
   pub label: String,
   pub description: String,
 }
 
-impl From<&ProcessorType> for ProcessorTypeDescriptor {
-  fn from(value: &ProcessorType) -> Self {
-    ProcessorTypeDescriptor { processor_type: value.clone(), label: value.label().to_string(), description: value.description().to_string() }
+impl From<&ProcessorTechnology> for ProcessorTypeDescriptor {
+  fn from(processor_technology: &ProcessorTechnology) -> Self {
+    ProcessorTypeDescriptor {
+      processor_technology: processor_technology.clone(),
+      label: processor_technology.label().to_string(),
+      description: processor_technology.description().to_string(),
+    }
   }
 }
 
 impl Display for ProcessorDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{} ({})", self.id, self.processor_type, self.label)?;
+    write!(f, "{}:{} ({})", self.id, self.processor_technology, self.label)?;
     if let Some(ref version) = self.version {
       write!(f, "\n  version {}", version)?;
     }

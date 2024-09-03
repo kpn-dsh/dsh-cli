@@ -15,7 +15,7 @@ use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorProfileId, ProcessorRealizationId, ProcessorType};
+use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorProfileId, ProcessorRealizationId, ProcessorTechnology};
 use crate::resource::resource_descriptor::ResourceDirection;
 use crate::resource::resource_registry::ResourceRegistry;
 use crate::resource::{ResourceIdentifier, ResourceType};
@@ -33,7 +33,10 @@ impl DshAppRealization {
   pub fn create(config_file_name: &str, engine_target: Arc<EngineTarget>, resource_registry: Arc<ResourceRegistry>) -> Result<Self, String> {
     let processor_config = read_dshapp_config(config_file_name)?;
     Ok(DshAppRealization {
-      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshApp, id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())? },
+      processor_identifier: ProcessorIdentifier {
+        processor_technology: ProcessorTechnology::DshApp,
+        id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())?,
+      },
       processor_config,
       engine_target,
       resource_registry,
@@ -76,8 +79,8 @@ impl ProcessorRealization for DshAppRealization {
     }
   }
 
-  fn processor_type(&self) -> ProcessorType {
-    ProcessorType::DshApp
+  fn processor_technology(&self) -> ProcessorTechnology {
+    ProcessorTechnology::DshApp
   }
 }
 

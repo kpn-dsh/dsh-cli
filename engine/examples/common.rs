@@ -4,14 +4,14 @@ use trifonius_engine::pipeline::PipelineId;
 use trifonius_engine::processor::processor_instance::ProcessorInstance;
 use trifonius_engine::processor::processor_realization::ProcessorRealization;
 use trifonius_engine::processor::processor_registry::ProcessorRegistry;
-use trifonius_engine::processor::{JunctionId, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
+use trifonius_engine::processor::{JunctionId, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 use trifonius_engine::resource::ResourceRealizationId;
 
 lazy_static! {
   pub static ref PROCESSOR_REALIZATION_ID: ProcessorRealizationId = ProcessorRealizationId::new("greenbox-consent-filter");
   pub static ref PROCESSOR_ID: ProcessorId = ProcessorId::new("consentfilter002");
   pub static ref PIPELINE_ID: PipelineId = PipelineId::new("pipeline");
-  pub static ref PROCESSOR_IDENTIFIER: ProcessorIdentifier = ProcessorIdentifier::new(ProcessorType::DshService, ProcessorRealizationId::new("greenbox-consent-filter"));
+  pub static ref PROCESSOR_IDENTIFIER: ProcessorIdentifier = ProcessorIdentifier::new(ProcessorTechnology::DshService, ProcessorRealizationId::new("greenbox-consent-filter"));
   pub static ref PROCESSOR_REGISTRY: ProcessorRegistry = ProcessorRegistry::default();
 }
 
@@ -36,7 +36,7 @@ pub fn pipeline_id() -> PipelineId {
 }
 
 pub fn processor_identifier() -> ProcessorIdentifier {
-  ProcessorIdentifier::new(ProcessorType::DshService, processor_realization_id())
+  ProcessorIdentifier::new(ProcessorTechnology::DshService, processor_realization_id())
 }
 
 pub fn junction_id() -> JunctionId {

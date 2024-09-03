@@ -10,7 +10,7 @@ use crate::processor::processor_config::ProcessorConfig;
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
+use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 use crate::resource::resource_registry::ResourceRegistry;
 
 pub struct DshServiceRealization {
@@ -24,7 +24,10 @@ impl DshServiceRealization {
   pub fn create(config_file_name: &str, engine_target: Arc<EngineTarget>, resource_registry: Arc<ResourceRegistry>) -> Result<Self, String> {
     let processor_config = read_dshservice_config(config_file_name)?;
     Ok(DshServiceRealization {
-      processor_identifier: ProcessorIdentifier { processor_type: ProcessorType::DshService, id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())? },
+      processor_identifier: ProcessorIdentifier {
+        processor_technology: ProcessorTechnology::DshService,
+        id: ProcessorRealizationId::try_from(processor_config.processor.id.as_str())?,
+      },
       processor_config,
       engine_target,
       resource_registry,
@@ -73,7 +76,7 @@ impl ProcessorRealization for DshServiceRealization {
     }
   }
 
-  fn processor_type(&self) -> ProcessorType {
-    ProcessorType::DshService
+  fn processor_technology(&self) -> ProcessorTechnology {
+    ProcessorTechnology::DshService
   }
 }

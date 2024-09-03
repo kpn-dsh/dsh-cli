@@ -1,5 +1,5 @@
 [processor]
-type = "dshservice"
+processor-technology = "dshservice"
 id = "test"
 label = "Test DSH Service"
 description = "Test profiles"

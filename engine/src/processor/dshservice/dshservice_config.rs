@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::processor::processor_config::{read_processor_config, DeployConfig, ProcessorConfig, VariableConfig, VariableType};
 use crate::processor::processor_descriptor::ProfileDescriptor;
-use crate::processor::{ProcessorProfileId, ProcessorType};
+use crate::processor::{ProcessorProfileId, ProcessorTechnology};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DshServiceSpecificConfig {
@@ -206,7 +206,7 @@ impl ProfileConfig {
 }
 
 pub fn read_dshservice_config(config_file_name: &str) -> Result<ProcessorConfig, String> {
-  let processor_config = read_processor_config(config_file_name, ProcessorType::DshService)?;
+  let processor_config = read_processor_config(config_file_name, ProcessorTechnology::DshService)?;
   let dshservice_specific_config = processor_config
     .dshservice_specific_config
     .as_ref()
@@ -235,9 +235,9 @@ fn read_dshservice_config_proper_values() {
 
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   path.push("tests/processors/dshservice/dshservice-config-test.toml");
-  let config = &read_processor_config(path.to_str().unwrap(), ProcessorType::DshService).unwrap();
+  let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshService).unwrap();
 
-  assert_eq!(config.processor.processor_type, ProcessorType::DshService);
+  assert_eq!(config.processor.processor_technology, ProcessorTechnology::DshService);
   assert_eq!(config.processor.id, "test");
   assert_eq!(config.processor.description, "Test profiles");
   assert_eq!(config.processor.version, Some("0.1.2".to_string()));
@@ -471,7 +471,7 @@ fn read_dshservice_config_proper_values() {
 fn read_dshservice_config_profile_proper_values() {
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   path.push("tests/processors/dshservice/dshservice-config-test.toml");
-  let config = &read_processor_config(path.to_str().unwrap(), ProcessorType::DshService).unwrap();
+  let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshService).unwrap();
   let dshservice_specific_config = config.dshservice_specific_config.as_ref().unwrap();
 
   let profile1 = dshservice_specific_config.profiles.iter().find(|p| p.id == "profile-1").unwrap().clone();

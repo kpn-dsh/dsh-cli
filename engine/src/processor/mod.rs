@@ -15,7 +15,7 @@ pub mod processor_realization;
 pub mod processor_registry;
 
 #[derive(Clone, Debug, Deserialize, Hash, Eq, PartialEq, Serialize)]
-pub enum ProcessorType {
+pub enum ProcessorTechnology {
   #[serde(rename = "dshapp")]
   DshApp,
   #[serde(rename = "dshservice")]
@@ -58,7 +58,7 @@ identifier!(
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ProcessorIdentifier {
-  pub processor_type: ProcessorType,
+  pub processor_technology: ProcessorTechnology,
   pub id: ProcessorRealizationId,
 }
 
@@ -68,40 +68,40 @@ pub struct JunctionIdentifier {
   pub junction_id: JunctionId,
 }
 
-impl Display for ProcessorType {
+impl Display for ProcessorTechnology {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
-      ProcessorType::DshApp => write!(f, "dshapp"),
-      ProcessorType::DshService => write!(f, "dshservice"),
+      ProcessorTechnology::DshApp => write!(f, "dshapp"),
+      ProcessorTechnology::DshService => write!(f, "dshservice"),
     }
   }
 }
 
-impl ProcessorType {
+impl ProcessorTechnology {
   fn description(&self) -> &str {
     match self {
-      ProcessorType::DshApp => "DSH App Catalog application, managed by the DSH platform",
-      ProcessorType::DshService => "DSH service managed by the DSH platform",
+      ProcessorTechnology::DshApp => "DSH App Catalog application, managed by the DSH platform",
+      ProcessorTechnology::DshService => "DSH service managed by the DSH platform",
     }
   }
 
   fn label(&self) -> &str {
     match self {
-      ProcessorType::DshApp => "DSH App",
-      ProcessorType::DshService => "DSH Service",
+      ProcessorTechnology::DshApp => "DSH App",
+      ProcessorTechnology::DshService => "DSH Service",
     }
   }
 }
 
 impl ProcessorIdentifier {
-  pub fn new(processor_type: ProcessorType, id: ProcessorRealizationId) -> Self {
-    ProcessorIdentifier { processor_type, id }
+  pub fn new(processor_technology: ProcessorTechnology, id: ProcessorRealizationId) -> Self {
+    ProcessorIdentifier { processor_technology, id }
   }
 }
 
 impl Display for ProcessorIdentifier {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}", self.processor_type, self.id)
+    write!(f, "{}:{}", self.processor_technology, self.id)
   }
 }
 

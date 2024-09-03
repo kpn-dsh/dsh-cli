@@ -5,7 +5,7 @@
 use crate::pipeline::PipelineId;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_instance::ProcessorInstance;
-use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
+use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 
 /// Defines the behavior of a Trifonius `ProcessorRealization`
 pub trait ProcessorRealization {
@@ -47,9 +47,9 @@ pub trait ProcessorRealization {
   /// * The created `ProcessorInstance`.
   fn processor_instance<'a>(&'a self, pipeline_id: Option<PipelineId>, processor_id: ProcessorId) -> Result<Box<dyn ProcessorInstance + 'a>, String>;
 
-  /// # Get this `ProcessorRealization`s type
+  /// # Get this `ProcessorRealization`s technology
   ///
   /// ## Returns
-  /// * This `ProcessorRealization`s type.
-  fn processor_type(&self) -> ProcessorType;
+  /// * This `ProcessorRealization`s technology.
+  fn processor_technology(&self) -> ProcessorTechnology;
 }

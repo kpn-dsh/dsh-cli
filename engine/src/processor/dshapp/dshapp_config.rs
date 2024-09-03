@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::processor::processor_config::{read_processor_config, DeployConfig, ProcessorConfig, VariableConfig, VariableType};
 use crate::processor::processor_descriptor::ProfileDescriptor;
-use crate::processor::{ProcessorProfileId, ProcessorType};
+use crate::processor::{ProcessorProfileId, ProcessorTechnology};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DshAppSpecificConfig {
@@ -88,7 +88,7 @@ impl ProfileConfig {
 }
 
 pub fn read_dshapp_config(config_file_name: &str) -> Result<ProcessorConfig, String> {
-  let processor_config = read_processor_config(config_file_name, ProcessorType::DshApp)?;
+  let processor_config = read_processor_config(config_file_name, ProcessorTechnology::DshApp)?;
   let dshapp_specific_config = processor_config
     .dshapp_specific_config
     .as_ref()
@@ -118,9 +118,9 @@ fn read_dshapp_config_proper_values() {
 
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   path.push("tests/processors/dshapp/dshapp-config-test.toml");
-  let config = &read_processor_config(path.to_str().unwrap(), ProcessorType::DshApp).unwrap();
+  let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshApp).unwrap();
 
-  assert_eq!(config.processor.processor_type, ProcessorType::DshApp);
+  assert_eq!(config.processor.processor_technology, ProcessorTechnology::DshApp);
   assert_eq!(config.processor.id, "test");
   assert_eq!(config.processor.description, "Test profiles");
   assert_eq!(config.processor.version, Some("0.1.2".to_string()));
@@ -350,7 +350,7 @@ fn read_dshapp_config_proper_values() {
 fn read_dshapp_config_profile_proper_values() {
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   path.push("tests/processors/dshapp/dshapp-config-test.toml");
-  let config = &read_processor_config(path.to_str().unwrap(), ProcessorType::DshApp).unwrap();
+  let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshApp).unwrap();
   let dshapp_specific_config = config.dshapp_specific_config.as_ref().unwrap();
 
   let profile1 = dshapp_specific_config.profiles.iter().find(|p| p.id == "profile-1").unwrap().clone();

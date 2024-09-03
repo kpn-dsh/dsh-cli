@@ -6,7 +6,7 @@ use crate::engine_target::EngineTarget;
 use crate::processor::dshapp::dshapp_realization::DshAppRealization;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{processor_config_dir_name, ProcessorIdentifier, ProcessorRealizationId, ProcessorType};
+use crate::processor::{processor_config_dir_name, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 use crate::resource::resource_registry::ResourceRegistry;
 
 pub(crate) struct DshAppRealizationRegistry {
@@ -21,7 +21,7 @@ impl<'a> DshAppRealizationRegistry {
       let config_file_name = path.unwrap().path().display().to_string();
       let dshapp_realization = DshAppRealization::create(config_file_name.as_str(), engine_target.clone(), resource_registry.clone())?;
       dshapp_realizations.insert(
-        ProcessorIdentifier { processor_type: ProcessorType::DshApp, id: dshapp_realization.id().clone() },
+        ProcessorIdentifier { processor_technology: ProcessorTechnology::DshApp, id: dshapp_realization.id().clone() },
         dshapp_realization,
       );
     }
@@ -31,7 +31,7 @@ impl<'a> DshAppRealizationRegistry {
   pub(crate) fn dshapp_realization_by_id(&'a self, id: &ProcessorRealizationId) -> Option<&(dyn ProcessorRealization + 'a)> {
     match self
       .dshapp_realizations
-      .get(&ProcessorIdentifier { processor_type: ProcessorType::DshApp, id: id.clone() })
+      .get(&ProcessorIdentifier { processor_technology: ProcessorTechnology::DshApp, id: id.clone() })
     {
       Some(a) => Some(a),
       None => None,
