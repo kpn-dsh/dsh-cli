@@ -7,6 +7,7 @@ pub(crate) mod bucket;
 pub(crate) mod certificate;
 pub(crate) mod formatter;
 pub(crate) mod proxy;
+pub(crate) mod secret;
 pub(crate) mod stream;
 pub(crate) mod topic;
 pub(crate) mod usage;
