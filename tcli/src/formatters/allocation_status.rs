@@ -24,8 +24,8 @@ impl Label for AllocationStatusLabel {
 }
 
 impl SubjectFormatter<AllocationStatusLabel> for AllocationStatus {
-  fn value(&self, column: &AllocationStatusLabel, target_id: &str) -> String {
-    match column {
+  fn value(&self, label: &AllocationStatusLabel, target_id: &str) -> String {
+    match label {
       AllocationStatusLabel::DerivedFrom => self.clone().derived_from.unwrap_or_default(),
       AllocationStatusLabel::Notifications => {
         if self.notifications.is_empty() {

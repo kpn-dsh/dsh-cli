@@ -27,8 +27,8 @@ impl Label for BucketLabel {
 }
 
 impl SubjectFormatter<BucketLabel> for BucketStatus {
-  fn value(&self, column: &BucketLabel, target_id: &str) -> String {
-    match column {
+  fn value(&self, label: &BucketLabel, target_id: &str) -> String {
+    match label {
       BucketLabel::DerivedFrom => self.status.derived_from.clone().unwrap_or_default(),
       BucketLabel::Encrypted => self.configuration.as_ref().map(|bs| bs.encrypted.to_string()).unwrap_or_default(),
       BucketLabel::Notifications => {
@@ -50,8 +50,8 @@ impl SubjectFormatter<BucketLabel> for BucketStatus {
 }
 
 impl SubjectFormatter<BucketLabel> for Bucket {
-  fn value(&self, column: &BucketLabel, target_id: &str) -> String {
-    match column {
+  fn value(&self, label: &BucketLabel, target_id: &str) -> String {
+    match label {
       BucketLabel::Encrypted => self.encrypted.to_string(),
       BucketLabel::Target => target_id.to_string(),
       BucketLabel::Versioned => self.versioned.to_string(),

@@ -76,8 +76,8 @@ impl Label for ApplicationLabel {
 }
 
 impl SubjectFormatter<ApplicationLabel> for Application {
-  fn value(&self, column: &ApplicationLabel, application_id: &str) -> String {
-    match column {
+  fn value(&self, label: &ApplicationLabel, application_id: &str) -> String {
+    match label {
       ApplicationLabel::Cpus => self.cpus.to_string(),
       ApplicationLabel::Env => {
         let mut key = self.env.keys().map(|k| k.to_string()).collect::<Vec<String>>();

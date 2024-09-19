@@ -41,8 +41,8 @@ impl SecretUsage {
 }
 
 impl SubjectFormatter<SecretUsageLabel> for SecretUsage {
-  fn value(&self, column: &SecretUsageLabel, target_id: &str) -> String {
-    match column {
+  fn value(&self, label: &SecretUsageLabel, target_id: &str) -> String {
+    match label {
       SecretUsageLabel::App => self.app.clone().unwrap_or_default(),
       SecretUsageLabel::Application => self.application.clone().unwrap_or_default(),
       SecretUsageLabel::Injections => {

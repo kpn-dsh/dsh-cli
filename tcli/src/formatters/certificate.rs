@@ -32,8 +32,8 @@ impl Label for CertificateLabel {
 }
 
 impl SubjectFormatter<CertificateLabel> for ActualCertificate {
-  fn value(&self, column: &CertificateLabel, target_id: &str) -> String {
-    match column {
+  fn value(&self, label: &CertificateLabel, target_id: &str) -> String {
+    match label {
       CertificateLabel::CertChainSecret => self.cert_chain_secret.clone(),
       CertificateLabel::DistinguishedName => self.distinguished_name.clone(),
       CertificateLabel::DnsNames => self.dns_names.join("\n"),
@@ -52,8 +52,8 @@ impl SubjectFormatter<CertificateLabel> for ActualCertificate {
 }
 
 impl SubjectFormatter<CertificateLabel> for Certificate {
-  fn value(&self, column: &CertificateLabel, target_id: &str) -> String {
-    match column {
+  fn value(&self, label: &CertificateLabel, target_id: &str) -> String {
+    match label {
       CertificateLabel::CertChainSecret => self.cert_chain_secret.clone(),
       CertificateLabel::KeySecret => self.key_secret.clone(),
       CertificateLabel::PassphraseSecret => self.clone().passphrase_secret.unwrap_or_default(),

@@ -41,8 +41,8 @@ impl Usage {
 }
 
 impl SubjectFormatter<UsageLabel> for Usage {
-  fn value(&self, column: &UsageLabel, target_id: &str) -> String {
-    match column {
+  fn value(&self, label: &UsageLabel, target_id: &str) -> String {
+    match label {
       UsageLabel::Target => target_id.to_string(),
       UsageLabel::App => self.app.clone().unwrap_or_default(),
       UsageLabel::Application => self.application.clone().unwrap_or_default(),
