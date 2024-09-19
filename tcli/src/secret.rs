@@ -49,6 +49,10 @@ impl Subject for SecretSubject {
     self.subject()
   }
 
+  fn subject_command_alias(&self) -> Option<&str> {
+    Some("s")
+  }
+
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::Create, SECRET_CREATE_CAPABILITY.as_ref());
@@ -286,7 +290,7 @@ impl CommandExecutor for SecretShowUsage {
     if !application_injections.is_empty() {
       let mut builder: TableBuilder<SecretUsageLabel, SecretUsage> = TableBuilder::list(&SECRET_USAGE_IN_APPLICATIONS_LABELS_SHOW, context);
       for (application_id, secret_injections) in application_injections {
-        let injections = secret_injections.iter().map(|(secret, envs)| format!("{}", envs.join("\n"))).collect();
+        let injections = secret_injections.iter().map(|(_, envs)| format!("{}", envs.join("\n"))).collect();
         builder.row(&SecretUsage::application(secret_id.clone(), application_id, injections));
       }
       builder.print();

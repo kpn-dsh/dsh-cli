@@ -47,10 +47,6 @@ impl Subject for StreamSubject {
     self.subject()
   }
 
-  fn subject_command_alias(&self) -> Option<&str> {
-    Some("s")
-  }
-
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     // capabilities.insert(CapabilityType::Create, STREAM_CREATE_CAPABILITY.as_ref());
