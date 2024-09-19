@@ -112,7 +112,7 @@ struct AppListConfiguration {}
 impl CommandExecutor for AppListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
     if context.show_capability_explanation() {
-      println!("list all apps and their configuration");
+      println!("list all apps and their configurations");
     }
     let apps = &dsh_api_client.get_app_configurations().await?;
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
