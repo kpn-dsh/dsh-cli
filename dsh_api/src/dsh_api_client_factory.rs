@@ -55,15 +55,24 @@ impl DshApiClientFactory {
 
 impl Default for DshApiClientFactory {
   fn default() -> Self {
+    let platform = DshPlatform::default();
     let tenant = DshApiTenant::default();
-    let secret_env = format!("TRIFONIUS_TARGET_TENANT_{}_SECRET", tenant.name().to_ascii_uppercase().replace('-', "_"));
-    let secret = match env::var(&secret_env) {
-      Ok(value) => value,
-      Err(_) => panic!("environment variable {} not set", secret_env),
+    let secret = match get_secret_from_platform_and_tenant(platform.to_string().as_str(), tenant.name()) {
+      Ok(secret) => secret,
+      Err(error) => panic!("{}", error),
     };
     match Self::create(tenant, secret) {
       Ok(factory) => factory,
       Err(error) => panic!("{}", error),
     }
   }
+}
+
+pub fn get_secret_from_platform_and_tenant(platform_name: &str, tenant_name: &str) -> Result<String, String> {
+  let secret_env = format!(
+    "DSH_API_SECRET_{}_{}",
+    platform_name.to_ascii_uppercase().replace('-', "_"),
+    tenant_name.to_ascii_uppercase().replace('-', "_")
+  );
+  env::var(&secret_env).map_err(|_| format!("environment variable {} not set", secret_env))
 }

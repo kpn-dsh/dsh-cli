@@ -10,22 +10,26 @@ use serde_json::Error as SerdeJsonError;
 use crate::dsh_api_tenant::DshApiTenant;
 pub use crate::generated::types;
 
+// Private module `generated` will contain the generated Client code.
+pub(crate) mod generated {
+  include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+}
+
 pub mod app_catalog;
 pub mod app_catalog_app_configuration;
 pub mod app_catalog_manifest;
 pub mod application;
 pub mod bucket;
+pub mod certificate;
 pub mod dsh_api_client;
 pub mod dsh_api_client_factory;
 pub mod dsh_api_tenant;
 pub mod platform;
+pub mod proxy;
 pub mod secret;
+pub mod stream;
 pub mod topic;
-
-// Private module `generated` will contain the generated Client code.
-pub(crate) mod generated {
-  include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
-}
+pub mod volume;
 
 #[derive(Debug)]
 pub enum DshApiError {
@@ -74,6 +78,21 @@ impl From<DshApiError> for String {
   fn from(value: DshApiError) -> Self {
     value.to_string()
   }
+}
+
+pub const PLATFORM_ENVIRONMENT_VARIABLE: &str = "DSH_API_PLATFORM";
+pub const TENANT_ENVIRONMENT_VARIABLE: &str = "DSH_API_TENANT";
+
+pub fn secret_environment_variable(platform_name: &str, tenant_name: &str) -> String {
+  format!(
+    "DSH_API_SECRET_{}_{}",
+    platform_name.to_ascii_uppercase().replace('-', "_"),
+    tenant_name.to_ascii_uppercase().replace('-', "_")
+  )
+}
+
+pub fn user_environment_variable(tenant_name: &str) -> String {
+  format!("DSH_API_USER_{}", tenant_name.to_ascii_uppercase().replace('-', "_"))
 }
 
 // API naming convention

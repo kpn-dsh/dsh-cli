@@ -9,6 +9,7 @@ use reqwest::StatusCode as ReqwestStatusCode;
 use serde::Serialize;
 
 use crate::platform::DshPlatform;
+use crate::types::error::ConversionError;
 use crate::{generated::Client as GeneratedClient, DshApiError, DshApiTenant};
 
 #[derive(Debug)]
@@ -32,26 +33,6 @@ impl<'a> DshApiClient<'a> {
   pub fn new(token: String, generated_client: &'a GeneratedClient, tenant: &'a DshApiTenant) -> Self {
     Self { token, generated_client, tenant }
   }
-
-  // /// Create dsh api client with default settings
-  // ///
-  // /// This function will create a `DshApiClient` using default settings
-  // /// from a set of environment variables.
-  // ///
-  // /// * `TRIFONIUS_CONFIG_DIR`
-  // /// * `TRIFONIUS_TARGET_PLATFORM`
-  // /// * `TRIFONIUS_TARGET_TENANT`
-  // /// * `TRIFONIUS_TARGET_TENANT_\[tenant\]_SECRET` - Replace `\[tenant\]` with the tenant name.
-  // /// * `TRIFONIUS_TARGET_TENANT_\[tenant\]_USER` - Replace `\[tenant\]` with the tenant name.
-  // ///
-  // /// See README.md for more information.
-  // ///
-  // /// ## Panics
-  // /// This function will panic if the `DshApiClient` could not be created,
-  // /// e.g. because the environment variables were not properly set.
-  // pub async fn default_client() -> Self {
-  //   DshApiClientFactory::default().client().await.expect("could not create dsh api client")
-  // }
 
   pub fn api_version(&self) -> &'static str {
     self.generated_client.api_version()
@@ -131,6 +112,12 @@ impl From<ReqwestStatusCode> for DshApiResponseStatus {
       ReqwestStatusCode::OK => Self::Ok,
       _ => Self::Unknown,
     }
+  }
+}
+
+impl From<ConversionError> for DshApiError {
+  fn from(value: ConversionError) -> Self {
+    DshApiError::Unexpected(value.to_string())
   }
 }
 

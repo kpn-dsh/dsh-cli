@@ -16,10 +16,10 @@
 //! * [`get_application_task_allocation_status(application_id, task_id) -> AllocationStatus`](DshApiClient::get_application_task_allocation_status)
 //! * [`get_application_task_state(application_id, task_id) -> Task`](DshApiClient::get_application_task_state)
 
-use crate::dsh_api_client::DshApiClient;
 use std::collections::HashMap;
 
-use crate::types::{AllocationStatus, Application, Task, TaskStatus};
+use crate::dsh_api_client::DshApiClient;
+use crate::types::{AllocationStatus, Application, ApplicationSecret, ApplicationVolumes, HealthCheck, Metrics, PortMapping, Task, TaskStatus};
 #[allow(unused_imports)]
 use crate::DshApiError;
 use crate::DshApiResult;
@@ -322,5 +322,70 @@ impl DshApiClient<'_> {
           .await,
       )
       .map(|result| result.1)
+  }
+}
+
+#[derive(Debug)]
+pub struct ApplicationDiff {
+  pub cpus: Option<(f64, f64)>,
+  pub env: Option<(HashMap<String, String>, HashMap<String, String>)>,
+  pub exposed_ports: Option<(HashMap<String, PortMapping>, HashMap<String, PortMapping>)>,
+  pub health_check: Option<(Option<HealthCheck>, Option<HealthCheck>)>,
+  pub image: Option<(String, String)>,
+  pub instances: Option<(u64, u64)>,
+  pub mem: Option<(u64, u64)>,
+  pub metrics: Option<(Option<Metrics>, Option<Metrics>)>,
+  pub needs_token: Option<(bool, bool)>,
+  pub readable_streams: Option<(Vec<String>, Vec<String>)>,
+  pub secrets: Option<(Vec<ApplicationSecret>, Vec<ApplicationSecret>)>,
+  pub single_instance: Option<(bool, bool)>,
+  pub spread_group: Option<(Option<String>, Option<String>)>,
+  pub topics: Option<(Vec<String>, Vec<String>)>,
+  pub user: Option<(String, String)>,
+  pub volumes: Option<(HashMap<String, ApplicationVolumes>, HashMap<String, ApplicationVolumes>)>,
+  pub writable_streams: Option<(Vec<String>, Vec<String>)>,
+}
+
+impl ApplicationDiff {
+  pub fn is_empty(&self) -> bool {
+    self.cpus.is_none()
+      && self.env.is_none()
+      && self.exposed_ports.is_none()
+      && self.health_check.is_none()
+      && self.image.is_none()
+      && self.instances.is_none()
+      && self.mem.is_none()
+      && self.metrics.is_none()
+      && self.needs_token.is_none()
+      && self.readable_streams.is_none()
+      && self.secrets.is_none()
+      && self.single_instance.is_none()
+      && self.spread_group.is_none()
+      && self.topics.is_none()
+      && self.user.is_none()
+      && self.volumes.is_none()
+      && self.writable_streams.is_none()
+  }
+}
+
+pub fn application_diff(baseline: &Application, sample: &Application) -> ApplicationDiff {
+  ApplicationDiff {
+    cpus: if baseline.cpus == sample.cpus { None } else { Some((baseline.cpus, sample.cpus)) },
+    env: if baseline.env == sample.env { None } else { Some((baseline.env.clone(), sample.env.clone())) },
+    exposed_ports: if baseline.exposed_ports == sample.exposed_ports.clone() { None } else { Some((baseline.exposed_ports.clone(), sample.exposed_ports.clone())) },
+    health_check: if baseline.health_check == sample.health_check { None } else { Some((baseline.health_check.clone(), sample.health_check.clone())) },
+    image: if baseline.image == sample.image.clone() { None } else { Some((baseline.image.clone(), sample.image.clone())) },
+    instances: if baseline.instances == sample.instances { None } else { Some((baseline.instances, sample.instances)) },
+    mem: if baseline.mem == sample.instances { None } else { Some((baseline.mem, sample.mem)) },
+    metrics: if baseline.metrics == sample.metrics { None } else { Some((baseline.metrics.clone(), sample.metrics.clone())) },
+    needs_token: if baseline.needs_token == sample.needs_token { None } else { Some((baseline.needs_token, sample.needs_token)) },
+    readable_streams: if baseline.readable_streams == sample.readable_streams { None } else { Some((baseline.readable_streams.clone(), sample.readable_streams.clone())) },
+    secrets: if baseline.secrets == sample.secrets { None } else { Some((baseline.secrets.clone(), sample.secrets.clone())) },
+    single_instance: if baseline.single_instance == sample.single_instance { None } else { Some((baseline.single_instance, sample.single_instance)) },
+    spread_group: if baseline.spread_group == sample.spread_group { None } else { Some((baseline.spread_group.clone(), sample.spread_group.clone())) },
+    topics: if baseline.topics == sample.topics { None } else { Some((baseline.topics.clone(), sample.topics.clone())) },
+    user: if baseline.user == sample.user { None } else { Some((baseline.user.clone(), sample.user.clone())) },
+    volumes: if baseline.volumes == sample.volumes { None } else { Some((baseline.volumes.clone(), sample.volumes.clone())) },
+    writable_streams: if baseline.writable_streams == sample.writable_streams { None } else { Some((baseline.writable_streams.clone(), sample.writable_streams.clone())) },
   }
 }

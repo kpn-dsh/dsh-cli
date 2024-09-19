@@ -34,14 +34,14 @@ async fn main() -> Result<(), String> {
 }
 
 const API_VERSION: &str = "apiVersion";
-const CONFIGURATION: &str = "configuration";
-const CONTACT: &str = "contact";
-const DESCRIPTION: &str = "description";
+const _CONFIGURATION: &str = "configuration";
+const _CONTACT: &str = "contact";
+const _DESCRIPTION: &str = "description";
 const ID: &str = "id";
 const KIND: &str = "kind";
-const MORE_INFO: &str = "moreInfo";
+const _MORE_INFO: &str = "moreInfo";
 const NAME: &str = "name";
-const RESOURCES: &str = "resources";
+const _RESOURCES: &str = "resources";
 const VENDOR: &str = "vendor";
 const VERSION: &str = "version";
 

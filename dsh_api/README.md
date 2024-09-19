@@ -1,4 +1,4 @@
-# Trifonius DSH API Client
+# DSH API Client
 
 ### Environment variables
 
@@ -9,12 +9,14 @@
     </tr>
     <tr align="top">
         <td align="top"><code>TRIFONIUS_CONFIG_DIR</code></td>
-        <td>Set the location of the configuration files directory. Defaults to the current working 
-            directory.
+        <td>
+            Set the location of the configuration files directory. 
+            Defaults to the current working directory. 
+            This variable is only used when the <code>trifonius</code> feature is enabled.
         </td>
     </tr>
     <tr align="top">
-        <td align="top"><code>TRIFONIUS_TARGET_PLATFORM</code></td>
+        <td align="top"><code>DSH_API_PLATFORM</code></td>
         <td>
             Target platform on which the tenant's environment lives.
             <ul>
@@ -27,30 +29,31 @@
         </td>
     </tr>
     <tr align="top">
-        <td><code>TRIFONIUS_TARGET_TENANT</code></td>
+        <td><code>DSH_API_TENANT</code></td>
         <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
-            will be managed by Trifonius.</td>
+            will be managed via the api.</td>
     </tr>
     <tr align="top">
-        <td><code>TRIFONIUS_TARGET_TENANT_[tenant]_SECRET</code></td>
+        <td><code>DSH_API_SECRET_[platform]_[tenant]</code></td>
         <td>
             Secret api token for the target tenant. 
-            Note that the placeholder <code>[tenant]</code> needs to be substituted 
-            with the tenant name in all capitals, and hyphens (<code>-</code>) 
-            replaced with underscores (<code>_</code>).
-            E.g. if the tenant name is <code>greenbox-dev</code>, the environment variable must be
-            <code>TRIFONIUS_TARGET_TENANT_GREENBOX_DEV_SECRET = "..."</code>.
+            The placeholders <code>[platform]</code> and <code>[tenant]</code> 
+            need to be substituted with the platform name and the tenant name in all capitals, 
+            with hyphens (<code>-</code>) replaced by underscores (<code>_</code>).
+            E.g. if the platform is <code>nplz</code> and the tenant name is 
+            <code>greenbox-dev</code>, the environment variable must be
+            <code>DSH_API_SECRET_NPLZ_GREENBOX_DEV = "..."</code>.
         </td>
     </tr>
     <tr align="top">
-        <td><code>TRIFONIUS_TARGET_TENANT_[tenant]_USER</code></td>
+        <td><code>DSH_API_USER_[tenant]</code></td>
         <td>
             Group id and user id for the target tenant.
-            Note that the placeholder <code>[tenant]</code> needs to be substituted 
-            with the tenant name in all capitals, and hyphens (<code>-</code>) 
-            replaced with underscores (<code>_</code>).
+            The placeholder <code>[tenant]</code> needs to be substituted 
+            with the tenant name in all capitals, with hyphens (<code>-</code>) 
+            replaced by underscores (<code>_</code>).
             E.g. if the tenant name is <code>greenbox-dev</code>, the environment variable must be
-            <code>TRIFONIUS_TARGET_TENANT_GREENBOX_DEV_USER = "1903:1903"</code>.
+            <code>DSH_API_USER_GREENBOX_DEV = "1903:1903"</code>.
         </td>
     </tr>
 </table>
