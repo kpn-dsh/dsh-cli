@@ -15,16 +15,16 @@ metadata = [
 ]
 
 [inbound-junctions.inbound-topic]
+junction-technology = "kafka"
 label = "Test inbound topic"
 description = "Test inbound topic description"
-allowed-resource-types = ["dshtopic"]
 
 [outbound-junctions.outbound-topic]
+junction-technology = "kafka"
 label = "Test outbound topic"
 description = "Test outbound topic description"
-minimum-number-of-resources = 1
-maximum-number-of-resources = 2
-allowed-resource-types = ["dshtopic"]
+minimum-number-of-connections = 1
+maximum-number-of-connections = 2
 
 [deploy]
 parameters = [

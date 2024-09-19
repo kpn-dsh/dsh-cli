@@ -9,8 +9,7 @@ use std::fmt::{Debug, Display, Formatter};
 use async_trait::async_trait;
 
 use crate::pipeline::PipelineId;
-use crate::processor::{JunctionId, ParameterId, ProcessorId};
-use crate::resource::ResourceIdentifier;
+use crate::processor::{JunctionId, JunctionIdentifier, ParameterId, ProcessorId};
 use crate::ProfileId;
 
 /// Defines the behavior of a Trifonius `ProcessorInstance`
@@ -29,8 +28,8 @@ pub trait ProcessorInstance: Send + Sync {
   /// * `Err(msg)` - when the deployment request could not be sent.
   async fn deploy(
     &self,
-    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    inbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>, // TODO Move this to start() method
   ) -> Result<(), String>;
@@ -52,8 +51,8 @@ pub trait ProcessorInstance: Send + Sync {
   /// * `Err(msg)`   - when the deployment request could not be sent.
   async fn deploy_dry_run(
     &self,
-    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    inbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>, // TODO Move this to start() method
   ) -> Result<String, String>;
@@ -67,7 +66,7 @@ pub trait ProcessorInstance: Send + Sync {
   /// ## Returns
   /// * `Ok<Vec<ResourceIdentifier>` - list of identifiers of compatible resources.
   /// * `Err(msg)`                   - when the list could not be composed.
-  async fn compatible_resources(&self, junction_id: &JunctionId) -> Result<Vec<ResourceIdentifier>, String>;
+  async fn compatible_junctions(&self, junction_id: &JunctionId) -> Result<Vec<JunctionIdentifier>, String>;
 
   /// # Returns the pipeline id of this `ProcessorInstance`
   ///

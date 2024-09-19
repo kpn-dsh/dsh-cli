@@ -9,18 +9,17 @@ use trifonius_dsh_api::dsh_api_client::DshApiClient;
 use trifonius_dsh_api::types::Application;
 use trifonius_dsh_api::DshApiError;
 
-use crate::engine_target::{from_tenant_to_template_mapping, EngineTarget, TemplateMapping};
+use crate::engine_target::{from_tenant_to_template_mapping, TemplateMapping};
 use crate::pipeline::PipelineId;
 use crate::placeholder::PlaceHolder;
 use crate::processor::dshservice::dshservice_api::into_api_application;
 use crate::processor::dshservice::dshservice_config::ProfileConfig;
 use crate::processor::dshservice::DshServiceName;
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
+use crate::processor::processor_context::ProcessorContext;
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
-use crate::processor::{JunctionId, ParameterId, ProcessorId};
-use crate::resource::resource_descriptor::ResourceDirection;
-use crate::resource::resource_registry::ResourceRegistry;
-use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
+use crate::processor::{JunctionDirection, JunctionId, JunctionIdentifier, JunctionTechnology, ParameterId, ProcessorId, ProcessorRealizationId};
+use crate::resource::{ResourceRealizationId, ResourceType};
 use crate::ProfileId;
 
 pub struct DshServiceInstance<'a> {
@@ -28,8 +27,7 @@ pub struct DshServiceInstance<'a> {
   processor_id: ProcessorId,
   processor_config: &'a ProcessorConfig,
   dshservice_name: DshServiceName,
-  engine_target: Arc<EngineTarget>,
-  resource_registry: Arc<ResourceRegistry>,
+  processor_context: Arc<ProcessorContext>,
 }
 
 impl<'a> DshServiceInstance<'a> {
@@ -37,48 +35,87 @@ impl<'a> DshServiceInstance<'a> {
     pipeline_id: Option<PipelineId>,
     processor_id: ProcessorId,
     processor_config: &'a ProcessorConfig,
-    engine_target: Arc<EngineTarget>,
-    resource_registry: Arc<ResourceRegistry>,
+    processor_context: Arc<ProcessorContext>,
   ) -> Result<Self, String> {
     let dshservice_name = DshServiceName::try_from((pipeline_id.as_ref(), &processor_id))?;
-    Ok(Self { pipeline_id, processor_id, processor_config, dshservice_name, engine_target, resource_registry })
+    Ok(Self { pipeline_id, processor_id, processor_config, dshservice_name, processor_context })
   }
 }
 
 #[async_trait]
 impl ProcessorInstance for DshServiceInstance<'_> {
-  async fn compatible_resources(&self, junction_id: &JunctionId) -> Result<Vec<ResourceIdentifier>, String> {
+  async fn compatible_junctions(&self, junction_id: &JunctionId) -> Result<Vec<JunctionIdentifier>, String> {
     if let Some((direction, junction_config)) = self
       .processor_config
       .inbound_junctions
       .as_ref()
-      .and_then(|m| m.get(junction_id).map(|config| (ResourceDirection::Inbound, config)))
+      .and_then(|m| m.get(junction_id).map(|config| (JunctionDirection::Inbound, config)))
       .or_else(|| {
         self
           .processor_config
           .outbound_junctions
           .as_ref()
-          .and_then(|m| m.get(junction_id).map(|config| (ResourceDirection::Outbound, config)))
+          .and_then(|m| m.get(junction_id).map(|config| (JunctionDirection::Outbound, config)))
       })
     {
-      let mut compatible_resources = Vec::<ResourceIdentifier>::new();
-      for allowed_resource_type in &junction_config.allowed_resource_types {
-        for resource_descriptor in self.resource_registry.resource_descriptors_by_type(allowed_resource_type) {
-          match direction {
-            ResourceDirection::Inbound => {
-              if resource_descriptor.readable {
-                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? })
+      let mut compatible_junctions = Vec::<JunctionIdentifier>::new();
+      match junction_config.junction_technology {
+        JunctionTechnology::Grpc => {
+          for processor_descriptor in self
+            .processor_context
+            .processor_registry
+            .processor_descriptors(&self.processor_context.engine_target)
+          {
+            match direction {
+              JunctionDirection::Inbound => {
+                for inbound_junction in &processor_descriptor.inbound_junctions {
+                  if inbound_junction.junction_technology == JunctionTechnology::Grpc {
+                    compatible_junctions.push(JunctionIdentifier::Processor(
+                      processor_descriptor.processor_technology.clone(),
+                      ProcessorRealizationId::try_from(processor_descriptor.id.to_string())?,
+                      JunctionId::try_from(inbound_junction.id.to_string())?,
+                    ))
+                  }
+                }
+              }
+              JunctionDirection::Outbound => {
+                for outbound_junction in &processor_descriptor.outbound_junctions {
+                  if outbound_junction.junction_technology == JunctionTechnology::Grpc {
+                    compatible_junctions.push(JunctionIdentifier::Processor(
+                      processor_descriptor.processor_technology.clone(),
+                      ProcessorRealizationId::try_from(processor_descriptor.id.to_string())?,
+                      JunctionId::try_from(outbound_junction.id.to_string())?,
+                    ))
+                  }
+                }
               }
             }
-            ResourceDirection::Outbound => {
-              if resource_descriptor.writable {
-                compatible_resources.push(ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? })
+          }
+        }
+        JunctionTechnology::Kafka => {
+          for resource_descriptor in self.processor_context.resource_registry.resource_descriptors_by_type(&ResourceType::DshTopic) {
+            match direction {
+              JunctionDirection::Inbound => {
+                if resource_descriptor.readable {
+                  compatible_junctions.push(JunctionIdentifier::Resource(
+                    ResourceType::DshTopic,
+                    ResourceRealizationId::try_from(resource_descriptor.id.as_str())?,
+                  ))
+                }
+              }
+              JunctionDirection::Outbound => {
+                if resource_descriptor.writable {
+                  compatible_junctions.push(JunctionIdentifier::Resource(
+                    ResourceType::DshTopic,
+                    ResourceRealizationId::try_from(resource_descriptor.id.as_str())?,
+                  ))
+                }
               }
             }
           }
         }
       }
-      Ok(compatible_resources)
+      Ok(compatible_junctions)
     } else {
       Ok(vec![])
     }
@@ -86,8 +123,8 @@ impl ProcessorInstance for DshServiceInstance<'_> {
 
   async fn deploy(
     &self,
-    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    inbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
   ) -> Result<(), String> {
@@ -98,9 +135,9 @@ impl ProcessorInstance for DshServiceInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.engine_target.tenant().user().to_string(),
+      self.processor_context.engine_target.tenant().user().to_string(),
     )?;
-    let client: DshApiClient = self.engine_target.dsh_api_client().await?;
+    let client: DshApiClient = self.processor_context.engine_target.dsh_api_client().await?;
     match client.create_application(&self.dshservice_name, dsh_application_config).await {
       Ok(()) => Ok(()),
       Err(DshApiError::NotFound) => Err(format!("unexpected NotFound response when deploying service {}", &self.dshservice_name)),
@@ -111,8 +148,8 @@ impl ProcessorInstance for DshServiceInstance<'_> {
 
   async fn deploy_dry_run(
     &self,
-    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    inbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
   ) -> Result<String, String> {
@@ -123,7 +160,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
       outbound_junctions,
       deploy_parameters,
       profile_id,
-      self.engine_target.tenant().user().to_string(),
+      self.processor_context.engine_target.tenant().user().to_string(),
     )?;
     match serde_json::to_string_pretty(&dsh_application_config) {
       Ok(config) => Ok(config),
@@ -145,6 +182,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
 
   async fn status(&self) -> Result<ProcessorStatus, String> {
     match self
+      .processor_context
       .engine_target
       .dsh_api_client()
       .await?
@@ -169,7 +207,14 @@ impl ProcessorInstance for DshServiceInstance<'_> {
   }
 
   async fn undeploy(&self) -> Result<bool, String> {
-    match self.engine_target.dsh_api_client().await?.delete_application(&self.dshservice_name).await {
+    match self
+      .processor_context
+      .engine_target
+      .dsh_api_client()
+      .await?
+      .delete_application(&self.dshservice_name)
+      .await
+    {
       Ok(()) => Ok(true),
       Err(DshApiError::NotFound) => Ok(false),
       Err(DshApiError::NotAuthorized) => Ok(false),
@@ -183,18 +228,18 @@ impl DshServiceInstance<'_> {
     &self,
     pipeline_id: Option<&PipelineId>,
     processor_id: &ProcessorId,
-    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    inbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
     user: String,
   ) -> Result<Application, String> {
     let inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
-      Some(inbound_junction_configs) => self.junction_topics(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
+      Some(inbound_junction_configs) => self.junction_topics(JunctionDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
       None => HashMap::new(),
     };
     let outbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.outbound_junctions {
-      Some(outbound_junction_configs) => self.junction_topics(ResourceDirection::Outbound, outbound_junctions, outbound_junction_configs)?,
+      Some(outbound_junction_configs) => self.junction_topics(JunctionDirection::Outbound, outbound_junctions, outbound_junction_configs)?,
       None => HashMap::new(),
     };
 
@@ -237,7 +282,7 @@ impl DshServiceInstance<'_> {
         }
       }
     };
-    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(self.engine_target.tenant());
+    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(self.processor_context.engine_target.tenant());
     template_mapping.insert(
       PlaceHolder::ProcessorRealizationId,
       self.processor_config.processor.processor_realization_id.clone(),
@@ -266,53 +311,65 @@ impl DshServiceInstance<'_> {
 
   fn junction_topics(
     &self,
-    in_out: ResourceDirection,
-    junctions_resources: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    in_out: JunctionDirection,
+    junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     junctions_configs: &HashMap<JunctionId, JunctionConfig>,
   ) -> Result<HashMap<JunctionId, String>, String> {
     let mut junction_topics = HashMap::<JunctionId, String>::new();
     for (junction_id, junction_config) in junctions_configs {
-      let multiple_resources_separator = junction_config.multiple_resources_separator.clone().unwrap_or(",".to_string());
-      match junctions_resources.get(junction_id) {
-        Some(junction_resource_ids) => {
-          if let Some(illegal_resource) = junction_resource_ids.iter().find(|ri| ri.resource_type != ResourceType::DshTopic) {
+      let multiple_connections_separator = junction_config.multiple_connections_separator.clone().unwrap_or(",".to_string());
+      match junctions.get(junction_id) {
+        Some(connected_junctions) => {
+          if let Some(illegal_junction) = connected_junctions.iter().find(|connected_junction| match connected_junction {
+            JunctionIdentifier::Processor(_, _, _) => true,
+            JunctionIdentifier::Resource(resource_type, _) => *resource_type != ResourceType::DshTopic,
+          }) {
             return Err(format!(
-              "resource '{}' connected to {} junction '{}' has wrong type, '{}' expected",
-              illegal_resource,
+              "junction '{}' connected to {} junction '{}' has wrong type, '{}' expected",
+              illegal_junction,
               in_out,
               junction_id,
               ResourceType::DshTopic
             ));
           }
           let (min, max) = junction_config.number_of_resources_range();
-          if junction_resource_ids.len() < min as usize {
+          if connected_junctions.len() < min as usize {
             return Err(format!(
-              "there should be at least {} resource instance(s) connected to {} junction '{}'",
+              "there should be at least {} junctions(s) connected to {} junction '{}'",
               min, in_out, junction_id
             ));
           }
-          if junction_resource_ids.len() > max as usize {
+          if connected_junctions.len() > max as usize {
             return Err(format!(
-              "there can be at most {} resource instance(s) connected to {} junction '{}'",
+              "there can be at most {} connection(s) connected to {} junction '{}'",
               min, in_out, junction_id
             ));
           }
           let mut topics = Vec::<String>::new();
-          for resource_id in junction_resource_ids {
-            match self.resource_registry.resource_realization_by_identifier(resource_id) {
-              Some(resource) => match &resource.descriptor().dshtopic_descriptor {
-                Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
-                None => unreachable!(),
-              },
-              None => {
-                return Err(format!(
-                  "resource '{}' connected to {} junction '{}' does not exist",
-                  resource_id, in_out, junction_id
-                ))
+          for junction_id in connected_junctions {
+            match junction_id {
+              JunctionIdentifier::Processor(_, _, _) => unreachable!(),
+              JunctionIdentifier::Resource(resource_type, resource_realization_id) => {
+                match self
+                  .processor_context
+                  .resource_registry
+                  .resource_realization(resource_type.clone(), resource_realization_id)
+                {
+                  Some(resource) => match &resource.descriptor().dshtopic_descriptor {
+                    Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
+                    None => unreachable!(),
+                  },
+                  None => {
+                    return Err(format!(
+                      "resource junction '{}' connected to {} junction '{}' does not exist",
+                      junction_id, in_out, junction_id
+                    ))
+                  }
+                }
               }
             }
           }
-          junction_topics.insert(junction_id.clone(), topics.join(multiple_resources_separator.as_str()));
+          junction_topics.insert(junction_id.clone(), topics.join(multiple_connections_separator.as_str()));
         }
         None => {
           let (min, max) = junction_config.number_of_resources_range();

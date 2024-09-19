@@ -7,21 +7,19 @@ use crate::pipeline::PipelineId;
 use crate::processor::dshservice::dshservice_config::read_dshservice_config;
 use crate::processor::dshservice::dshservice_instance::DshServiceInstance;
 use crate::processor::processor_config::ProcessorConfig;
+use crate::processor::processor_context::ProcessorContext;
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
-use crate::resource::resource_registry::ResourceRegistry;
 
 pub struct DshServiceRealization {
   pub(crate) processor_identifier: ProcessorIdentifier,
   pub(crate) processor_config: ProcessorConfig,
-  pub(crate) engine_target: Arc<EngineTarget>,
-  pub(crate) resource_registry: Arc<ResourceRegistry>,
 }
 
 impl DshServiceRealization {
-  pub fn create(config_file_name: &str, engine_target: Arc<EngineTarget>, resource_registry: Arc<ResourceRegistry>) -> Result<Self, String> {
+  pub fn create(config_file_name: &str) -> Result<Self, String> {
     let processor_config = read_dshservice_config(config_file_name)?;
     Ok(DshServiceRealization {
       processor_identifier: ProcessorIdentifier {
@@ -29,14 +27,12 @@ impl DshServiceRealization {
         processor_realization_id: ProcessorRealizationId::try_from(processor_config.processor.processor_realization_id.as_str())?,
       },
       processor_config,
-      engine_target,
-      resource_registry,
     })
   }
 }
 
 impl ProcessorRealization for DshServiceRealization {
-  fn descriptor(&self) -> ProcessorDescriptor {
+  fn descriptor(&self, engine_target: &EngineTarget) -> ProcessorDescriptor {
     let profiles = self
       .processor_config
       .dshservice_specific_config
@@ -48,7 +44,7 @@ impl ProcessorRealization for DshServiceRealization {
       .collect::<Vec<ProfileDescriptor>>();
     self
       .processor_config
-      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(self.engine_target.tenant()))
+      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(engine_target.tenant()))
   }
 
   fn processor_realization_id(&self) -> &ProcessorRealizationId {
@@ -63,14 +59,13 @@ impl ProcessorRealization for DshServiceRealization {
     &self.processor_config.processor.label
   }
 
-  fn processor_instance<'a>(&'a self, pipeline_id: Option<PipelineId>, processor_id: ProcessorId) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
-    match DshServiceInstance::create(
-      pipeline_id,
-      processor_id,
-      &self.processor_config,
-      self.engine_target.clone(),
-      self.resource_registry.clone(),
-    ) {
+  fn processor_instance<'a>(
+    &'a self,
+    pipeline_id: Option<PipelineId>,
+    processor_id: ProcessorId,
+    processor_context: Arc<ProcessorContext>,
+  ) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
+    match DshServiceInstance::create(pipeline_id, processor_id, &self.processor_config, processor_context.clone()) {
       Ok(processor) => Ok(Box::new(processor)),
       Err(error) => Err(error),
     }

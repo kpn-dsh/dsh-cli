@@ -4,11 +4,13 @@ use std::ops::Deref;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
+use crate::resource::{ResourceRealizationId, ResourceType};
 use crate::{config_dir_name, identifier};
 
 pub mod dshapp;
 pub mod dshservice;
 pub mod processor_config;
+pub mod processor_context;
 pub mod processor_descriptor;
 pub mod processor_instance;
 pub mod processor_realization;
@@ -20,6 +22,14 @@ pub enum ProcessorTechnology {
   DshApp,
   #[serde(rename = "dshservice")]
   DshService,
+}
+
+#[derive(Clone, Debug, Deserialize, Hash, Eq, PartialEq, Serialize)]
+pub enum JunctionTechnology {
+  #[serde(rename = "grpc")]
+  Grpc,
+  #[serde(rename = "kafka")]
+  Kafka,
 }
 
 identifier!(
@@ -62,9 +72,44 @@ pub struct ProcessorIdentifier {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct JunctionIdentifier {
-  pub processor_identifier: ProcessorIdentifier,
-  pub junction_id: JunctionId,
+pub enum JunctionIdentifier {
+  Processor(ProcessorTechnology, ProcessorRealizationId, JunctionId),
+  Resource(ResourceType, ResourceRealizationId),
+}
+
+impl Display for JunctionIdentifier {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      JunctionIdentifier::Processor(_, realization_id, junction_id) => write!(f, "{}.{}", realization_id, junction_id),
+      JunctionIdentifier::Resource(resource_type, realization_id) => write!(f, "{}:{}", realization_id, resource_type),
+    }
+  }
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum JunctionDirection {
+  #[serde(rename = "inbound")]
+  Inbound,
+  #[serde(rename = "outbound")]
+  Outbound,
+}
+
+impl Display for JunctionDirection {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      JunctionDirection::Inbound => write!(f, "inbound"),
+      JunctionDirection::Outbound => write!(f, "outbound"),
+    }
+  }
+}
+
+impl Display for JunctionTechnology {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match &self {
+      JunctionTechnology::Grpc => write!(f, "grpc"),
+      JunctionTechnology::Kafka => write!(f, "kafka"),
+    }
+  }
 }
 
 impl Display for ProcessorTechnology {

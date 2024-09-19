@@ -3,8 +3,7 @@ use std::fmt::{Display, Formatter};
 use serde::{Deserialize, Serialize};
 
 use crate::processor::processor_config::{DeploymentParameterConfig, DeploymentParameterConfigOption, DeploymentParameterType, JunctionConfig};
-use crate::processor::ProcessorTechnology;
-use crate::resource::ResourceType;
+use crate::processor::{JunctionTechnology, ProcessorTechnology};
 
 /// Describes a `Processor`
 ///
@@ -48,14 +47,14 @@ pub struct ProcessorDescriptor {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct JunctionDescriptor {
   pub id: String,
+  #[serde(rename = "junction-technology")]
+  pub junction_technology: JunctionTechnology,
   pub label: String,
   pub description: String,
-  #[serde(rename = "minimum-number-of-resources")]
-  pub minimum_number_of_resources: u32,
-  #[serde(rename = "maximum-number-of-resources")]
-  pub maximum_number_of_resources: u32,
-  #[serde(rename = "allowed-resource-types", skip_serializing_if = "Vec::is_empty")]
-  pub allowed_resource_types: Vec<ResourceType>,
+  #[serde(rename = "minimum-number-of-connections")]
+  pub minimum_number_of_connections: u32,
+  #[serde(rename = "maximum-number-of-connections")]
+  pub maximum_number_of_connections: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -165,22 +164,17 @@ impl Display for ProcessorDescriptor {
 
 impl Display for JunctionDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{} ({}", self.id, self.label)?;
-    if self.minimum_number_of_resources == self.maximum_number_of_resources {
-      if self.minimum_number_of_resources == 1 {
+    write!(f, "{}:{} ({}", self.id, self.junction_technology, self.label)?;
+    if self.minimum_number_of_connections == self.maximum_number_of_connections {
+      if self.minimum_number_of_connections == 1 {
         write!(f, ", 1 resource")?
       } else {
-        write!(f, ", {} resources", self.minimum_number_of_resources)?
+        write!(f, ", {} resources", self.minimum_number_of_connections)?
       }
     } else {
-      write!(f, ", {}-{} resources", self.minimum_number_of_resources, self.maximum_number_of_resources)?
+      write!(f, ", {}-{} resources", self.minimum_number_of_connections, self.maximum_number_of_connections)?
     }
     write!(f, ", {}", self.description)?;
-    write!(
-      f,
-      ", allowed resource types: {}",
-      &self.allowed_resource_types.iter().map(|i| i.to_string()).collect::<Vec<String>>().join(", ")
-    )?;
     write!(f, ")")
   }
 }
@@ -240,7 +234,7 @@ impl From<(String, JunctionConfig)> for JunctionDescriptor {
 impl From<(&String, &JunctionConfig)> for JunctionDescriptor {
   fn from((id, config): (&String, &JunctionConfig)) -> Self {
     let c = config.clone();
-    let (min, max) = match (config.minimum_number_of_resources, config.maximum_number_of_resources) {
+    let (min, max) = match (config.minimum_number_of_connections, config.maximum_number_of_connections) {
       (None, None) => (1, 1),
       (None, Some(max)) => (1, max),
       (Some(min), None) => (min, u32::MAX),
@@ -248,11 +242,11 @@ impl From<(&String, &JunctionConfig)> for JunctionDescriptor {
     };
     JunctionDescriptor {
       id: id.to_owned(),
+      junction_technology: c.junction_technology.clone(),
       label: c.label,
       description: c.description,
-      minimum_number_of_resources: min,
-      maximum_number_of_resources: max,
-      allowed_resource_types: c.allowed_resource_types,
+      minimum_number_of_connections: min,
+      maximum_number_of_connections: max,
     }
   }
 }

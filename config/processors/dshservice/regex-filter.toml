@@ -10,14 +10,14 @@ metrics-url = "${MONITORING_URL}"
 viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
 
 [inbound-junctions.inbound-kafka-topic]
+junction-technology = "kafka"
 label = "Source topics"
 description = "Kafka topic that the filter will consume from."
-allowed-resource-types = ["dshtopic"]
 
 [outbound-junctions.outbound-kafka-topic]
+junction-technology = "kafka"
 label = "Sink topics"
 description = "Kafka topic that the filter will produce to."
-allowed-resource-types = ["dshtopic"]
 
 [[deploy.parameters]]
 type = "boolean"

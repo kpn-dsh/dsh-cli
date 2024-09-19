@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use lazy_static::lazy_static;
 
 use trifonius_engine::pipeline::PipelineId;
+use trifonius_engine::processor::processor_context::ProcessorContext;
 use trifonius_engine::processor::processor_instance::ProcessorInstance;
 use trifonius_engine::processor::processor_realization::ProcessorRealization;
 use trifonius_engine::processor::processor_registry::ProcessorRegistry;
@@ -15,11 +18,17 @@ lazy_static! {
   pub static ref PROCESSOR_REGISTRY: ProcessorRegistry = ProcessorRegistry::default();
 }
 
-pub fn dshservice_instance() -> Box<dyn ProcessorInstance> {
-  dshservice_realization().processor_instance(Some(pipeline_id()), processor_id()).unwrap()
+pub fn processor_context() -> Arc<ProcessorContext> {
+  Arc::new(ProcessorContext::default())
 }
 
-pub fn dshservice_realization() -> &'static dyn ProcessorRealization {
+pub fn dshservice_instance() -> Box<dyn ProcessorInstance> {
+  _dshservice_realization()
+    .processor_instance(Some(pipeline_id()), processor_id(), processor_context())
+    .unwrap()
+}
+
+pub fn _dshservice_realization() -> &'static dyn ProcessorRealization {
   PROCESSOR_REGISTRY.processor_realization_by_identifier(&PROCESSOR_IDENTIFIER).unwrap()
 }
 
@@ -35,7 +44,7 @@ pub fn pipeline_id() -> PipelineId {
   PipelineId::new("pipeline")
 }
 
-pub fn processor_identifier() -> ProcessorIdentifier {
+pub fn _processor_identifier() -> ProcessorIdentifier {
   ProcessorIdentifier::new(ProcessorTechnology::DshService, processor_realization_id())
 }
 

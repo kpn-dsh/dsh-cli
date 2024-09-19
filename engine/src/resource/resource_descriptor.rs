@@ -5,23 +5,6 @@ use serde::{Deserialize, Serialize};
 use crate::resource::dshtopic::dshtopic_descriptor::DshTopicDescriptor;
 use crate::resource::ResourceType;
 
-#[derive(Deserialize, Serialize)]
-pub enum ResourceDirection {
-  #[serde(rename = "inbound")]
-  Inbound,
-  #[serde(rename = "outbound")]
-  Outbound,
-}
-
-impl Display for ResourceDirection {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
-      ResourceDirection::Inbound => write!(f, "inbound"),
-      ResourceDirection::Outbound => write!(f, "outbound"),
-    }
-  }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResourceTypeDescriptor {
   #[serde(rename = "type")]

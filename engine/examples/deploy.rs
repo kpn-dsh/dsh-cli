@@ -34,8 +34,8 @@ async fn main() -> Result<(), String> {
   let binding = Some(ProfileId::new("minimal"));
   let profile_id = binding.as_ref();
 
-  let r = dshservice_instance.deploy(&inbound_junctions, &outbound_junctions, &parameters, profile_id).await;
-  println!("{:?}", r);
+  // let r = dshservice_instance.deploy(&inbound_junctions, &outbound_junctions, &parameters, profile_id).await;
+  // println!("{:?}", r);
 
   Ok(())
 }

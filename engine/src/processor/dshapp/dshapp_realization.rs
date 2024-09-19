@@ -12,13 +12,12 @@ use crate::processor::dshapp::dshapp_config::{read_dshapp_config, ProfileConfig}
 use crate::processor::dshapp::dshapp_instance::DshAppInstance;
 use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
+use crate::processor::processor_context::ProcessorContext;
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
-use crate::resource::resource_descriptor::ResourceDirection;
-use crate::resource::resource_registry::ResourceRegistry;
-use crate::resource::{ResourceIdentifier, ResourceType};
+use crate::processor::{JunctionDirection, JunctionId, JunctionIdentifier, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
+use crate::resource::ResourceType;
 use crate::ProfileId;
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
@@ -26,12 +25,10 @@ use crate::ProfileId;
 pub struct DshAppRealization {
   processor_identifier: ProcessorIdentifier,
   pub(crate) processor_config: ProcessorConfig,
-  pub(crate) engine_target: Arc<EngineTarget>,
-  pub(crate) resource_registry: Arc<ResourceRegistry>,
 }
 
 impl DshAppRealization {
-  pub fn create(config_file_name: &str, engine_target: Arc<EngineTarget>, resource_registry: Arc<ResourceRegistry>) -> Result<Self, String> {
+  pub fn create(config_file_name: &str) -> Result<Self, String> {
     let processor_config = read_dshapp_config(config_file_name)?;
     Ok(DshAppRealization {
       processor_identifier: ProcessorIdentifier {
@@ -39,14 +36,12 @@ impl DshAppRealization {
         processor_realization_id: ProcessorRealizationId::try_from(processor_config.processor.processor_realization_id.as_str())?,
       },
       processor_config,
-      engine_target,
-      resource_registry,
     })
   }
 }
 
 impl ProcessorRealization for DshAppRealization {
-  fn descriptor(&self) -> ProcessorDescriptor {
+  fn descriptor(&self, engine_target: &EngineTarget) -> ProcessorDescriptor {
     let profiles = self
       .processor_config
       .dshapp_specific_config
@@ -58,7 +53,7 @@ impl ProcessorRealization for DshAppRealization {
       .collect::<Vec<ProfileDescriptor>>();
     self
       .processor_config
-      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(self.engine_target.tenant()))
+      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(engine_target.tenant()))
   }
 
   fn processor_realization_id(&self) -> &ProcessorRealizationId {
@@ -73,8 +68,13 @@ impl ProcessorRealization for DshAppRealization {
     &self.processor_config.processor.label
   }
 
-  fn processor_instance<'a>(&'a self, pipeline_id: Option<PipelineId>, processor_id: ProcessorId) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
-    match DshAppInstance::create(pipeline_id, processor_id, self) {
+  fn processor_instance<'a>(
+    &'a self,
+    pipeline_id: Option<PipelineId>,
+    processor_id: ProcessorId,
+    processor_context: Arc<ProcessorContext>,
+  ) -> Result<Box<dyn ProcessorInstance + 'a>, String> {
+    match DshAppInstance::create(pipeline_id, processor_id, self, processor_context) {
       Ok(processor) => Ok(Box::new(processor)),
       Err(error) => Err(error),
     }
@@ -90,18 +90,24 @@ impl DshAppRealization {
     &self,
     pipeline_id: Option<&PipelineId>,
     processor_id: &ProcessorId,
-    inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-    outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    inbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
+    outbound_junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     deploy_parameters: &HashMap<ParameterId, String>,
     profile_id: Option<&ProfileId>,
-    user: String,
+    _user: String,
+    processor_context: Arc<ProcessorContext>,
   ) -> Result<Application, String> {
-    let inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
-      Some(inbound_junction_configs) => self.junction_topics(ResourceDirection::Inbound, inbound_junctions, inbound_junction_configs)?,
+    let _inbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.inbound_junctions {
+      Some(inbound_junction_configs) => self.junction_topics(JunctionDirection::Inbound, inbound_junctions, inbound_junction_configs, processor_context.clone())?,
       None => HashMap::new(),
     };
-    let outbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.outbound_junctions {
-      Some(outbound_junction_configs) => self.junction_topics(ResourceDirection::Outbound, outbound_junctions, outbound_junction_configs)?,
+    let _outbound_junction_topics: HashMap<JunctionId, String> = match &self.processor_config.outbound_junctions {
+      Some(outbound_junction_configs) => self.junction_topics(
+        JunctionDirection::Outbound,
+        outbound_junctions,
+        outbound_junction_configs,
+        processor_context.clone(),
+      )?,
       None => HashMap::new(),
     };
 
@@ -129,7 +135,7 @@ impl DshAppRealization {
     }
 
     let dshapp_specific_config = self.processor_config.dshapp_specific_config.as_ref().unwrap();
-    let profile: ProfileConfig = match profile_id {
+    let _profile: ProfileConfig = match profile_id {
       Some(pn) => match dshapp_specific_config.profiles.iter().find(|p| p.profile_id == pn.0) {
         Some(p) => p.clone(),
         None => return Err(format!("profile '{}' is not defined", pn)),
@@ -144,7 +150,7 @@ impl DshAppRealization {
         }
       }
     };
-    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(self.engine_target.tenant());
+    let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(processor_context.engine_target.tenant());
     template_mapping.insert(PlaceHolder::ProcessorRealizationId, self.processor_identifier.processor_realization_id.0.clone());
     if let Some(pipeline_id) = pipeline_id {
       template_mapping.insert(PlaceHolder::PipelineId, pipeline_id.to_string());
@@ -169,49 +175,61 @@ impl DshAppRealization {
 
   fn junction_topics(
     &self,
-    in_out: ResourceDirection,
-    junctions_resources: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+    in_out: JunctionDirection,
+    junctions: &HashMap<JunctionId, Vec<JunctionIdentifier>>,
     junctions_configs: &HashMap<JunctionId, JunctionConfig>,
+    processor_context: Arc<ProcessorContext>,
   ) -> Result<HashMap<JunctionId, String>, String> {
     let mut junction_topics = HashMap::<JunctionId, String>::new();
     for (junction_id, junction_config) in junctions_configs {
-      let multiple_resources_separator = junction_config.multiple_resources_separator.clone().unwrap_or(",".to_string());
-      match junctions_resources.get(junction_id) {
-        Some(junction_resource_ids) => {
-          if let Some(illegal_resource) = junction_resource_ids.iter().find(|ri| ri.resource_type != ResourceType::DshTopic) {
+      let multiple_resources_separator = junction_config.multiple_connections_separator.clone().unwrap_or(",".to_string());
+      match junctions.get(junction_id) {
+        Some(connected_junctions) => {
+          if let Some(illegal_junction) = connected_junctions.iter().find(|connected_junction| match connected_junction {
+            JunctionIdentifier::Processor(_, _, _) => true,
+            JunctionIdentifier::Resource(resource_type, _) => *resource_type != ResourceType::DshTopic,
+          }) {
             return Err(format!(
-              "resource '{}' connected to {} junction '{}' has wrong type, '{}' expected",
-              illegal_resource,
+              "resource junction '{}' connected to {} junction '{}' has wrong type, '{}' expected",
+              illegal_junction,
               in_out,
               junction_id,
               ResourceType::DshTopic
             ));
           }
           let (min, max) = junction_config.number_of_resources_range();
-          if junction_resource_ids.len() < min as usize {
+          if connected_junctions.len() < min as usize {
             return Err(format!(
               "there should be at least {} resource instance(s) connected to {} junction '{}'",
               min, in_out, junction_id
             ));
           }
-          if junction_resource_ids.len() > max as usize {
+          if connected_junctions.len() > max as usize {
             return Err(format!(
               "there can be at most {} resource instance(s) connected to {} junction '{}'",
               min, in_out, junction_id
             ));
           }
           let mut topics = Vec::<String>::new();
-          for resource_id in junction_resource_ids {
-            match self.resource_registry.resource_realization_by_identifier(resource_id) {
-              Some(resource) => match &resource.descriptor().dshtopic_descriptor {
-                Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
-                None => unreachable!(),
-              },
-              None => {
-                return Err(format!(
-                  "resource '{}' connected to {} junction '{}' does not exist",
-                  resource_id, in_out, junction_id
-                ))
+          for junction_id in connected_junctions {
+            match junction_id {
+              JunctionIdentifier::Processor(_, _, _) => unreachable!(),
+              JunctionIdentifier::Resource(resource_type, resource_realization_id) => {
+                match processor_context
+                  .resource_registry
+                  .resource_realization(resource_type.clone(), resource_realization_id)
+                {
+                  Some(resource) => match &resource.descriptor().dshtopic_descriptor {
+                    Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
+                    None => unreachable!(),
+                  },
+                  None => {
+                    return Err(format!(
+                      "resource junction '{}' connected to {} junction '{}' does not exist",
+                      junction_id, in_out, junction_id
+                    ))
+                  }
+                }
               }
             }
           }

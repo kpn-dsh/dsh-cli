@@ -1,19 +1,16 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::fs;
-use std::io::ErrorKind::NotFound;
 
-use log::{debug, error};
+use log::debug;
 use serde::{Deserialize, Serialize};
-use toml::de::Error;
 
 use crate::engine_target::{template_resolver, validate_template, TemplateMapping};
 use crate::placeholder::PlaceHolder;
 use crate::processor::dshapp::dshapp_config::DshAppSpecificConfig;
 use crate::processor::dshservice::dshservice_config::DshServiceSpecificConfig;
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
-use crate::processor::{JunctionId, ParameterId, ProcessorRealizationId, ProcessorTechnology};
-use crate::resource::ResourceType;
+use crate::processor::{JunctionId, JunctionTechnology, ParameterId, ProcessorRealizationId, ProcessorTechnology};
+use crate::read_config;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorConfig {
@@ -53,16 +50,16 @@ pub struct ProcessorGlobalConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct JunctionConfig {
+  #[serde(rename = "junction-technology")]
+  pub junction_technology: JunctionTechnology,
   pub label: String,
   pub description: String,
-  #[serde(rename = "minimum-number-of-resources")]
-  pub minimum_number_of_resources: Option<u32>,
-  #[serde(rename = "maximum-number-of-resources")]
-  pub maximum_number_of_resources: Option<u32>,
-  #[serde(rename = "allowed-resource-types")]
-  pub allowed_resource_types: Vec<ResourceType>,
-  #[serde(rename = "multiple-resources-separator")]
-  pub multiple_resources_separator: Option<String>,
+  #[serde(rename = "minimum-number-of-connections")]
+  pub minimum_number_of_connections: Option<u32>,
+  #[serde(rename = "maximum-number-of-connections")]
+  pub maximum_number_of_connections: Option<u32>,
+  #[serde(rename = "multiple-connections-separator")]
+  pub multiple_connections_separator: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -259,7 +256,7 @@ impl JunctionConfig {
     if self.description.is_empty() {
       return Err(format!("junction '{}' has empty description", id));
     }
-    match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
+    match (self.minimum_number_of_connections, self.maximum_number_of_connections) {
       (None, Some(max)) if max < 1 => return Err(format!("junction '{}' maximum number of resources must be 1 or greater", id)),
       (Some(min), Some(max)) if min > max => {
         return Err(format!(
@@ -269,14 +266,11 @@ impl JunctionConfig {
       }
       _ => (),
     }
-    if self.allowed_resource_types.is_empty() {
-      return Err(format!("junction '{}' has no allowed resource types", id));
-    }
     Ok(())
   }
 
   fn convert_to_descriptor(&self, id: &JunctionId) -> JunctionDescriptor {
-    let (min, max) = match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
+    let (min, max) = match (self.minimum_number_of_connections, self.maximum_number_of_connections) {
       (None, None) => (1, 1),
       (None, Some(max)) => (1, max),
       (Some(min), None) => (min, u32::MAX),
@@ -284,16 +278,16 @@ impl JunctionConfig {
     };
     JunctionDescriptor {
       id: id.0.to_owned(),
+      junction_technology: self.junction_technology.clone(),
       label: self.label.clone(),
       description: self.description.clone(),
-      minimum_number_of_resources: min,
-      maximum_number_of_resources: max,
-      allowed_resource_types: self.allowed_resource_types.clone(),
+      minimum_number_of_connections: min,
+      maximum_number_of_connections: max,
     }
   }
 
   pub(crate) fn number_of_resources_range(&self) -> (u32, u32) {
-    match (self.minimum_number_of_resources, self.maximum_number_of_resources) {
+    match (self.minimum_number_of_connections, self.maximum_number_of_connections) {
       (None, None) => (1, 1),
       (None, Some(max)) => (0, max),
       (Some(min), None) => (min, u32::MAX),
@@ -454,27 +448,11 @@ impl Display for DeploymentParameterConfig {
 
 pub fn read_processor_config(config_file_name: &str, processor_technology: ProcessorTechnology) -> Result<ProcessorConfig, String> {
   debug!("read {} config file: {}", processor_technology, config_file_name);
-  let processor_config = read_config::<ProcessorConfig>(config_file_name)?;
+  let processor_config = read_config::<ProcessorConfig>(config_file_name, processor_technology.to_string().as_str())?;
   debug!("successfully read and parsed {} config file\n{:#?}", processor_technology, processor_config);
   processor_config.validate(processor_technology)?;
   debug!("successfully validated config");
   Ok(processor_config)
-}
-
-pub fn read_config<C>(config_file_name: &str) -> Result<C, String>
-where
-  C: for<'de> toml::macros::Deserialize<'de>,
-{
-  match fs::read_to_string(config_file_name) {
-    Ok(config_string) => match toml::from_str::<C>(&config_string) {
-      Ok(config) => Ok(config),
-      Err(error) => Err(format!("error reading config file '{}', {}", config_file_name, parse_error_message(error))),
-    },
-    Err(error) => match error.kind() {
-      NotFound => Err(format!("could not find config file '{}'", config_file_name)),
-      _ => Err(format!("error reading config file '{}', {}", config_file_name, error)),
-    },
-  }
 }
 
 fn validate_config_template(template: &str, template_id: &str) -> Result<(), String> {
@@ -494,24 +472,4 @@ fn validate_config_template(template: &str, template_id: &str) -> Result<(), Str
     return Err(format!("{} cannot be empty", template_id));
   }
   validate_template(template, &VALID_PLACEHOLDERS).map_err(|message| format!("{} has {}", template_id, message))
-}
-
-fn parse_error_message(parse_error: Error) -> String {
-  const TOML_PARSE_ERROR_PREFIX: &str = "TOML parse error at ";
-  let description = parse_error.message().lines().collect::<Vec<&str>>().join(", ");
-  let binding = parse_error.to_string();
-  match binding.lines().collect::<Vec<_>>().first() {
-    Some(first_line_column) => {
-      if let Some(stripped) = first_line_column.strip_prefix(TOML_PARSE_ERROR_PREFIX) {
-        format!("parse error at {} ({})", stripped, description)
-      } else {
-        error!("{}", parse_error);
-        description
-      }
-    }
-    None => {
-      error!("{}", parse_error);
-      description
-    }
-  }
 }

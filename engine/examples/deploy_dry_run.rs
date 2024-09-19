@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use trifonius_engine::processor::{JunctionId, ParameterId};
+use trifonius_engine::processor::{JunctionId, JunctionIdentifier, ParameterId};
+use trifonius_engine::resource::ResourceRealizationId;
 use trifonius_engine::resource::ResourceType;
-use trifonius_engine::resource::{ResourceIdentifier, ResourceRealizationId};
 use trifonius_engine::ProfileId;
 
 #[path = "common.rs"]
@@ -14,15 +14,17 @@ async fn main() -> Result<(), String> {
 
   let dshservice_instance = crate::common::dshservice_instance();
 
-  let inbound_junction = JunctionId::new("inbound-kafka-topic");
-  let inbound_resource_id = ResourceRealizationId::new("stream-reference-implementation-3p");
-  let inbound_resource = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: inbound_resource_id };
-  let inbound_junctions = HashMap::from([(inbound_junction, vec![inbound_resource])]);
+  let inbound_junction_id = JunctionId::new("inbound-kafka-topic");
+  let inbound_resource_realization_id = ResourceRealizationId::new("stream-reference-implementation-3p");
+  // let inbound_resource = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: inbound_resource_id };
+  let inbound_junction_identifier = JunctionIdentifier::Resource(ResourceType::DshTopic, inbound_resource_realization_id);
+  let inbound_junctions = HashMap::from([(inbound_junction_id, vec![inbound_junction_identifier])]);
 
-  let outbound_junction = JunctionId::new("outbound-kafka-topic");
-  let outbound_resource_id = ResourceRealizationId::new("scratch-reference-implementation-compliant");
-  let outbound_resource = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: outbound_resource_id };
-  let outbound_junctions = HashMap::from([(outbound_junction, vec![outbound_resource])]);
+  let outbound_junction_id = JunctionId::new("outbound-kafka-topic");
+  let outbound_resource_realization_id = ResourceRealizationId::new("scratch-reference-implementation-compliant");
+  // let outbound_resource = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: outbound_resource_realization_id };
+  let outbound_junction_identifier = JunctionIdentifier::Resource(ResourceType::DshTopic, outbound_resource_realization_id);
+  let outbound_junctions = HashMap::from([(outbound_junction_id, vec![outbound_junction_identifier])]);
 
   let parameters = HashMap::from([
     (ParameterId::new("identifier-picker-regex"), "(?:cancelled|created|updated):([0-9]+)".to_string()),

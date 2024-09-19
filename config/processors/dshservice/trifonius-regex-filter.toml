@@ -1,0 +1,71 @@
+[processor]
+processor-technology = "dshservice"
+processor-realization-id = "trifonius-regex-filter"
+label = "Trifonius gRPC processor regex filter"
+description = "Filters gRPC records based on regular expression."
+version = "0.1.0"
+icon = "filter"
+tags = ["filter", "whitelist", "blacklist"]
+
+[inbound-junctions.inbound]
+junction-technology = "grpc"
+label = "Inbound"
+description = "Inbound junction."
+# TODO Filters: schema available, whitelist in config, blacklist in config, mqtt/http gateway
+
+[outbound-junctions.destinations]
+junction-technology = "grpc"
+label = "Outbound destinations"
+description = "Outbound destination junction."
+
+[outbound-junctions.dlq-destinations]
+junction-technology = "grpc"
+label = "Dead letter destination"
+description = "Outbound dead letter destination."
+minimum-number-of-connections = 0
+maximum-number-of-connections = 1
+
+[[deploy.parameters]]
+type = "free-text"
+id = "regex"
+label = "Regular exprssion"
+description = "Provide the regular expression."
+
+[[deploy.parameters]]
+type = "boolean"
+id = "enable-consumption"
+label = "Enable consumption"
+description = "Must be enabled when the topic records are wrapped in a DSH envelope (stream topics). Else, this must be disabled."
+optional = true
+default = "false"
+
+[[deploy.parameters]]
+type = "boolean"
+id = "enable-production"
+label = "Enable production"
+description = "Must be enabled when the topic records are wrapped in a DSH envelope (stream topics). Else, this must be disabled."
+optional = true
+default = "false"
+
+[dshservice]
+image = 'registry.cp.kpn-dsh.com/greenbox-dev/trifonius-regex-filter:0.1.0'
+needs-token = false
+single-instance = false
+
+[dshservice.environment-variables]
+PROCESSOR_NAME = { type = "template", value = "${PIPELINE_ID}-regex" }
+REGEX = { type = "value", value = "[a-zA-Z0-9]+" }
+ENCODING = { type = "value", value = "encoding" }
+__DESTINATIONS = { type = "outbound-junction", id = "destinations" }
+__DLQ_DESTINATIONS = { type = "outbound-junction", id = "dlq-destinations" }
+__ENABLE_CONSUMPTION = { type = "deployment-parameter", id = "enable-consumption" }
+__ENABLE_PRODUCTION = { type = "deployment-parameter", id = "enable-production" }
+__GRPC_PORT = { type = "value", value = "62222" }
+
+[[dshservice.profiles]]
+profile-id = "default"
+label = "Default"
+description = "Minimal profile for small amounts of data"
+cpus = 0.25
+instances = 1
+mem = 256

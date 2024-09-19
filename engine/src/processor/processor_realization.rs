@@ -2,7 +2,11 @@
 
 #![allow(clippy::module_inception)]
 
+use std::sync::Arc;
+
+use crate::engine_target::EngineTarget;
 use crate::pipeline::PipelineId;
+use crate::processor::processor_context::ProcessorContext;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
@@ -13,7 +17,7 @@ pub trait ProcessorRealization {
   ///
   /// ## Returns
   /// * This `ProcessorRealization`s descriptor.
-  fn descriptor(&self) -> ProcessorDescriptor;
+  fn descriptor(&self, engine_target: &EngineTarget) -> ProcessorDescriptor;
 
   /// # Get this `ProcessorRealization`s id (name)
   ///
@@ -45,7 +49,12 @@ pub trait ProcessorRealization {
   ///
   /// ## Returns
   /// * The created `ProcessorInstance`.
-  fn processor_instance<'a>(&'a self, pipeline_id: Option<PipelineId>, processor_id: ProcessorId) -> Result<Box<dyn ProcessorInstance + 'a>, String>;
+  fn processor_instance<'a>(
+    &'a self,
+    pipeline_id: Option<PipelineId>,
+    processor_id: ProcessorId,
+    processor_context: Arc<ProcessorContext>,
+  ) -> Result<Box<dyn ProcessorInstance + 'a>, String>;
 
   /// # Get this `ProcessorRealization`s technology
   ///

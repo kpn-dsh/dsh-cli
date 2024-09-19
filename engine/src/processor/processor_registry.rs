@@ -1,12 +1,9 @@
-use std::sync::Arc;
-
 use crate::engine_target::EngineTarget;
 use crate::processor::dshapp::dshapp_registry::DshAppRealizationRegistry;
 use crate::processor::dshservice::dshservice_registry::DshServiceRealizationRegistry;
 use crate::processor::processor_descriptor::{ProcessorDescriptor, ProcessorTypeDescriptor};
 use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
-use crate::resource::resource_registry::ResourceRegistry;
 
 pub struct ProcessorRegistry {
   dshapp_realization_registry: DshAppRealizationRegistry,
@@ -18,11 +15,8 @@ impl ProcessorRegistry {
     Self::default()
   }
 
-  pub fn create(engine_target: Arc<EngineTarget>, resource_registry: Arc<ResourceRegistry>) -> Result<ProcessorRegistry, String> {
-    Ok(ProcessorRegistry {
-      dshapp_realization_registry: DshAppRealizationRegistry::create(engine_target.clone(), resource_registry.clone())?,
-      dshservice_realization_registry: DshServiceRealizationRegistry::create(engine_target, resource_registry)?,
-    })
+  pub fn create() -> Result<ProcessorRegistry, String> {
+    Ok(ProcessorRegistry { dshapp_realization_registry: DshAppRealizationRegistry::create()?, dshservice_realization_registry: DshServiceRealizationRegistry::create()? })
   }
 
   pub fn processor_types(&self) -> Vec<ProcessorTypeDescriptor> {
@@ -51,40 +45,45 @@ impl ProcessorRegistry {
     }
   }
 
-  pub fn processor_descriptor(&self, processor_technology: ProcessorTechnology, processor_realization_id: &ProcessorRealizationId) -> Option<ProcessorDescriptor> {
+  pub fn processor_descriptor(
+    &self,
+    processor_technology: ProcessorTechnology,
+    processor_realization_id: &ProcessorRealizationId,
+    engine_target: &EngineTarget,
+  ) -> Option<ProcessorDescriptor> {
     match processor_technology {
       ProcessorTechnology::DshApp => self
         .dshapp_realization_registry
         .dshapp_realization_by_id(processor_realization_id)
-        .map(|realization| realization.descriptor()),
+        .map(|realization| realization.descriptor(engine_target)),
       ProcessorTechnology::DshService => self
         .dshservice_realization_registry
         .dshservice_realization_by_id(processor_realization_id)
-        .map(|realization| realization.descriptor()),
+        .map(|realization| realization.descriptor(engine_target)),
     }
   }
 
-  pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier) -> Option<ProcessorDescriptor> {
+  pub fn processor_descriptor_by_identifier(&self, processor_identifier: &ProcessorIdentifier, engine_target: &EngineTarget) -> Option<ProcessorDescriptor> {
     match processor_identifier.processor_technology {
       ProcessorTechnology::DshApp => self
         .dshapp_realization_registry
         .dshapp_realization_by_id(&processor_identifier.processor_realization_id)
-        .map(|realization| realization.descriptor()),
+        .map(|realization| realization.descriptor(engine_target)),
       ProcessorTechnology::DshService => self
         .dshservice_realization_registry
         .dshservice_realization_by_id(&processor_identifier.processor_realization_id)
-        .map(|realization| realization.descriptor()),
+        .map(|realization| realization.descriptor(engine_target)),
     }
   }
 
-  pub fn processor_descriptors(&self) -> Vec<ProcessorDescriptor> {
-    self.dshservice_realization_registry.dshservice_descriptors()
+  pub fn processor_descriptors(&self, engine_target: &EngineTarget) -> Vec<ProcessorDescriptor> {
+    self.dshservice_realization_registry.dshservice_descriptors(engine_target)
   }
 
-  pub fn processor_descriptors_by_type(&self, processor_technology: ProcessorTechnology) -> Vec<ProcessorDescriptor> {
+  pub fn processor_descriptors_by_type(&self, processor_technology: ProcessorTechnology, engine_target: &EngineTarget) -> Vec<ProcessorDescriptor> {
     match processor_technology {
-      ProcessorTechnology::DshApp => self.dshapp_realization_registry.dshapp_descriptors(),
-      ProcessorTechnology::DshService => self.dshservice_realization_registry.dshservice_descriptors(),
+      ProcessorTechnology::DshApp => self.dshapp_realization_registry.dshapp_descriptors(engine_target),
+      ProcessorTechnology::DshService => self.dshservice_realization_registry.dshservice_descriptors(engine_target),
     }
   }
 
@@ -102,13 +101,9 @@ impl ProcessorRegistry {
 
 impl Default for ProcessorRegistry {
   fn default() -> Self {
-    let engine_target = Arc::new(EngineTarget::default());
-    match ResourceRegistry::create(engine_target.clone()) {
-      Ok(resource_registry) => match Self::create(engine_target, Arc::new(resource_registry)) {
-        Ok(registry) => registry,
-        Err(error) => panic!("unable to create processor registry ({})", error),
-      },
-      Err(error) => panic!("unable to create resource registry ({})", error),
+    match Self::create() {
+      Ok(registry) => registry,
+      Err(error) => panic!("unable to create processor registry ({})", error),
     }
   }
 }

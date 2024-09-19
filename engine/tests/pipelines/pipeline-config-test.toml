@@ -1,0 +1,38 @@
+pipeline-id = "test"
+version = "1.2.3"
+name = "Test pipeline"
+description = "Test pipeline description"
+icon = "ICON"
+tags = ["TAG1", "TAG2"]
+more-info-url = "https://dsh.kpn.com"
+metrics-url = "https://grafana.com"
+viewer-url = "https://eavesdropper.kpn.com"
+metadata = [
+    ["metadata1", "METADATA1"],
+    ["metadata2", "METADATA2"]
+]
+
+resources = [
+    { resource-id = "res1", resource-realization = "res-realization1", parameters = { } },
+    { resource-id = "res2", resource-realization = "res-realization2", parameters = { } }
+]
+processors = [
+    { processor-id = "proc1", processor-realization = "proc-realization1", parameters = { }, profile-id = "profile1" },
+    { processor-id = "proc2", processor-realization = "proc-realization2", parameters = { }, profile-id = "profile2" }
+]
+connections = [
+    { source = ["res1", "res2"], target = { processor-id = "proc1", junction = "inbound" } },
+    { source = { processor-id = "proc2", junction = "outbound" }, target = ["res1", "res2"] },
+    { source = { processor-id = "proc1", junction = "outbound" }, target = { processor-id = "proc2", junction = "inbound" } },
+    { source = { processor-id = "proc2", junction = "outbound" }, target = { processor-id = "proc1", junction = "inbound" } }
+]
+dependencies = []
+profiles = []
+
+
+
+
+#inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+#outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
+#deploy_parameters: &HashMap<ParameterId, String>,
+#profile_id: Option<&ProfileId>, // TODO Move this to start() method

@@ -31,8 +31,6 @@ identifier!(
 
 #[derive(Clone, Debug, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub enum ResourceType {
-  // #[serde(rename = "dshgateway")]
-  // DshGateway,
   #[serde(rename = "dshtopic")]
   DshTopic,
 }

@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::identifier;
 
 pub mod pipeline;
+pub mod pipeline_config;
 pub mod pipeline_descriptor;
+pub mod pipeline_instance;
 pub mod pipeline_registry;
 
 identifier!(
