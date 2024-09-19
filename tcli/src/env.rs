@@ -93,10 +93,11 @@ impl CommandExecutor for EnvFindInApps {
           .collect();
         if !keys.is_empty() {
           keys.sort();
-          builder.vec(&vec![app_id, resource_id.to_string(), keys.join(", ")]);
+          builder.vec(&vec![app_id, resource_id.to_string(), keys.join("\n")]);
         }
       }
     }
+    builder.print_list();
     Ok(false)
   }
 }
@@ -123,9 +124,10 @@ impl CommandExecutor for EnvFindInApplications {
         .collect();
       if !keys.is_empty() {
         keys.sort();
-        builder.vec(&vec![application_id, keys.join(", ")]);
+        builder.vec(&vec![application_id, keys.join("\n")]);
       }
     }
+    builder.print_list();
     Ok(false)
   }
 }
