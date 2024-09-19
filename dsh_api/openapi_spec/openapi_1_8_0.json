@@ -3,7 +3,7 @@
   "info": {
     "description": "Resource management API for DSH",
     "title": "DSH Tenant Resource Management REST API",
-    "version": "1.7.0"
+    "version": "1.8.0"
   },
   "servers": [
     {
@@ -75,6 +75,14 @@
     {
       "description": "Manage the limits of other tenants.",
       "name": "managed tenant limits"
+    },
+    {
+      "description": "Manage public and internal streams.",
+      "name": "managed streams"
+    },
+    {
+      "description": "Manage access to streams.",
+      "name": "managed streams access"
     },
     {
       "description": "Request and renew Tenant API tokens.",
@@ -5857,6 +5865,893 @@
           "managed tenant limits"
         ]
       }
+    },
+    "/manage/{manager}/stream": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagedStreamId"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "a list of stream id's"
+          }
+        },
+        "summary": "get a list of streams managed by the managing tenant",
+        "tags": [
+          "managed streams"
+        ]
+      }
+    },
+    "/manage/{manager}/stream/public/{streamId}/configuration": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedPublicStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Delete request was accepted"
+          }
+        },
+        "summary": "Delete a public managed stream",
+        "tags": [
+          "managed streams"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedPublicStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "publicManagedStreamWithDefaultKafkaPartitioner": {
+                    "$ref": "#/components/examples/publicManagedStreamWithDefaultKafkaPartitioner"
+                  },
+                  "publicManagedStreamWithTopicLevelPartitioner": {
+                    "$ref": "#/components/examples/publicManagedStreamWithTopicLevelPartitioner"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PublicManagedStream"
+                }
+              }
+            },
+            "description": "managed stream configuration"
+          },
+          "404": {
+            "description": "managed stream not found"
+          }
+        },
+        "summary": "Get the configuration for a public managed stream",
+        "tags": [
+          "managed streams"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedPublicStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "publicManagedStreamWithDefaultKafkaPartitioner": {
+                  "$ref": "#/components/examples/publicManagedStreamWithDefaultKafkaPartitioner"
+                },
+                "publicManagedStreamWithTopicLevelPartitioner": {
+                  "$ref": "#/components/examples/publicManagedStreamWithTopicLevelPartitioner"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/PublicManagedStream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Configuration was accepted, stream is being created"
+          },
+          "400": {
+            "description": "Configuration was rejected"
+          }
+        },
+        "summary": "Create a public managed stream",
+        "tags": [
+          "managed streams"
+        ]
+      }
+    },
+    "/manage/{manager}/stream/internal/{streamId}/configuration": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedInternalStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Delete request was accepted"
+          }
+        },
+        "summary": "Delete an internal managed stream",
+        "tags": [
+          "managed streams"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedInternalStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "managedInternalStream": {
+                    "$ref": "#/components/examples/managedInternalStream"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/InternalManagedStream"
+                }
+              }
+            },
+            "description": "managed stream configuration"
+          },
+          "404": {
+            "description": "managed stream not found"
+          }
+        },
+        "summary": "Get the configuration for an internal managed stream",
+        "tags": [
+          "managed streams"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedInternalStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "managedInternalStream": {
+                  "$ref": "#/components/examples/managedInternalStream"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/InternalManagedStream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Configuration was accepted, stream is being created"
+          },
+          "400": {
+            "description": "Configuration was rejected"
+          }
+        },
+        "summary": "Create an internal managed stream",
+        "tags": [
+          "managed streams"
+        ]
+      }
+    },
+    "/manage/{manager}/stream/{streamId}/access/write": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "description": "Tenant name",
+                    "example": "sometenant",
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "A list of all names of tenants that have write access to the stream"
+          }
+        },
+        "summary": "get a list of all tenants that have write access to the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      }
+    },
+    "/manage/{manager}/stream/{streamId}/access/write/{tenant}": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "tenant name",
+            "example": "tenant-a",
+            "explode": false,
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Write access to the stream has been revoked for the tenant"
+          }
+        },
+        "summary": "Revoke write access for the tenant on the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      },
+      "head": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "tenant name",
+            "example": "tenant-a",
+            "explode": false,
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The tenant has write access to the stream"
+          },
+          "404": {
+            "description": "The tenant does not have write access to the stream"
+          }
+        },
+        "summary": "Check whether the tenant has write access to the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      },
+      "put": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "tenant name",
+            "example": "tenant-a",
+            "explode": false,
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Write access to the stream is granted to the tenant"
+          }
+        },
+        "summary": "Grant the tenant write access to the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      }
+    },
+    "/manage/{manager}/stream/{streamId}/access/read": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "description": "Tenant name",
+                    "example": "sometenant",
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "A list of all names of tenants that have read access to the stream"
+          }
+        },
+        "summary": "get a list of all tenants that have read access to the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      }
+    },
+    "/manage/{manager}/stream/{streamId}/access/read/{tenant}": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "tenant name",
+            "example": "tenant-a",
+            "explode": false,
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Read access to the stream has been revoked for the tenant"
+          }
+        },
+        "summary": "Revoke read access for the tenant on the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      },
+      "head": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "tenant name",
+            "example": "tenant-a",
+            "explode": false,
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The tenant has read access to the stream"
+          },
+          "404": {
+            "description": "The tenant does not have read access to the stream"
+          }
+        },
+        "summary": "Check whether the tenant has read access to the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      },
+      "put": {
+        "parameters": [
+          {
+            "description": "Name of the tenant that is acting as manager for this request",
+            "example": "manager-tenant",
+            "explode": false,
+            "in": "path",
+            "name": "manager",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "id of the managed stream, including the type prefix",
+            "examples": {
+              "awesomedata": {
+                "summary": "public stream called `awesomedata` for tenant `tnanet`",
+                "value": "stream.tnanet---awesomedata"
+              },
+              "moredata": {
+                "summary": "internal stream called `moredata` for tenant `tnanet`",
+                "value": "internal.tnanet---moredata"
+              },
+              "evenmoredata": {
+                "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+                "value": "stream.tnanet---evenmoredata"
+              }
+            },
+            "explode": false,
+            "in": "path",
+            "name": "streamId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedStreamId"
+            },
+            "style": "simple"
+          },
+          {
+            "description": "tenant name",
+            "example": "tenant-a",
+            "explode": false,
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Read access to the stream is granted to the tenant"
+          }
+        },
+        "summary": "Grant the tenant write access to the stream",
+        "tags": [
+          "managed streams access"
+        ]
+      }
     }
   },
   "components": {
@@ -6036,6 +6931,67 @@
             "provisioned": true,
             "notifications": []
           }
+        }
+      },
+      "managedInternalStream": {
+        "description": "a internal managed stream",
+        "value": {
+          "kind": "internal",
+          "partitions": 3,
+          "replicationFactor": 2
+        }
+      },
+      "publicManagedStreamWithDefaultKafkaPartitioner": {
+        "description": "a public managed stream with a default kafka partitioner",
+        "value": {
+          "kind": "public",
+          "partitions": 6,
+          "replicationFactor": 3,
+          "contract": {
+            "$ref": "#/components/examples/publicStreamContractWithDefaultKafkaPartitioner/value"
+          }
+        }
+      },
+      "publicManagedStreamWithTopicLevelPartitioner": {
+        "description": "a public managed stream with a topic level partitioner",
+        "value": {
+          "kind": "public",
+          "partitions": 6,
+          "replicationFactor": 3,
+          "contract": {
+            "$ref": "#/components/examples/publicStreamContractWithTopicLevelPartitioner/value"
+          }
+        }
+      },
+      "publicStreamContractWithTopicLevelPartitioner": {
+        "description": "stream contract for a managed public stream with a topic level partitioner",
+        "value": {
+          "canBeRetained": true,
+          "partitioner": {
+            "$ref": "#/components/examples/topicLevelPartitioner/value"
+          }
+        }
+      },
+      "publicStreamContractWithDefaultKafkaPartitioner": {
+        "description": "stream contract for a managed public stream with a default kafka partitioner",
+        "value": {
+          "canBeRetained": true,
+          "partitioner": {
+            "$ref": "#/components/examples/defaultKafkaPartitioner/value"
+          }
+        }
+      },
+      "topicLevelPartitioner": {
+        "description": "a topic level partitioner",
+        "value": {
+          "kind": "topicLevel",
+          "topicLevel": 2
+        }
+      },
+      "defaultKafkaPartitioner": {
+        "description": "the default kafka partitioner",
+        "value": {
+          "kind": "kafkaDefault"
         }
       },
       "managedTenant": {
@@ -6540,6 +7496,69 @@
         "required": true,
         "schema": {
           "type": "string"
+        },
+        "style": "simple"
+      },
+      "ManagedStreamId": {
+        "description": "id of the managed stream, including the type prefix",
+        "examples": {
+          "awesomedata": {
+            "summary": "public stream called `awesomedata` for tenant `tnanet`",
+            "value": "stream.tnanet---awesomedata"
+          },
+          "moredata": {
+            "summary": "internal stream called `moredata` for tenant `tnanet`",
+            "value": "internal.tnanet---moredata"
+          },
+          "evenmoredata": {
+            "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+            "value": "stream.tnanet---evenmoredata"
+          }
+        },
+        "explode": false,
+        "in": "path",
+        "name": "streamId",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ManagedStreamId"
+        },
+        "style": "simple"
+      },
+      "ManagedPublicStreamId": {
+        "description": "id of the managed stream, including the type prefix",
+        "examples": {
+          "awesomedata": {
+            "summary": "public stream called `awesomedata` for tenant `tnanet`",
+            "value": "stream.tnanet---awesomedata"
+          },
+          "evenmoredata": {
+            "summary": "public stream called `evenmoredata` for tenant `tnanet`",
+            "value": "stream.tnanet---evenmoredata"
+          }
+        },
+        "explode": false,
+        "in": "path",
+        "name": "streamId",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ManagedPublicStreamId"
+        },
+        "style": "simple"
+      },
+      "ManagedInternalStreamId": {
+        "description": "id of the managed stream, including the type prefix",
+        "examples": {
+          "moredata": {
+            "summary": "internal stream called `moredata` for tenant `tnanet`",
+            "value": "internal.tnanet---moredata"
+          }
+        },
+        "explode": false,
+        "in": "path",
+        "name": "streamId",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ManagedInternalStreamId"
         },
         "style": "simple"
       },
@@ -7798,6 +8817,137 @@
           }
         ]
       },
+      "InternalManagedStream": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Topic"
+          },
+          {
+            "$ref": "#/components/schemas/InternalManagedStream_allOf"
+          }
+        ],
+        "description": "An internal stream.  A stream that can be shared between different tenants, but is not accessible over the MQTT protocol adapter.\n",
+        "example": {
+          "$ref": "#/components/examples/managedInternalStream"
+        },
+        "type": "object"
+      },
+      "PublicManagedStream": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Topic"
+          },
+          {
+            "$ref": "#/components/schemas/PublicManagedStream_allOf"
+          }
+        ],
+        "description": "A public stream.  A stream that can be shared between different tenants within the DSH platform, and is accessible over the MQTT protocol adapter. A public stream requires a stream contract.\n",
+        "example": [
+          {
+            "$ref": "#/components/examples/publicManagedStreamWithTopicLevelPartitioner"
+          },
+          {
+            "$ref": "#/components/examples/publicManagedStreamWithDefaultKafkaPartitioner"
+          }
+        ],
+        "type": "object"
+      },
+      "PublicManagedStreamContract": {
+        "description": "The stream contract for a public stream.",
+        "example": [
+          {
+            "$ref": "#/components/examples/publicManagedStreamWithTopicLevelPartitioner"
+          },
+          {
+            "$ref": "#/components/examples/publicManagedStreamWithDefaultKafkaPartitioner"
+          }
+        ],
+        "properties": {
+          "canBeRetained": {
+            "description": "Whether MQTT records can have the \"retained\" flag.",
+            "type": "boolean"
+          },
+          "partitioner": {
+            "description": "The partitioner used to partition messages across different kafka partitions.",
+            "discriminator": {
+              "mapping": {
+                "topicLevel": "#/components/schemas/PublicManagedStreamTopicLevelPartitioner",
+                "kafkaDefault": "#/components/schemas/PublicManagedStreamKafkaDefaultPartitioner"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicManagedStreamTopicLevelPartitioner"
+              },
+              {
+                "$ref": "#/components/schemas/PublicManagedStreamKafkaDefaultPartitioner"
+              }
+            ]
+          }
+        },
+        "required": [
+          "canBeRetained",
+          "partitioner"
+        ],
+        "type": "object"
+      },
+      "PublicManagedStreamTopicLevelPartitioner": {
+        "example": {
+          "$ref": "#/components/examples/topicLevelPartitioner"
+        },
+        "properties": {
+          "topicLevel": {
+            "example": 2,
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "topicLevel"
+            ],
+            "example": "topicLevel",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "topicLevel"
+        ],
+        "type": "object"
+      },
+      "PublicManagedStreamKafkaDefaultPartitioner": {
+        "example": {
+          "$ref": "#/components/examples/defaultKafkaPartitioner"
+        },
+        "properties": {
+          "kind": {
+            "enum": [
+              "kafkaDefault"
+            ],
+            "example": "kafkaDefault",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "ManagedStreamId": {
+        "description": "The id of a managed stream consists of a `stream.` or `internal.` prefix followed by the name of the managing tenant and the name of the stream separated by `---` (three hyphens).  \nId's starting with `stream` indicate a public stream,  id's starting with `internal` indicate an internal stream.\nFor an internal stream called `maerts` for tenant `tnanet` the full name would be  `internal.tnanet---maerts`. For a public stream with the same name and tenant,  the full name would be `stream.tnanet---maerts`.\nNote that the regular expressions below don't cover all restrictions.  The tenant name part must still adhere to the rules for tenant names, the stream name part must still adhere to the following rules: - Must have a minimum length of 3 and a maximum length of 100, - Must only contain lower case alphanumerical characters `[a-z0-9]` and hyphens `-`, - Must not contain three sequential hyphens `---`, two sequential hyphens is fine, - Must start with an lowercase letter `^[a-z]` - Must end with a lowercase letter or digit `[a-z0-9]$`\n",
+        "pattern": "^(stream|internal)\\.[a-z][a-z0-9-]{0,38}[a-z]---[a-z][a-z0-9-]{1,98}[a-z0-9]$",
+        "type": "string"
+      },
+      "ManagedPublicStreamId": {
+        "description": "The id of a managed stream consists of a `stream.` or `internal.` prefix followed by the name of the managing tenant and the name of the stream separated by `---` (three hyphens).  \nId's starting with `stream` indicate a public stream,  id's starting with `internal` indicate an internal stream.\nFor an internal stream called `maerts` for tenant `tnanet` the full name would be  `internal.tnanet---maerts`. For a public stream with the same name and tenant,  the full name would be `stream.tnanet---maerts`.\nNote that the regular expressions below don't cover all restrictions.  The tenant name part must still adhere to the rules for tenant names, the stream name part must still adhere to the following rules: - Must have a minimum length of 3 and a maximum length of 100, - Must only contain lower case alphanumerical characters `[a-z0-9]` and hyphens `-`, - Must not contain three sequential hyphens `---`, two sequential hyphens is fine, - Must start with an lowercase letter `^[a-z]` - Must end with a lowercase letter or digit `[a-z0-9]$`\n",
+        "pattern": "^(stream)\\.[a-z][a-z0-9-]{0,38}[a-z]---[a-z][a-z0-9-]{1,98}[a-z0-9]$",
+        "type": "string"
+      },
+      "ManagedInternalStreamId": {
+        "description": "The id of a managed stream consists of a `internal.` prefix followed by the name of the managing tenant and the name of the stream separated by `---` (three hyphens).  \nid's starting with `internal` indicate an internal stream.\nFor an internal stream called `maerts` for tenant `tnanet` the full name would be  `internal.tnanet---maerts`.\nNote that the regular expressions below don't cover all restrictions.  The tenant name part must still adhere to the rules for tenant names, the stream name part must still adhere to the following rules: - Must have a minimum length of 3 and a maximum length of 100, - Must only contain lower case alphanumerical characters `[a-z0-9]` and hyphens `-`, - Must not contain three sequential hyphens `---`, two sequential hyphens is fine, - Must start with an lowercase letter `^[a-z]` - Must end with a lowercase letter or digit `[a-z0-9]$`\n",
+        "pattern": "^(internal)\\.[a-z][a-z0-9-]{0,38}[a-z]---[a-z][a-z0-9-]{1,98}[a-z0-9]$",
+        "type": "string"
+      },
       "ManagedTenant": {
         "example": {
           "manager": "manager",
@@ -8886,6 +10036,40 @@
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "InternalManagedStream_allOf": {
+        "properties": {
+          "kind": {
+            "description": "For internal streams, the value of `kind` must be `internal.`",
+            "enum": [
+              "internal"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "PublicManagedStream_allOf": {
+        "properties": {
+          "kind": {
+            "description": "For public streams, the value of `kind` must be `public`",
+            "enum": [
+              "public"
+            ],
+            "type": "string"
+          },
+          "contract": {
+            "$ref": "#/components/schemas/PublicManagedStreamContract"
+          }
+        },
+        "required": [
+          "contract",
+          "kind"
         ],
         "type": "object"
       },

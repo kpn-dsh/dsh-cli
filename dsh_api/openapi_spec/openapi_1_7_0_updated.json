@@ -108,6 +108,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -128,7 +138,8 @@
         "summary": "Returns the configuration of every application created by a given tenant.",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantApplicationConfiguration"
       }
     },
     "/allocation/{tenant}/application/{appid}/configuration": {
@@ -157,6 +168,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -167,7 +188,8 @@
         "summary": "deletes an application by a specified application id",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationDeleteByTenantApplicationByAppidConfiguration"
       },
       "get": {
         "parameters": [
@@ -194,6 +216,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -216,7 +248,8 @@
         "summary": "Returns the configuration of a certain application, specified by the tenant name and application name.",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantApplicationByAppidConfiguration"
       },
       "put": {
         "parameters": [
@@ -243,6 +276,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -272,7 +315,8 @@
         "summary": "creates an application allocation, or update it's configuration",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationPutByTenantApplicationByAppidConfiguration"
       }
     },
     "/allocation/{tenant}/application/actual": {
@@ -289,6 +333,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -309,7 +363,8 @@
         "summary": "returns a list containing the configuration of every deployed application of a given tenant",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantApplicationActual"
       }
     },
     "/allocation/{tenant}/application/{appid}/actual": {
@@ -338,6 +393,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -360,7 +425,8 @@
         "summary": "returns the configuration of a deployed application allocation for a given app id and tenant",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantApplicationByAppidActual"
       }
     },
     "/allocation/{tenant}/application/{appid}/status": {
@@ -389,6 +455,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -411,7 +487,8 @@
         "summary": "returns a status description of an application allocation",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantApplicationByAppidStatus"
       }
     },
     "/allocation/{tenant}/appcatalogapp/configuration": {
@@ -428,6 +505,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -448,7 +535,8 @@
         "summary": "returns a list containing all App Catalog App allocations and their respective configurations of a given tenant",
         "tags": [
           "app catalog"
-        ]
+        ],
+        "operationId": "app catalogGetByTenantAppcatalogappConfiguration"
       }
     },
     "/allocation/{tenant}/appcatalogapp/actual": {
@@ -465,6 +553,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -485,7 +583,8 @@
         "summary": "returns a list containing all App Catalog App allocations and their respective configurations of a given tenant, as they are actually deployed",
         "tags": [
           "app catalog"
-        ]
+        ],
+        "operationId": "app catalogGetByTenantAppcatalogappActual"
       }
     },
     "/allocation/{tenant}/appcatalogapp/{appcatalogappid}/configuration": {
@@ -514,6 +613,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -531,7 +640,8 @@
         "summary": "returns the configuration of an App Catalog App allocation by a specified tenant name and App Catalog App Id. To only view the configuration parameters of this allocation, see the `appcatalogappconfiguration` section.\n",
         "tags": [
           "app catalog"
-        ]
+        ],
+        "operationId": "app catalogGetByTenantAppcatalogappByAppcatalogappidConfiguration"
       }
     },
     "/allocation/{tenant}/appcatalogapp/{appcatalogappid}/actual": {
@@ -560,6 +670,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -577,7 +697,8 @@
         "summary": "returns the configuration of an App Catalog App allocation as it is actually deployed. To only view the configuration parameters of this allocation, see the `appcatalogappconfiguration` section.\n",
         "tags": [
           "app catalog"
-        ]
+        ],
+        "operationId": "app catalogGetByTenantAppcatalogappByAppcatalogappidActual"
       }
     },
     "/appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/configuration": {
@@ -606,6 +727,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -616,7 +747,8 @@
         "summary": "deletes an App Catalog App",
         "tags": [
           "app catalog app configuration"
-        ]
+        ],
+        "operationId": "app catalog app configurationDeleteAppcatalogByTenantAppcatalogappByAppcatalogappidConfiguration"
       },
       "get": {
         "parameters": [
@@ -643,6 +775,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -665,7 +807,8 @@
         "summary": "Returns the wanted configuration of an App Catalog App by its tenant name and AppCatalogApp Id. If an App Catalog App is stuck while deploying and not on actual, it will show up here.",
         "tags": [
           "app catalog app configuration"
-        ]
+        ],
+        "operationId": "app catalog app configurationGetAppcatalogByTenantAppcatalogappByAppcatalogappidConfiguration"
       },
       "put": {
         "parameters": [
@@ -692,6 +835,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -721,7 +874,8 @@
         "summary": "creates a new App Catalog App, or update its configuration",
         "tags": [
           "app catalog app configuration"
-        ]
+        ],
+        "operationId": "app catalog app configurationPutAppcatalogByTenantAppcatalogappByAppcatalogappidConfiguration"
       }
     },
     "/appcatalog/{tenant}/appcatalogapp/{appcatalogappid}/status": {
@@ -750,6 +904,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -772,7 +936,8 @@
         "summary": "gets status description of an App Catalog App",
         "tags": [
           "app catalog app configuration"
-        ]
+        ],
+        "operationId": "app catalog app configurationGetAppcatalogByTenantAppcatalogappByAppcatalogappidStatus"
       }
     },
     "/appcatalog/{tenant}/manifest": {
@@ -789,6 +954,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -809,7 +984,8 @@
         "summary": "returns a list of AppCatalog manifests for a given tenant",
         "tags": [
           "app catalog manifest"
-        ]
+        ],
+        "operationId": "app catalog manifestGetAppcatalogByTenantManifest"
       }
     },
     "/allocation/{tenant}/bucketwatch": {
@@ -820,6 +996,16 @@
             "in": "path",
             "name": "tenant",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
             "schema": {
               "type": "string"
             }
@@ -840,7 +1026,8 @@
         "summary": "lists all bucketwatches of a tenant",
         "tags": [
           "bucket watch"
-        ]
+        ],
+        "operationId": "bucket watchGetByTenantBucketwatch"
       },
       "parameters": [
         {
@@ -875,6 +1062,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -897,7 +1094,8 @@
         "summary": "shows overall status of a bucketwatch allocation",
         "tags": [
           "bucket watch"
-        ]
+        ],
+        "operationId": "bucket watchGetByTenantBucketByIdBucketwatch"
       },
       "parameters": [
         {
@@ -942,6 +1140,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -952,7 +1160,8 @@
         "summary": "deletes a bucketwatch",
         "tags": [
           "bucket watch"
-        ]
+        ],
+        "operationId": "bucket watchDeleteByTenantBucketByIdBucketwatchConfiguration"
       },
       "get": {
         "parameters": [
@@ -974,6 +1183,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -991,7 +1210,8 @@
         "summary": "gets configuration of a bucketwatch allocation",
         "tags": [
           "bucket watch"
-        ]
+        ],
+        "operationId": "bucket watchGetByTenantBucketByIdBucketwatchConfiguration"
       },
       "parameters": [
         {
@@ -1034,6 +1254,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1044,7 +1274,8 @@
         "summary": "creates bucketwatch configuration.",
         "tags": [
           "bucket watch"
-        ]
+        ],
+        "operationId": "bucket watchPutByTenantBucketByIdBucketwatchConfiguration"
       }
     },
     "/allocation/{tenant}/bucket/{id}/bucketwatch/actual": {
@@ -1068,6 +1299,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1085,7 +1326,8 @@
         "summary": "gets actual configuration of a bucketwatch allocation",
         "tags": [
           "bucket watch"
-        ]
+        ],
+        "operationId": "bucket watchGetByTenantBucketByIdBucketwatchActual"
       },
       "parameters": [
         {
@@ -1130,6 +1372,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1152,7 +1404,8 @@
         "summary": "gets status description of a bucketwatch allocation",
         "tags": [
           "bucket watch"
-        ]
+        ],
+        "operationId": "bucket watchGetByTenantBucketByIdBucketwatchStatus"
       },
       "parameters": [
         {
@@ -1187,6 +1440,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1204,7 +1467,8 @@
         "summary": "lists all bucket names of a tenant",
         "tags": [
           "bucket"
-        ]
+        ],
+        "operationId": "bucketGetByTenantBucket"
       },
       "parameters": [
         {
@@ -1239,6 +1503,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1261,7 +1535,8 @@
         "summary": "shows overall status of a bucket allocation",
         "tags": [
           "bucket"
-        ]
+        ],
+        "operationId": "bucketGetByTenantBucketById"
       },
       "parameters": [
         {
@@ -1306,6 +1581,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1316,7 +1601,8 @@
         "summary": "deletes a bucket",
         "tags": [
           "bucket"
-        ]
+        ],
+        "operationId": "bucketDeleteByTenantBucketByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -1335,6 +1621,16 @@
             "in": "path",
             "name": "id",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
             "schema": {
               "type": "string"
             }
@@ -1360,7 +1656,8 @@
         "summary": "gets configuration of a bucket allocation",
         "tags": [
           "bucket"
-        ]
+        ],
+        "operationId": "bucketGetByTenantBucketByIdConfiguration"
       },
       "parameters": [
         {
@@ -1403,6 +1700,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1429,7 +1736,8 @@
         "summary": "creates bucket configuration.It is impossible to update an existing bucket. This requires a delete of the existing bucket and creation of a new one with the wanted configuration.",
         "tags": [
           "bucket"
-        ]
+        ],
+        "operationId": "bucketPutByTenantBucketByIdConfiguration"
       }
     },
     "/allocation/{tenant}/bucket/{id}/actual": {
@@ -1450,6 +1758,16 @@
             "in": "path",
             "name": "id",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
             "schema": {
               "type": "string"
             }
@@ -1475,7 +1793,8 @@
         "summary": "gets actual configuration of a bucket allocation",
         "tags": [
           "bucket"
-        ]
+        ],
+        "operationId": "bucketGetByTenantBucketByIdActual"
       },
       "parameters": [
         {
@@ -1520,6 +1839,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1542,7 +1871,8 @@
         "summary": "gets status description of a bucket allocation",
         "tags": [
           "bucket"
-        ]
+        ],
+        "operationId": "bucketGetByTenantBucketByIdStatus"
       },
       "parameters": [
         {
@@ -1577,6 +1907,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1594,7 +1934,8 @@
         "summary": "lists all bucketaccesses of a tenant",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessGetByTenantBucketaccess"
       },
       "parameters": [
         {
@@ -1629,6 +1970,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1646,7 +1997,8 @@
         "summary": "shows bucketaccesses about a specific bucket",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessGetByTenantBucketByIdBucketaccess"
       },
       "parameters": [
         {
@@ -1701,6 +2053,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1718,7 +2080,8 @@
         "summary": "shows overall status of a third party bucket",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessGetByTenantBucketByIdBucketaccessByName"
       },
       "parameters": [
         {
@@ -1783,6 +2146,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1793,7 +2166,8 @@
         "summary": "deletes a bucketaccess",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessDeleteByTenantBucketByIdBucketaccessByNameConfiguration"
       },
       "get": {
         "parameters": [
@@ -1825,6 +2199,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1842,7 +2226,8 @@
         "summary": "gets configuration of a bucketaccess allocation",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessGetByTenantBucketByIdBucketaccessByNameConfiguration"
       },
       "parameters": [
         {
@@ -1905,6 +2290,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1931,7 +2326,8 @@
         "summary": "creates bucketaccess configuration.",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessPutByTenantBucketByIdBucketaccessByNameConfiguration"
       }
     },
     "/allocation/{tenant}/bucket/{id}/bucketaccess/{name}/actual": {
@@ -1965,6 +2361,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1987,7 +2393,8 @@
         "summary": "gets actual configuration of a bucketaccess allocation",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessGetByTenantBucketByIdBucketaccessByNameActual"
       },
       "parameters": [
         {
@@ -2052,6 +2459,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2074,7 +2491,8 @@
         "summary": "gets status description of a bucketaccess allocation",
         "tags": [
           "bucket access"
-        ]
+        ],
+        "operationId": "bucket accessGetByTenantBucketByIdBucketaccessByNameStatus"
       },
       "parameters": [
         {
@@ -2122,6 +2540,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2139,7 +2567,8 @@
         "summary": "returns a list of all certificate names that are allocated to a tenant",
         "tags": [
           "certificate"
-        ]
+        ],
+        "operationId": "certificateGetByTenantCertificate"
       }
     },
     "/allocation/{tenant}/certificate/{id}": {
@@ -2168,6 +2597,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2190,7 +2629,8 @@
         "summary": "returns the status of a specific certificate allocation by id",
         "tags": [
           "certificate"
-        ]
+        ],
+        "operationId": "certificateGetByTenantCertificateById"
       }
     },
     "/allocation/{tenant}/certificate/{id}/configuration": {
@@ -2219,6 +2659,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2229,7 +2679,8 @@
         "summary": "deletes a certificate by id",
         "tags": [
           "certificate"
-        ]
+        ],
+        "operationId": "certificateDeleteByTenantCertificateByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -2256,6 +2707,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2278,7 +2739,8 @@
         "summary": "returns the configuration of a certificate allocation",
         "tags": [
           "certificate"
-        ]
+        ],
+        "operationId": "certificateGetByTenantCertificateByIdConfiguration"
       },
       "put": {
         "parameters": [
@@ -2305,6 +2767,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2331,7 +2803,8 @@
         "summary": "create a new certificate. It is impossible to update an existing certificate. This requires a delete of the existing certificate and creation of a new one with the wanted configuration.",
         "tags": [
           "certificate"
-        ]
+        ],
+        "operationId": "certificatePutByTenantCertificateByIdConfiguration"
       }
     },
     "/allocation/{tenant}/certificate/{id}/actual": {
@@ -2360,6 +2833,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2382,7 +2865,8 @@
         "summary": "returns the actual configuration of a certificate allocation. This may not represent the wanted configuration.",
         "tags": [
           "certificate"
-        ]
+        ],
+        "operationId": "certificateGetByTenantCertificateByIdActual"
       }
     },
     "/allocation/{tenant}/certificate/{id}/status": {
@@ -2411,6 +2895,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2433,7 +2927,8 @@
         "summary": "returns a brief status description of a certificate allocation",
         "tags": [
           "certificate"
-        ]
+        ],
+        "operationId": "certificateGetByTenantCertificateByIdStatus"
       }
     },
     "/allocation/{tenant}/database": {
@@ -2450,6 +2945,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2467,7 +2972,8 @@
         "summary": "(beta release) lists ids of all databases of a tenant",
         "tags": [
           "database"
-        ]
+        ],
+        "operationId": "databaseGetByTenantDatabase"
       }
     },
     "/allocation/{tenant}/database/{id}": {
@@ -2496,6 +3002,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2518,7 +3034,8 @@
         "summary": "(beta release) gets overall status of a database allocation",
         "tags": [
           "database"
-        ]
+        ],
+        "operationId": "databaseGetByTenantDatabaseById"
       }
     },
     "/allocation/{tenant}/database/{id}/configuration": {
@@ -2547,6 +3064,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2557,7 +3084,8 @@
         "summary": "(beta release) deletes a database",
         "tags": [
           "database"
-        ]
+        ],
+        "operationId": "databaseDeleteByTenantDatabaseByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -2584,6 +3112,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2606,7 +3144,8 @@
         "summary": "(beta release) gets configuration for a database allocation",
         "tags": [
           "database"
-        ]
+        ],
+        "operationId": "databaseGetByTenantDatabaseByIdConfiguration"
       },
       "put": {
         "parameters": [
@@ -2633,6 +3172,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2659,7 +3208,8 @@
         "summary": "(beta release) creates a database configuration. It is impossible to update an existing database.",
         "tags": [
           "database"
-        ]
+        ],
+        "operationId": "databasePutByTenantDatabaseByIdConfiguration"
       }
     },
     "/allocation/{tenant}/database/{id}/actual": {
@@ -2688,6 +3238,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2710,7 +3270,8 @@
         "summary": "(beta release) gets actual state for a database allocation",
         "tags": [
           "database"
-        ]
+        ],
+        "operationId": "databaseGetByTenantDatabaseByIdActual"
       }
     },
     "/allocation/{tenant}/database/{id}/status": {
@@ -2739,6 +3300,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2761,7 +3332,8 @@
         "summary": "(beta release) gets status description of a database allocation",
         "tags": [
           "database"
-        ]
+        ],
+        "operationId": "databaseGetByTenantDatabaseByIdStatus"
       }
     },
     "/allocation/{tenant}/datacatalog/asset/{kind}": {
@@ -2788,6 +3360,16 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2805,7 +3387,8 @@
         "summary": "lists all data catalog assets of a tenant for the given kind",
         "tags": [
           "data catalog"
-        ]
+        ],
+        "operationId": "data catalogGetByTenantDatacatalogAssetByKind"
       },
       "parameters": [
         {
@@ -2866,6 +3449,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2888,7 +3481,8 @@
         "summary": "shows overall status of a datacatalog asset allocation",
         "tags": [
           "data catalog"
-        ]
+        ],
+        "operationId": "data catalogGetByTenantDatacatalogAssetByKindByName"
       },
       "parameters": [
         {
@@ -2959,6 +3553,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2969,7 +3573,8 @@
         "summary": "deletes a dataCatalogAsset",
         "tags": [
           "data catalog"
-        ]
+        ],
+        "operationId": "data catalogDeleteByTenantDatacatalogAssetByKindByNameConfiguration"
       },
       "get": {
         "parameters": [
@@ -3004,6 +3609,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3012,10 +3627,7 @@
               "application/json": {
                 "examples": {
                   "bucket": {
-                    "$ref": "#/components/examples/dataCatalogAssetBucket"
-                  },
-                  "writablestream": {
-                    "$ref": "#/components/examples/dataCatalogAssetWritableStream"
+                    "$ref": "#/components/examples/dataCatalogAsset"
                   }
                 },
                 "schema": {
@@ -3029,7 +3641,8 @@
         "summary": "gets configuration of a data catalog asset allocation",
         "tags": [
           "data catalog"
-        ]
+        ],
+        "operationId": "data catalogGetByTenantDatacatalogAssetByKindByNameConfiguration"
       },
       "parameters": [
         {
@@ -3098,6 +3711,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3105,10 +3728,7 @@
             "application/json": {
               "examples": {
                 "bucket": {
-                  "$ref": "#/components/examples/dataCatalogAssetBucket"
-                },
-                "writablestream": {
-                  "$ref": "#/components/examples/dataCatalogAssetWritableStream"
+                  "$ref": "#/components/examples/dataCatalogAsset"
                 }
               },
               "schema": {
@@ -3127,7 +3747,8 @@
         "summary": "creates dataCatalogAsset configuration.",
         "tags": [
           "data catalog"
-        ]
+        ],
+        "operationId": "data catalogPutByTenantDatacatalogAssetByKindByNameConfiguration"
       }
     },
     "/allocation/{tenant}/flinkcluster": {
@@ -3144,6 +3765,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3166,7 +3797,8 @@
         "summary": "returns the overall status of a Flink Cluster",
         "tags": [
           "flink cluster"
-        ]
+        ],
+        "operationId": "flink clusterGetByTenantFlinkcluster"
       }
     },
     "/allocation/{tenant}/flinkcluster/configuration": {
@@ -3183,6 +3815,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3193,7 +3835,8 @@
         "summary": "deletes a Flink Cluster. Since only one cluster can be created per tenant, only the tenants' name needs to be specified.",
         "tags": [
           "flink cluster"
-        ]
+        ],
+        "operationId": "flink clusterDeleteByTenantFlinkclusterConfiguration"
       },
       "get": {
         "parameters": [
@@ -3208,6 +3851,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3230,7 +3883,8 @@
         "summary": "returns the configuration of a Flink Cluster",
         "tags": [
           "flink cluster"
-        ]
+        ],
+        "operationId": "flink clusterGetByTenantFlinkclusterConfiguration"
       },
       "put": {
         "parameters": [
@@ -3245,6 +3899,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3271,7 +3935,8 @@
         "summary": "create a new Flink Cluster. It is impossible to update an existing Flink Cluster. This requires a delete of the existing Flink Cluster and creation of a new one with the wanted configuration.",
         "tags": [
           "flink cluster"
-        ]
+        ],
+        "operationId": "flink clusterPutByTenantFlinkclusterConfiguration"
       }
     },
     "/allocation/{tenant}/flinkcluster/actual": {
@@ -3288,6 +3953,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3310,7 +3985,8 @@
         "summary": "returns the actual configuration of a Flink Cluster.",
         "tags": [
           "flink cluster"
-        ]
+        ],
+        "operationId": "flink clusterGetByTenantFlinkclusterActual"
       }
     },
     "/allocation/{tenant}/flinkcluster/status": {
@@ -3327,6 +4003,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3349,7 +4035,8 @@
         "summary": "returns a brief status description of a Flink Cluster",
         "tags": [
           "flink cluster"
-        ]
+        ],
+        "operationId": "flink clusterGetByTenantFlinkclusterStatus"
       }
     },
     "/allocation/{tenant}/kafkaproxy": {
@@ -3366,6 +4053,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3383,7 +4080,8 @@
         "summary": "returns a list of all kafka proxies of a tenant",
         "tags": [
           "kafka proxy"
-        ]
+        ],
+        "operationId": "kafka proxyGetByTenantKafkaproxy"
       }
     },
     "/allocation/{tenant}/kafkaproxy/{id}/configuration": {
@@ -3412,6 +4110,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3422,7 +4130,8 @@
         "summary": "deletes a kafka proxy",
         "tags": [
           "kafka proxy"
-        ]
+        ],
+        "operationId": "kafka proxyDeleteByTenantKafkaproxyByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -3449,6 +4158,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3471,7 +4190,8 @@
         "summary": "Returns the configuration of a certain kafka Proxy, specified by the tenant name and kafka Proxy name.",
         "tags": [
           "kafka proxy"
-        ]
+        ],
+        "operationId": "kafka proxyGetByTenantKafkaproxyByIdConfiguration"
       },
       "put": {
         "parameters": [
@@ -3498,6 +4218,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3524,11 +4254,12 @@
         "summary": "update the value of the kafka proxy",
         "tags": [
           "kafka proxy"
-        ]
+        ],
+        "operationId": "kafka proxyPutByTenantKafkaproxyByIdConfiguration"
       }
     },
     "/robot/{tenant}/generate-secret": {
-      "post": {
+      "get": {
         "parameters": [
           {
             "description": "tenant name",
@@ -3541,6 +4272,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3555,13 +4296,14 @@
                 }
               }
             },
-            "description": "triggers the generation of a new Client Secret for the tenant’s robot account.  __This automatically invalidates the existing client secret __, and returns a new client secret in the response body!"
+            "description": "triggers the generation of a new Client Secret for the tenant\u2019s robot account.  __This automatically invalidates the existing client secret __, and returns a new client secret in the response body!"
           }
         },
         "summary": "generate new client secret for a tenant",
         "tags": [
           "robot"
-        ]
+        ],
+        "operationId": "robotGetRobotByTenantGenerate-secret"
       }
     },
     "/allocation/{tenant}/secret": {
@@ -3578,6 +4320,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3595,7 +4347,8 @@
         "summary": "returns a list of all secret names of a tenant",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretGetByTenantSecret"
       },
       "post": {
         "parameters": [
@@ -3610,6 +4363,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3636,7 +4399,8 @@
         "summary": "create a new secret",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretPostByTenantSecret"
       }
     },
     "/allocation/{tenant}/secret/{id}/configuration": {
@@ -3665,6 +4429,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3675,7 +4449,8 @@
         "summary": "deletes a secret",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretDeleteByTenantSecretByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -3702,6 +4477,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3719,7 +4504,8 @@
         "summary": "returns the configuration of a secret allocation",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretGetByTenantSecretByIdConfiguration"
       }
     },
     "/allocation/{tenant}/secret/{id}/actual": {
@@ -3748,6 +4534,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3765,7 +4561,8 @@
         "summary": "returns the actual state of a secret. The response body will always be empty because we cannot share the secret value, but the response code will tell you more about its state.",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretGetByTenantSecretByIdActual"
       }
     },
     "/allocation/{tenant}/secret/{id}/status": {
@@ -3794,6 +4591,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3816,7 +4623,8 @@
         "summary": "returns a brief status description of a secret allocation",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretGetByTenantSecretByIdStatus"
       }
     },
     "/allocation/{tenant}/secret/{id}": {
@@ -3845,6 +4653,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3862,7 +4680,8 @@
         "summary": "returns the value of a secret",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretGetByTenantSecretById"
       },
       "put": {
         "parameters": [
@@ -3889,6 +4708,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3911,7 +4740,8 @@
         "summary": "update the value of a secret",
         "tags": [
           "secret"
-        ]
+        ],
+        "operationId": "secretPutByTenantSecretById"
       }
     },
     "/allocation/{tenant}/task": {
@@ -3928,6 +4758,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3945,7 +4785,8 @@
         "summary": "return a list containing the ids of all applications with derived tasks",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantTask"
       }
     },
     "/allocation/{tenant}/task/{appid}": {
@@ -3974,6 +4815,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3991,7 +4842,8 @@
         "summary": "return a list containing the ids of an application's derived tasks",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantTaskByAppid"
       }
     },
     "/allocation/{tenant}/task/{appid}/{id}": {
@@ -4032,6 +4884,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4054,7 +4916,8 @@
         "summary": "returns overall status of a task",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantTaskByAppidById"
       }
     },
     "/allocation/{tenant}/task/{appid}/{id}/actual": {
@@ -4095,6 +4958,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4117,7 +4990,8 @@
         "summary": "returns the actual state of a specific task",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantTaskByAppidByIdActual"
       }
     },
     "/allocation/{tenant}/task/{appid}/{id}/status": {
@@ -4158,6 +5032,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4180,7 +5064,8 @@
         "summary": "returns a brief status description of a task",
         "tags": [
           "application"
-        ]
+        ],
+        "operationId": "applicationGetByTenantTaskByAppidByIdStatus"
       }
     },
     "/allocation/{tenant}/bucket/fromthirdparty": {
@@ -4191,6 +5076,16 @@
             "in": "path",
             "name": "tenant",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
             "schema": {
               "type": "string"
             }
@@ -4211,7 +5106,8 @@
         "summary": "lists only bucket names of a tenant that originated from a third party bucket",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketGetByTenantBucketFromthirdparty"
       },
       "parameters": [
         {
@@ -4236,6 +5132,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4253,7 +5159,8 @@
         "summary": "list summaries of third party buckets, registered using credentials shared to you by a third party",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketGetByTenantThirdpartybucketconcession"
       },
       "parameters": [
         {
@@ -4273,6 +5180,16 @@
             "in": "path",
             "name": "tenant",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
             "schema": {
               "type": "string"
             }
@@ -4302,7 +5219,8 @@
         "summary": "register a new bucket concession for which credentials were shared to you by a third party",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketPostByTenantThirdpartybucketconcession"
       }
     },
     "/allocation/{tenant}/thirdpartybucketconcession/{id}": {
@@ -4323,6 +5241,16 @@
             "in": "path",
             "name": "id",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
             "schema": {
               "type": "string"
             }
@@ -4348,7 +5276,8 @@
         "summary": "shows overall status of a third party bucket",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketGetByTenantThirdpartybucketconcessionById"
       },
       "parameters": [
         {
@@ -4393,6 +5322,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4403,7 +5342,8 @@
         "summary": "unregisters a third party bucket. This will also remove the virtual bucket.",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketDeleteByTenantThirdpartybucketconcessionByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -4422,6 +5362,16 @@
             "in": "path",
             "name": "id",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
             "schema": {
               "type": "string"
             }
@@ -4447,7 +5397,8 @@
         "summary": "gets configuration of a third party bucket (received bucket access) allocation",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketGetByTenantThirdpartybucketconcessionByIdConfiguration"
       },
       "parameters": [
         {
@@ -4492,6 +5443,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4514,7 +5475,8 @@
         "summary": "gets actual configuration of a third party bucket (received bucket access) allocation",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketGetByTenantThirdpartybucketconcessionByIdActual"
       },
       "parameters": [
         {
@@ -4559,6 +5521,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4581,7 +5553,8 @@
         "summary": "gets status description of third party bucket (received bucket access) allocation",
         "tags": [
           "third party bucket"
-        ]
+        ],
+        "operationId": "third party bucketGetByTenantThirdpartybucketconcessionByIdStatus"
       },
       "parameters": [
         {
@@ -4619,6 +5592,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4636,7 +5619,8 @@
         "summary": "returns a list of topics of a tenant",
         "tags": [
           "topic"
-        ]
+        ],
+        "operationId": "topicGetByTenantTopic"
       }
     },
     "/allocation/{tenant}/topic/{id}": {
@@ -4665,6 +5649,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4687,7 +5681,8 @@
         "summary": "returns the overall status of a topic allocation",
         "tags": [
           "topic"
-        ]
+        ],
+        "operationId": "topicGetByTenantTopicById"
       }
     },
     "/allocation/{tenant}/topic/{id}/configuration": {
@@ -4716,6 +5711,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4726,7 +5731,8 @@
         "summary": "deletes a topic",
         "tags": [
           "topic"
-        ]
+        ],
+        "operationId": "topicDeleteByTenantTopicByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -4753,6 +5759,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4775,7 +5791,8 @@
         "summary": "returns the configuration of a topic allocation",
         "tags": [
           "topic"
-        ]
+        ],
+        "operationId": "topicGetByTenantTopicByIdConfiguration"
       },
       "put": {
         "parameters": [
@@ -4802,6 +5819,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -4828,7 +5855,8 @@
         "summary": "create a new topic. It is impossible to update an existing topic. This requires a delete of the existing topic and creation of a new one with the wanted configuration.",
         "tags": [
           "topic"
-        ]
+        ],
+        "operationId": "topicPutByTenantTopicByIdConfiguration"
       }
     },
     "/allocation/{tenant}/topic/{id}/actual": {
@@ -4857,6 +5885,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4879,7 +5917,8 @@
         "summary": "returns actual configuration of a topic allocation",
         "tags": [
           "topic"
-        ]
+        ],
+        "operationId": "topicGetByTenantTopicByIdActual"
       }
     },
     "/allocation/{tenant}/topic/{id}/status": {
@@ -4908,6 +5947,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4930,7 +5979,8 @@
         "summary": "returns a brief status description of a topic allocation",
         "tags": [
           "topic"
-        ]
+        ],
+        "operationId": "topicGetByTenantTopicByIdStatus"
       }
     },
     "/allocation/{tenant}/volume": {
@@ -4947,6 +5997,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4964,7 +6024,8 @@
         "summary": "returns a list containing the ids of all volumes of a given tenant",
         "tags": [
           "volume"
-        ]
+        ],
+        "operationId": "volumeGetByTenantVolume"
       }
     },
     "/allocation/{tenant}/volume/{id}": {
@@ -4993,6 +6054,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5015,7 +6086,8 @@
         "summary": "returns the overall status of a volume allocation",
         "tags": [
           "volume"
-        ]
+        ],
+        "operationId": "volumeGetByTenantVolumeById"
       }
     },
     "/allocation/{tenant}/volume/{id}/configuration": {
@@ -5044,6 +6116,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5054,7 +6136,8 @@
         "summary": "deletes a volume",
         "tags": [
           "volume"
-        ]
+        ],
+        "operationId": "volumeDeleteByTenantVolumeByIdConfiguration"
       },
       "get": {
         "parameters": [
@@ -5081,6 +6164,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5103,7 +6196,8 @@
         "summary": "returns the configuration for a volume allocation",
         "tags": [
           "volume"
-        ]
+        ],
+        "operationId": "volumeGetByTenantVolumeByIdConfiguration"
       },
       "put": {
         "parameters": [
@@ -5130,6 +6224,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5156,7 +6260,8 @@
         "summary": "create a new volume configuration. It is impossible to update an existing volume. This requires a delete of the existing volume and creation of a new one with the wanted configuration.",
         "tags": [
           "volume"
-        ]
+        ],
+        "operationId": "volumePutByTenantVolumeByIdConfiguration"
       }
     },
     "/allocation/{tenant}/volume/{id}/actual": {
@@ -5185,6 +6290,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5207,7 +6322,8 @@
         "summary": "returns the actual state for a volume allocation",
         "tags": [
           "volume"
-        ]
+        ],
+        "operationId": "volumeGetByTenantVolumeByIdActual"
       }
     },
     "/allocation/{tenant}/volume/{id}/status": {
@@ -5236,6 +6352,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5258,7 +6384,8 @@
         "summary": "returns a brief status description of a volume allocation",
         "tags": [
           "volume"
-        ]
+        ],
+        "operationId": "volumeGetByTenantVolumeByIdStatus"
       }
     },
     "/manage/{manager}/tenant": {
@@ -5275,6 +6402,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5292,7 +6429,8 @@
         "summary": "returns a list of tenants managed by the `manager` tenant",
         "tags": [
           "managed tenant"
-        ]
+        ],
+        "operationId": "managed tenantGetManageByManagerTenant"
       }
     },
     "/manage/{manager}/tenant/{tenant}/configuration": {
@@ -5321,6 +6459,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5331,7 +6479,8 @@
         "summary": "deletes a managed tenant for the managing tenant",
         "tags": [
           "managed tenant"
-        ]
+        ],
+        "operationId": "managed tenantDeleteManageByManagerTenantByTenantConfiguration"
       },
       "get": {
         "parameters": [
@@ -5358,6 +6507,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5380,7 +6539,8 @@
         "summary": "returns the configuration of tenant as managed by the manager",
         "tags": [
           "managed tenant"
-        ]
+        ],
+        "operationId": "managed tenantGetManageByManagerTenantByTenantConfiguration"
       },
       "put": {
         "parameters": [
@@ -5407,6 +6567,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5436,7 +6606,8 @@
         "summary": "creates and/or updates a managed tenant for managing tenant or update its configuration",
         "tags": [
           "managed tenant"
-        ]
+        ],
+        "operationId": "managed tenantPutManageByManagerTenantByTenantConfiguration"
       }
     },
     "/manage/{manager}/tenant/{tenant}/actual": {
@@ -5465,6 +6636,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5487,7 +6668,8 @@
         "summary": "returns the actual state for a managed tenant allocation",
         "tags": [
           "managed tenant"
-        ]
+        ],
+        "operationId": "managed tenantGetManageByManagerTenantByTenantActual"
       }
     },
     "/manage/{manager}/tenant/{tenant}/status": {
@@ -5516,6 +6698,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5538,7 +6730,8 @@
         "summary": "returns a brief status description of a managed tenant allocation",
         "tags": [
           "managed tenant"
-        ]
+        ],
+        "operationId": "managed tenantGetManageByManagerTenantByTenantStatus"
       }
     },
     "/manage/{manager}/tenant/{tenant}/limit": {
@@ -5567,6 +6760,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5592,7 +6795,8 @@
         "summary": "get all limits of a managed tenant",
         "tags": [
           "managed tenant limits"
-        ]
+        ],
+        "operationId": "managed tenant limitsGetManageByManagerTenantByTenantLimit"
       },
       "patch": {
         "parameters": [
@@ -5619,6 +6823,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5654,7 +6868,8 @@
         "summary": "update multiple limits of a managed tenant",
         "tags": [
           "managed tenant limits"
-        ]
+        ],
+        "operationId": "managed tenant limitsPatchManageByManagerTenantByTenantLimit"
       }
     },
     "/manage/{manager}/tenant/{tenant}/limit/{kind}": {
@@ -5706,6 +6921,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5752,7 +6977,8 @@
         "summary": "get a specific managed tenant limit set by the managing tenant",
         "tags": [
           "managed tenant limits"
-        ]
+        ],
+        "operationId": "managed tenant limitsGetManageByManagerTenantByTenantLimitByKind"
       },
       "put": {
         "parameters": [
@@ -5802,6 +7028,16 @@
               "type": "string"
             },
             "style": "simple"
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Authorization header (bearer token)",
+            "required": true,
+            "deprecated": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5855,7 +7091,8 @@
         "summary": "create and/or update the configured limits for a managed tenant",
         "tags": [
           "managed tenant limits"
-        ]
+        ],
+        "operationId": "managed tenant limitsPutManageByManagerTenantByTenantLimitByKind"
       }
     }
   },
@@ -6369,18 +7606,11 @@
           }
         }
       },
-      "dataCatalogAssetBucket": {
-        "description": "an example data catalog asset for a bucket",
+      "dataCatalogAsset": {
+        "description": "an example data catalog asset",
         "value": {
           "kind": "bucket",
           "name": "my-bucket"
-        }
-      },
-      "dataCatalogAssetWritableStream": {
-        "description": "an example data catalog asset for a public writablestream",
-        "value": {
-          "kind": "writablestream",
-          "name": "stream.my-stream"
         }
       },
       "thirdpartybucketRegistration": {
@@ -6602,6 +7832,14 @@
           "type": "string"
         },
         "style": "simple"
+      }
+    },
+    "responses": {
+      "200-AllocationStatus": {
+        "$ref": "./openapi-common.yml#/components/responses/200-AllocationStatus"
+      },
+      "200-ChildList": {
+        "$ref": "./openapi-common.yml#/components/responses/200-ChildList"
       }
     },
     "schemas": {
@@ -7504,7 +8742,7 @@
       "KafkaProxy": {
         "example": {
           "mem": 3072,
-          "zone": "private",
+          "zone": "internal",
           "cpus": 0.3,
           "instances": 2,
           "schemaStoreCpus": 0.1,
@@ -7542,7 +8780,7 @@
           "zone": {
             "description": "Available networks on this platform",
             "enum": [
-              "private",
+              "internal",
               "public"
             ],
             "type": "string"
