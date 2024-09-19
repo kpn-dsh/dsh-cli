@@ -7,11 +7,12 @@ use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT, TARGET_A
 use crate::capability::CapabilityType::*;
 use crate::flags::{create_flag, FlagType};
 use crate::subject::Subject;
-use crate::CommandResult;
+use crate::{TcliContext, TcliResult};
 
 pub(crate) const CREATE: &str = "create";
 pub(crate) const DELETE: &str = "delete";
 pub(crate) const FIND: &str = "find";
+pub(crate) const DIFF: &str = "diff";
 pub(crate) const LIST: &str = "list";
 pub(crate) const SHOW: &str = "show";
 pub(crate) const START: &str = "start";
@@ -22,6 +23,7 @@ pub(crate) const UPDATE: &str = "update";
 pub(crate) enum CapabilityType {
   Create,
   Delete,
+  Diff,
   Find,
   List,
   Show,
@@ -30,7 +32,7 @@ pub(crate) enum CapabilityType {
   Update,
 }
 
-pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 8] = [Create, Delete, Find, List, Show, Start, Stop, Update];
+pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 9] = [Create, Delete, Diff, Find, List, Show, Start, Stop, Update];
 
 impl TryFrom<&str> for CapabilityType {
   type Error = String;
@@ -39,6 +41,7 @@ impl TryFrom<&str> for CapabilityType {
     match value {
       CREATE => Ok(Create),
       DELETE => Ok(Delete),
+      DIFF => Ok(Diff),
       FIND => Ok(Find),
       LIST => Ok(List),
       SHOW => Ok(Show),
@@ -55,6 +58,7 @@ impl CapabilityType {
     match self {
       Create => CREATE,
       Delete => DELETE,
+      Diff => DIFF,
       Find => FIND,
       List => LIST,
       Show => SHOW,
@@ -72,6 +76,7 @@ impl CapabilityType {
     match self {
       Create => None,
       Delete => None,
+      Diff => Some("d"),
       Find => Some("f"),
       List => Some("l"),
       Show => Some("s"),
@@ -85,6 +90,7 @@ impl CapabilityType {
     match self {
       Create => vec![target_argument(subject, None)],
       Delete => vec![target_argument(subject, None)],
+      Diff => vec![target_argument(subject, None)],
       Find => vec![query_argument(None)],
       List => vec![],
       Show => vec![target_argument(subject, None)],
@@ -98,6 +104,7 @@ impl CapabilityType {
     match self {
       Create => &[TARGET_ARGUMENT],
       Delete => &[TARGET_ARGUMENT],
+      Diff => &[TARGET_ARGUMENT],
       Find => &[QUERY_ARGUMENT],
       List => &[],
       Show => &[TARGET_ARGUMENT],
@@ -118,12 +125,19 @@ pub trait Capability {
 
   fn long_about(&self) -> Option<String>;
 
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult;
+  async fn execute_capability(
+    &self,
+    argument: Option<String>,
+    sub_argument: Option<String>,
+    matches: &ArgMatches,
+    context: &TcliContext,
+    dsh_api_client: &DshApiClient<'_>,
+  ) -> TcliResult;
 }
 
 #[async_trait]
 pub(crate) trait CommandExecutor {
-  async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult;
+  async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult;
 }
 
 pub(crate) struct DeclarativeCapability<'a> {
@@ -180,32 +194,40 @@ impl Capability for DeclarativeCapability<'_> {
     self.command_long_about.clone()
   }
 
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let mut at_least_one_executed = false;
+  async fn execute_capability(
+    &self,
+    argument: Option<String>,
+    sub_argument: Option<String>,
+    matches: &ArgMatches,
+    context: &TcliContext,
+    dsh_api_client: &DshApiClient<'_>,
+  ) -> TcliResult {
+    let mut last_tcli_result: Option<TcliResult> = None;
     if self.run_all_executors {
       for (flag_type, executor, _) in &self.command_executors {
         if matches.get_flag(flag_type.id()) {
-          executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await?;
-          at_least_one_executed = true;
+          last_tcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
         }
       }
     } else {
       for (flag_type, executor, _) in &self.command_executors {
         if matches.get_flag(flag_type.id()) {
-          executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await?;
-          at_least_one_executed = true;
+          last_tcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
           break;
         }
       }
     }
-    if !at_least_one_executed {
-      if let Some(default_executor) = self.default_command_executor {
-        default_executor.execute(argument.clone(), sub_argument.clone(), matches, dsh_api_client).await
-      } else {
-        Ok(())
+    match last_tcli_result {
+      Some(tcli_result) => tcli_result,
+      None => {
+        if let Some(default_executor) = self.default_command_executor {
+          default_executor
+            .execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client)
+            .await
+        } else {
+          Ok(true)
+        }
       }
-    } else {
-      Ok(())
     }
   }
 }

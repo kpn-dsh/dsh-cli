@@ -10,10 +10,9 @@ use trifonius_dsh_api::types::AppCatalogManifest;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
-use crate::formatters::app::{app_to_default_vector, default_app_column_labels};
+use crate::formatters::formatter::print_ids;
 use crate::subject::Subject;
-use crate::tabular::make_tabular_with_headers;
-use crate::CommandResult;
+use crate::{TcliContext, TcliResult};
 
 pub(crate) struct ManifestSubject {}
 
@@ -96,7 +95,10 @@ struct ManifestListAll {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    if context.show_capability_explanation() {
+      println!("list all app catalog manifests");
+    }
     let manifests: Vec<AppCatalogManifest> = dsh_api_client.get_app_catalog_manifests().await?;
 
     for (index, manifest) in manifests.iter().enumerate() {
@@ -123,7 +125,7 @@ impl CommandExecutor for ManifestListAll {
       // println!("vendor         {}", object.get(VENDOR).unwrap());
       // println!("version        {}", object.get(VERSION).unwrap());
     }
-    Ok(())
+    Ok(false)
   }
 }
 
@@ -131,19 +133,22 @@ struct ManifestListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let apps = &dsh_api_client.get_app_configurations().await?;
-    let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
-    app_ids.sort();
-    let mut table: Vec<Vec<String>> = vec![];
-    for app_id in app_ids {
-      let app = apps.get(&app_id).unwrap();
-      table.push(app_to_default_vector(app_id.as_str(), app));
-    }
-    for line in make_tabular_with_headers(&default_app_column_labels(), table) {
-      println!("{}", line)
-    }
-    Ok(())
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, _context: &TcliContext, _dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    // if context.show_capability_explanation() {
+    //   println!("list all app catalog manifests with their configurations");
+    // }
+    // let apps = &dsh_api_client.get_app_configurations().await?;
+    // let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+    // app_ids.sort();
+    // let mut builder = StringTableBuilder::new(&["app", "application resource", "environment variables"], context);
+    // for app_id in app_ids {
+    //   let app = apps.get(&app_id).unwrap();
+    //   table.push(app_to_default_vector(app_id.as_str(), app));
+    // }
+    // for line in make_tabular_with_headers(&default_app_column_labels(), table) {
+    //   println!("{}", line)
+    // }
+    Ok(false)
   }
 }
 
@@ -151,12 +156,21 @@ struct ManifestListIds {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let id_versions_pairs: Vec<(String, Vec<String>)> = dsh_api_client.get_app_catalog_manifest_ids_with_versions().await?;
-    for (id, _) in id_versions_pairs {
-      println!("{}", id)
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    if context.show_capability_explanation() {
+      println!("list all app catalog manifest ids");
     }
-    Ok(())
+    print_ids(
+      "manifest ids".to_string(),
+      dsh_api_client
+        .get_app_catalog_manifest_ids_with_versions()
+        .await?
+        .iter()
+        .map(|p| p.0.clone())
+        .collect::<Vec<String>>(),
+      context,
+    );
+    Ok(false)
   }
 }
 
@@ -164,8 +178,11 @@ struct ManifestShowAll {}
 
 #[async_trait]
 impl CommandExecutor for ManifestShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
+    if context.show_capability_explanation() {
+      println!("show all parameters for app catalog manifest '{}'", manifest_id);
+    }
     let all_manifests: Vec<AppCatalogManifest> = dsh_api_client.get_app_catalog_manifests().await?;
     let all_values: Vec<Map<String, Value>> = all_manifests
       .iter()
@@ -228,7 +245,7 @@ impl CommandExecutor for ManifestShowAll {
     //   // println!("vendor         {}", object.get(VENDOR).unwrap());
     //   // println!("version        {}", object.get(VERSION).unwrap());
     // }
-    Ok(())
+    Ok(false)
 
     // let app = dsh_api_client.get_app_configuration(manifest_id.as_str()).await?;
     // println!("name:                 {}", app.name);

@@ -3,10 +3,13 @@ use clap::{builder, Arg, ArgAction};
 
 use crate::subject::Subject;
 
+pub(crate) const NO_BORDER_ARGUMENT: &str = "no-border-argument";
+pub(crate) const PLATFORM_ARGUMENT: &str = "platform-argument";
 pub(crate) const SET_VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
-pub(crate) const VERBOSITY_ARGUMENT: &str = "verbosity-argument";
-pub(crate) const TARGET_ARGUMENT: &str = "target-argument";
 pub(crate) const _SUBTARGET_ARGUMENT: &str = "subtarget-argument";
+pub(crate) const TARGET_ARGUMENT: &str = "target-argument";
+pub(crate) const TENANT_ARGUMENT: &str = "tenant-argument";
+pub(crate) const VERBOSITY_ARGUMENT: &str = "verbosity-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 
 #[derive(clap::ValueEnum, Clone, Debug, PartialEq, PartialOrd)]
@@ -21,6 +24,25 @@ pub(crate) enum Verbosity {
   High = 3,
 }
 
+pub(crate) fn no_border_argument() -> Arg {
+  Arg::new(NO_BORDER_ARGUMENT)
+    .long("no-border")
+    .action(ArgAction::SetTrue)
+    .help("Hide border")
+    .long_help("When this option is provided the table border will be ommitted.")
+}
+
+pub(crate) fn platform_argument() -> Arg {
+  Arg::new(PLATFORM_ARGUMENT)
+    .long("platform")
+    .short('p')
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("PLATFORM")
+    .help("Platform name")
+    .long_help("This option specifies the name of the target platform. Allowed values are 'nplz' ,'poc', 'prod', 'prodaz' and 'prodlz'.")
+}
+
 pub(crate) fn set_verbosity_argument() -> Arg {
   Arg::new(SET_VERBOSITY_ARGUMENT)
     .long("verbosity")
@@ -29,6 +51,17 @@ pub(crate) fn set_verbosity_argument() -> Arg {
     .value_name("VERBOSITY")
     .help("Set the verbosity level")
     .long_help("If this option is provided, it will set the verbosity level. The possible values are 'off', 'low', 'medium' and 'high'.")
+}
+
+pub(crate) fn tenant_argument() -> Arg {
+  Arg::new(TENANT_ARGUMENT)
+    .long("tenant")
+    .short('t')
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("TENANT")
+    .help("Tenant name")
+    .long_help("This option specifies the name of the target tenant.")
 }
 
 pub(crate) fn verbosity_argument() -> Arg {

@@ -12,6 +12,8 @@ pub(crate) enum FlagType {
   Application,
   Configuration,
   Ids,
+  Json,
+  MultiLine,
   Tasks,
   Usage,
   Value,
@@ -27,6 +29,8 @@ impl FlagType {
       Application => "application-flag",
       Configuration => "configuration-flag",
       Ids => "ids-flag",
+      Json => "json-flag",
+      MultiLine => "multi-line-flag",
       Tasks => "tasks-flag",
       Usage => "usage-flag",
       Value => "value-flag",
@@ -42,6 +46,8 @@ impl FlagType {
       Application => "application",
       Configuration => "configuration",
       Ids => "ids",
+      Json => "json",
+      MultiLine => "multi-line",
       Tasks => "tasks",
       Usage => "usage",
       Value => "value",
@@ -57,6 +63,8 @@ impl FlagType {
       Application => None,
       Configuration => Some('c'),
       Ids => Some('i'),
+      Json => Some('j'),
+      MultiLine => Some('m'),
       Tasks => None,
       Usage => Some('u'),
       Value => Some('v'),
@@ -73,6 +81,8 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
     Application => application_flag(subject, long_help),
     Configuration => configuration_flag(subject, long_help),
     Ids => ids_flag(subject, long_help),
+    Json => json_flag(subject, long_help),
+    MultiLine => multi_line_flag(subject, long_help),
     Tasks => tasks_flag(subject, long_help),
     Usage => usage_flag(subject, long_help),
     Value => value_flag(subject, long_help),
@@ -120,6 +130,14 @@ fn configuration_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
 
 fn ids_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(Ids, subject, format!("Show {}'s ids.", subject.subject()).as_str(), long_help)
+}
+
+fn json_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Json, subject, format!("Show {} as json.", subject.subject()).as_str(), long_help)
+}
+
+fn multi_line_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(MultiLine, subject, format!("Enter {} as multi-line string.", subject.subject()).as_str(), long_help)
 }
 
 fn tasks_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {

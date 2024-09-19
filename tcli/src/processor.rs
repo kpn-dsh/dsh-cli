@@ -9,9 +9,9 @@ use trifonius_dsh_api::types::Application;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
+use crate::formatters::formatter::StringTableBuilder;
 use crate::subject::Subject;
-use crate::tabular::make_tabular_with_headers;
-use crate::CommandResult;
+use crate::{TcliContext, TcliResult};
 
 const TRIFONIUS_PIPELINE_ID: &str = "TRIFONIUS_PIPELINE_ID";
 const TRIFONIUS_PROCESSOR_REALIZATION_ID: &str = "TRIFONIUS_PROCESSOR_REALIZATION_ID";
@@ -79,9 +79,15 @@ struct ListAll {}
 
 #[async_trait]
 impl CommandExecutor for ListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    if context.show_capability_explanation() {
+      println!("list all Trifonius processors");
+    }
     let applications = dsh_api_client.get_application_configurations().await?;
-    let mut table: Vec<Vec<String>> = vec![];
+    let mut builder = StringTableBuilder::new(
+      &["application", "pipeline", "processor", "type", "processor id", "service name", "ports", "cpus", "mem", "#", "user", "metrics"],
+      context,
+    );
     for (application_id, application) in applications {
       if let Some(trifonius_parameters) = find_trifonius_parameters(&application) {
         let parameters = vec![
@@ -98,16 +104,11 @@ impl CommandExecutor for ListAll {
           application.user,
           application.metrics.clone().map(|m| format!("{}:{}", m.path, m.port)).unwrap_or_default(),
         ];
-        table.push(parameters);
+        builder.vec(&parameters);
       }
     }
-    for line in make_tabular_with_headers(
-      &["application", "pipeline", "processor", "type", "processor id", "service name", "ports", "cpus", "mem", "#", "user", "metrics"],
-      table,
-    ) {
-      println!("{}", line)
-    }
-    Ok(())
+    builder.print_list();
+    Ok(false)
   }
 }
 

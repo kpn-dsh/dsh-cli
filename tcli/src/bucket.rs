@@ -2,17 +2,18 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
+use futures::future::try_join_all;
 use lazy_static::lazy_static;
 
 use trifonius_dsh_api::dsh_api_client::DshApiClient;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
-use crate::formatters::allocation_status::{allocation_status_table_column_labels, allocation_status_to_table_row};
-use crate::formatters::bucket::{bucket_status_table_column_labels, bucket_status_to_table_row, bucket_table_column_labels, bucket_to_table_row};
+use crate::formatters::allocation_status::print_allocation_statuses;
+use crate::formatters::bucket::{BUCKET_LABELS, BUCKET_STATUS_LABELS};
+use crate::formatters::formatter::{print_ids, TableBuilder};
 use crate::subject::Subject;
-use crate::tabular::make_tabular_with_headers;
-use crate::CommandResult;
+use crate::{TcliContext, TcliResult};
 
 pub(crate) struct BucketSubject {}
 
@@ -92,17 +93,18 @@ struct BucketListAll {}
 
 #[async_trait]
 impl CommandExecutor for BucketListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    if context.show_capability_explanation() {
+      println!("list all buckets with their parameters");
+    }
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
-    let bucket_statuses = futures::future::join_all(bucket_ids.iter().map(|id| dsh_api_client.get_bucket(id.as_str()))).await;
-    let mut table = vec![];
+    let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| dsh_api_client.get_bucket(id.as_str()))).await?;
+    let mut builder = TableBuilder::list(&BUCKET_STATUS_LABELS, context);
     for (bucket_id, bucket_status) in bucket_ids.iter().zip(bucket_statuses) {
-      table.push(bucket_status_to_table_row(bucket_id, bucket_status.ok().as_ref()));
+      builder.value(bucket_id.to_string(), &bucket_status);
     }
-    for line in make_tabular_with_headers(&bucket_status_table_column_labels(BUCKET_SUBJECT_TARGET), table) {
-      println!("{}", line)
-    }
-    Ok(())
+    builder.print();
+    Ok(false)
   }
 }
 
@@ -110,17 +112,14 @@ struct BucketListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for BucketListAllocationStatus {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    if context.show_capability_explanation() {
+      println!("list all buckets with their allocation status");
+    }
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
-    let allocation_statuses = futures::future::join_all(bucket_ids.iter().map(|bucket_id| dsh_api_client.get_bucket_allocation_status(bucket_id))).await;
-    let mut table: Vec<Vec<String>> = vec![];
-    for (bucket_id, allocation_status) in bucket_ids.iter().zip(allocation_statuses) {
-      table.push(allocation_status_to_table_row(bucket_id, allocation_status.ok().as_ref()));
-    }
-    for line in make_tabular_with_headers(&allocation_status_table_column_labels(BUCKET_SUBJECT_TARGET), table) {
-      println!("{}", line)
-    }
-    Ok(())
+    let allocation_statuses = try_join_all(bucket_ids.iter().map(|bucket_id| dsh_api_client.get_bucket_allocation_status(bucket_id))).await?;
+    print_allocation_statuses(bucket_ids, allocation_statuses, context);
+    Ok(false)
   }
 }
 
@@ -128,17 +127,18 @@ struct BucketListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for BucketListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    if context.show_capability_explanation() {
+      println!("list all buckets with their configuration");
+    }
     let bucket_ids = dsh_api_client.get_bucket_ids().await?;
-    let buckets = futures::future::join_all(bucket_ids.iter().map(|id| dsh_api_client.get_bucket_configuration(id.as_str()))).await;
-    let mut table = vec![];
+    let buckets = try_join_all(bucket_ids.iter().map(|bucket_id| dsh_api_client.get_bucket_configuration(bucket_id.as_str()))).await?;
+    let mut builder = TableBuilder::list(&BUCKET_LABELS, context);
     for (bucket_id, bucket) in bucket_ids.iter().zip(buckets) {
-      table.push(bucket_to_table_row(bucket_id, bucket.ok().as_ref()));
+      builder.value(bucket_id.to_string(), &bucket);
     }
-    for line in make_tabular_with_headers(&bucket_table_column_labels(BUCKET_SUBJECT_TARGET), table) {
-      println!("{}", line)
-    }
-    Ok(())
+    builder.print();
+    Ok(false)
   }
 }
 
@@ -146,12 +146,12 @@ struct BucketListIds {}
 
 #[async_trait]
 impl CommandExecutor for BucketListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
-    let bucket_ids = dsh_api_client.get_bucket_ids().await?;
-    for bucket_id in bucket_ids {
-      println!("{}", bucket_id)
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
+    if context.show_capability_explanation() {
+      println!("list all bucket ids");
     }
-    Ok(())
+    print_ids("bucket ids".to_string(), dsh_api_client.get_bucket_ids().await?, context);
+    Ok(false)
   }
 }
 
@@ -159,11 +159,14 @@ struct BucketShowAll {}
 
 #[async_trait]
 impl CommandExecutor for BucketShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
+    if context.show_capability_explanation() {
+      println!("show all parameters for bucket '{}'", bucket_id);
+    }
     let bucket = dsh_api_client.get_bucket(bucket_id.as_str()).await?;
     println!("{:?}", bucket);
-    Ok(())
+    Ok(false)
   }
 }
 
@@ -171,10 +174,13 @@ struct BucketShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for BucketShowAllocationStatus {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
+    if context.show_capability_explanation() {
+      println!("show the allocation status for bucket '{}'", bucket_id);
+    }
     let allocation_status = dsh_api_client.get_bucket_allocation_status(bucket_id.as_str()).await?;
     println!("{}", serde_json::to_string_pretty(&allocation_status).unwrap());
-    Ok(())
+    Ok(false)
   }
 }

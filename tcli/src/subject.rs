@@ -6,7 +6,7 @@ use clap::{ArgMatches, Command};
 use trifonius_dsh_api::dsh_api_client::DshApiClient;
 
 use crate::capability::{Capability, CapabilityType, ALL_CAPABILITY_TYPES};
-use crate::CommandResult;
+use crate::{TcliContext, TcliResult};
 
 #[async_trait]
 pub trait Subject {
@@ -26,7 +26,7 @@ pub trait Subject {
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)>;
 
-  async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &'a DshApiClient<'_>) -> CommandResult {
+  async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, context: &TcliContext, dsh_api_client: &'a DshApiClient<'_>) -> TcliResult {
     match matches.subcommand() {
       Some((capability_command_id, matches)) => match CapabilityType::try_from(capability_command_id) {
         Ok(ref capability_type) => match self.capabilities().get(capability_type) {
@@ -34,7 +34,7 @@ pub trait Subject {
             let arguments = capability_type.command_target_argument_ids();
             let argument = arguments.first().and_then(|argument| matches.get_one::<String>(argument)).cloned();
             let sub_argument = arguments.get(1).and_then(|argument| matches.get_one::<String>(argument)).cloned();
-            capability.execute_capability(argument, sub_argument, matches, dsh_api_client).await
+            capability.execute_capability(argument, sub_argument, matches, context, dsh_api_client).await
           }
           None => unreachable!(),
         },
@@ -44,9 +44,9 @@ pub trait Subject {
     }
   }
 
-  async fn execute_subject_list_shortcut<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &'a DshApiClient<'_>) -> CommandResult {
+  async fn execute_subject_list_shortcut<'a>(&self, matches: &'a ArgMatches, context: &TcliContext, dsh_api_client: &'a DshApiClient<'_>) -> TcliResult {
     match self.capabilities().get(&CapabilityType::List) {
-      Some(capability) => capability.execute_capability(None, None, matches, dsh_api_client).await,
+      Some(capability) => capability.execute_capability(None, None, matches, context, dsh_api_client).await,
       None => unreachable!(),
     }
   }

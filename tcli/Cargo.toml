@@ -16,5 +16,8 @@ dsh_sdk = { version = "0.4", features = ["rest-token-fetcher"], default-features
 futures = "0.3"
 lazy_static = "1.5"
 serde_json = "1.0"
+tabled = "0.16"
+termion = "4.0"
 tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros"] }
 trifonius-dsh-api = { path = "../dsh_api" }
+regex = "1.10"

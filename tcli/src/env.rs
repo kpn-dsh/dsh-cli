@@ -10,9 +10,9 @@ use trifonius_dsh_api::types::AppCatalogApp;
 use crate::app::get_application_from_app;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
+use crate::formatters::formatter::StringTableBuilder;
 use crate::subject::Subject;
-use crate::tabular::make_tabular_with_headers;
-use crate::CommandResult;
+use crate::{TcliContext, TcliResult};
 
 pub(crate) struct EnvSubject {}
 
@@ -74,12 +74,15 @@ struct EnvFindInApps {}
 
 #[async_trait]
 impl CommandExecutor for EnvFindInApps {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
     let query = target.unwrap_or_else(|| unreachable!());
+    if context.show_capability_explanation() {
+      println!("find environment variables that contain '{}' in apps", query);
+    }
     let apps: &HashMap<String, AppCatalogApp> = &dsh_api_client.get_app_configurations().await?;
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     app_ids.sort();
-    let mut table: Vec<Vec<String>> = vec![];
+    let mut builder = StringTableBuilder::new(&["app", "application resource", "environment variables"], context);
     for app_id in app_ids {
       let app = apps.get(&app_id).unwrap();
       if let Some((resource_id, application)) = get_application_from_app(app) {
@@ -90,14 +93,11 @@ impl CommandExecutor for EnvFindInApps {
           .collect();
         if !keys.is_empty() {
           keys.sort();
-          table.push(vec![app_id, resource_id.to_string(), keys.join(", ")]);
+          builder.vec(&vec![app_id, resource_id.to_string(), keys.join(", ")]);
         }
       }
     }
-    for line in make_tabular_with_headers(&["app", "application resource", "environment variables"], table) {
-      println!("{}", line)
-    }
-    Ok(())
+    Ok(false)
   }
 }
 
@@ -105,12 +105,15 @@ struct EnvFindInApplications {}
 
 #[async_trait]
 impl CommandExecutor for EnvFindInApplications {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, dsh_api_client: &DshApiClient<'_>) -> CommandResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &TcliContext, dsh_api_client: &DshApiClient<'_>) -> TcliResult {
     let query = target.unwrap_or_else(|| unreachable!());
+    if context.show_capability_explanation() {
+      println!("find environment variables that contain '{}' in applications", query);
+    }
     let applications = &dsh_api_client.get_application_actual_configurations().await?;
     let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     application_ids.sort();
-    let mut table: Vec<Vec<String>> = vec![];
+    let mut builder = StringTableBuilder::new(&["application", "environment variables"], context);
     for application_id in application_ids {
       let application = applications.get(&application_id).unwrap();
       let mut keys: Vec<String> = application
@@ -120,12 +123,9 @@ impl CommandExecutor for EnvFindInApplications {
         .collect();
       if !keys.is_empty() {
         keys.sort();
-        table.push(vec![application_id, keys.join(", ")]);
+        builder.vec(&vec![application_id, keys.join(", ")]);
       }
     }
-    for line in make_tabular_with_headers(&["application", "environment variables"], table) {
-      println!("{}", line)
-    }
-    Ok(())
+    Ok(false)
   }
 }
