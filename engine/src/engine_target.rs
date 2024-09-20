@@ -5,10 +5,10 @@ use rand::Rng;
 use regex::Regex;
 use uuid::Uuid;
 
-use trifonius_dsh_api::dsh_api_client::DshApiClient;
-use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
-use trifonius_dsh_api::dsh_api_tenant::DshApiTenant;
-use trifonius_dsh_api::platform::DshPlatform;
+use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_tenant::DshApiTenant;
+use dsh_api::platform::DshPlatform;
 
 use crate::placeholder::PlaceHolder;
 

@@ -1,5 +1,5 @@
-use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
-use trifonius_dsh_api::types::{AllocationStatus, Empty};
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::types::{AllocationStatus, Empty};
 
 #[tokio::main]
 async fn main() -> Result<(), String> {

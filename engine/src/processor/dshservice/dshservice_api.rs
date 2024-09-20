@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use trifonius_dsh_api::types::{
+use dsh_api::types::{
   Application as ApiApplication, ApplicationSecret as ApiApplicationSecret, ApplicationVolumes as ApiApplicationVolumes, HealthCheck as ApiHealthCheck,
   HealthCheckProtocol as ApiHealthCheckProtocol, Metrics as ApiMetrics, PathSpec as ApiPathSpec, PortMapping as ApiPortMapping, PortMappingTls as ApiPortMappingTls,
 };

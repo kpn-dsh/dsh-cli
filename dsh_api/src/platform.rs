@@ -70,7 +70,7 @@ impl DshPlatform {
   ///
   /// ## Example
   /// ```rust
-  /// use trifonius_dsh_api::platform::DshPlatform;
+  /// use dsh_api::platform::DshPlatform;
   ///
   /// let nplz_platform = DshPlatform::NpLz;
   /// if let Some(console) = nplz_platform.console_url() {
@@ -96,7 +96,7 @@ impl DshPlatform {
   ///
   /// ## Example
   /// ```rust
-  /// use trifonius_dsh_api::platform::DshPlatform;
+  /// use dsh_api::platform::DshPlatform;
   ///
   /// let tenant = "greenbox-dev";
   /// if let Some(url) = DshPlatform::NpLz.monitoring_url(tenant) {
@@ -117,7 +117,7 @@ impl DshPlatform {
   ///
   /// ## Example
   /// ```rust
-  /// use trifonius_dsh_api::platform::DshPlatform;
+  /// use dsh_api::platform::DshPlatform;
   ///
   /// if let Some(vhosts_domain) = DshPlatform::NpLz.public_vhosts_domain() {
   ///   println!("for the eavesdropper, click https://eavesdropper.{}", vhosts_domain);

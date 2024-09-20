@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use trifonius_dsh_api::types::Application;
+use dsh_api::types::Application;
 
 use crate::engine_target::{from_tenant_to_template_mapping, EngineTarget, TemplateMapping};
 use crate::pipeline::PipelineId;

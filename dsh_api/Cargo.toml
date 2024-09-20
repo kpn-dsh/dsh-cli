@@ -1,5 +1,5 @@
 [package]
-name = "trifonius-dsh-api"
+name = "dsh-api"
 
 authors.workspace = true
 description.workspace = true

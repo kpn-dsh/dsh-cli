@@ -21,8 +21,8 @@ impl DshApiTenant {
   /// ## Examples
   ///
   /// ```no_run
-  /// # use trifonius_dsh_api::dsh_api_tenant::DshApiTenant;
-  /// # use trifonius_dsh_api::platform::DshPlatform;
+  /// # use dsh_api::dsh_api_tenant::DshApiTenant;
+  /// # use dsh_api::platform::DshPlatform;
   /// let name = String::from("greenbox-dev");
   /// let user = String::from("1903:1903");
   /// let platform = DshPlatform::NpLz;
@@ -52,8 +52,8 @@ impl DshApiTenant {
   /// ## Examples
   ///
   /// ```no_run
-  /// # use trifonius_dsh_api::dsh_api_tenant::DshApiTenant;
-  /// # use trifonius_dsh_api::platform::DshPlatform;
+  /// # use dsh_api::dsh_api_tenant::DshApiTenant;
+  /// # use dsh_api::platform::DshPlatform;
   /// # fn main() -> Result<(), String> {
   /// let tenant_name = String::from("greenbox-dev");
   /// let dsh_api_tenant = DshApiTenant::from_tenant(tenant_name)?;
@@ -85,8 +85,8 @@ impl DshApiTenant {
   /// ## Examples
   ///
   /// ```no_run
-  /// # use trifonius_dsh_api::dsh_api_tenant::DshApiTenant;
-  /// # use trifonius_dsh_api::platform::DshPlatform;
+  /// # use dsh_api::dsh_api_tenant::DshApiTenant;
+  /// # use dsh_api::platform::DshPlatform;
   /// # fn main() -> Result<(), String> {
   /// let tenant_name = String::from("greenbox-dev");
   /// let platform = DshPlatform::NpLz;
@@ -119,8 +119,8 @@ impl DshApiTenant {
   /// ## Examples
   ///
   /// ```no_run
-  /// # use trifonius_dsh_api::dsh_api_tenant::DshApiTenant;
-  /// # use trifonius_dsh_api::platform::DshPlatform;
+  /// # use dsh_api::dsh_api_tenant::DshApiTenant;
+  /// # use dsh_api::platform::DshPlatform;
   /// # fn main() -> Result<(), String> {
   /// let tenant_name = String::from("greenbox-dev");
   /// let platform = DshPlatform::NpLz;

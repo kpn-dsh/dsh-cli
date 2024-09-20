@@ -1,7 +1,7 @@
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use std::collections::HashMap;
-use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
 
-use trifonius_dsh_api::types::{AllocationStatus, Application, Task, TaskStatus};
+use dsh_api::types::{AllocationStatus, Application, Task, TaskStatus};
 
 const APPLICATION_ID: &str = "consentfilter-test002";
 const TASK_ID: &str = "8f4b5747-lnmj4-00000000";

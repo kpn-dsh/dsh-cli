@@ -1,7 +1,6 @@
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::types::AppCatalogApp;
 use std::collections::HashMap;
-use trifonius_dsh_api::dsh_api_client_factory::DshApiClientFactory;
-
-use trifonius_dsh_api::types::AppCatalogApp;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {

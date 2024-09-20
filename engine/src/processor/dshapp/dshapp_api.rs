@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use trifonius_dsh_api::types::AppCatalogApp as ApiAppCatalogApp;
+use dsh_api::types::AppCatalogApp as ApiAppCatalogApp;
 
 use crate::engine_target::{template_resolver, TemplateMapping};
 use crate::processor::dshapp::dshapp_config::{DshAppSpecificConfig, ProfileConfig};

@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use trifonius_dsh_api::dsh_api_client::DshApiClient;
-use trifonius_dsh_api::types::Application;
-use trifonius_dsh_api::DshApiError;
+use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::types::Application;
+use dsh_api::DshApiError;
 
 use crate::engine_target::{from_tenant_to_template_mapping, TemplateMapping};
 use crate::pipeline::PipelineId;

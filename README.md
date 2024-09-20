@@ -1,5 +1,5 @@
 # Trifonius engine project
 
-* [Trifonius DSH API Client](dsh_api)
+* [DSH Api Client](dsh_api)
+* [DSH Api Command Line Tool](dcli)
 * [Trifonius Engine](engine)
-* [Trifonius Command Line Tool](cli)

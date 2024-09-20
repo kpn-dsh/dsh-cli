@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 async-trait = "0.1"
+dsh-api = { path = "../dsh_api" }
 dsh_sdk = { version = "0.4", features = ["bootstrap"], default-features = false }
 lazy_static = "1.5"
 log = "0.4"
@@ -19,7 +20,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9.33"
 toml = "0.8"
-trifonius-dsh-api = { path = "../dsh_api" }
 uuid = { version = "1.10", features = ["v4"] }
 
 # Move dependency to dev-dependencies
