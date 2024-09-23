@@ -45,7 +45,7 @@ impl Subject for ApplicationSubject {
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    let mut capabilities = HashMap::new();
     capabilities.insert(CapabilityType::Diff, APPLICATION_DIFF_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::List, APPLICATION_LIST_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::Show, APPLICATION_SHOW_CAPABILITY.as_ref());
