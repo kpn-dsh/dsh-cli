@@ -16,9 +16,9 @@ pub trait Subject {
 
   fn subject_command_about(&self) -> String;
 
-  fn subject_command_long_about(&self) -> String;
-
-  fn subject_command_name(&self) -> &str;
+  fn subject_command_long_about(&self) -> String {
+    self.subject_command_about()
+  }
 
   fn subject_command_alias(&self) -> Option<&str> {
     None
@@ -59,8 +59,7 @@ pub(crate) fn clap_subject_command(subject: &dyn Subject) -> (String, Command) {
       capability_subcommands.push(capability.clap_capability_command(subject))
     }
   }
-  let subject_command_name = subject.subject_command_name();
-  let mut subject_command = Command::new(subject_command_name.to_string())
+  let mut subject_command = Command::new(subject.subject().to_string())
     .about(subject.subject_command_about())
     .long_about(subject.subject_command_long_about())
     .arg_required_else_help(true)
@@ -68,13 +67,13 @@ pub(crate) fn clap_subject_command(subject: &dyn Subject) -> (String, Command) {
   if let Some(alias) = subject.subject_command_alias() {
     subject_command = subject_command.alias(alias.to_string())
   }
-  (subject_command_name.to_string(), subject_command)
+  (subject.subject().to_string(), subject_command)
 }
 
 pub(crate) fn clap_subject_list_shortcut(subject: &dyn Subject) -> Option<(String, Command)> {
   if let Some(list_capability) = subject.capabilities().get(&CapabilityType::List) {
     let list_flags = list_capability.clap_flags(subject);
-    let subject_list_shortcut_name = format!("{}s", subject.subject_command_name());
+    let subject_list_shortcut_name = format!("{}s", subject.subject());
     let mut subject_list_shortcut = Command::new(subject_list_shortcut_name.to_string())
       .about(subject.subject_command_about())
       .args(list_flags)
