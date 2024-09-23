@@ -8,7 +8,9 @@ pub(crate) mod certificate;
 pub(crate) mod formatter;
 pub(crate) mod proxy;
 pub(crate) mod secret;
+#[cfg(feature = "stream")]
 pub(crate) mod stream;
+pub(crate) mod task;
 pub(crate) mod topic;
 pub(crate) mod usage;
 pub(crate) mod volume;

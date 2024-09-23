@@ -27,9 +27,11 @@ use crate::bucket::BUCKET_SUBJECT;
 use crate::certificate::CERTIFICATE_SUBJECT;
 use crate::env::ENV_SUBJECT;
 use crate::manifest::MANIFEST_SUBJECT;
+#[cfg(feature = "trifonius")]
 use crate::processor::PROCESSOR_SUBJECT;
 use crate::proxy::PROXY_SUBJECT;
 use crate::secret::SECRET_SUBJECT;
+#[cfg(feature = "stream")]
 use crate::stream::STREAM_SUBJECT;
 use crate::subject::{clap_subject_command, clap_subject_list_shortcut, Subject};
 use crate::topic::TOPIC_SUBJECT;
@@ -46,17 +48,37 @@ mod env;
 mod flags;
 mod formatters;
 mod manifest;
+#[cfg(feature = "trifonius")]
 mod processor;
 mod proxy;
 mod secret;
+#[cfg(feature = "stream")]
 mod stream;
 mod subject;
 mod topic;
 mod vhost;
 mod volume;
 
+#[cfg(feature = "trifonius")]
+static ABOUT: &str = "DSH api command line interface (with Trifonius)";
+#[cfg(not(feature = "trifonius"))]
 static ABOUT: &str = "DSH api command line interface";
-static LONG_ABOUT: &str = "DSH api command line interface.";
+
+#[cfg(feature = "trifonius")]
+static LONG_ABOUT: &str = "DSH api command line interface (with Trifonius support).";
+#[cfg(not(feature = "trifonius"))]
+static LONG_ABOUT: &str = "DSH api command line interface\n\n\
+   The DSH api command line tool enables the user to call a subset of the functions \
+   in the DSH api from the command line. \
+   It also supports functions that are not supported directly from the DSH api, \
+   such as finding all applications that use a certain resource (e.g. a secret) or showing a \
+   list of all resources of a certain type (e.g. list all volumes).";
+
+static AFTER_HELP: &str = "Most commands adding an 's' as a postfix will yield the same result \
+   as using the 'list' subcommand, e.g. using 'dcli apps' will be the same \
+   as using 'dcli app list'.";
+static BEFORE_HELP: &str = "before help";
+static LONG_VERSION: &str = "version: 0.0.7\ndsh api version: 1.8.0";
 
 type DcliResult = Result<bool, String>;
 
@@ -141,9 +163,11 @@ async fn inner_main() -> DcliResult {
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
+    #[cfg(feature = "trifonius")]
     PROCESSOR_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
+    #[cfg(feature = "stream")]
     STREAM_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
@@ -168,8 +192,8 @@ async fn inner_main() -> DcliResult {
   let command = Command::new("dcli")
     .about(ABOUT)
     .long_about(LONG_ABOUT)
-    .after_help("For most commands adding an 's' will yield the same result as using the 'list' subcommand, e.g. using 'dcli apps' will be the same as using 'dcli app list'.")
-    .before_help("before help")
+    .after_help(AFTER_HELP)
+    .before_help(BEFORE_HELP)
     .args(vec![
       no_border_argument(),
       platform_argument(),
@@ -185,7 +209,7 @@ async fn inner_main() -> DcliResult {
     .styles(styles)
     .subcommands(clap_commands)
     .version("0.0.7")
-    .long_version("version: 0.0.7\ndsh api version: 1.8.0");
+    .long_version(LONG_VERSION);
 
   let matches = command.get_matches();
 
