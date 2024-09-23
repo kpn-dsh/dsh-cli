@@ -13,7 +13,10 @@ pub(crate) enum FlagType {
   Configuration,
   Ids,
   Json,
+  Killed,
   MultiLine,
+  Started,
+  Stopped,
   Tasks,
   Usage,
   Value,
@@ -30,7 +33,10 @@ impl FlagType {
       Configuration => "configuration-flag",
       Ids => "ids-flag",
       Json => "json-flag",
+      Killed => "killed-flag",
       MultiLine => "multi-line-flag",
+      Started => "started-flag",
+      Stopped => "stopped-flag",
       Tasks => "tasks-flag",
       Usage => "usage-flag",
       Value => "value-flag",
@@ -47,7 +53,10 @@ impl FlagType {
       Configuration => "configuration",
       Ids => "ids",
       Json => "json",
+      Killed => "killed",
       MultiLine => "multi-line",
+      Started => "started",
+      Stopped => "stopped",
       Tasks => "tasks",
       Usage => "usage",
       Value => "value",
@@ -64,7 +73,10 @@ impl FlagType {
       Configuration => Some('c'),
       Ids => Some('i'),
       Json => Some('j'),
+      Killed => None,
       MultiLine => Some('m'),
+      Started => None,
+      Stopped => None,
       Tasks => None,
       Usage => Some('u'),
       Value => Some('v'),
@@ -82,7 +94,10 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
     Configuration => configuration_flag(subject, long_help),
     Ids => ids_flag(subject, long_help),
     Json => json_flag(subject, long_help),
+    Killed => killed_flag(subject, long_help),
     MultiLine => multi_line_flag(subject, long_help),
+    Started => started_flag(subject, long_help),
+    Stopped => stopped_flag(subject, long_help),
     Tasks => tasks_flag(subject, long_help),
     Usage => usage_flag(subject, long_help),
     Value => value_flag(subject, long_help),
@@ -90,7 +105,12 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
 }
 
 fn actual_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Actual, subject, format!("Show actual {} configuration.", subject.subject()).as_str(), long_help)
+  create_clap_flag(
+    Actual,
+    subject,
+    format!("Include the {}'s actual configuration.", subject.subject()).as_str(),
+    long_help,
+  )
 }
 
 fn all_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
@@ -101,7 +121,7 @@ fn allocation_status_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Ar
   create_clap_flag(
     AllocationStatus,
     subject,
-    format!("Show {}'s allocation status", subject.subject()).as_str(),
+    format!("Include the {}'s allocation status.", subject.subject()).as_str(),
     long_help,
   )
 }
@@ -123,33 +143,50 @@ fn configuration_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(
     Configuration,
     subject,
-    format!("Show {}'s initial configuration.", subject.subject()).as_str(),
+    format!("Include the {}'s initial configuration.", subject.subject()).as_str(),
     long_help,
   )
 }
 
 fn ids_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Ids, subject, format!("Show {}'s ids.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Ids, subject, format!("Include the {}'s ids.", subject.subject()).as_str(), long_help)
 }
 
 fn json_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Json, subject, format!("Show {} as json.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Json, subject, format!("Show the {} as json.", subject.subject()).as_str(), long_help)
+}
+
+fn killed_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Killed, subject, format!("Include killed {}'s.", subject.subject()).as_str(), long_help)
 }
 
 fn multi_line_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(MultiLine, subject, format!("Enter {} as multi-line string.", subject.subject()).as_str(), long_help)
+  create_clap_flag(
+    MultiLine,
+    subject,
+    format!("Enter the {} as multi-line string.", subject.subject()).as_str(),
+    long_help,
+  )
+}
+
+fn started_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Started, subject, format!("Include started {}'s.", subject.subject()).as_str(), long_help)
+}
+
+fn stopped_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Stopped, subject, format!("Include stopped {}'s.", subject.subject()).as_str(), long_help)
 }
 
 fn tasks_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Tasks, subject, format!("Show {}'s tasks.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Tasks, subject, format!("Include the {}'s tasks.", subject.subject()).as_str(), long_help)
 }
 
 fn usage_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Usage, subject, format!("Show {}'s usages.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Usage, subject, format!("Include the {}'s usages.", subject.subject()).as_str(), long_help)
 }
 
 fn value_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Value, subject, format!("Show {}'s value.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Value, subject, format!("Include the {}'s value.", subject.subject()).as_str(), long_help)
 }
 
 fn create_clap_flag(flag_type: FlagType, _subject: &dyn Subject, help: &str, long_help: &Option<&str>) -> Arg {
