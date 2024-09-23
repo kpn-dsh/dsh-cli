@@ -40,10 +40,6 @@ impl Subject for ProxySubject {
     "Show, manage and list Kafka proxies used by the applications/services and apps on the DSH.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::Delete, PROXY_DELETE_CAPABILITY.as_ref());
@@ -59,8 +55,6 @@ lazy_static! {
     capability_type: CapabilityType::Delete,
     command_about: "Delete proxy".to_string(),
     command_long_about: Some("Delete a Kafka proxy.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![],
     default_command_executor: Some(&ProxyDelete {}),
     run_all_executors: false,
@@ -71,8 +65,6 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List proxies".to_string(),
     command_long_about: Some("Lists all Kafka proxies used by the applications/services and apps on the DSH.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::All, &ProxyListAll {}, None), (FlagType::Ids, &ProxyListIds {}, None)],
     default_command_executor: Some(&ProxyListIds {}),
     run_all_executors: true,
@@ -83,8 +75,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show Kafka proxy configuration".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::Configuration, &ProxyShowConfiguration {}, None)],
     default_command_executor: Some(&ProxyShowConfiguration {}),
     run_all_executors: false,
@@ -95,8 +85,6 @@ lazy_static! {
     capability_type: CapabilityType::Update,
     command_about: "Update proxy".to_string(),
     command_long_about: Some("Update a Kafka proxy configuration.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![],
     default_command_executor: Some(&ProxyUpdateConfiguration {}),
     run_all_executors: false,

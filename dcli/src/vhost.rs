@@ -39,10 +39,6 @@ impl Subject for VhostSubject {
     "Show which DSH component use a vhost.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn subject_command_alias(&self) -> Option<&str> {
     Some("v")
   }
@@ -62,8 +58,6 @@ lazy_static! {
     command_long_about: Some(
       "List applications that have vhosts configured. Vhosts that are provisioned but are not configured in any applications will not be shown.".to_string()
     ),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::Usage, &VhostListUsage {}, None)],
     default_command_executor: Some(&VhostListUsage {}),
     run_all_executors: false,
@@ -74,8 +68,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show vhost usage".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::Usage, &VhostShowUsage {}, None)],
     default_command_executor: Some(&VhostShowUsage {}),
     run_all_executors: false,

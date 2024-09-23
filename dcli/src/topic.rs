@@ -44,10 +44,6 @@ impl Subject for TopicSubject {
     "Show, manage and list topics deployed on the DSH.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn subject_command_alias(&self) -> Option<&str> {
     Some("t")
   }
@@ -79,8 +75,6 @@ lazy_static! {
     capability_type: CapabilityType::Delete,
     command_about: "Delete scratch topic".to_string(),
     command_long_about: Some("Delete a scratch topic.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![],
     default_command_executor: Some(&TopicDelete {}),
     run_all_executors: false,
@@ -91,8 +85,6 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List topics".to_string(),
     command_long_about: Some("Lists all available topics.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &TopicListAll {}, None),
       (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
@@ -109,8 +101,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show topic configuration".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &TopicShowAll {}, None),
       (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),

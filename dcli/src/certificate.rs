@@ -46,10 +46,6 @@ impl Subject for CertificateSubject {
     "Show, manage and list certificates deployed on the DSH.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn subject_command_alias(&self) -> Option<&str> {
     Some("c")
   }
@@ -67,8 +63,6 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List certificates".to_string(),
     command_long_about: Some("Lists all available certificates.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &CertificateListAll {}, None),
       (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
@@ -85,8 +79,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show certificate configuration".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &CertificateShowAll {}, None),
       (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),

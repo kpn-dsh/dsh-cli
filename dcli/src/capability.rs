@@ -144,8 +144,6 @@ pub(crate) struct DeclarativeCapability<'a> {
   pub(crate) capability_type: CapabilityType,
   pub(crate) command_about: String,
   pub(crate) command_long_about: Option<String>,
-  pub(crate) command_after_help: Option<String>,
-  pub(crate) command_after_long_help: Option<String>,
   pub(crate) command_executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<&'a str>)>,
   pub(crate) default_command_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
   pub(crate) run_all_executors: bool,
@@ -172,12 +170,6 @@ impl Capability for DeclarativeCapability<'_> {
     }
     if let Some(ref long_about) = self.command_long_about {
       capability_command = capability_command.long_about(long_about)
-    }
-    if let Some(ref after_help) = self.command_after_help {
-      capability_command = capability_command.after_help(after_help)
-    }
-    if let Some(ref after_long_help) = self.command_after_long_help {
-      capability_command = capability_command.after_long_help(after_long_help)
     }
     capability_command
   }

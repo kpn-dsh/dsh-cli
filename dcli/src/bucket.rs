@@ -41,10 +41,6 @@ impl Subject for BucketSubject {
     "Show, manage and list buckets deployed on the DSH.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn subject_command_alias(&self) -> Option<&str> {
     Some("b")
   }
@@ -62,8 +58,6 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List buckets".to_string(),
     command_long_about: Some("Lists all available buckets.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &BucketListAll {}, None),
       (FlagType::AllocationStatus, &BucketListAllocationStatus {}, None),
@@ -79,8 +73,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show bucket configuration".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::All, &BucketShowAll {}, None), (FlagType::AllocationStatus, &BucketShowAllocationStatus {}, None),],
     default_command_executor: Some(&BucketShowAll {}),
     run_all_executors: false,

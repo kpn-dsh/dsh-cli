@@ -36,19 +36,7 @@ impl Subject for AppSubject {
   }
 
   fn subject_command_about(&self) -> String {
-    "Show, manage and list DSH App Catalog apps.".to_string()
-  }
-
-  fn subject_command_long_about(&self) -> String {
-    "Show, manage and list apps deployed from the DSH App Catalog.".to_string()
-  }
-
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
-  fn subject_command_alias(&self) -> Option<&str> {
-    None
+    "Show, manage and list apps deployed from the DSH app catalog.".to_string()
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
@@ -62,10 +50,8 @@ impl Subject for AppSubject {
 lazy_static! {
   pub static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
-    command_about: "List apps".to_string(),
-    command_long_about: Some("Lists all available App Catalog apps.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
+    command_about: "List deployed apps".to_string(),
+    command_long_about: Some("Lists all apps deployed from the DSH app catalog.".to_string()),
     command_executors: vec![
       (FlagType::All, &AppListConfiguration {}, None),
       (FlagType::AllocationStatus, &AppListAllocationStatus {}, None),
@@ -80,9 +66,7 @@ lazy_static! {
   pub static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
     command_about: "Show app configuration".to_string(),
-    command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: Some("".to_string()),
+    command_long_about: Some("Show the configuration of an app deployed from the DSH app catalog.".to_string()),
     command_executors: vec![(FlagType::All, &AppShowAll {}, None)],
     default_command_executor: Some(&AppShowAll {}),
     run_all_executors: false,
@@ -97,7 +81,7 @@ struct AppListAllocationStatus {}
 impl CommandExecutor for AppListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all apps and their application status");
+      println!("list all deployed apps and their allocation status");
     }
     let app_ids = dsh_api_client.get_app_ids().await?;
     let allocation_statuses = try_join_all(app_ids.iter().map(|app_id| dsh_api_client.get_app_catalog_app_allocation_status(app_id))).await?;
@@ -112,7 +96,7 @@ struct AppListConfiguration {}
 impl CommandExecutor for AppListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all apps and their configurations");
+      println!("list all deployed apps and their configurations");
     }
     let apps = &dsh_api_client.get_app_configurations().await?;
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
@@ -133,7 +117,7 @@ struct AppListIds {}
 impl CommandExecutor for AppListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all app ids");
+      println!("list all deployed app ids");
     }
     print_ids("app ids".to_string(), dsh_api_client.get_app_ids().await?, context);
     Ok(false)

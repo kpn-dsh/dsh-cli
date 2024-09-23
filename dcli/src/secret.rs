@@ -48,10 +48,6 @@ impl Subject for SecretSubject {
     "Show, manage and list secrets used by the applications/services and apps on the DSH.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn subject_command_alias(&self) -> Option<&str> {
     Some("s")
   }
@@ -71,8 +67,6 @@ lazy_static! {
     capability_type: CapabilityType::Create,
     command_about: "Create secret".to_string(),
     command_long_about: Some("Create a secret.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::MultiLine, &SecretCreateMultiLine {}, None)],
     default_command_executor: Some(&SecretCreateSingleLine {}),
     run_all_executors: false,
@@ -83,8 +77,6 @@ lazy_static! {
     capability_type: CapabilityType::Delete,
     command_about: "Delete secret".to_string(),
     command_long_about: Some("Delete a secret.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![],
     default_command_executor: Some(&SecretDelete {}),
     run_all_executors: false,
@@ -95,8 +87,6 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List secrets".to_string(),
     command_long_about: Some("Lists all secrets used by the applications/services and apps on the DSH.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &SecretListIds {}, None),
       (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
@@ -115,8 +105,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show secret configuration or value".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::AllocationStatus, &SecretShowAllocationStatus {}, None),
       (FlagType::Usage, &SecretShowUsage {}, None),

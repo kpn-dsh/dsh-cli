@@ -44,10 +44,6 @@ impl Subject for VolumeSubject {
     "Show, manage and list volumes deployed on the DSH.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::Create, VOLUME_CREATE_CAPABILITY.as_ref());
@@ -63,8 +59,6 @@ lazy_static! {
     capability_type: CapabilityType::Create,
     command_about: "Create volume".to_string(),
     command_long_about: Some("Create a volume.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![],
     default_command_executor: Some(&VolumeCreate {}),
     run_all_executors: false,
@@ -75,8 +69,6 @@ lazy_static! {
     capability_type: CapabilityType::Delete,
     command_about: "Delete volume".to_string(),
     command_long_about: Some("Delete a volume.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![],
     default_command_executor: Some(&VolumeDelete {}),
     run_all_executors: false,
@@ -87,8 +79,6 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List volumes".to_string(),
     command_long_about: Some("Lists all available volumes.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &VolumeListAll {}, None),
       (FlagType::AllocationStatus, &VolumeListAllocationStatus {}, None),
@@ -105,8 +95,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show volume configuration".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![
       (FlagType::All, &VolumeShowAll {}, None),
       (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),

@@ -7,13 +7,14 @@ use lazy_static::lazy_static;
 
 use dsh_api::application::application_diff;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::types::Application;
+use dsh_api::types::{Application, TaskStatus};
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
-use crate::flags::FlagType;
-use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses, ALLOCATION_STATUS_LABELS};
+use crate::flags::{create_flag, FlagType};
+use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::application::{ApplicationLabel, APPLICATION_LABELS_LIST, APPLICATION_LABELS_SHOW};
 use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::task::TASK_LABELS_LIST;
 use crate::subject::Subject;
 use crate::{to_command_error_with_id, DcliContext, DcliResult};
 
@@ -36,15 +37,7 @@ impl Subject for ApplicationSubject {
   }
 
   fn subject_command_about(&self) -> String {
-    "Show, manage and list DSH applications/services.".to_string()
-  }
-
-  fn subject_command_long_about(&self) -> String {
-    "Show, manage and list applications/services deployed on the DSH.".to_string()
-  }
-
-  fn subject_command_name(&self) -> &str {
-    self.subject()
+    "Show, manage and list applications deployed on the DSH.".to_string()
   }
 
   fn subject_command_alias(&self) -> Option<&str> {
@@ -64,9 +57,7 @@ lazy_static! {
   pub static ref APPLICATION_DIFF_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Diff,
     command_about: "Diff applications".to_string(),
-    command_long_about: Some("Compare the deployed configuration of the application against the actual configuration.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
+    command_long_about: Some("Compare the deployment configuration of the application against the actual configuration.".to_string()),
     command_executors: vec![(FlagType::All, &ApplicationDiffAll {}, None),],
     default_command_executor: Some(&ApplicationDiffAll {}),
     run_all_executors: false,
@@ -76,9 +67,12 @@ lazy_static! {
   pub static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
     command_about: "List applications".to_string(),
-    command_long_about: Some("Lists all available DSH applications/services.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
+    command_long_about: Some(
+      "Lists all deployed DSH applications. \
+    This will also include applications that are stopped \
+    (deployed with 0 instances)."
+        .to_string()
+    ),
     command_executors: vec![
       (FlagType::All, &ApplicationListAll {}, None),
       (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
@@ -89,14 +83,15 @@ lazy_static! {
     default_command_executor: Some(&ApplicationListIds {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    extra_flags: vec![
+      create_flag(&FlagType::Started, &ApplicationSubject {}, &Some("List all started applications.")),
+      create_flag(&FlagType::Stopped, &ApplicationSubject {}, &Some("List all stopped applications."))
+    ],
   });
   pub static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
     command_about: "Show application configuration".to_string(),
-    command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
+    command_long_about: Some("".to_string()),
     command_executors: vec![
       (FlagType::All, &ApplicationShowAll {}, None),
       (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
@@ -135,11 +130,11 @@ struct ApplicationListAll {}
 
 #[async_trait]
 impl CommandExecutor for ApplicationListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all applications with their parameters");
     }
-    print_applications(&dsh_api_client.get_application_actual_configurations().await?, context)
+    print_applications(&dsh_api_client.get_application_actual_configurations().await?, matches, context)
   }
 }
 
@@ -167,11 +162,11 @@ struct ApplicationListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for ApplicationListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all applications with their configuration");
     }
-    print_applications(&dsh_api_client.get_application_configurations().await?, context)
+    print_applications(&dsh_api_client.get_application_configurations().await?, matches, context)
   }
 }
 
@@ -277,6 +272,7 @@ impl CommandExecutor for ApplicationShowConfiguration {
     let application = dsh_api_client.get_application_configuration(application_id.as_str()).await?;
     let mut builder = TableBuilder::show(&APPLICATION_LABELS_SHOW, context);
     builder.value(application_id, &application);
+    builder.print();
     Ok(false)
   }
 }
@@ -291,27 +287,45 @@ impl CommandExecutor for ApplicationShowTasks {
       println!("show all tasks for application '{}'", application_id);
     }
     let task_ids = dsh_api_client.get_application_derived_task_ids(application_id.as_str()).await?;
-    let allocation_statuses = try_join_all(
+    let task_statuses = try_join_all(
       task_ids
         .iter()
-        .map(|task_id| dsh_api_client.get_application_task_allocation_status(application_id.as_str(), task_id.as_str())),
+        .map(|task_id| dsh_api_client.get_application_task(application_id.as_str(), task_id.as_str())),
     )
     .await?;
-    let mut builder = TableBuilder::show(&ALLOCATION_STATUS_LABELS, context);
-    for (task_id, allocation_status) in task_ids.iter().zip(allocation_statuses) {
-      builder.value(task_id.to_string(), &allocation_status);
+    let mut tasks: Vec<(&String, TaskStatus)> = task_ids.iter().zip(task_statuses).collect();
+    tasks.sort_by(|first, second| second.1.actual.clone().unwrap().staged_at.cmp(&first.1.actual.clone().unwrap().staged_at));
+    let mut builder = TableBuilder::list(&TASK_LABELS_LIST, context);
+    for (task_id, task_status) in tasks {
+      builder.value(task_id.to_string(), &task_status);
     }
     builder.print();
     Ok(false)
   }
 }
 
-fn print_applications(applications: &HashMap<String, Application>, context: &DcliContext) -> DcliResult {
+fn print_applications(applications: &HashMap<String, Application>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
   let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
   application_ids.sort();
   let mut builder = TableBuilder::list(&APPLICATION_LABELS_LIST, context);
   for application_id in application_ids {
-    builder.value(application_id.clone(), applications.get(&application_id).unwrap());
+    if let Some(application) = applications.get(&application_id) {
+      match (matches.get_flag(FlagType::Started.id()), matches.get_flag(FlagType::Stopped.id())) {
+        (false, true) => {
+          if application.instances == 0 {
+            builder.value(application_id.clone(), application);
+          }
+        }
+        (true, false) => {
+          if application.instances > 0 {
+            builder.value(application_id.clone(), application);
+          }
+        }
+        _ => {
+          builder.value(application_id.clone(), application);
+        }
+      };
+    };
   }
   builder.print();
   Ok(false)

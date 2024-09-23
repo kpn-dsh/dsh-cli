@@ -40,10 +40,6 @@ impl Subject for ManifestSubject {
     "Show the manifest files for the apps in the DSH App Catalog.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::List, MANIFEST_LIST_CAPABILITY.as_ref());
@@ -57,8 +53,6 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List manifests".to_string(),
     command_long_about: Some("Lists all manifest files from the App Catalog.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::All, &ManifestListAll {}, None), (FlagType::Configuration, &ManifestListConfiguration {}, None), (FlagType::Ids, &ManifestListIds {}, None),],
     default_command_executor: Some(&ManifestListAll {}),
     run_all_executors: true,
@@ -69,8 +63,6 @@ lazy_static! {
     capability_type: CapabilityType::Show,
     command_about: "Show manifest configuration".to_string(),
     command_long_about: None,
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::All, &ManifestShowAll {}, None)],
     default_command_executor: Some(&ManifestShowAll {}),
     run_all_executors: false,

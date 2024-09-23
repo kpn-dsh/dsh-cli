@@ -40,10 +40,6 @@ impl Subject for EnvSubject {
     "Find values used in environment variables used to configure applications/services and apps deployed on the DSH.".to_string()
   }
 
-  fn subject_command_name(&self) -> &str {
-    self.subject()
-  }
-
   fn subject_command_alias(&self) -> Option<&str> {
     Some("e")
   }
@@ -60,8 +56,6 @@ lazy_static! {
     capability_type: CapabilityType::Find,
     command_about: "Find environment variable values".to_string(),
     command_long_about: Some("Find values used in environment variables used to configure applications/services and apps deployed on the DSH.".to_string()),
-    command_after_help: None,
-    command_after_long_help: None,
     command_executors: vec![(FlagType::App, &EnvFindInApps {}, None), (FlagType::Application, &EnvFindInApplications {}, None),],
     default_command_executor: Some(&EnvFindInApplications {}),
     run_all_executors: true,

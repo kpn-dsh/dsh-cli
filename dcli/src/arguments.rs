@@ -28,8 +28,8 @@ pub(crate) fn no_border_argument() -> Arg {
   Arg::new(NO_BORDER_ARGUMENT)
     .long("no-border")
     .action(ArgAction::SetTrue)
-    .help("Hide border")
-    .long_help("When this option is provided the table border will be ommitted.")
+    .help("Omit output border")
+    .long_help("When this option is provided table borders will be omitted from the output.")
 }
 
 pub(crate) fn platform_argument() -> Arg {
@@ -39,8 +39,13 @@ pub(crate) fn platform_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("PLATFORM")
-    .help("Platform name")
-    .long_help("This option specifies the name of the target platform. Allowed values are 'nplz' ,'poc', 'prod', 'prodaz' and 'prodlz'.")
+    .help("Target platform")
+    .long_help(
+      "This option specifies the name of the target platform. \
+    Supported values are 'nplz', 'poc', 'prod', 'prodaz' and 'prodlz'. \
+    If this argument is not provided, \
+    the platform must be specified via the environment variable 'DSH_API_PLATFORM'.",
+    )
 }
 
 pub(crate) fn set_verbosity_argument() -> Arg {
@@ -49,8 +54,13 @@ pub(crate) fn set_verbosity_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<Verbosity>::new())
     .value_name("VERBOSITY")
-    .help("Set the verbosity level")
-    .long_help("If this option is provided, it will set the verbosity level. The possible values are 'off', 'low', 'medium' and 'high'.")
+    .help("Verbosity level")
+    .long_help(
+      "If this option is provided, \
+    it will set the verbosity level. \
+    Supported values are 'off', 'low', 'medium' and 'high'. \
+    The default verbosity setting is 'low'.",
+    )
 }
 
 pub(crate) fn tenant_argument() -> Arg {
@@ -60,8 +70,12 @@ pub(crate) fn tenant_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("TENANT")
-    .help("Tenant name")
-    .long_help("This option specifies the name of the target tenant.")
+    .help("Target tenant")
+    .long_help(
+      "This option specifies the name of the target tenant. \
+    If this argument is not provided, \
+    the tenant must be specified via the environment variable 'DSH_API_TENANT'.",
+    )
 }
 
 pub(crate) fn verbosity_argument() -> Arg {
@@ -69,7 +83,10 @@ pub(crate) fn verbosity_argument() -> Arg {
     .short('v')
     .action(ArgAction::Count)
     .help("Verbosity level")
-    .long_help("This option determines the verbosity of the information that will be written to the output.")
+    .long_help(
+      "This option determines the verbosity of the information \
+    that will be written to the output.",
+    )
     .conflicts_with(SET_VERBOSITY_ARGUMENT)
 }
 
