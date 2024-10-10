@@ -189,10 +189,9 @@ fn parse_image_string(image_string: &str) -> Option<(String, String)> {
       ),
       app_catalog_captures.get(6).map(|m| m.as_str().to_string()).unwrap_or_default(),
     )),
-    None => match REGISTRY_IMAGE_REGEX.captures(image_string) {
-      Some(registry_captures) => Some(("registry".to_string(), registry_captures.get(2).map(|m| m.as_str().to_string()).unwrap_or_default())),
-      None => None,
-    },
+    None => REGISTRY_IMAGE_REGEX
+      .captures(image_string)
+      .map(|registry_captures| ("registry".to_string(), registry_captures.get(2).map(|m| m.as_str().to_string()).unwrap_or_default())),
   }
 }
 

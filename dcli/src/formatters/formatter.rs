@@ -196,7 +196,7 @@ impl<'a> StringTableBuilder<'a> {
     println!("{}", table);
   }
 
-  pub fn print_show(self) {
+  pub fn _print_show(self) {
     let mut table = self.tabled_builder.build();
     if let Ok((columns, _rows)) = terminal_size() {
       table.with(Width::truncate(columns as usize).suffix("..."));

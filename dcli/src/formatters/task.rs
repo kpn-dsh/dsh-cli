@@ -1,12 +1,14 @@
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use chrono::DateTime;
+
 use dsh_api::types::{Task, TaskStatus};
+
+use crate::formatters::formatter::{Label, SubjectFormatter};
 
 #[derive(Eq, Hash, PartialEq)]
 pub(crate) enum TaskLabel {
   Healthy,
   HostIpAddress,
-  LastestLog,
+  _LastestLog,
   LastUpdateAt,
   StagedAt,
   StartedAt,
@@ -20,7 +22,7 @@ impl Label for TaskLabel {
     match self {
       Self::Healthy => "healthy",
       Self::HostIpAddress => "host ip address",
-      Self::LastestLog => "latest log",
+      Self::_LastestLog => "latest log",
       Self::LastUpdateAt => "last update",
       Self::StagedAt => "staged",
       Self::StartedAt => "started",
@@ -34,7 +36,7 @@ impl Label for TaskLabel {
     match self {
       Self::Healthy => "healthy",
       Self::HostIpAddress => "host",
-      Self::LastestLog => "log",
+      Self::_LastestLog => "log",
       Self::LastUpdateAt => "update",
       Self::StagedAt => "staged",
       Self::StartedAt => "started",
@@ -55,7 +57,7 @@ impl SubjectFormatter<TaskLabel> for TaskStatus {
       Some(task) => match label {
         TaskLabel::Healthy => task.healthy.map(|healthy| healthy.to_string()).unwrap_or_default(),
         TaskLabel::HostIpAddress => task.host.to_string(),
-        TaskLabel::LastestLog => task.logs.map(|log| log.to_string()).unwrap_or_default(),
+        TaskLabel::_LastestLog => task.logs.map(|log| log.to_string()).unwrap_or_default(),
         TaskLabel::LastUpdateAt => task
           .last_update
           .and_then(|update| DateTime::from_timestamp_millis(update).map(|ts| ts.to_string()))

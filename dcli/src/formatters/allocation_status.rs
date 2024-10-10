@@ -44,7 +44,7 @@ impl SubjectFormatter<AllocationStatusLabel> for AllocationStatus {
   }
 }
 
-pub static ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
+pub static _ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
   [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::DerivedFrom, AllocationStatusLabel::Notifications];
 
 pub static DEFAULT_ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
