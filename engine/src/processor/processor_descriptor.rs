@@ -4,6 +4,7 @@ use serde::Serialize;
 
 use crate::processor::processor_config::{DeploymentParameterConfig, DeploymentParameterConfigOption, DeploymentParameterType, JunctionConfig};
 use crate::processor::{JunctionDirection, JunctionId, JunctionTechnology, ParameterId, ProcessorId, ProcessorTechnology};
+use crate::resource::ResourceTechnology;
 use crate::version::Version;
 use crate::ProfileId;
 
@@ -102,7 +103,14 @@ pub struct ProcessorTypeDescriptor {
   pub description: String,
 }
 
-impl ProcessorDescriptor {}
+impl JunctionDescriptor {
+  pub(crate) fn is_resource_technology_compatible(&self, resource_technology: &ResourceTechnology) -> bool {
+    match self.junction_technology {
+      JunctionTechnology::DshTopic => resource_technology == &ResourceTechnology::DshTopic,
+      JunctionTechnology::Grpc => false,
+    }
+  }
+}
 
 impl From<&ProcessorTechnology> for ProcessorTypeDescriptor {
   fn from(processor_technology: &ProcessorTechnology) -> Self {

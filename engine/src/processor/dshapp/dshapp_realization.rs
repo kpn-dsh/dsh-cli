@@ -15,7 +15,7 @@ use crate::processor::dshapp::dshapp_instance::DshAppInstance;
 use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_context::ProcessorContext;
-use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
+use crate::processor::processor_descriptor::{JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{JunctionDirection, JunctionId, JunctionIdentifier, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
@@ -85,6 +85,34 @@ impl ProcessorRealization for DshAppRealization {
 
   fn processor_technology(&self) -> ProcessorTechnology {
     ProcessorTechnology::DshApp
+  }
+
+  fn inbound_junction_descriptors(&self) -> Option<Vec<JunctionDescriptor>> {
+    match &self.processor_config.inbound_junctions {
+      Some(junctions) => {
+        let mut junction_descriptors = junctions
+          .iter()
+          .map(|(junction_id, junction_config)| junction_config.convert_to_descriptor(junction_id, JunctionDirection::Inbound))
+          .collect::<Vec<_>>();
+        junction_descriptors.sort_by(|jd1, jd2| jd1.id.cmp(&jd2.id));
+        Some(junction_descriptors)
+      }
+      None => None,
+    }
+  }
+
+  fn outbound_junction_descriptors(&self) -> Option<Vec<JunctionDescriptor>> {
+    match &self.processor_config.outbound_junctions {
+      Some(junctions) => {
+        let mut junction_descriptors = junctions
+          .iter()
+          .map(|(junction_id, junction_config)| junction_config.convert_to_descriptor(junction_id, JunctionDirection::Outbound))
+          .collect::<Vec<_>>();
+        junction_descriptors.sort_by(|jd1, jd2| jd1.id.cmp(&jd2.id));
+        Some(junction_descriptors)
+      }
+      None => None,
+    }
   }
 }
 

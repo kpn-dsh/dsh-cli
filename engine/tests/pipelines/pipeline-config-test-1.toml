@@ -9,10 +9,12 @@ resources = [
 ]
 processors = [
     { processor-id = "proc1", name = "DSH Service Processor 1", processor-realization = "service-topic-1", processor-realization-version = "0.1.2", parameters = { }, profile-id = "profile1" },
-    { processor-id = "proc2", name = "DSH Service Processor 2", processor-realization = "service-topic-2", processor-realization-version = "0.1.2", parameters = { }, profile-id = "profile2" }
+    { processor-id = "proc2", name = "DSH Service Processor 2", processor-realization = "service-topic-2", processor-realization-version = "0.1.2", parameters = { }, profile-id = "profile2" },
+    { processor-id = "proc3", name = "DSH Service Processor gRPc", processor-realization = "service-grpc-1", processor-realization-version = "0.1.2", parameters = { }, profile-id = "profile1" }
 ]
 connections = [
     { source-resources = ["res1", "res2"], target-processor = { processor-id = "proc1", junction = "inbound-topic" } },
+    #    { source-resources = ["res1", "res2"], target-processor = { processor-id = "proc3", junction = "inbound-grpc" } },
     { source-processor = { processor-id = "proc2", junction = "outbound-topic" }, target-resources = ["res1", "res2"] },
     { source-processor = { processor-id = "proc1", junction = "outbound-topic" }, target-processor = { processor-id = "proc2", junction = "inbound-topic" } },
     { source-processor = { processor-id = "proc2", junction = "outbound-topic" }, target-processor = { processor-id = "proc1", junction = "inbound-topic" } }

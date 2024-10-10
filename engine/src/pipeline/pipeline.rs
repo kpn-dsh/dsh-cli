@@ -82,6 +82,19 @@ impl<'a> Pipeline<'a> {
           let source_resource_identifiers = Self::get_resource_identifiers(&resources, source_resource_ids, &pipeline_config.pipeline_id)?;
           let (target_processor_realization_id, target_processor_descriptor, inbound_junction_descriptor) =
             Self::get_processor_inbound_junction(dsh_api_tenant, &pipeline_config, &processors, target_processor_junction)?;
+          if let Some((_, incompatible_resource)) = resources
+            .iter()
+            .find(|(_, resource)| !inbound_junction_descriptor.is_resource_technology_compatible(&resource.technology))
+          {
+            return Err(format!(
+              "source resource '{}' has technology '{}' while inbound junction '{}.{}' expects technology '{}'",
+              incompatible_resource.id,
+              incompatible_resource.technology,
+              target_processor_descriptor.id,
+              inbound_junction_descriptor.id,
+              inbound_junction_descriptor.junction_technology
+            ));
+          }
           let connection = PipelineConnection {
             connection: ConnectionType::ResourcesToProcessor {
               source_resources: source_resource_identifiers,
@@ -139,6 +152,7 @@ impl<'a> Pipeline<'a> {
       };
     }
 
+    #[allow(unused_mut)]
     let mut dependencies = vec![];
 
     Ok(Pipeline { id: pipeline_config.pipeline_id, name: pipeline_config.name, resources, processors, connections, dependencies })
@@ -383,7 +397,7 @@ impl Display for Pipeline<'_> {
     if !self.resources.is_empty() {
       writeln!(f, "  resources")?;
       let mut resources = self.resources.values().collect::<Vec<_>>();
-      resources.sort_by(|r1, r2| r1.id.cmp(&r2.id));
+      resources.sort_by(|pr1, pr2| pr1.id.cmp(&pr2.id));
       for resource in resources {
         writeln!(f, "    {}", resource)?;
       }
@@ -391,9 +405,31 @@ impl Display for Pipeline<'_> {
     if !self.processors.is_empty() {
       writeln!(f, "  processors")?;
       let mut processors = self.processors.values().collect::<Vec<_>>();
-      processors.sort_by(|p1, p2| p1.id.cmp(&p2.id));
+      processors.sort_by(|pp1, pp2| pp1.id.cmp(&pp2.id));
       for processor in processors {
-        writeln!(f, "    {}", processor)?;
+        writeln!(f, "    {}:{}:{}", processor.id, processor.technology, processor.realization_id)?;
+        if let Some(inbound_junctions) = processor.realization.inbound_junction_descriptors() {
+          writeln!(
+            f,
+            "      inbound junctions: {}",
+            inbound_junctions
+              .iter()
+              .map(|junction_descriptor| format!("{}:{}", junction_descriptor.id, junction_descriptor.junction_technology))
+              .collect::<Vec<_>>()
+              .join(", ")
+          )?;
+        }
+        if let Some(outbound_junctions) = processor.realization.outbound_junction_descriptors() {
+          writeln!(
+            f,
+            "      outbound junctions: {}",
+            outbound_junctions
+              .iter()
+              .map(|junction_descriptor| format!("{}:{}", junction_descriptor.id, junction_descriptor.junction_technology))
+              .collect::<Vec<_>>()
+              .join(", ")
+          )?;
+        }
       }
     }
     if !self.connections.is_empty() {

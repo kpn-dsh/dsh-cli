@@ -11,10 +11,10 @@ use crate::processor::dshservice::dshservice_config::read_dshservice_config;
 use crate::processor::dshservice::dshservice_instance::DshServiceInstance;
 use crate::processor::processor_config::ProcessorConfig;
 use crate::processor::processor_context::ProcessorContext;
-use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescriptor};
+use crate::processor::processor_descriptor::{JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
-use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
+use crate::processor::{JunctionDirection, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 
 #[derive(Debug)]
 pub struct DshServiceRealization {
@@ -77,6 +77,34 @@ impl ProcessorRealization for DshServiceRealization {
 
   fn processor_technology(&self) -> ProcessorTechnology {
     ProcessorTechnology::DshService
+  }
+
+  fn inbound_junction_descriptors(&self) -> Option<Vec<JunctionDescriptor>> {
+    match &self.processor_config.inbound_junctions {
+      Some(junctions) => {
+        let mut junction_descriptors = junctions
+          .iter()
+          .map(|(junction_id, junction_config)| junction_config.convert_to_descriptor(junction_id, JunctionDirection::Inbound))
+          .collect::<Vec<_>>();
+        junction_descriptors.sort_by(|jd1, jd2| jd1.id.cmp(&jd2.id));
+        Some(junction_descriptors)
+      }
+      None => None,
+    }
+  }
+
+  fn outbound_junction_descriptors(&self) -> Option<Vec<JunctionDescriptor>> {
+    match &self.processor_config.outbound_junctions {
+      Some(junctions) => {
+        let mut junction_descriptors = junctions
+          .iter()
+          .map(|(junction_id, junction_config)| junction_config.convert_to_descriptor(junction_id, JunctionDirection::Outbound))
+          .collect::<Vec<_>>();
+        junction_descriptors.sort_by(|jd1, jd2| jd1.id.cmp(&jd2.id));
+        Some(junction_descriptors)
+      }
+      None => None,
+    }
   }
 }
 

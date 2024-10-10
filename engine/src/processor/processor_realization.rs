@@ -9,7 +9,7 @@ use dsh_api::dsh_api_tenant::DshApiTenant;
 
 use crate::pipeline::PipelineId;
 use crate::processor::processor_context::ProcessorContext;
-use crate::processor::processor_descriptor::ProcessorDescriptor;
+use crate::processor::processor_descriptor::{JunctionDescriptor, ProcessorDescriptor};
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 
@@ -63,4 +63,16 @@ pub trait ProcessorRealization: Display + Sync {
   /// ## Returns
   /// * This `ProcessorRealization`s technology.
   fn processor_technology(&self) -> ProcessorTechnology;
+
+  /// # Get this `ProcessorRealization`s inbound junction descriptors
+  ///
+  /// ## Returns
+  /// * This `ProcessorRealization`s inbound junction descriptors.
+  fn inbound_junction_descriptors(&self) -> Option<Vec<JunctionDescriptor>>;
+
+  /// # Get this `ProcessorRealization`s outbound junction descriptors
+  ///
+  /// ## Returns
+  /// * This `ProcessorRealization`s outbound junction descriptors.
+  fn outbound_junction_descriptors(&self) -> Option<Vec<JunctionDescriptor>>;
 }

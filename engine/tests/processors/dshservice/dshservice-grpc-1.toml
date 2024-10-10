@@ -1,0 +1,36 @@
+[processor]
+processor-technology = "dshservice"
+processor-realization-id = "service-grpc-1"
+label = "Test DSH Service"
+description = "Test profiles"
+version = "0.1.2"
+
+[inbound-junctions.inbound-grpc]
+junction-technology = "grpc"
+label = "Test inbound grpc"
+description = "Test inbound grpc description"
+
+[outbound-junctions.outbound-grpc]
+junction-technology = "grpc"
+label = "Test outbound grpc"
+description = "Test outbound grpc description"
+minimum-number-of-connections = 1
+maximum-number-of-connections = 2
+
+[deploy]
+parameters = []
+
+[dshservice]
+
+image = "test-image:0.1.2-SNAPSHOT"
+needs-token = false
+single-instance = false
+spread-group = "SPREAD_GROUP"
+
+[[dshservice.profiles]]
+profile-id = "profile-1"
+label = "Profile 1"
+description = "Profile 1"
+cpus = 1
+instances = 1
+mem = 1
