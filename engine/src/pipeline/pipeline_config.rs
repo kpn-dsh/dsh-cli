@@ -10,7 +10,7 @@ use crate::placeholder::PlaceHolder;
 use crate::processor::{JunctionId, ParameterId, ProcessorId, ProcessorRealizationId};
 use crate::resource::{ResourceId, ResourceRealizationId};
 use crate::version::Version;
-use crate::{read_config, ProfileId};
+use crate::{read_config_file, ProfileId};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct PipelineConfig {
@@ -145,7 +145,7 @@ impl Display for ProcessorJunctionConfig {
 
 pub fn read_pipeline_config(config_file_name: &str) -> Result<PipelineConfig, String> {
   debug!("read pipeline config file: {}", config_file_name);
-  let pipeline_config = read_config::<PipelineConfig>(config_file_name, "pipeline")?;
+  let pipeline_config = read_config_file::<PipelineConfig>(config_file_name, "pipeline")?;
   debug!("successfully read and parsed pipeline config file\n{:#?}", pipeline_config);
   pipeline_config.validate()?;
   debug!("successfully validated config");

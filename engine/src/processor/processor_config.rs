@@ -10,7 +10,7 @@ use crate::processor::dshapp::dshapp_config::DshAppSpecificConfig;
 use crate::processor::dshservice::dshservice_config::DshServiceSpecificConfig;
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
 use crate::processor::{JunctionDirection, JunctionId, JunctionTechnology, ParameterId, ProcessorId, ProcessorRealizationId, ProcessorTechnology};
-use crate::read_config;
+use crate::read_config_file;
 use crate::version::Version;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -267,7 +267,7 @@ impl JunctionConfig {
     Ok(())
   }
 
-  fn convert_to_descriptor(&self, id: &JunctionId, direction: JunctionDirection) -> JunctionDescriptor {
+  pub(crate) fn convert_to_descriptor(&self, id: &JunctionId, direction: JunctionDirection) -> JunctionDescriptor {
     let (min, max) = match (self.minimum_number_of_connections, self.maximum_number_of_connections) {
       (None, None) => (1, 1),
       (None, Some(max)) => (1, max),
@@ -490,7 +490,7 @@ impl Display for DeploymentParameterConfig {
 
 pub fn read_processor_config(config_file_name: &str, processor_technology: ProcessorTechnology) -> Result<ProcessorConfig, String> {
   debug!("read {} config file: {}", processor_technology, config_file_name);
-  let processor_config = read_config::<ProcessorConfig>(config_file_name, processor_technology.to_string().as_str())?;
+  let processor_config = read_config_file::<ProcessorConfig>(config_file_name, processor_technology.to_string().as_str())?;
   debug!("successfully read and parsed {} config file\n{:#?}", processor_technology, processor_config);
   processor_config.validate(processor_technology)?;
   debug!("successfully validated config");
