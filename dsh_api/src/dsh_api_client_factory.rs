@@ -2,6 +2,7 @@ use std::env;
 
 use dsh_sdk::RestTokenFetcherBuilder;
 use dsh_sdk::{Platform as SdkPlatform, RestTokenFetcher};
+use lazy_static::lazy_static;
 
 use crate::dsh_api_client::DshApiClient;
 use crate::platform::DshPlatform;
@@ -15,20 +16,8 @@ pub struct DshApiClientFactory {
 }
 
 impl DshApiClientFactory {
-  pub fn platform(&self) -> &DshPlatform {
-    self.tenant.platform()
-  }
-
-  pub fn tenant(&self) -> &DshApiTenant {
-    &self.tenant
-  }
-
-  pub fn tenant_name(&self) -> &str {
-    self.tenant.name()
-  }
-
-  pub fn user(&self) -> &str {
-    self.tenant.user()
+  pub fn new() -> DshApiClientFactory {
+    DshApiClientFactory::default()
   }
 
   pub fn create(tenant: DshApiTenant, secret: String) -> Result<Self, String> {
@@ -43,6 +32,22 @@ impl DshApiClientFactory {
       }
       Err(e) => Err(format!("could not create token fetcher ({})", e)),
     }
+  }
+
+  pub fn platform(&self) -> &DshPlatform {
+    self.tenant.platform()
+  }
+
+  pub fn tenant(&self) -> &DshApiTenant {
+    &self.tenant
+  }
+
+  pub fn tenant_name(&self) -> &str {
+    self.tenant.name()
+  }
+
+  pub fn user(&self) -> &str {
+    self.tenant.user()
   }
 
   pub async fn client(&self) -> Result<DshApiClient, String> {
@@ -61,11 +66,15 @@ impl Default for DshApiClientFactory {
       Ok(secret) => secret,
       Err(error) => panic!("{}", error),
     };
-    match Self::create(tenant, secret) {
+    match DshApiClientFactory::create(tenant, secret) {
       Ok(factory) => factory,
       Err(error) => panic!("{}", error),
     }
   }
+}
+
+lazy_static! {
+  pub static ref DEFAULT_DSH_API_CLIENT_FACTORY: DshApiClientFactory = DshApiClientFactory::default();
 }
 
 pub fn get_secret_from_platform_and_tenant(platform_name: &str, tenant_name: &str) -> Result<String, String> {
