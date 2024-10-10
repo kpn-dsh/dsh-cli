@@ -217,7 +217,7 @@ impl DshAppRealization {
           for junction_id in connected_junctions {
             match junction_id {
               JunctionIdentifier::Processor(_, _, _) => unreachable!(),
-              JunctionIdentifier::Resource(resource_type, resource_realization_id) => match processor_context.resource_registry.resource_realization(resource_realization_id) {
+              JunctionIdentifier::Resource(_, resource_realization_id) => match processor_context.resource_registry.resource_realization(resource_realization_id) {
                 Some(resource) => match &resource.descriptor().dshtopic_descriptor {
                   Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
                   None => unreachable!(),

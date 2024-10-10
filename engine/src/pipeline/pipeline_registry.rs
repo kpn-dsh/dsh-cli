@@ -19,7 +19,6 @@ pub struct PipelineRegistry<'a> {
 impl<'a> PipelineRegistry<'a> {
   pub fn create(engine_target: &'a EngineTarget, resource_registry: &'a ResourceRegistry, processor_registry: &'a ProcessorRegistry) -> Result<PipelineRegistry<'a>, String> {
     let mut pipelines: HashMap<PipelineId, Pipeline> = HashMap::new();
-    let pipeline_config_dir = pipeline_config_dir_name();
     let paths = fs::read_dir(pipeline_config_dir_name()).map_err(|error| error.to_string())?;
     for path in paths {
       let config_file_name = path.unwrap().path().display().to_string();
