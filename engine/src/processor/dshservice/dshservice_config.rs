@@ -238,7 +238,7 @@ fn read_dshservice_config_proper_values() {
   use crate::version::Version;
 
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  path.push("tests/processors/dshservice/dshservice-config-test-1.toml");
+  path.push("tests/processors/dshservice/dshservice-dshtopic-1.toml");
   let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshService).unwrap();
 
   assert_eq!(config.processor.processor_technology, ProcessorTechnology::DshService);
@@ -474,7 +474,7 @@ fn read_dshservice_config_proper_values() {
 #[test]
 fn read_dshservice_config_profile_proper_values() {
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  path.push("tests/processors/dshservice/dshservice-config-test-1.toml");
+  path.push("tests/processors/dshservice/dshservice-dshtopic-1.toml");
   let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshService).unwrap();
   let dshservice_specific_config = config.dshservice_specific_config.as_ref().unwrap();
 

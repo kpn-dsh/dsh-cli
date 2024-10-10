@@ -349,20 +349,18 @@ impl DshServiceInstance<'_> {
           for junction_id in connected_junctions {
             match junction_id {
               JunctionIdentifier::Processor(_, _, _) => unreachable!(),
-              JunctionIdentifier::Resource(resource_type, resource_realization_id) => {
-                match self.processor_context.resource_registry.resource_realization(resource_realization_id) {
-                  Some(resource) => match &resource.descriptor().dshtopic_descriptor {
-                    Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
-                    None => unreachable!(),
-                  },
-                  None => {
-                    return Err(format!(
-                      "resource junction '{}' connected to {} junction '{}' does not exist",
-                      junction_id, in_out, junction_id
-                    ))
-                  }
+              JunctionIdentifier::Resource(_, resource_realization_id) => match self.processor_context.resource_registry.resource_realization(resource_realization_id) {
+                Some(resource) => match &resource.descriptor().dshtopic_descriptor {
+                  Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
+                  None => unreachable!(),
+                },
+                None => {
+                  return Err(format!(
+                    "resource junction '{}' connected to {} junction '{}' does not exist",
+                    junction_id, in_out, junction_id
+                  ))
                 }
-              }
+              },
             }
           }
           junction_topics.insert(junction_id.clone(), topics.join(multiple_connections_separator.as_str()));
