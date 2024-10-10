@@ -40,7 +40,7 @@ impl ProcessorRegistry {
     vec![ProcessorTypeDescriptor::from(&ProcessorTechnology::DshApp), ProcessorTypeDescriptor::from(&ProcessorTechnology::DshService)]
   }
 
-  pub(crate) fn processor_realization_ids(&self) -> Vec<&ProcessorRealizationId> {
+  pub(crate) fn _processor_realization_ids(&self) -> Vec<&ProcessorRealizationId> {
     let mut ids = [self.dshapp_realization_registry.processor_realization_ids(), self.dshservice_realization_registry.processor_realization_ids()].concat();
     ids.sort();
     ids
