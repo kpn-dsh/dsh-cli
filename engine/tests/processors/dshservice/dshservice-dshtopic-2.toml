@@ -1,6 +1,6 @@
 [processor]
 processor-technology = "dshservice"
-processor-realization-id = "dshservice2"
+processor-realization-id = "service-topic-2"
 label = "Test DSH Service 2"
 description = "Test profiles 2"
 version = "0.1.2"

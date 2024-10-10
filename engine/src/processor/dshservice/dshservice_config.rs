@@ -242,7 +242,7 @@ fn read_dshservice_config_proper_values() {
   let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshService).unwrap();
 
   assert_eq!(config.processor.processor_technology, ProcessorTechnology::DshService);
-  assert_eq!(config.processor.processor_realization_id, ProcessorRealizationId::new("dshservice1"));
+  assert_eq!(config.processor.processor_realization_id, ProcessorRealizationId::new("service-topic-1"));
   assert_eq!(config.processor.description, "Test profiles");
   assert_eq!(config.processor.version, Version::try_from("0.1.2").unwrap());
   assert_eq!(config.processor.icon, Some("ICON".to_string()));
