@@ -1,10 +1,8 @@
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
 
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::resource::{ResourceRealizationId, ResourceType};
+use crate::resource::{ResourceRealizationId, ResourceTechnology};
 use crate::{config_dir_name, identifier};
 
 pub mod dshapp;
@@ -26,10 +24,10 @@ pub enum ProcessorTechnology {
 
 #[derive(Clone, Debug, Deserialize, Hash, Eq, PartialEq, Serialize)]
 pub enum JunctionTechnology {
+  #[serde(rename = "dshtopic")]
+  DshTopic,
   #[serde(rename = "grpc")]
   Grpc,
-  #[serde(rename = "kafka")]
-  Kafka,
 }
 
 identifier!(
@@ -38,7 +36,12 @@ identifier!(
   "junction id",
   "^[a-z][a-z0-9-]{0,49}$",
   "valid-junction-id",
-  "invalid_junction_id"
+  "invalid_junction_id",
+  /// A `JunctionId` identifies an inbound or outbound junction in the scope
+  /// of a processor realization.
+  /// `JunctionId`s must be unique within the scope of their containing
+  /// processor realization, so an inbound junction can not have the same
+  /// `JunctionId` as an outbound junction.
 );
 identifier!(
   "trifonius_engine::processor",
@@ -46,7 +49,13 @@ identifier!(
   "parameter id",
   "^[a-z][a-z0-9-]{0,49}$",
   "valid-parameter-id",
-  "invalid_parameter_id"
+  "invalid_parameter_id",
+  /// A `ParameterId` identifies a parameter that must be provided
+  /// by the pipeline designer when he is designing a pipeline.
+  /// A parameter (and hence `ParameterId`) is defined in the
+  /// processor realization configuration file and can be retrieved from the backend as part
+  /// of the processor descriptor.
+  /// `ParameterId`s must be unique within the scope of their containing processor realization.
 );
 identifier!(
   "trifonius_engine::processor",
@@ -54,7 +63,11 @@ identifier!(
   "processor realization id",
   "^[a-z][a-z0-9-]{0,49}$",
   "valid-processor-realization-id",
-  "invalid_processor_realization_id"
+  "invalid_processor_realization_id",
+  /// Uniquely identifies a specific realization of a processor,
+  /// based on a specific processor technology,
+  /// usually with a configuration file.
+  /// `ProcessorRealization`s define the processors that are available to Trifonius designers.
 );
 identifier!(
   "trifonius_engine::processor",
@@ -62,7 +75,8 @@ identifier!(
   "processor id",
   "^[a-z][a-z0-9]{0,17}$",
   "validid",
-  "invalid-id"
+  "invalid-id",
+  /// Identifies an instance of a processor realization in the scope of a pipeline.
 );
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -74,19 +88,19 @@ pub struct ProcessorIdentifier {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum JunctionIdentifier {
   Processor(ProcessorTechnology, ProcessorRealizationId, JunctionId),
-  Resource(ResourceType, ResourceRealizationId),
+  Resource(ResourceTechnology, ResourceRealizationId),
 }
 
 impl Display for JunctionIdentifier {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      JunctionIdentifier::Processor(_, realization_id, junction_id) => write!(f, "{}.{}", realization_id, junction_id),
+      JunctionIdentifier::Processor(technology, realization_id, junction_id) => write!(f, "{}:{}.{}", realization_id, technology, junction_id),
       JunctionIdentifier::Resource(resource_type, realization_id) => write!(f, "{}:{}", realization_id, resource_type),
     }
   }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum JunctionDirection {
   #[serde(rename = "inbound")]
   Inbound,
@@ -107,7 +121,7 @@ impl Display for JunctionTechnology {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self {
       JunctionTechnology::Grpc => write!(f, "grpc"),
-      JunctionTechnology::Kafka => write!(f, "kafka"),
+      JunctionTechnology::DshTopic => write!(f, "dshtopic"),
     }
   }
 }

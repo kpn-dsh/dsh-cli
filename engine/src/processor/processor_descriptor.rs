@@ -1,9 +1,11 @@
 use std::fmt::{Display, Formatter};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::processor::processor_config::{DeploymentParameterConfig, DeploymentParameterConfigOption, DeploymentParameterType, JunctionConfig};
-use crate::processor::{JunctionTechnology, ProcessorTechnology};
+use crate::processor::{JunctionDirection, JunctionId, JunctionTechnology, ParameterId, ProcessorId, ProcessorTechnology};
+use crate::version::Version;
+use crate::ProfileId;
 
 /// Describes a `Processor`
 ///
@@ -13,17 +15,17 @@ use crate::processor::{JunctionTechnology, ProcessorTechnology};
 /// `Processor`s descriptors. A `Processor` can be used by a control application (cli or gui) to
 /// present the `Processor` to the user and to determine which parameters the user needs to provide
 /// to deploy a `Processor`.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ProcessorDescriptor {
-  #[serde(rename = "processor-technology")]
-  pub processor_technology: ProcessorTechnology,
-  pub id: String,
+  #[serde(rename = "technology")]
+  pub technology: ProcessorTechnology,
+  pub id: ProcessorId,
   pub label: String,
   pub description: String,
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub version: Option<String>,
+  pub version: Option<Version>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub icon: Option<String>, // TODO Is String the proper type?
+  pub icon: Option<String>,
   #[serde(skip_serializing_if = "Vec::is_empty")]
   pub tags: Vec<String>,
   #[serde(rename = "inbound-junctions", skip_serializing_if = "Vec::is_empty")]
@@ -44,9 +46,10 @@ pub struct ProcessorDescriptor {
   pub viewer_url: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct JunctionDescriptor {
-  pub id: String,
+  pub id: JunctionId,
+  pub direction: JunctionDirection,
   #[serde(rename = "junction-technology")]
   pub junction_technology: JunctionTechnology,
   pub label: String,
@@ -57,11 +60,11 @@ pub struct JunctionDescriptor {
   pub maximum_number_of_connections: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct DeploymentParameterDescriptor {
   #[serde(rename = "type")]
   pub parameter_type: DeploymentParameterType,
-  pub id: String,
+  pub id: ParameterId,
   pub label: String,
   pub description: String,
   pub optional: bool,
@@ -73,7 +76,7 @@ pub struct DeploymentParameterDescriptor {
   pub default: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct DeploymentParameterOptionDescriptor {
   pub id: String,
   pub label: String,
@@ -81,9 +84,9 @@ pub struct DeploymentParameterOptionDescriptor {
   pub description: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ProfileDescriptor {
-  pub profile_id: String,
+  pub profile_id: ProfileId, // TODO id
   pub label: String,
   pub description: String,
   pub instances: Option<u64>,
@@ -91,13 +94,15 @@ pub struct ProfileDescriptor {
   pub mem: Option<u64>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ProcessorTypeDescriptor {
   #[serde(rename = "processor-technology")]
   pub processor_technology: ProcessorTechnology,
   pub label: String,
   pub description: String,
 }
+
+impl ProcessorDescriptor {}
 
 impl From<&ProcessorTechnology> for ProcessorTypeDescriptor {
   fn from(processor_technology: &ProcessorTechnology) -> Self {
@@ -111,7 +116,7 @@ impl From<&ProcessorTechnology> for ProcessorTypeDescriptor {
 
 impl Display for ProcessorDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{} ({})", self.id, self.processor_technology, self.label)?;
+    write!(f, "{}:{} ({})", self.id, self.technology, self.label)?;
     if let Some(ref version) = self.version {
       write!(f, "\n  version {}", version)?;
     }
@@ -164,7 +169,7 @@ impl Display for ProcessorDescriptor {
 
 impl Display for JunctionDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{} ({}", self.id, self.junction_technology, self.label)?;
+    write!(f, "{}:{}:{} ({}", self.id, self.direction, self.junction_technology, self.label)?;
     if self.minimum_number_of_connections == self.maximum_number_of_connections {
       if self.minimum_number_of_connections == 1 {
         write!(f, ", 1 resource")?
@@ -225,15 +230,14 @@ impl Display for DeploymentParameterOptionDescriptor {
   }
 }
 
-impl From<(String, JunctionConfig)> for JunctionDescriptor {
-  fn from((id, config): (String, JunctionConfig)) -> Self {
-    JunctionDescriptor::from((&id, &config))
+impl From<(String, JunctionDirection, JunctionConfig)> for JunctionDescriptor {
+  fn from((id, direction, config): (String, JunctionDirection, JunctionConfig)) -> Self {
+    JunctionDescriptor::from((&id, &direction, &config))
   }
 }
 
-impl From<(&String, &JunctionConfig)> for JunctionDescriptor {
-  fn from((id, config): (&String, &JunctionConfig)) -> Self {
-    let c = config.clone();
+impl From<(&String, &JunctionDirection, &JunctionConfig)> for JunctionDescriptor {
+  fn from((id, direction, config): (&String, &JunctionDirection, &JunctionConfig)) -> Self {
     let (min, max) = match (config.minimum_number_of_connections, config.maximum_number_of_connections) {
       (None, None) => (1, 1),
       (None, Some(max)) => (1, max),
@@ -241,10 +245,11 @@ impl From<(&String, &JunctionConfig)> for JunctionDescriptor {
       (Some(min), Some(max)) => (min, max),
     };
     JunctionDescriptor {
-      id: id.to_owned(),
-      junction_technology: c.junction_technology.clone(),
-      label: c.label,
-      description: c.description,
+      id: JunctionId(id.to_owned()), // TODO
+      direction: direction.clone(),
+      junction_technology: config.junction_technology.clone(),
+      label: config.label.clone(),
+      description: config.description.clone(),
       minimum_number_of_connections: min,
       maximum_number_of_connections: max,
     }
@@ -266,7 +271,7 @@ impl From<(String, &DeploymentParameterConfig)> for DeploymentParameterDescripto
   fn from((id, config): (String, &DeploymentParameterConfig)) -> Self {
     DeploymentParameterDescriptor {
       parameter_type: config.typ.clone(),
-      id,
+      id: ParameterId(id), // TODO
       label: config.label.to_string(),
       description: config.description.to_string(),
       initial_value: config.initial_value.clone(),

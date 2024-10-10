@@ -19,7 +19,7 @@ use crate::processor::processor_config::{JunctionConfig, ProcessorConfig};
 use crate::processor::processor_context::ProcessorContext;
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
 use crate::processor::{JunctionDirection, JunctionId, JunctionIdentifier, JunctionTechnology, ParameterId, ProcessorId, ProcessorRealizationId};
-use crate::resource::{ResourceRealizationId, ResourceType};
+use crate::resource::{ResourceRealizationId, ResourceTechnology};
 use crate::ProfileId;
 
 pub struct DshServiceInstance<'a> {
@@ -64,14 +64,14 @@ impl ProcessorInstance for DshServiceInstance<'_> {
           for processor_descriptor in self
             .processor_context
             .processor_registry
-            .processor_descriptors(&self.processor_context.engine_target)
+            .processor_descriptors(self.processor_context.engine_target.tenant())
           {
             match direction {
               JunctionDirection::Inbound => {
                 for inbound_junction in &processor_descriptor.inbound_junctions {
                   if inbound_junction.junction_technology == JunctionTechnology::Grpc {
                     compatible_junctions.push(JunctionIdentifier::Processor(
-                      processor_descriptor.processor_technology.clone(),
+                      processor_descriptor.technology.clone(),
                       ProcessorRealizationId::try_from(processor_descriptor.id.to_string())?,
                       JunctionId::try_from(inbound_junction.id.to_string())?,
                     ))
@@ -82,7 +82,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
                 for outbound_junction in &processor_descriptor.outbound_junctions {
                   if outbound_junction.junction_technology == JunctionTechnology::Grpc {
                     compatible_junctions.push(JunctionIdentifier::Processor(
-                      processor_descriptor.processor_technology.clone(),
+                      processor_descriptor.technology.clone(),
                       ProcessorRealizationId::try_from(processor_descriptor.id.to_string())?,
                       JunctionId::try_from(outbound_junction.id.to_string())?,
                     ))
@@ -92,13 +92,13 @@ impl ProcessorInstance for DshServiceInstance<'_> {
             }
           }
         }
-        JunctionTechnology::Kafka => {
-          for resource_descriptor in self.processor_context.resource_registry.resource_descriptors_by_type(&ResourceType::DshTopic) {
+        JunctionTechnology::DshTopic => {
+          for resource_descriptor in self.processor_context.resource_registry.resource_descriptors_by_type(&ResourceTechnology::DshTopic) {
             match direction {
               JunctionDirection::Inbound => {
                 if resource_descriptor.readable {
                   compatible_junctions.push(JunctionIdentifier::Resource(
-                    ResourceType::DshTopic,
+                    ResourceTechnology::DshTopic,
                     ResourceRealizationId::try_from(resource_descriptor.id.as_str())?,
                   ))
                 }
@@ -106,7 +106,7 @@ impl ProcessorInstance for DshServiceInstance<'_> {
               JunctionDirection::Outbound => {
                 if resource_descriptor.writable {
                   compatible_junctions.push(JunctionIdentifier::Resource(
-                    ResourceType::DshTopic,
+                    ResourceTechnology::DshTopic,
                     ResourceRealizationId::try_from(resource_descriptor.id.as_str())?,
                   ))
                 }
@@ -285,7 +285,7 @@ impl DshServiceInstance<'_> {
     let mut template_mapping: TemplateMapping = from_tenant_to_template_mapping(self.processor_context.engine_target.tenant());
     template_mapping.insert(
       PlaceHolder::ProcessorRealizationId,
-      self.processor_config.processor.processor_realization_id.clone(),
+      self.processor_config.processor.processor_realization_id.to_string(),
     );
     if let Some(pipeline_name) = pipeline_id {
       template_mapping.insert(PlaceHolder::PipelineId, pipeline_name.to_string());
@@ -322,14 +322,14 @@ impl DshServiceInstance<'_> {
         Some(connected_junctions) => {
           if let Some(illegal_junction) = connected_junctions.iter().find(|connected_junction| match connected_junction {
             JunctionIdentifier::Processor(_, _, _) => true,
-            JunctionIdentifier::Resource(resource_type, _) => *resource_type != ResourceType::DshTopic,
+            JunctionIdentifier::Resource(resource_type, _) => *resource_type != ResourceTechnology::DshTopic,
           }) {
             return Err(format!(
               "junction '{}' connected to {} junction '{}' has wrong type, '{}' expected",
               illegal_junction,
               in_out,
               junction_id,
-              ResourceType::DshTopic
+              ResourceTechnology::DshTopic
             ));
           }
           let (min, max) = junction_config.number_of_resources_range();
@@ -350,11 +350,7 @@ impl DshServiceInstance<'_> {
             match junction_id {
               JunctionIdentifier::Processor(_, _, _) => unreachable!(),
               JunctionIdentifier::Resource(resource_type, resource_realization_id) => {
-                match self
-                  .processor_context
-                  .resource_registry
-                  .resource_realization(resource_type.clone(), resource_realization_id)
-                {
+                match self.processor_context.resource_registry.resource_realization(resource_realization_id) {
                   Some(resource) => match &resource.descriptor().dshtopic_descriptor {
                     Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
                     None => unreachable!(),

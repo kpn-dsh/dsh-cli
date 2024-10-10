@@ -15,12 +15,12 @@ metadata = [
 ]
 
 [inbound-junctions.inbound-topic]
-junction-technology = "kafka"
+junction-technology = "dshtopic"
 label = "Test inbound topic"
 description = "Test inbound topic description"
 
 [outbound-junctions.outbound-topic]
-junction-technology = "kafka"
+junction-technology = "dshtopic"
 label = "Test outbound topic"
 description = "Test outbound topic description"
 minimum-number-of-connections = 1
@@ -42,8 +42,8 @@ parameters = [
 ]
 
 [health-check]
-ping = { host = "127.0.0.1", timeout-millis = 3000 }
-http-response-status = { endpoint = "www.kpn.com", accepted-response-status = [200, 202, 204], timeout-millis = 3000 }
+ping = { host = { type = "value", value = " 127.0.0.1" }, timeout-millis = 3000 }
+http-response-status = { endpoint = { type = "value", value = "www.kpn.com" }, accepted-response-status = [200, 202, 204], timeout-millis = 3000 }
 
 [dshservice]
 

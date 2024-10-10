@@ -7,7 +7,7 @@ use crate::engine_target::EngineTarget;
 use crate::resource::dshtopic::dshtopic_realization::DshTopicRealization;
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_realization::ResourceRealization;
-use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceType};
+use crate::resource::{ResourceIdentifier, ResourceRealizationId, ResourceTechnology};
 
 pub(crate) struct DshTopicRealizationRegistry {
   dshtopic_realizations: HashMap<ResourceIdentifier, DshTopicRealization>,
@@ -27,7 +27,7 @@ impl DshTopicRealizationRegistry {
   pub(crate) fn dshtopic_realization_by_id(&self, id: &ResourceRealizationId) -> Option<&(dyn ResourceRealization)> {
     match self
       .dshtopic_realizations
-      .get(&ResourceIdentifier { resource_type: ResourceType::DshTopic, id: id.clone() })
+      .get(&ResourceIdentifier { resource_type: ResourceTechnology::DshTopic, id: id.clone() })
     {
       Some(a) => Some(a),
       None => None,

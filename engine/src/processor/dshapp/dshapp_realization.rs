@@ -1,11 +1,13 @@
 #![allow(clippy::module_inception)]
 
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
+use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::types::Application;
 
-use crate::engine_target::{from_tenant_to_template_mapping, EngineTarget, TemplateMapping};
+use crate::engine_target::{from_tenant_to_template_mapping, TemplateMapping};
 use crate::pipeline::PipelineId;
 use crate::placeholder::PlaceHolder;
 use crate::processor::dshapp::dshapp_config::{read_dshapp_config, ProfileConfig};
@@ -17,11 +19,12 @@ use crate::processor::processor_descriptor::{ProcessorDescriptor, ProfileDescrip
 use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{JunctionDirection, JunctionId, JunctionIdentifier, ParameterId, ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
-use crate::resource::ResourceType;
+use crate::resource::ResourceTechnology;
 use crate::ProfileId;
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
 
+#[derive(Debug)]
 pub struct DshAppRealization {
   processor_identifier: ProcessorIdentifier,
   pub(crate) processor_config: ProcessorConfig,
@@ -33,7 +36,7 @@ impl DshAppRealization {
     Ok(DshAppRealization {
       processor_identifier: ProcessorIdentifier {
         processor_technology: ProcessorTechnology::DshApp,
-        processor_realization_id: ProcessorRealizationId::try_from(processor_config.processor.processor_realization_id.as_str())?,
+        processor_realization_id: ProcessorRealizationId::try_from(processor_config.processor.processor_realization_id.to_string())?,
       },
       processor_config,
     })
@@ -41,7 +44,7 @@ impl DshAppRealization {
 }
 
 impl ProcessorRealization for DshAppRealization {
-  fn descriptor(&self, engine_target: &EngineTarget) -> ProcessorDescriptor {
+  fn descriptor(&self, dsh_api_tenant: &DshApiTenant) -> ProcessorDescriptor {
     let profiles = self
       .processor_config
       .dshapp_specific_config
@@ -53,7 +56,7 @@ impl ProcessorRealization for DshAppRealization {
       .collect::<Vec<ProfileDescriptor>>();
     self
       .processor_config
-      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(engine_target.tenant()))
+      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(dsh_api_tenant))
   }
 
   fn processor_realization_id(&self) -> &ProcessorRealizationId {
@@ -187,14 +190,14 @@ impl DshAppRealization {
         Some(connected_junctions) => {
           if let Some(illegal_junction) = connected_junctions.iter().find(|connected_junction| match connected_junction {
             JunctionIdentifier::Processor(_, _, _) => true,
-            JunctionIdentifier::Resource(resource_type, _) => *resource_type != ResourceType::DshTopic,
+            JunctionIdentifier::Resource(resource_type, _) => *resource_type != ResourceTechnology::DshTopic,
           }) {
             return Err(format!(
               "resource junction '{}' connected to {} junction '{}' has wrong type, '{}' expected",
               illegal_junction,
               in_out,
               junction_id,
-              ResourceType::DshTopic
+              ResourceTechnology::DshTopic
             ));
           }
           let (min, max) = junction_config.number_of_resources_range();
@@ -214,23 +217,18 @@ impl DshAppRealization {
           for junction_id in connected_junctions {
             match junction_id {
               JunctionIdentifier::Processor(_, _, _) => unreachable!(),
-              JunctionIdentifier::Resource(resource_type, resource_realization_id) => {
-                match processor_context
-                  .resource_registry
-                  .resource_realization(resource_type.clone(), resource_realization_id)
-                {
-                  Some(resource) => match &resource.descriptor().dshtopic_descriptor {
-                    Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
-                    None => unreachable!(),
-                  },
-                  None => {
-                    return Err(format!(
-                      "resource junction '{}' connected to {} junction '{}' does not exist",
-                      junction_id, in_out, junction_id
-                    ))
-                  }
+              JunctionIdentifier::Resource(resource_type, resource_realization_id) => match processor_context.resource_registry.resource_realization(resource_realization_id) {
+                Some(resource) => match &resource.descriptor().dshtopic_descriptor {
+                  Some(dshtopic_descriptor) => topics.push(dshtopic_descriptor.topic.to_string()),
+                  None => unreachable!(),
+                },
+                None => {
+                  return Err(format!(
+                    "resource junction '{}' connected to {} junction '{}' does not exist",
+                    junction_id, in_out, junction_id
+                  ))
                 }
-              }
+              },
             }
           }
           junction_topics.insert(junction_id.clone(), topics.join(multiple_resources_separator.as_str()));
@@ -244,5 +242,11 @@ impl DshAppRealization {
       }
     }
     Ok(junction_topics)
+  }
+}
+
+impl Display for DshAppRealization {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "processor realization {}", self.processor_identifier)
   }
 }

@@ -1,10 +1,11 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
-use serde::de::{Error, Unexpected, Visitor};
+use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Version {
   major: u32,
   minor: u32,
@@ -49,38 +50,47 @@ impl TryFrom<&str> for Version {
   }
 }
 
-struct DeserializeVersionFromStringVisitor;
+impl FromStr for Version {
+  type Err = String;
 
-impl<'de> Visitor<'de> for DeserializeVersionFromStringVisitor {
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Self::try_from(s)
+  }
+}
+
+struct VersionStringVisitor;
+
+impl<'de> Visitor<'de> for VersionStringVisitor {
   type Value = Version;
 
   fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-    formatter.write_str("a valid version representation")
+    formatter.write_str("a version string 'x.y.z'")
   }
 
-  fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+  fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
   where
     E: Error,
   {
-    match Version::try_from(v) {
-      Ok(version) => Ok(version),
-      Err(_) => Err(E::invalid_value(Unexpected::Str(v), &self)),
-    }
+    Version::try_from(value).map_err(|e| E::custom(e))
   }
 }
 
-pub fn deserialize_version_from_representation<'de, D>(deserializer: D) -> Result<Version, D::Error>
-where
-  D: Deserializer<'de>,
-{
-  deserializer.deserialize_any(DeserializeVersionFromStringVisitor)
+impl<'de> Deserialize<'de> for Version {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    deserializer.deserialize_str(VersionStringVisitor)
+  }
 }
 
-pub fn serialize_version_to_representation<S>(version: &Version, serializer: S) -> Result<S::Ok, S::Error>
-where
-  S: Serializer,
-{
-  serializer.serialize_str(version.to_string().as_str())
+impl Serialize for Version {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    self.to_string().serialize(serializer)
+  }
 }
 
 #[test]
@@ -88,4 +98,28 @@ fn test_try_from() {
   assert_eq!(Version::try_from("1").unwrap(), Version::new(1, 0, 0));
   assert_eq!(Version::try_from("1.2").unwrap(), Version::new(1, 2, 0));
   assert_eq!(Version::try_from("1.2.3").unwrap(), Version::new(1, 2, 3));
+}
+
+#[test]
+fn test_deserialize() {
+  #[derive(Deserialize)]
+  struct StructureUnderTest {
+    version: Version,
+  }
+  assert_eq!(
+    serde_json::from_str::<StructureUnderTest>("{\"version\":\"1.2.3\"}").unwrap().version,
+    Version::new(1, 2, 3)
+  );
+}
+
+#[test]
+fn test_serialize() {
+  #[derive(Serialize)]
+  struct StructureUnderTest {
+    version: Version,
+  }
+  assert_eq!(
+    serde_json::to_string(&StructureUnderTest { version: Version::new(1, 2, 3) }).unwrap(),
+    "{\"version\":\"1.2.3\"}"
+  );
 }

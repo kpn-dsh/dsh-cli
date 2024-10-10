@@ -1,89 +1,77 @@
 {
-  "pipeline-id": "test",
+  "pipeline-id": "pipeline2",
   "version": "1.2.3",
   "name": "Test pipeline",
   "description": "Test pipeline description",
-  "icon": "ICON",
-  "tags": [
-    "TAG1",
-    "TAG2"
-  ],
-  "more-info-url": "https://dsh.kpn.com",
-  "metrics-url": "https://grafana.com",
-  "viewer-url": "https://eavesdropper.kpn.com",
-  "metadata": [
-    [
-      "metadata1",
-      "METADATA1"
-    ],
-    [
-      "metadata2",
-      "METADATA2"
-    ]
-  ],
   "resources": [
     {
       "resource-id": "res1",
-      "resource-realization": "res-realization1",
+      "name": "RES1",
+      "resource-realization": "internal-keyring-codomain-values-boss",
       "parameters": {}
     },
     {
       "resource-id": "res2",
-      "resource-realization": "res-realization2",
+      "name": "RES2",
+      "resource-realization": "scratch-reference-implementation-compliant",
       "parameters": {}
     }
   ],
   "processors": [
     {
       "processor-id": "proc1",
-      "processor-realization": "proc-realization1",
+      "name": "DSH Service Processor 1",
+      "processor-realization": "dshservice1",
+      "processor-realization-version": "0.1.2",
       "parameters": {},
       "profile-id": "profile1"
     },
     {
       "processor-id": "proc2",
-      "processor-realization": "proc-realization2",
+      "name": "DSH Service Processor 2",
+      "processor-realization": "dshservice2",
+      "processor-realization-version": "0.1.2",
       "parameters": {},
       "profile-id": "profile2"
     }
   ],
   "connections": [
     {
-      "source": [
+      "source-resources": [
         "res1",
         "res2"
       ],
-      "target": {
+      "target-processor": {
         "processor-id": "proc1",
         "junction": "inbound"
       }
     },
     {
-      "source": {
+      "source-processor": {
         "processor-id": "proc2",
         "junction": "outbound"
       },
-      "target": [
+      "target-resources": [
         "res1",
         "res2"
       ]
     },
     {
-      "source": {
+      "source-processor": {
         "processor-id": "proc1",
         "junction": "outbound"
       },
-      "target": {
+      "target-processor": {
         "processor-id": "proc2",
         "junction": "inbound"
       }
     },
     {
-      "source": {
+      "source-processor": {
         "processor-id": "proc2",
         "junction": "outbound"
       },
-      "target": {
+      "target-processor": {
         "processor-id": "proc1",
         "junction": "inbound"
       }

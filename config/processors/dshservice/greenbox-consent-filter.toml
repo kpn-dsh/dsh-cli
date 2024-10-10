@@ -9,14 +9,14 @@ tags = ["greenbox", "consent", "filter", "privacy", "compliancy", "gdps", "avg",
 metrics-url = "${MONITORING_URL}"
 viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
 
-[inbound-junctions.inbound-kafka-topic]
-junction-technology = "kafka"
+[inbound-junctions.inbound-dsh-topic]
+junction-technology = "dshtopic"
 label = "Source topics"
 description = "Kafka topic that the consent filter dsh service will consume from. This topic must use strings for its record keys."
 # TODO Filters: schema available, whitelist in config, blacklist in config, mqtt/http gateway
 
-[outbound-junctions.outbound-kafka-topic]
-junction-technology = "kafka"
+[outbound-junctions.outbound-dsh-topic]
+junction-technology = "dshtopic"
 label = "Sink topics"
 description = "Kafka topic that the consent filter dsh service will produce to."
 
@@ -71,7 +71,7 @@ injections = [{ env = "GREENBOX_BACKEND_PASSWORD" }]
 CLASSIFICATION_IDENTIFIER = { type = "value", value = "org.kpn.greenbox.ri:ReferenceSchemaAvro:1.0.0" }
 COMPLIANCY_AGENT = { type = "deployment-parameter", id = "compliancy-agent" }
 CONSUMER_GROUP_ID = { type = "template", value = "${TENANT}_${RANDOM}_grpid" }
-CONSUMER_TOPIC = { type = "inbound-junction", id = "inbound-kafka-topic" }
+CONSUMER_TOPIC = { type = "inbound-junction", id = "inbound-dsh-topic" }
 GREENBOX_BACKEND_HOST = { type = "template", value = "greenbox-backend-dev.dsh-dev.dsh.np.aws.kpn.com" }
 GREENBOX_BACKEND_USERNAME = { type = "template", value = "${TENANT}" }
 GREENBOX_CONSUMER_CONTEXT_DOMAIN = { type = "value", value = "retail" }
@@ -87,7 +87,7 @@ LOG_LEVEL_COMPLIANCY = { type = "value", value = "info" }
 LOG_LEVEL_DSH = { type = "value", value = "info" }
 LOG_LEVEL_GREENBOX = { type = "value", value = "info" }
 MITIGATION_STRATEGY = { type = "deployment-parameter", id = "mitigation-strategy" }
-PRODUCER_TOPIC = { type = "outbound-junction", id = "outbound-kafka-topic" }
+PRODUCER_TOPIC = { type = "outbound-junction", id = "outbound-dsh-topic" }
 
 [[dshservice.profiles]]
 profile-id = "minimal"

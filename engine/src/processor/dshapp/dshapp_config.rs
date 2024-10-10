@@ -103,7 +103,7 @@ pub fn read_dshapp_config(config_file_name: &str) -> Result<ProcessorConfig, Str
 impl ProfileConfig {
   pub(crate) fn convert_to_descriptor(self: &ProfileConfig) -> ProfileDescriptor {
     ProfileDescriptor {
-      profile_id: self.profile_id.clone(),
+      profile_id: ProfileId(self.profile_id.clone()), // TODO
       label: self.label.clone(),
       description: self.description.clone(),
       instances: Some(self.instances),
@@ -117,15 +117,17 @@ impl ProfileConfig {
 #[ignore]
 fn read_dshapp_config_proper_values() {
   use crate::processor::processor_config::{DeploymentParameterConfigOption, DeploymentParameterConfigOptionLabel};
+  use crate::processor::ProcessorRealizationId;
+  use crate::version::Version;
 
   let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   path.push("tests/processors/dshapp/dshapp-config-test.toml");
   let config = &read_processor_config(path.to_str().unwrap(), ProcessorTechnology::DshApp).unwrap();
 
   assert_eq!(config.processor.processor_technology, ProcessorTechnology::DshApp);
-  assert_eq!(config.processor.processor_realization_id, "test");
+  assert_eq!(config.processor.processor_realization_id, ProcessorRealizationId::new("test"));
   assert_eq!(config.processor.description, "Test profiles");
-  assert_eq!(config.processor.version, Some("0.1.2".to_string()));
+  assert_eq!(config.processor.version, Version::try_from("0.1.2").unwrap());
   assert_eq!(config.processor.icon, Some("ICON".to_string()));
   assert_eq!(config.processor.more_info_url, Some("https://dsh.kpn.com".to_string()));
   assert_eq!(config.processor.metrics_url, Some("https://grafana.com".to_string()));

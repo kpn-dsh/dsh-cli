@@ -1,8 +1,11 @@
 #![allow(clippy::module_inception)]
 
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::engine_target::{from_tenant_to_template_mapping, EngineTarget};
+use dsh_api::dsh_api_tenant::DshApiTenant;
+
+use crate::engine_target::from_tenant_to_template_mapping;
 use crate::pipeline::PipelineId;
 use crate::processor::dshservice::dshservice_config::read_dshservice_config;
 use crate::processor::dshservice::dshservice_instance::DshServiceInstance;
@@ -13,6 +16,7 @@ use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::processor_realization::ProcessorRealization;
 use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 
+#[derive(Debug)]
 pub struct DshServiceRealization {
   pub(crate) processor_identifier: ProcessorIdentifier,
   pub(crate) processor_config: ProcessorConfig,
@@ -24,7 +28,7 @@ impl DshServiceRealization {
     Ok(DshServiceRealization {
       processor_identifier: ProcessorIdentifier {
         processor_technology: ProcessorTechnology::DshService,
-        processor_realization_id: ProcessorRealizationId::try_from(processor_config.processor.processor_realization_id.as_str())?,
+        processor_realization_id: processor_config.processor.processor_realization_id.clone(),
       },
       processor_config,
     })
@@ -32,7 +36,7 @@ impl DshServiceRealization {
 }
 
 impl ProcessorRealization for DshServiceRealization {
-  fn descriptor(&self, engine_target: &EngineTarget) -> ProcessorDescriptor {
+  fn descriptor(&self, dsh_api_tenant: &DshApiTenant) -> ProcessorDescriptor {
     let profiles = self
       .processor_config
       .dshservice_specific_config
@@ -44,7 +48,7 @@ impl ProcessorRealization for DshServiceRealization {
       .collect::<Vec<ProfileDescriptor>>();
     self
       .processor_config
-      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(engine_target.tenant()))
+      .convert_to_descriptor(profiles, &from_tenant_to_template_mapping(dsh_api_tenant))
   }
 
   fn processor_realization_id(&self) -> &ProcessorRealizationId {
@@ -73,5 +77,11 @@ impl ProcessorRealization for DshServiceRealization {
 
   fn processor_technology(&self) -> ProcessorTechnology {
     ProcessorTechnology::DshService
+  }
+}
+
+impl Display for DshServiceRealization {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}\n{:#?}", self.processor_identifier, self.processor_config)
   }
 }

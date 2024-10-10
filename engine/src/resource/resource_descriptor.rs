@@ -3,26 +3,26 @@ use std::fmt::{Debug, Display, Formatter};
 use serde::{Deserialize, Serialize};
 
 use crate::resource::dshtopic::dshtopic_descriptor::DshTopicDescriptor;
-use crate::resource::ResourceType;
+use crate::resource::ResourceTechnology;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResourceTypeDescriptor {
   #[serde(rename = "type")]
-  pub resource_type: ResourceType,
+  pub resource_type: ResourceTechnology,
   pub label: String,
   pub description: String,
 }
 
-impl From<&ResourceType> for ResourceTypeDescriptor {
-  fn from(value: &ResourceType) -> Self {
+impl From<&ResourceTechnology> for ResourceTypeDescriptor {
+  fn from(value: &ResourceTechnology) -> Self {
     ResourceTypeDescriptor { resource_type: value.clone(), label: value.label().to_owned(), description: value.description().to_owned() }
   }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResourceDescriptor {
-  #[serde(rename = "type")]
-  pub resource_type: ResourceType,
+  #[serde(rename = "technology")]
+  pub technology: ResourceTechnology,
   pub id: String,
   pub label: String,
   pub description: String,
@@ -50,7 +50,7 @@ pub struct ResourceDescriptor {
 
 impl Display for ResourceDescriptor {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{} ({})", self.id, self.resource_type, self.label)?;
+    write!(f, "{}:{} ({})", self.id, self.technology, self.label)?;
     if let Some(ref version) = self.version {
       write!(f, "\n  version: {}", version)?;
     }

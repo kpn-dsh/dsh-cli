@@ -12,12 +12,20 @@ use dsh_api::platform::DshPlatform;
 
 use crate::placeholder::PlaceHolder;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct EngineTarget {
   pub(crate) dsh_api_client_factory: DshApiClientFactory,
 }
 
 impl EngineTarget {
+  pub fn new() -> EngineTarget {
+    EngineTarget::default()
+  }
+
+  pub fn create(dsh_api_client_factory: DshApiClientFactory) -> Result<Self, String> {
+    Ok(EngineTarget { dsh_api_client_factory })
+  }
+
   pub fn platform(&self) -> &DshPlatform {
     self.dsh_api_client_factory.tenant().platform()
   }
@@ -33,16 +41,23 @@ impl EngineTarget {
   pub fn user(&self) -> &str {
     self.dsh_api_client_factory.tenant().user()
   }
-}
-
-impl EngineTarget {
-  pub fn create(dsh_api_client_factory: DshApiClientFactory) -> Result<Self, String> {
-    Ok(EngineTarget { dsh_api_client_factory })
-  }
 
   pub async fn dsh_api_client(&self) -> Result<DshApiClient, String> {
     self.dsh_api_client_factory.client().await
   }
+}
+
+impl Default for EngineTarget {
+  fn default() -> Self {
+    match EngineTarget::create(DshApiClientFactory::default()) {
+      Ok(engine_target) => engine_target,
+      Err(error) => panic!("{}", error),
+    }
+  }
+}
+
+lazy_static! {
+  pub static ref DEFAULT_ENGINE_TARGET: EngineTarget = EngineTarget::default();
 }
 
 pub type TemplateMapping = HashMap<PlaceHolder, String>;

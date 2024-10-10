@@ -12,7 +12,7 @@ use crate::processor::dshapp::DshAppName;
 use crate::processor::processor_context::ProcessorContext;
 use crate::processor::processor_instance::{ProcessorInstance, ProcessorStatus};
 use crate::processor::{JunctionDirection, JunctionId, JunctionIdentifier, ParameterId, ProcessorId};
-use crate::resource::{ResourceRealizationId, ResourceType};
+use crate::resource::{ResourceRealizationId, ResourceTechnology};
 use crate::ProfileId;
 
 // TODO Voeg environment variabelen toe die de processor beschrijven en ook in welke pipeline hij zit
@@ -133,12 +133,12 @@ impl ProcessorInstance for DshAppInstance<'_> {
       })
     {
       let mut compatible_resources = Vec::<JunctionIdentifier>::new();
-      for resource_descriptor in self.processor_context.resource_registry.resource_descriptors_by_type(&ResourceType::DshTopic) {
+      for resource_descriptor in self.processor_context.resource_registry.resource_descriptors_by_type(&ResourceTechnology::DshTopic) {
         match direction {
           JunctionDirection::Inbound => {
             if resource_descriptor.readable {
               compatible_resources.push(JunctionIdentifier::Resource(
-                ResourceType::DshTopic,
+                ResourceTechnology::DshTopic,
                 ResourceRealizationId::try_from(resource_descriptor.id.as_str())?,
               ))
             }
@@ -146,7 +146,7 @@ impl ProcessorInstance for DshAppInstance<'_> {
           JunctionDirection::Outbound => {
             if resource_descriptor.writable {
               compatible_resources.push(JunctionIdentifier::Resource(
-                ResourceType::DshTopic,
+                ResourceTechnology::DshTopic,
                 ResourceRealizationId::try_from(resource_descriptor.id.as_str())?,
               ))
             }

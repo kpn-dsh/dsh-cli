@@ -1,14 +1,11 @@
 #![doc(html_favicon_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
 #![doc(html_logo_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
 
-use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::ErrorKind::NotFound;
-use std::ops::Deref;
 
-use lazy_static::lazy_static;
 use log::error;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Error as JsonError;
 use serde_yaml::Error as YamlError;
 use toml::de::Error as TomlError;
@@ -34,7 +31,10 @@ identifier!(
   "profile id",
   "^[a-z][a-z0-9-]{0,49}$",
   "valid-profile-id",
-  "invalid_profile_id"
+  "invalid_profile_id",
+  /// A `ProfileId` identifies a deployment profile which enables to provide some
+  /// parameters of a pipeline (and its constituent processors and resources) at runtime,
+  /// without having to define an entirely new pipeline.
 );
 
 pub fn read_config<C>(config_file_name: &str, config_type: &str) -> Result<C, String>

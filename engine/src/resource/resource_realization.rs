@@ -3,9 +3,9 @@
 use crate::pipeline::PipelineId;
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_instance::ResourceInstance;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, ResourceType};
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, ResourceTechnology};
 
-pub trait ResourceRealization {
+pub trait ResourceRealization: Sync + Send {
   /// # Get this `ResourceRealization`s descriptor
   ///
   /// ## Returns
@@ -48,5 +48,5 @@ pub trait ResourceRealization {
   ///
   /// ## Returns
   /// * This `ResourceRealization`s type.
-  fn resource_type(&self) -> ResourceType;
+  fn resource_type(&self) -> ResourceTechnology;
 }

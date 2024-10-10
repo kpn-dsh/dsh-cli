@@ -9,8 +9,9 @@ use crate::placeholder::PlaceHolder;
 use crate::processor::dshapp::dshapp_config::DshAppSpecificConfig;
 use crate::processor::dshservice::dshservice_config::DshServiceSpecificConfig;
 use crate::processor::processor_descriptor::{DeploymentParameterDescriptor, JunctionDescriptor, ProcessorDescriptor, ProfileDescriptor};
-use crate::processor::{JunctionId, JunctionTechnology, ParameterId, ProcessorRealizationId, ProcessorTechnology};
+use crate::processor::{JunctionDirection, JunctionId, JunctionTechnology, ParameterId, ProcessorId, ProcessorRealizationId, ProcessorTechnology};
 use crate::read_config;
+use crate::version::Version;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProcessorConfig {
@@ -33,10 +34,10 @@ pub struct ProcessorGlobalConfig {
   #[serde(rename = "processor-technology")]
   pub processor_technology: ProcessorTechnology,
   #[serde(rename = "processor-realization-id")]
-  pub processor_realization_id: String,
+  pub processor_realization_id: ProcessorRealizationId,
   pub label: String,
   pub description: String,
-  pub version: Option<String>,
+  pub version: Version,
   pub icon: Option<String>, // TODO Is String the proper type?
   pub tags: Option<Vec<String>>,
   #[serde(rename = "more-info-url")]
@@ -168,9 +169,6 @@ impl ProcessorConfig {
     if self.processor.description.is_empty() {
       return Err(format!("{} description cannot be empty", processor_technology));
     }
-    if self.processor.version.clone().is_some_and(|ref version| version.is_empty()) {
-      return Err(format!("{} version cannot be empty", processor_technology));
-    }
     if let Some(ref url) = self.processor.more_info_url {
       validate_config_template(url, "more-info-url template")?
     }
@@ -207,24 +205,24 @@ impl ProcessorConfig {
 
   pub(crate) fn convert_to_descriptor(&self, profiles: Vec<ProfileDescriptor>, mapping: &TemplateMapping) -> ProcessorDescriptor {
     ProcessorDescriptor {
-      processor_technology: ProcessorTechnology::DshService,
-      id: self.processor.processor_realization_id.clone(),
+      technology: ProcessorTechnology::DshService,
+      id: ProcessorId(self.processor.processor_realization_id.clone().parse().unwrap()), // TODO
       label: self.processor.label.clone(),
       description: self.processor.description.clone(),
-      version: self.processor.version.clone(),
+      version: Some(self.processor.version.clone()),
       icon: self.processor.icon.clone(),
       tags: self.processor.tags.clone().unwrap_or_default(),
       inbound_junctions: match &self.inbound_junctions {
         Some(inbound_junctions) => inbound_junctions
           .iter()
-          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
+          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id, JunctionDirection::Inbound))
           .collect::<Vec<JunctionDescriptor>>(),
         None => vec![],
       },
       outbound_junctions: match &self.outbound_junctions {
         Some(outbound_junctions) => outbound_junctions
           .iter()
-          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id))
+          .map(|(id, junction_config)| junction_config.convert_to_descriptor(id, JunctionDirection::Outbound))
           .collect::<Vec<JunctionDescriptor>>(),
         None => vec![],
       },
@@ -269,7 +267,7 @@ impl JunctionConfig {
     Ok(())
   }
 
-  fn convert_to_descriptor(&self, id: &JunctionId) -> JunctionDescriptor {
+  fn convert_to_descriptor(&self, id: &JunctionId, direction: JunctionDirection) -> JunctionDescriptor {
     let (min, max) = match (self.minimum_number_of_connections, self.maximum_number_of_connections) {
       (None, None) => (1, 1),
       (None, Some(max)) => (1, max),
@@ -277,7 +275,8 @@ impl JunctionConfig {
       (Some(min), Some(max)) => (min, max),
     };
     JunctionDescriptor {
-      id: id.0.to_owned(),
+      id: JunctionId(id.0.to_owned()), // TODO
+      direction,
       junction_technology: self.junction_technology.clone(),
       label: self.label.clone(),
       description: self.description.clone(),
@@ -397,6 +396,49 @@ impl DeploymentParameterConfig {
 impl DeploymentParameterConfigOptionLabel {
   pub fn validate(&self, _attribute: &str) -> Result<(), String> {
     Ok(())
+  }
+}
+
+impl Display for ProcessorConfig {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    self.processor.fmt(f)?;
+    if let Some(ref inbound_junctions) = self.inbound_junctions {
+      writeln!(f, "  inbound junctions")?;
+      for (junction_id, junction_config) in inbound_junctions.iter() {
+        writeln!(f, "    {} -> {}", junction_id, junction_config)?;
+      }
+    }
+    if let Some(ref outbound_junctions) = self.outbound_junctions {
+      writeln!(f, "  outbound junctions")?;
+      for (junction_id, junction_config) in outbound_junctions.iter() {
+        writeln!(f, "    {} -> {}", junction_id, junction_config)?;
+      }
+    }
+    Ok(())
+  }
+}
+
+impl Display for ProcessorGlobalConfig {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}:{}:{} ({})",
+      self.processor_realization_id, self.version, self.processor_technology, self.description
+    )
+  }
+}
+
+impl Display for JunctionConfig {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{} [{},{}] ({}, {})",
+      self.junction_technology,
+      self.minimum_number_of_connections.unwrap_or_default(),
+      self.maximum_number_of_connections.unwrap_or_default(),
+      self.label,
+      self.description
+    )
   }
 }
 

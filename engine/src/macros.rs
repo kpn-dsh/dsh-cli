@@ -1,28 +1,48 @@
 // #![warn(rustdoc::invalid_rust_codeblocks)]
+// #![warn(rustdoc::invalid_rust_codeblocks)]
 #![doc = "Macros"]
-#![doc = "# `identifier!($name:ident, $label:literal, $regex:literal)`"]
+#![doc = "# `identifier!(...)`"]
+#![doc = "This macro generates an identifier struct that can be used in the Trifonius engine."]
+#![doc = "A generated identifier consists of a named tuple-struct,"]
+#![doc = "which implicitly implements a number of useful traits like"]
+#![doc = "[`Clone`],"]
+#![doc = "[`Debug`][core::fmt::Debug],"]
+#![doc = "[`Deref`][std::ops::Deref],"]
+#![doc = "[`Deserialize`][serde::Deserialize],"]
+#![doc = "[`Display`][std::fmt::Display],"]
+#![doc = "[`Eq`],"]
+#![doc = "[`FromStr`][core::str::FromStr],"]
+#![doc = "[`Hash`][core::hash::Hash],"]
+#![doc = "[`PartialEq`],"]
+#![doc = "[`Ord`],"]
+#![doc = "[`PartialOrd`],"]
+#![doc = "[`Serialize`][serde::Serialize] and"]
+#![doc = "[`TryFrom`]."]
+#![doc = "It also provides validation by means of an `is_valid(id: &str)` method and"]
+#![doc = "a `new(id: &str)` factory function that panics on any invalid identifier."]
+#![doc = ""]
+#![doc = "Note that this macro requires the `lazy_static` dependency."]
+#![doc = ""]
 #![doc = "## Examples"]
 #![doc = "Create a `ProcessorId` identifier component"]
 #![doc = "```rust"]
-#![doc = "use std::fmt::{Display, Formatter};"]
-#![doc = "use std::ops::Deref;"]
-#![doc = ""]
-#![doc = "use lazy_static::lazy_static;"]
-#![doc = "use serde::{Deserialize, Serialize};"]
-#![doc = ""]
 #![doc = "use trifonius_engine::identifier;"]
 #![doc = ""]
-#![doc = "identifier!(\"processor\", ProcessorId, \"processor identifier\", \"^[a-z][a-z0-9]{0,19}$\", \"validprocessorid\", \"invalid_processor_id\");"]
+#![doc = "identifier!("]
+#![doc = "  \"processor\",              // path of the crate"]
+#![doc = "  ProcessorId,              // name of the generated identifier struct"]
+#![doc = "  \"processor identifier\",   // text used in generated comments"]
+#![doc = "  \"^[a-z][a-z0-9]{0,19}$\",  // regular expression to validate the identifier"]
+#![doc = "  \"validprocessorid\",       // example of valid identifier"]
+#![doc = "  \"invalid_processor_id\",   // example of invalid identifier"]
+#![doc = "  /// Doc comment           // multiline doc comment for the generated code"]
+#![doc = ");"]
 #![doc = "```"]
 #![doc = "This will yield something like:"]
 #![doc = "```rust,ignore"]
-#![doc = "use std::fmt::{Display, Formatter};"]
-#![doc = "use std::ops::Deref;"]
-#![doc = ""]
-#![doc = "use lazy_static::lazy_static;"]
-#![doc = "use serde::{Deserialize, Serialize};"]
-#![doc = ""]
-#![doc = "#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]"]
+#![doc = "/// Doc comment"]
+#![doc = "#[derive(Clone, Debug, serde::Deserialize, Eq, Hash, PartialEq, Ord,"]
+#![doc = "           PartialOrd, serde::Serialize)]"]
 #![doc = "pub struct ProcessorId(String);"]
 #![doc = "impl ProcessorId {"]
 #![doc = "  /// Create new `ProcessorId`"]
@@ -35,20 +55,21 @@
 #![doc = "impl TryFrom<&str> for ProcessorId { ... }"]
 #![doc = "impl TryFrom<String> for ProcessorId { ... }"]
 #![doc = "impl Display for ProcessorId { ... }"]
-#![doc = "impl Deref for ProcessorId { ... }"]
+#![doc = "impl std::ops::Deref for ProcessorId { ... }"]
 #![doc = "```"]
 
 #[macro_export]
 macro_rules! identifier {
-  ($crate_name:literal, $name:ident, $label:literal, $regex:literal, $valid_id:literal, $invalid_id:literal) => {
+  ($crate_name:literal, $name:ident, $label:literal, $regex:literal, $valid_id:literal, $invalid_id:literal, $(#[$doc:meta])*) => {
     #[doc = concat!("# `", stringify!($name), "`")]
     #[doc = ""]
-    #[doc = concat!("A `", stringify!($name), "` is used to create, represent, validate and display a ", $label, ".")]
+    $(#[$doc])*
     #[doc = ""]
     #[doc = "## Validation rules"]
     #[doc = ""]
     #[doc = concat!("A `", stringify!($name), "` needs to match the regular expression `", $regex, "`.")]
-    #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+    #[derive(Clone, Debug, serde::Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize)]
+    #[serde(try_from = "String")]
     pub struct $name(String);
 
     impl $name {
@@ -61,6 +82,7 @@ macro_rules! identifier {
       #[doc = concat!("Create a `", stringify!($name), "` instance from a string slice:")]
       #[doc = "```rust"]
       #[doc = concat!("use ", $crate_name, "::", stringify!($name), ";")]
+      #[doc = ""]
       #[doc = concat!("let id = ", stringify!($name), "::new(\"", $valid_id, "\");")]
       #[doc = concat!("println!(\"", $label, " is {}\", id);")]
       #[doc = "```"]
@@ -86,6 +108,7 @@ macro_rules! identifier {
       #[doc = concat!("Validate a ", $label, " string slice:")]
       #[doc = "```rust"]
       #[doc = concat!("use ", $crate_name, "::", stringify!($name), ";")]
+      #[doc = ""]
       #[doc = concat!("assert!(", stringify!($name), "::is_valid(\"", $valid_id, "\"));")]
       #[doc = concat!("assert!(!", stringify!($name), "::is_valid(\"", $invalid_id, "\"));")]
       #[doc = "```"]
@@ -106,6 +129,7 @@ macro_rules! identifier {
       #[doc = "```rust"]
       #[doc = "use regex::Regex;"]
       #[doc = concat!("use ", $crate_name, "::", stringify!($name), ";")]
+      #[doc = ""]
       #[doc = concat!("let regex: &'static Regex = ", stringify!($name), "::regex();")]
       #[doc = concat!("assert!(regex.is_match(\"", $valid_id, "\"));")]
       #[doc = concat!("assert!(!regex.is_match(\"",  $invalid_id, "\"));")]
@@ -113,7 +137,7 @@ macro_rules! identifier {
       #[doc = "## Returns"]
       #[doc = concat!("The regular expression used by this `", stringify!($name), "`.")]
       pub fn regex() -> &'static regex::Regex {
-        lazy_static! {
+        lazy_static::lazy_static! {
           static ref ID_REGEX: regex::Regex = regex::Regex::new($regex).unwrap();
         }
         &ID_REGEX
@@ -144,14 +168,22 @@ macro_rules! identifier {
       }
     }
 
-    impl Display for $name {
-      fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    impl core::str::FromStr for $name {
+      type Err = String;
+
+      fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from(s)
+      }
+    }
+
+    impl std::fmt::Display for $name {
+      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
       }
     }
 
     #[doc(hidden)]
-    impl Deref for $name {
+    impl std::ops::Deref for $name {
       type Target = str;
 
       fn deref(&self) -> &Self::Target {

@@ -1,4 +1,4 @@
-pipeline-id: test
+pipeline-id: testyaml
 version: 1.2.3
 name: Test pipeline
 description: Test pipeline description
@@ -57,12 +57,3 @@ connections:
       junction: inbound
 dependencies: [ ]
 profiles: [ ]
-
-
-
-
-
-#inbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-#outbound_junctions: &HashMap<JunctionId, Vec<ResourceIdentifier>>,
-#deploy_parameters: &HashMap<ParameterId, String>,
-#profile_id: Option<&ProfileId>, // TODO Move this to start() method

@@ -13,7 +13,7 @@ use crate::resource::dshtopic::DshTopicType;
 use crate::resource::resource_descriptor::ResourceDescriptor;
 use crate::resource::resource_instance::ResourceInstance;
 use crate::resource::resource_realization::ResourceRealization;
-use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, ResourceType};
+use crate::resource::{ResourceId, ResourceIdentifier, ResourceRealizationId, ResourceTechnology};
 
 pub(crate) struct DshTopicRealization {
   pub(crate) resource_identifier: ResourceIdentifier,
@@ -32,7 +32,7 @@ impl DshTopicRealization {
       DshTopicType::Stream => Some(format!("{}.dsh", stream.name())),
     };
     let resource_descriptor = ResourceDescriptor {
-      resource_type: ResourceType::DshTopic,
+      technology: ResourceTechnology::DshTopic,
       id: resource_id.to_string(),
       label: stream.name().to_string(),
       description: "DSH Kafka topic".to_string(),
@@ -77,7 +77,7 @@ impl DshTopicRealization {
         cluster: stream.cluster().to_string(),
       }),
     };
-    let resource_identifier = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? };
+    let resource_identifier = ResourceIdentifier { resource_type: ResourceTechnology::DshTopic, id: ResourceRealizationId::try_from(resource_descriptor.id.as_str())? };
     Ok(DshTopicRealization { resource_identifier, resource_descriptor, engine_target })
   }
 }
@@ -148,8 +148,8 @@ impl ResourceRealization for DshTopicRealization {
     }
   }
 
-  fn resource_type(&self) -> ResourceType {
-    ResourceType::DshTopic
+  fn resource_type(&self) -> ResourceTechnology {
+    ResourceTechnology::DshTopic
   }
 }
 

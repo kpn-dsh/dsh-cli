@@ -3,19 +3,19 @@ processor-technology = "dshservice"
 processor-realization-id = "regex-filter"
 label = "Regex filter"
 description = "Retain records that (don't) match a regular expression. Filters can be applied on the key, value and/or headers. Supports Avro, JSON and plain text. In case of AVRO and JSON it supports to match on nested fields."
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 icon = "filter"
 tags = ["filter", "regex", "match", "avro", "json"]
 metrics-url = "${MONITORING_URL}"
 viewer-url = "${CONSOLE_URL}/#/profiles/${TENANT}"
 
-[inbound-junctions.inbound-kafka-topic]
-junction-technology = "kafka"
+[inbound-junctions.inbound-dsh-topic]
+junction-technology = "dshtopic"
 label = "Source topics"
 description = "Kafka topic that the filter will consume from."
 
-[outbound-junctions.outbound-kafka-topic]
-junction-technology = "kafka"
+[outbound-junctions.outbound-dsh-topic]
+junction-technology = "dshtopic"
 label = "Sink topics"
 description = "Kafka topic that the filter will produce to."
 
@@ -129,8 +129,8 @@ needs-token = true
 single-instance = false
 
 [dshservice.environment-variables]
-KAFKA_SOURCE_TOPIC = { type = "inbound-junction", id = "inbound-kafka-topic" }
-KAFKA_TARGET_TOPIC = { type = "outbound-junction", id = "outbound-kafka-topic" }
+KAFKA_SOURCE_TOPIC = { type = "inbound-junction", id = "inbound-dsh-topic" }
+KAFKA_TARGET_TOPIC = { type = "outbound-junction", id = "outbound-dsh-topic" }
 # Generic parameters
 KAFKA_AUTO_OFFSET_RESET = { type = "deployment-parameter", id = "kafka-offset-reset" }
 KAFKA_CONSUMER_GROUP_TYPE = { type = "value", value = "SHARED" }

@@ -2,9 +2,11 @@
 
 #![allow(clippy::module_inception)]
 
+use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::engine_target::EngineTarget;
+use dsh_api::dsh_api_tenant::DshApiTenant;
+
 use crate::pipeline::PipelineId;
 use crate::processor::processor_context::ProcessorContext;
 use crate::processor::processor_descriptor::ProcessorDescriptor;
@@ -12,12 +14,12 @@ use crate::processor::processor_instance::ProcessorInstance;
 use crate::processor::{ProcessorId, ProcessorIdentifier, ProcessorRealizationId, ProcessorTechnology};
 
 /// Defines the behavior of a Trifonius `ProcessorRealization`
-pub trait ProcessorRealization {
+pub trait ProcessorRealization: Display + Sync {
   /// # Get this `ProcessorRealization`s descriptor
   ///
   /// ## Returns
   /// * This `ProcessorRealization`s descriptor.
-  fn descriptor(&self, engine_target: &EngineTarget) -> ProcessorDescriptor;
+  fn descriptor(&self, dsh_api_tenant: &DshApiTenant) -> ProcessorDescriptor;
 
   /// # Get this `ProcessorRealization`s id (name)
   ///
