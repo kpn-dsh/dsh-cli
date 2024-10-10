@@ -23,12 +23,12 @@ pub fn processor_context() -> Arc<ProcessorContext> {
 }
 
 pub fn dshservice_instance() -> Box<dyn ProcessorInstance> {
-  _dshservice_realization()
+  dshservice_realization()
     .processor_instance(Some(pipeline_id()), processor_id(), processor_context())
     .unwrap()
 }
 
-pub fn _dshservice_realization() -> &'static dyn ProcessorRealization {
+pub fn dshservice_realization() -> &'static dyn ProcessorRealization {
   PROCESSOR_REGISTRY.processor_realization_by_identifier(&PROCESSOR_IDENTIFIER).unwrap()
 }
 
@@ -44,12 +44,12 @@ pub fn pipeline_id() -> PipelineId {
   PipelineId::new("pipeline")
 }
 
-pub fn _processor_identifier() -> ProcessorIdentifier {
+pub fn processor_identifier() -> ProcessorIdentifier {
   ProcessorIdentifier::new(ProcessorTechnology::DshService, processor_realization_id())
 }
 
 pub fn junction_id() -> JunctionId {
-  JunctionId::new("inbound-kafka-topic")
+  JunctionId::new("inbound-dsh-topic")
 }
 
 pub fn resource_realization_id() -> ResourceRealizationId {

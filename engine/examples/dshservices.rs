@@ -1,4 +1,4 @@
-use trifonius_engine::engine_target::EngineTarget;
+use dsh_api::dsh_api_tenant::DshApiTenant;
 use trifonius_engine::processor::processor_registry::ProcessorRegistry;
 use trifonius_engine::processor::ProcessorTechnology;
 
@@ -6,7 +6,7 @@ use trifonius_engine::processor::ProcessorTechnology;
 mod common;
 
 fn main() {
-  let engine_target = EngineTarget::default();
-  let dshservice_descriptors = ProcessorRegistry::default().processor_descriptors_by_type(ProcessorTechnology::DshService, &engine_target);
+  let dsh_api_tenant = DshApiTenant::default();
+  let dshservice_descriptors = ProcessorRegistry::default().processor_descriptors_by_type(ProcessorTechnology::DshService, &dsh_api_tenant);
   println!("{}", serde_json::to_string_pretty(&dshservice_descriptors).unwrap());
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use trifonius_engine::processor::{JunctionId, JunctionIdentifier, ParameterId};
 use trifonius_engine::resource::ResourceRealizationId;
-use trifonius_engine::resource::ResourceType;
+use trifonius_engine::resource::ResourceTechnology;
 use trifonius_engine::ProfileId;
 
 #[path = "common.rs"]
@@ -14,16 +14,16 @@ async fn main() -> Result<(), String> {
 
   let dshservice_instance = crate::common::dshservice_instance();
 
-  let inbound_junction_id = JunctionId::new("inbound-kafka-topic");
+  let inbound_junction_id = JunctionId::new("inbound-dsh-topic");
   let inbound_resource_realization_id = ResourceRealizationId::new("stream-reference-implementation-3p");
   // let inbound_resource = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: inbound_resource_id };
-  let inbound_junction_identifier = JunctionIdentifier::Resource(ResourceType::DshTopic, inbound_resource_realization_id);
+  let inbound_junction_identifier = JunctionIdentifier::Resource(ResourceTechnology::DshTopic, inbound_resource_realization_id);
   let inbound_junctions = HashMap::from([(inbound_junction_id, vec![inbound_junction_identifier])]);
 
-  let outbound_junction_id = JunctionId::new("outbound-kafka-topic");
+  let outbound_junction_id = JunctionId::new("outbound-dsh-topic");
   let outbound_resource_realization_id = ResourceRealizationId::new("scratch-reference-implementation-compliant");
   // let outbound_resource = ResourceIdentifier { resource_type: ResourceType::DshTopic, id: outbound_resource_realization_id };
-  let outbound_junction_identifier = JunctionIdentifier::Resource(ResourceType::DshTopic, outbound_resource_realization_id);
+  let outbound_junction_identifier = JunctionIdentifier::Resource(ResourceTechnology::DshTopic, outbound_resource_realization_id);
   let outbound_junctions = HashMap::from([(outbound_junction_id, vec![outbound_junction_identifier])]);
 
   let parameters = HashMap::from([
