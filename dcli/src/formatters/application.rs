@@ -1,3 +1,6 @@
+use lazy_static::lazy_static;
+use regex::Regex;
+
 use dsh_api::types::Application;
 
 use crate::formatters::formatter::{Label, SubjectFormatter};
@@ -96,7 +99,10 @@ impl SubjectFormatter<ApplicationLabel> for Application {
         },
         None => "".to_string(),
       },
-      ApplicationLabel::Image => self.image.clone(),
+      ApplicationLabel::Image => match parse_image_string(self.image.as_str()) {
+        Some((kind, image)) => format!("{}:{}", kind, image),
+        None => self.image.clone(),
+      },
       ApplicationLabel::Instances => self.instances.to_string(),
       ApplicationLabel::Mem => self.mem.to_string(),
       ApplicationLabel::Metrics => self
@@ -166,3 +172,53 @@ pub static APPLICATION_LABELS_SHOW: [ApplicationLabel; 18] = [
   ApplicationLabel::User,
   ApplicationLabel::Env,
 ];
+
+lazy_static! {
+  static ref APP_CATALOG_IMAGE_REGEX: Regex =
+    Regex::new(r"APPCATALOG_REGISTRY/dsh-appcatalog/tenant/([a-z0-9-_]+)/([0-9]+)/([0-9]+)/(release|draft)/(klarrio|kpn)/([a-zA-Z0-9-_:.]+)").unwrap();
+  static ref REGISTRY_IMAGE_REGEX: Regex = Regex::new(r"registry.cp.kpn-dsh.com/([a-z0-9-_]+)/([a-zA-Z0-9-_:.]+)").unwrap();
+}
+
+fn parse_image_string(image_string: &str) -> Option<(String, String)> {
+  match APP_CATALOG_IMAGE_REGEX.captures(image_string) {
+    Some(app_catalog_captures) => Some((
+      format!(
+        "app:{}:{}",
+        app_catalog_captures.get(4).map(|m| m.as_str().to_string()).unwrap_or_default(),
+        app_catalog_captures.get(5).map(|m| m.as_str().to_string()).unwrap_or_default()
+      ),
+      app_catalog_captures.get(6).map(|m| m.as_str().to_string()).unwrap_or_default(),
+    )),
+    None => match REGISTRY_IMAGE_REGEX.captures(image_string) {
+      Some(registry_captures) => Some(("registry".to_string(), registry_captures.get(2).map(|m| m.as_str().to_string()).unwrap_or_default())),
+      None => None,
+    },
+  }
+}
+
+#[test]
+fn test_app_catalog_image_draft_kpn() {
+  const APP_CATALOG_IMAGE: &str = "APPCATALOG_REGISTRY/dsh-appcatalog/tenant/greenbox-dev/1903/1903/draft/kpn/schema-store-proxy:0.2.3-0";
+  assert_eq!(
+    parse_image_string(APP_CATALOG_IMAGE).unwrap(),
+    ("app:draft:kpn".to_string(), "schema-store-proxy:0.2.3-0".to_string())
+  );
+}
+
+#[test]
+fn test_app_catalog_image_release_klarrio() {
+  const APP_CATALOG_IMAGE: &str = "APPCATALOG_REGISTRY/dsh-appcatalog/tenant/greenbox-dev/1903/1903/release/klarrio/whoami:1.6.1";
+  assert_eq!(
+    parse_image_string(APP_CATALOG_IMAGE).unwrap(),
+    ("app:release:klarrio".to_string(), "whoami:1.6.1".to_string())
+  );
+}
+
+#[test]
+fn test_registry_image() {
+  const REGISTRY_IMAGE: &str = "registry.cp.kpn-dsh.com/greenbox-dev/cck-ingestor:0.0.18";
+  assert_eq!(
+    parse_image_string(REGISTRY_IMAGE).unwrap(),
+    ("registry".to_string(), "cck-ingestor:0.0.18".to_string())
+  );
+}
