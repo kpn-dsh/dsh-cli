@@ -34,8 +34,15 @@ impl<'a> Pipeline<'a> {
     resource_registry: &'a ResourceRegistry,
     processor_registry: &'a ProcessorRegistry,
   ) -> Result<Pipeline<'a>, String> {
-    let pipeline_config = read_pipeline_config(config_file_name)?;
+    read_pipeline_config(config_file_name).and_then(|config| Self::create_from_config(&config, dsh_api_tenant, resource_registry, processor_registry))
+  }
 
+  pub fn create_from_config(
+    pipeline_config: &PipelineConfig,
+    dsh_api_tenant: &'a DshApiTenant,
+    resource_registry: &'a ResourceRegistry,
+    processor_registry: &'a ProcessorRegistry,
+  ) -> Result<Pipeline<'a>, String> {
     let mut resources = HashMap::<ResourceId, PipelineResource>::new();
     for resource_config in &pipeline_config.resources {
       let name = resource_config.name.clone();
@@ -155,7 +162,7 @@ impl<'a> Pipeline<'a> {
     #[allow(unused_mut)]
     let mut dependencies = vec![];
 
-    Ok(Pipeline { id: pipeline_config.pipeline_id, name: pipeline_config.name, resources, processors, connections, dependencies })
+    Ok(Pipeline { id: pipeline_config.pipeline_id.clone(), name: pipeline_config.name.clone(), resources, processors, connections, dependencies })
   }
 
   fn get_processor_inbound_junction(
