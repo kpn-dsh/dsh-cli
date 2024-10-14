@@ -1,4 +1,4 @@
-use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_client_factory::DEFAULT_DSH_API_CLIENT_FACTORY;
 use dsh_api::types::{AllocationStatus, Empty};
 
 #[tokio::main]
@@ -10,7 +10,7 @@ async fn main() -> Result<(), String> {
   // let secret = client.delete_secret(secret_id).await?;
   // let secret = client.update_secret(secret_id).await?;
 
-  let client_factory = DshApiClientFactory::default();
+  let client_factory = &DEFAULT_DSH_API_CLIENT_FACTORY;
   let client = client_factory.client().await?;
 
   let mut secrets: Vec<String> = client.get_secret_ids().await?;

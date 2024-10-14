@@ -3,9 +3,11 @@ use std::env;
 use dsh_sdk::RestTokenFetcherBuilder;
 use dsh_sdk::{Platform as SdkPlatform, RestTokenFetcher};
 use lazy_static::lazy_static;
+use log::info;
 
 use crate::dsh_api_client::DshApiClient;
-use crate::platform::DshPlatform;
+use crate::dsh_api_tenant::DEFAULT_DSH_API_TENANT;
+use crate::platform::{DshPlatform, DEFAULT_DSH_PLATFORM};
 use crate::{generated::Client as GeneratedClient, DshApiTenant};
 
 #[derive(Debug)]
@@ -60,14 +62,17 @@ impl DshApiClientFactory {
 
 impl Default for DshApiClientFactory {
   fn default() -> Self {
-    let platform = DshPlatform::default();
-    let tenant = DshApiTenant::default();
+    let platform: &DEFAULT_DSH_PLATFORM = &DEFAULT_DSH_PLATFORM;
+    let tenant: &DEFAULT_DSH_API_TENANT = &DEFAULT_DSH_API_TENANT;
     let secret = match get_secret_from_platform_and_tenant(platform.to_string().as_str(), tenant.name()) {
       Ok(secret) => secret,
       Err(error) => panic!("{}", error),
     };
-    match DshApiClientFactory::create(tenant, secret) {
-      Ok(factory) => factory,
+    match DshApiClientFactory::create((*tenant).clone(), secret) {
+      Ok(factory) => {
+        info!("default dsh api client factory for {}@{} created", tenant.name(), platform.to_string());
+        factory
+      }
       Err(error) => panic!("{}", error),
     }
   }

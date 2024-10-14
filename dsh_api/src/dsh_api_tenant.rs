@@ -1,5 +1,8 @@
 use std::env;
 
+use lazy_static::lazy_static;
+use log::info;
+
 use crate::platform::DshPlatform;
 use crate::{user_environment_variable, TENANT_ENVIRONMENT_VARIABLE};
 
@@ -199,8 +202,13 @@ impl Default for DshApiTenant {
       Err(error) => panic!("{}", error),
     };
     let platform = DshPlatform::default();
+    info!("default dsh api client for {}@{} created", tenant_name, platform);
     DshApiTenant::new(tenant_name, user, platform)
   }
+}
+
+lazy_static! {
+  pub static ref DEFAULT_DSH_API_TENANT: DshApiTenant = DshApiTenant::default();
 }
 
 pub fn get_default_tenant_name() -> Result<String, String> {

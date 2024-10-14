@@ -4,6 +4,8 @@ use std::env;
 use std::fmt::{Display, Formatter};
 
 use dsh_sdk::Platform as SdkPlatform;
+use lazy_static::lazy_static;
+use log::info;
 
 use crate::PLATFORM_ENVIRONMENT_VARIABLE;
 
@@ -216,8 +218,15 @@ impl Default for DshPlatform {
   /// if it contains an invalid platform name.
   fn default() -> Self {
     match Self::try_from(()) {
-      Ok(dsh_platform) => dsh_platform,
+      Ok(dsh_platform) => {
+        info!("default dsh platform {} created", dsh_platform);
+        dsh_platform
+      }
       Err(error) => panic!("{}", error),
     }
   }
+}
+
+lazy_static! {
+  pub static ref DEFAULT_DSH_PLATFORM: DshPlatform = DshPlatform::default();
 }

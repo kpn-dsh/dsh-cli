@@ -1,4 +1,4 @@
-use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_client_factory::DEFAULT_DSH_API_CLIENT_FACTORY;
 use dsh_api::types::{AllocationStatus, Task};
 
 const SERVICE_ID: &str = "consentfilter-test002";
@@ -9,7 +9,7 @@ async fn main() -> Result<(), String> {
   let application_id = SERVICE_ID;
   let task_id = TASK_ID;
 
-  let client_factory = DshApiClientFactory::default();
+  let client_factory = &DEFAULT_DSH_API_CLIENT_FACTORY;
   let client = client_factory.client().await?;
 
   // Return applications that have derived tasks
