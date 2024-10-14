@@ -74,7 +74,7 @@ static LONG_ABOUT: &str = "DSH api command line interface\n\n\
    such as finding all applications that use a certain resource (e.g. a secret) or showing a \
    list of all resources of a certain type (e.g. list all volumes).";
 
-static AFTER_HELP: &str = "Most commands adding an 's' as a postfix will yield the same result \
+static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dcli apps' will be the same \
    as using 'dcli app list'.";
 static BEFORE_HELP: &str = "before help";
