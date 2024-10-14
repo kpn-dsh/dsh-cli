@@ -78,6 +78,8 @@ lazy_static! {
       (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
       (FlagType::Configuration, &ApplicationListConfiguration {}, None),
       (FlagType::Ids, &ApplicationListIds {}, None),
+      (FlagType::Started, &ApplicationListAll {}, None),
+      (FlagType::Stopped, &ApplicationListAll {}, None),
       (FlagType::Tasks, &ApplicationListTasks {}, None),
     ],
     default_command_executor: Some(&ApplicationListIds {}),

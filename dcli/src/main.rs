@@ -33,7 +33,7 @@ use crate::proxy::PROXY_SUBJECT;
 use crate::secret::SECRET_SUBJECT;
 #[cfg(feature = "stream")]
 use crate::stream::STREAM_SUBJECT;
-use crate::subject::{clap_subject_command, clap_subject_list_shortcut, Subject};
+use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
 use crate::topic::TOPIC_SUBJECT;
 use crate::vhost::VHOST_SUBJECT;
 use crate::volume::VOLUME_SUBJECT;
@@ -175,17 +175,17 @@ async fn inner_main() -> DcliResult {
   ];
 
   let mut subject_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
-  let mut clap_commands: Vec<Command> = Vec::new();
-
   let mut subject_list_shortcut_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
+
+  let mut clap_commands: Vec<Command> = Vec::new();
 
   for subject in subjects {
     let (command_name, clap_command) = clap_subject_command(subject);
     subject_registry.insert(command_name.to_string(), subject);
     clap_commands.push(clap_command);
-    if let Some((list_shortcut_name, clap_list_shortcut)) = clap_subject_list_shortcut(subject) {
+    if let Some((list_shortcut_name, clap_list_command_shortcut)) = clap_list_shortcut_command(subject) {
       subject_list_shortcut_registry.insert(list_shortcut_name.to_string(), subject);
-      clap_commands.push(clap_list_shortcut);
+      clap_commands.push(clap_list_command_shortcut);
     }
   }
 

@@ -70,21 +70,21 @@ pub(crate) fn clap_subject_command(subject: &dyn Subject) -> (String, Command) {
   (subject.subject().to_string(), subject_command)
 }
 
-pub(crate) fn clap_subject_list_shortcut(subject: &dyn Subject) -> Option<(String, Command)> {
+pub(crate) fn clap_list_shortcut_command(subject: &dyn Subject) -> Option<(String, Command)> {
   if let Some(list_capability) = subject.capabilities().get(&CapabilityType::List) {
+    let list_shortcut_name = format!("{}s", subject.subject());
     let list_flags = list_capability.clap_flags(subject);
-    let subject_list_shortcut_name = format!("{}s", subject.subject());
-    let mut subject_list_shortcut = Command::new(subject_list_shortcut_name.to_string())
+    let mut list_shortcut_command = Command::new(list_shortcut_name.to_string())
       .about(subject.subject_command_about())
       .args(list_flags)
       .hide(true);
     if let Some(alias) = subject.subject_command_alias() {
-      subject_list_shortcut = subject_list_shortcut.alias(format!("{}s", alias))
+      list_shortcut_command = list_shortcut_command.alias(format!("{}s", alias))
     }
     if let Some(long_about) = list_capability.long_about() {
-      subject_list_shortcut = subject_list_shortcut.long_about(long_about)
+      list_shortcut_command = list_shortcut_command.long_about(long_about)
     }
-    Some((subject_list_shortcut_name.to_string(), subject_list_shortcut))
+    Some((list_shortcut_name, list_shortcut_command))
   } else {
     None
   }
