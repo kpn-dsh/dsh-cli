@@ -175,11 +175,15 @@ impl Capability for DeclarativeCapability<'_> {
   }
 
   fn clap_flags(&self, subject: &dyn Subject) -> Vec<Arg> {
-    self
-      .command_executors
-      .iter()
-      .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help))
-      .collect::<Vec<Arg>>()
+    [
+      self
+        .command_executors
+        .iter()
+        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help))
+        .collect::<Vec<Arg>>(),
+      self.extra_flags.clone(),
+    ]
+    .concat()
   }
 
   fn long_about(&self) -> Option<String> {

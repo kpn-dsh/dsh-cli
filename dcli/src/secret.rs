@@ -90,6 +90,8 @@ lazy_static! {
     command_executors: vec![
       (FlagType::All, &SecretListIds {}, None),
       (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
+      (FlagType::App, &SecretListIds {}, None),
+      (FlagType::Application, &SecretListIds {}, None),
       (FlagType::Ids, &SecretListIds {}, None),
       (FlagType::Usage, &SecretListUsage {}, None),
     ],
