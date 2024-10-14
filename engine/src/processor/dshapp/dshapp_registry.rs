@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fs;
 
+use log::info;
+
 use dsh_api::dsh_api_tenant::DshApiTenant;
 
 use crate::processor::dshapp::dshapp_realization::DshAppRealization;
@@ -15,6 +17,7 @@ pub(crate) struct DshAppRealizationRegistry {
 
 impl<'a> DshAppRealizationRegistry {
   pub(crate) fn create() -> Result<DshAppRealizationRegistry, String> {
+    info!("create dshapp processor registry");
     let mut realizations: HashMap<ProcessorRealizationId, DshAppRealization> = HashMap::new();
     let paths = fs::read_dir(format!("{}/dshapp", processor_config_dir_name())).map_err(|error| error.to_string())?;
     for path in paths {
@@ -26,6 +29,7 @@ impl<'a> DshAppRealizationRegistry {
           dshapp_realization.processor_realization_id()
         ));
       }
+      info!("  dshapp processor {}", dshapp_realization.processor_realization_id());
       realizations.insert(dshapp_realization.processor_realization_id().clone(), dshapp_realization);
     }
     Ok(Self { realizations })

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dsh_sdk::Properties;
+use log::info;
 
 use crate::engine_target::EngineTarget;
 use crate::resource::dshtopic::dshtopic_realization::DshTopicRealization;
@@ -15,10 +16,12 @@ pub(crate) struct DshTopicRealizationRegistry {
 
 impl DshTopicRealizationRegistry {
   pub(crate) fn create(engine_target: Arc<EngineTarget>) -> Result<Self, String> {
+    info!("create dshtopic realization registry");
     let mut dshtopic_realizations: HashMap<ResourceIdentifier, DshTopicRealization> = HashMap::new();
     let dsh_properties: &Properties = Properties::get();
     for stream in dsh_properties.datastream().streams().values() {
       let dshtopic_realization = DshTopicRealization::create(stream, engine_target.clone())?;
+      info!("  {}", dshtopic_realization.resource_identifier);
       dshtopic_realizations.insert(dshtopic_realization.resource_identifier.clone(), dshtopic_realization);
     }
     Ok(Self { dshtopic_realizations })

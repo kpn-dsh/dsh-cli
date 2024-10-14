@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs;
 
+use log::info;
+
 use dsh_api::dsh_api_tenant::DshApiTenant;
 
 use crate::processor::dshservice::dshservice_realization::DshServiceRealization;
@@ -16,6 +18,7 @@ pub(crate) struct DshServiceRealizationRegistry {
 
 impl DshServiceRealizationRegistry {
   pub(crate) fn create() -> Result<DshServiceRealizationRegistry, String> {
+    info!("create dshservice processor registry");
     let mut realizations: HashMap<ProcessorRealizationId, DshServiceRealization> = HashMap::new();
     let paths = fs::read_dir(format!("{}/dshservice", processor_config_dir_name())).map_err(|error| error.to_string())?;
     for path in paths {
@@ -27,6 +30,7 @@ impl DshServiceRealizationRegistry {
           dshservice_realization.processor_realization_id()
         ));
       }
+      info!("  dshservice processor {}", dshservice_realization.processor_realization_id());
       realizations.insert(dshservice_realization.processor_realization_id().clone(), dshservice_realization);
     }
     Ok(Self { realizations })

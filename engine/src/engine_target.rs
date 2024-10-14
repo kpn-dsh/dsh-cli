@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
+use log::info;
 use rand::Rng;
 use regex::Regex;
 use uuid::Uuid;
@@ -50,7 +51,10 @@ impl EngineTarget {
 impl Default for EngineTarget {
   fn default() -> Self {
     match EngineTarget::create(DshApiClientFactory::default()) {
-      Ok(engine_target) => engine_target,
+      Ok(engine_target) => {
+        info!("default engine target for {}@{} created", engine_target.tenant_name(), engine_target.platform());
+        engine_target
+      }
       Err(error) => panic!("{}", error),
     }
   }
