@@ -64,7 +64,7 @@ lazy_static! {
       (FlagType::Configuration, &BucketListConfiguration {}, None),
       (FlagType::Ids, &BucketListIds {}, None),
     ],
-    default_command_executor: Some(&BucketListIds {}),
+    default_command_executor: Some(&BucketListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![],

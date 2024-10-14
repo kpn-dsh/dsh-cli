@@ -86,7 +86,7 @@ lazy_static! {
       (FlagType::Ids, &VolumeListIds {}, None),
       (FlagType::Usage, &VolumeListUsage {}, None),
     ],
-    default_command_executor: Some(&VolumeListIds {}),
+    default_command_executor: Some(&VolumeListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![],

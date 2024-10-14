@@ -66,7 +66,7 @@ lazy_static! {
     command_about: "List proxies".to_string(),
     command_long_about: Some("Lists all Kafka proxies used by the applications/services and apps on the DSH.".to_string()),
     command_executors: vec![(FlagType::All, &ProxyListAll {}, None), (FlagType::Ids, &ProxyListIds {}, None)],
-    default_command_executor: Some(&ProxyListIds {}),
+    default_command_executor: Some(&ProxyListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![],

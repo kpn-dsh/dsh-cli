@@ -58,7 +58,7 @@ lazy_static! {
       (FlagType::Configuration, &AppListConfiguration {}, None),
       (FlagType::Ids, &AppListIds {}, None),
     ],
-    default_command_executor: Some(&AppListIds {}),
+    default_command_executor: Some(&AppListConfiguration {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![],

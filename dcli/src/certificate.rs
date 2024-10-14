@@ -70,7 +70,7 @@ lazy_static! {
       (FlagType::Ids, &CertificateListIds {}, None),
       (FlagType::Usage, &CertificateListUsage {}, None),
     ],
-    default_command_executor: Some(&CertificateListIds {}),
+    default_command_executor: Some(&CertificateListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![],

@@ -92,7 +92,7 @@ lazy_static! {
       (FlagType::Ids, &TopicListIds {}, None),
       (FlagType::Usage, &TopicListUsage {}, None),
     ],
-    default_command_executor: Some(&TopicListIds {}),
+    default_command_executor: Some(&TopicListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![],

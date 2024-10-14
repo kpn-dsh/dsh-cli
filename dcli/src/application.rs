@@ -82,7 +82,7 @@ lazy_static! {
       (FlagType::Stopped, &ApplicationListAll {}, None),
       (FlagType::Tasks, &ApplicationListTasks {}, None),
     ],
-    default_command_executor: Some(&ApplicationListIds {}),
+    default_command_executor: Some(&ApplicationListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
     extra_flags: vec![
@@ -100,7 +100,7 @@ lazy_static! {
       (FlagType::Configuration, &ApplicationShowConfiguration {}, None),
       (FlagType::Tasks, &ApplicationShowTasks {}, None),
     ],
-    default_command_executor: Some(&ApplicationShowConfiguration {}),
+    default_command_executor: Some(&ApplicationShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
     extra_flags: vec![],
