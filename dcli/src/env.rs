@@ -102,7 +102,7 @@ impl CommandExecutor for EnvFind {
       }
       builder.print_list();
     }
-    if matches.get_flag(FilterFlagType::App.id()) {
+    if include_application {
       if context.show_capability_explanation() {
         println!("find environment variables that contain '{}' in applications", query);
       }
