@@ -101,26 +101,24 @@ impl SubjectFormatter<TopicLabel> for TopicStatus {
   }
 }
 
-pub static TOPIC_STATUS_LABELS: [TopicLabel; 9] = [
+pub static TOPIC_STATUS_LABELS: [TopicLabel; 8] = [
   TopicLabel::Target,
   TopicLabel::Partitions,
   TopicLabel::ReplicationFactor,
   TopicLabel::CleanupPolicy,
   TopicLabel::TimestampType,
   TopicLabel::MaxMessageBytes,
-  TopicLabel::DerivedFrom,
   TopicLabel::Notifications,
   TopicLabel::Provisioned,
 ];
 
-pub static TOPIC_LABELS: [TopicLabel; 9] = [
+pub static TOPIC_LABELS: [TopicLabel; 8] = [
   TopicLabel::Target,
   TopicLabel::Partitions,
   TopicLabel::ReplicationFactor,
   TopicLabel::CleanupPolicy,
   TopicLabel::TimestampType,
   TopicLabel::MaxMessageBytes,
-  TopicLabel::DerivedFrom,
   TopicLabel::Notifications,
   TopicLabel::Provisioned,
 ];
