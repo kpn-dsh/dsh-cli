@@ -5,7 +5,9 @@ use dsh_api::dsh_api_client::DshApiClient;
 
 use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT, TARGET_ARGUMENT};
 use crate::capability::CapabilityType::*;
+use crate::filter_flags::{create_filter_flag, FilterFlagType};
 use crate::flags::{create_flag, FlagType};
+use crate::modifier_flags::{create_modifier_flag, ModifierFlagType};
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
 
@@ -148,7 +150,8 @@ pub(crate) struct DeclarativeCapability<'a> {
   pub(crate) default_command_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
   pub(crate) run_all_executors: bool,
   pub(crate) extra_arguments: Vec<Arg>,
-  pub(crate) extra_flags: Vec<Arg>,
+  pub(crate) filter_flags: Vec<(FilterFlagType, Option<&'a str>)>,
+  pub(crate) modifier_flags: Vec<(ModifierFlagType, Option<&'a str>)>,
 }
 
 #[async_trait]
@@ -163,8 +166,7 @@ impl Capability for DeclarativeCapability<'_> {
       .about(&self.command_about)
       .args(self.capability_type.command_target_arguments(subject))
       .args(self.clap_flags(subject))
-      .args(&self.extra_arguments)
-      .args(&self.extra_flags);
+      .args(&self.extra_arguments);
     if let Some(alias) = self.capability_type.command_alias() {
       capability_command = capability_command.alias(alias)
     }
@@ -181,7 +183,16 @@ impl Capability for DeclarativeCapability<'_> {
         .iter()
         .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help))
         .collect::<Vec<Arg>>(),
-      self.extra_flags.clone(),
+      self
+        .filter_flags
+        .iter()
+        .map(|(flag_type, long_help)| create_filter_flag(flag_type, subject, long_help))
+        .collect::<Vec<_>>(),
+      self
+        .modifier_flags
+        .iter()
+        .map(|(flag_type, long_help)| create_modifier_flag(flag_type, subject, long_help))
+        .collect::<Vec<_>>(),
     ]
     .concat()
   }
@@ -199,22 +210,30 @@ impl Capability for DeclarativeCapability<'_> {
     dsh_api_client: &DshApiClient<'_>,
   ) -> DcliResult {
     let mut last_dcli_result: Option<DcliResult> = None;
+    let mut number_of_executed_capabilities = 0;
     if self.run_all_executors {
       for (flag_type, executor, _) in &self.command_executors {
         if matches.get_flag(flag_type.id()) {
           last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
+          number_of_executed_capabilities = number_of_executed_capabilities + 1;
         }
       }
     } else {
       for (flag_type, executor, _) in &self.command_executors {
-        if matches.get_flag(flag_type.id()) {
+        if matches.get_flag(flag_type.id()) && last_dcli_result.is_none() {
           last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
-          break;
+          number_of_executed_capabilities = number_of_executed_capabilities + 1;
         }
       }
     }
     match last_dcli_result {
-      Some(dcli_result) => dcli_result,
+      Some(dcli_result) => {
+        if number_of_executed_capabilities > 1 {
+          Ok(true)
+        } else {
+          dcli_result
+        }
+      }
       None => {
         if let Some(default_executor) = self.default_command_executor {
           default_executor

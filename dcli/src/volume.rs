@@ -10,6 +10,7 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Application, Volume};
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::formatter::{print_ids, TableBuilder};
@@ -63,7 +64,8 @@ lazy_static! {
     default_command_executor: Some(&VolumeCreate {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Delete,
@@ -73,7 +75,8 @@ lazy_static! {
     default_command_executor: Some(&VolumeDelete {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
@@ -89,7 +92,8 @@ lazy_static! {
     default_command_executor: Some(&VolumeListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![(FilterFlagType::App, Some("List all apps that use the volume.")), (FilterFlagType::Application, Some("List all applications that use the volume."))],
+    modifier_flags: vec![],
   });
   pub static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -104,7 +108,8 @@ lazy_static! {
     default_command_executor: Some(&VolumeShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
 }
 

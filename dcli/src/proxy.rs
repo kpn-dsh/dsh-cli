@@ -59,7 +59,8 @@ lazy_static! {
     default_command_executor: Some(&ProxyDelete {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![]
   });
   pub static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
@@ -69,7 +70,8 @@ lazy_static! {
     default_command_executor: Some(&ProxyListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![]
   });
   pub static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -79,7 +81,8 @@ lazy_static! {
     default_command_executor: Some(&ProxyShowConfiguration {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![]
   });
   pub static ref PROXY_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Update,
@@ -89,7 +92,8 @@ lazy_static! {
     default_command_executor: Some(&ProxyUpdateConfiguration {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![]
   });
 }
 

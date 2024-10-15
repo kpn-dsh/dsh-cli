@@ -84,7 +84,7 @@ lazy_static! {
     default_command_executor: Some(&StreamListIds {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
   });
   pub static ref STREAM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -96,7 +96,7 @@ lazy_static! {
     default_command_executor: Some(&StreamShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
   });
 }
 

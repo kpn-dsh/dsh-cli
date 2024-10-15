@@ -71,7 +71,7 @@ lazy_static! {
     default_command_executor: Some(&ListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
   });
 }
 

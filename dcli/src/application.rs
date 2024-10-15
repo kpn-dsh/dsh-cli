@@ -10,7 +10,8 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Application, TaskStatus};
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
-use crate::flags::{create_flag, FlagType};
+use crate::filter_flags::FilterFlagType;
+use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::application::{ApplicationLabel, APPLICATION_LABELS_LIST, APPLICATION_LABELS_SHOW};
 use crate::formatters::formatter::{print_ids, TableBuilder};
@@ -62,7 +63,8 @@ lazy_static! {
     default_command_executor: Some(&ApplicationDiffAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
@@ -78,17 +80,13 @@ lazy_static! {
       (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
       (FlagType::Configuration, &ApplicationListConfiguration {}, None),
       (FlagType::Ids, &ApplicationListIds {}, None),
-      (FlagType::Started, &ApplicationListAll {}, None),
-      (FlagType::Stopped, &ApplicationListAll {}, None),
       (FlagType::Tasks, &ApplicationListTasks {}, None),
     ],
     default_command_executor: Some(&ApplicationListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![
-      create_flag(&FlagType::Started, &ApplicationSubject {}, &Some("List all started applications.")),
-      create_flag(&FlagType::Stopped, &ApplicationSubject {}, &Some("List all stopped applications."))
-    ],
+    filter_flags: vec![(FilterFlagType::Started, Some("List all started applications.")), (FilterFlagType::Stopped, Some("List all stopped applications."))],
+    modifier_flags: vec![],
   });
   pub static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -103,7 +101,8 @@ lazy_static! {
     default_command_executor: Some(&ApplicationShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
 }
 
@@ -312,7 +311,7 @@ fn print_applications(applications: &HashMap<String, Application>, matches: &Arg
   let mut builder = TableBuilder::list(&APPLICATION_LABELS_LIST, context);
   for application_id in application_ids {
     if let Some(application) = applications.get(&application_id) {
-      match (matches.get_flag(FlagType::Started.id()), matches.get_flag(FlagType::Stopped.id())) {
+      match (matches.get_flag(FilterFlagType::Started.id()), matches.get_flag(FilterFlagType::Stopped.id())) {
         (false, true) => {
           if application.instances == 0 {
             builder.value(application_id.clone(), application);

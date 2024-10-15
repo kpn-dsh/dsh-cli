@@ -73,7 +73,8 @@ lazy_static! {
     default_command_executor: Some(&CertificateListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -87,7 +88,8 @@ lazy_static! {
     default_command_executor: Some(&CertificateShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
 }
 

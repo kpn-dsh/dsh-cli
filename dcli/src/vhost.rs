@@ -1,9 +1,9 @@
-use async_trait::async_trait;
+use std::collections::HashMap;
 
+use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::HashMap;
 
 use dsh_api::dsh_api_client::DshApiClient;
 
@@ -62,7 +62,8 @@ lazy_static! {
     default_command_executor: Some(&VhostListUsage {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref VHOST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -72,7 +73,8 @@ lazy_static! {
     default_command_executor: Some(&VhostShowUsage {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
 }
 
@@ -148,10 +150,6 @@ impl CommandExecutor for VhostShowUsage {
   }
 }
 
-lazy_static! {
-  static ref VHOST_REGEX: Regex = Regex::new(r"\{\s*vhost\(\s*'([a-zA-Z0-9_\.-]+)'\s*(,\s*'([a-zA-Z0-9_-]+)')?\s*\)\s*\}").unwrap();
-}
-
 fn a_zone(a_zone_string: String) -> Option<String> {
   if a_zone_string.contains("'private'") {
     Some("private".to_string())
@@ -160,6 +158,10 @@ fn a_zone(a_zone_string: String) -> Option<String> {
   } else {
     None
   }
+}
+
+lazy_static! {
+  static ref VHOST_REGEX: Regex = Regex::new(r"\{\s*vhost\(\s*'([a-zA-Z0-9_\.-]+)'\s*(,\s*'([a-zA-Z0-9_-]+)')?\s*\)\s*\}").unwrap();
 }
 
 pub(crate) fn parse_vhost_string(vhost_string: &str) -> Option<(String, Option<String>)> {
@@ -176,29 +178,29 @@ pub(crate) fn parse_vhost_string(vhost_string: &str) -> Option<(String, Option<S
 //   const VHOST_STRINGS: [&str; 26] = [
 //     "{ vhost('broker-schema-store.kafka.greenbox-dev', 'private') }",
 //     "{ vhost('cmd.greenbox-dev', 'private') }",
+//     "{ vhost('cmd.greenbox-dev','private') }",
 //     "{ vhost('dsh-schema-store.greenbox-dev','public') }",
 //     "{ vhost('eavesdropper-092.greenbox-dev', 'public') }",
-//     "{ vhost('simple-keyring-service', 'private') }",
-//     "{ vhost('simple-keyring-service', 'private') }",
-//     "{ vhost('greenbox-lab','private') }",
-//     "{ vhost('monitor-dashboard','public') }",
-//     "{ vhost('greenbox-backend-dev') }",
-//     "{ vhost('greenbox-tutorial-jupyter', 'public') }",
 //     "{ vhost('greenbox','public') }",
+//     "{ vhost('greenbox-backend-dev') }",
+//     "{ vhost('greenbox-dev','public') }",
+//     "{ vhost('greenbox-lab','private') }",
+//     "{ vhost('greenbox-tutorial-jupyter', 'public') }",
 //     "{ vhost('keyring-050.greenbox-dev', 'public') }",
 //     "{ vhost('keyring-app2.greenbox-dev', 'public') }",
 //     "{ vhost('keyring-dev','public') }",
 //     "{ vhost('keyring-dev-proxy.greenbox-dev', 'public') }",
+//     "{ vhost('keyring-dex','private') }",
 //     "{ vhost('keyring-documentation', 'public') }",
 //     "{ vhost('keyring-service-dev') }",
-//     "{ vhost('simple-keyring-service','private') }",
-//     "{ vhost('keyring-dex','private') }",
-//     "{ vhost('schema-registry-dev') }",
+//     "{ vhost('monitor-dashboard','public') }",
 //     "{ vhost('schema-registry-console-dev', 'public') }",
+//     "{ vhost('schema-registry-dev') }",
 //     "{ vhost('schema-registry-doc-dev') }",
+//     "{ vhost('simple-keyring-service', 'private') }",
+//     "{ vhost('simple-keyring-service', 'private') }",
+//     "{ vhost('simple-keyring-service','private') }",
 //     "{ vhost('trifonius-be','private') }",
-//     "{ vhost('greenbox-dev','public') }",
-//     "{ vhost('cmd.greenbox-dev','private') }",
 //     "{ vhost('whoami.greenbox-dev', 'public') }",
 //   ];
 //   for vhost_string in VHOST_STRINGS {

@@ -67,7 +67,8 @@ lazy_static! {
     default_command_executor: Some(&BucketListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -77,7 +78,8 @@ lazy_static! {
     default_command_executor: Some(&BucketShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
 }
 

@@ -12,13 +12,15 @@ use dsh_api::types::Secret;
 use crate::app::apps_with_secret_injections;
 use crate::application::applications_with_secret_injections;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
-use crate::flags::{create_flag, FlagType};
+use crate::filter_flags::FilterFlagType;
+use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::formatter::{print_ids, TableBuilder};
 use crate::formatters::secret::{
   SecretUsage, SecretUsageLabel, SECRET_USAGE_IN_APPLICATIONS_LABELS_LIST, SECRET_USAGE_IN_APPLICATIONS_LABELS_SHOW, SECRET_USAGE_IN_APPS_LABELS_LIST,
   SECRET_USAGE_IN_APPS_LABELS_SHOW,
 };
+use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
 use crate::{confirmed, read_multi_line, read_single_line, DcliContext, DcliResult};
 
@@ -67,11 +69,12 @@ lazy_static! {
     capability_type: CapabilityType::Create,
     command_about: "Create secret".to_string(),
     command_long_about: Some("Create a secret.".to_string()),
-    command_executors: vec![(FlagType::MultiLine, &SecretCreateMultiLine {}, None)],
-    default_command_executor: Some(&SecretCreateSingleLine {}),
+    command_executors: vec![],
+    default_command_executor: Some(&SecretCreate {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![(ModifierFlagType::MultiLine, None)],
   });
   pub static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Delete,
@@ -81,7 +84,8 @@ lazy_static! {
     default_command_executor: Some(&SecretDelete {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
@@ -90,18 +94,14 @@ lazy_static! {
     command_executors: vec![
       (FlagType::All, &SecretListIds {}, None),
       (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
-      (FlagType::App, &SecretListIds {}, None),
-      (FlagType::Application, &SecretListIds {}, None),
       (FlagType::Ids, &SecretListIds {}, None),
       (FlagType::Usage, &SecretListUsage {}, None),
     ],
     default_command_executor: Some(&SecretListIds {}),
-    run_all_executors: true,
+    run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![
-      create_flag(&FlagType::App, &SecretSubject {}, &Some("List all apps that use the secret.")),
-      create_flag(&FlagType::Application, &SecretSubject {}, &Some("List all applications that use the secret."))
-    ],
+    filter_flags: vec![(FilterFlagType::App, Some("List all apps that use the secret.")), (FilterFlagType::Application, Some("List all applications that use the secret."))],
+    modifier_flags: vec![],
   });
   pub static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -115,49 +115,45 @@ lazy_static! {
     default_command_executor: None,
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
 }
 
-struct SecretCreateMultiLine {}
+struct SecretCreate {}
 
 #[async_trait]
-impl CommandExecutor for SecretCreateMultiLine {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("create new multi-line secret '{}'", secret_id);
+impl CommandExecutor for SecretCreate {
+  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+    if matches.get_flag(ModifierFlagType::MultiLine.id()) {
+      let secret_id = target.unwrap_or_else(|| unreachable!());
+      if context.show_capability_explanation() {
+        println!("create new multi-line secret '{}'", secret_id);
+      }
+      if dsh_api_client.get_secret(&secret_id).await.is_ok() {
+        return Err(format!("secret '{}' already exists", secret_id));
+      }
+      println!("enter multi-line secret (terminate input with ctrl-d after last line)");
+      let value = read_multi_line()?;
+      let secret = Secret { name: secret_id, value };
+      dsh_api_client.create_secret(&secret).await?;
+      println!("ok");
+      Ok(true)
+    } else {
+      let secret_id = target.unwrap_or_else(|| unreachable!());
+      if context.show_capability_explanation() {
+        println!("create new single line secret '{}'", secret_id);
+      }
+      if dsh_api_client.get_secret(&secret_id).await.is_ok() {
+        return Err(format!("secret '{}' already exists", secret_id));
+      }
+      println!("enter secret followed by newline");
+      let value = read_single_line()?;
+      let secret = Secret { name: secret_id, value };
+      dsh_api_client.create_secret(&secret).await?;
+      println!("ok");
+      Ok(true)
     }
-    if dsh_api_client.get_secret(&secret_id).await.is_ok() {
-      return Err(format!("secret '{}' already exists", secret_id));
-    }
-    println!("enter multi-line secret (terminate input with ctrl-d after last line)");
-    let value = read_multi_line()?;
-    let secret = Secret { name: secret_id, value };
-    dsh_api_client.create_secret(&secret).await?;
-    println!("ok");
-    Ok(true)
-  }
-}
-
-struct SecretCreateSingleLine {}
-
-#[async_trait]
-impl CommandExecutor for SecretCreateSingleLine {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("create new single line secret '{}'", secret_id);
-    }
-    if dsh_api_client.get_secret(&secret_id).await.is_ok() {
-      return Err(format!("secret '{}' already exists", secret_id));
-    }
-    println!("enter secret followed by newline");
-    let value = read_single_line()?;
-    let secret = Secret { name: secret_id, value };
-    dsh_api_client.create_secret(&secret).await?;
-    println!("ok");
-    Ok(true)
   }
 }
 
@@ -217,7 +213,7 @@ struct SecretListUsage {}
 #[async_trait]
 impl CommandExecutor for SecretListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if matches.get_flag(FlagType::App.id()) {
+    if matches.get_flag(FilterFlagType::App.id()) {
       if context.show_capability_explanation() {
         println!("list all secrets with their usage in apps");
       }
@@ -241,7 +237,7 @@ impl CommandExecutor for SecretListUsage {
       }
       builder.print();
     }
-    if matches.get_flag(FlagType::Application.id()) {
+    if matches.get_flag(FilterFlagType::Application.id()) {
       if context.show_capability_explanation() {
         println!("list all secrets with their usage in applications");
       }

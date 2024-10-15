@@ -50,7 +50,6 @@ impl Subject for TopicSubject {
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    // capabilities.insert(CapabilityType::Create, TOPIC_CREATE_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::Delete, TOPIC_DELETE_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::List, TOPIC_LIST_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::Show, TOPIC_SHOW_CAPABILITY.as_ref());
@@ -59,18 +58,6 @@ impl Subject for TopicSubject {
 }
 
 lazy_static! {
-  // pub static ref TOPIC_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-  //   capability_type: CapabilityType::Create,
-  //   command_about: "Create scratch topic".to_string(),
-  //   command_long_about: Some("Create a scratch topic.".to_string()),
-  //   command_after_help: None,
-  //   command_after_long_help: None,
-  //   command_executors: vec![],
-  //   default_command_executor: Some(&TopicCreate {}),
-  //   run_all_executors: false,
-  //   extra_arguments: vec![],
-  //   extra_flags: vec![],
-  // });
   pub static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Delete,
     command_about: "Delete scratch topic".to_string(),
@@ -79,7 +66,8 @@ lazy_static! {
     default_command_executor: Some(&TopicDelete {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
@@ -95,7 +83,8 @@ lazy_static! {
     default_command_executor: Some(&TopicListAll {}),
     run_all_executors: true,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
   pub static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
@@ -110,35 +99,10 @@ lazy_static! {
     default_command_executor: Some(&TopicShowAll {}),
     run_all_executors: false,
     extra_arguments: vec![],
-    extra_flags: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
   });
 }
-
-// struct TopicCreate {}
-
-// #[async_trait]
-// impl CommandExecutor for TopicCreate {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -Ï> DcliResult {
-//     let topic_id = target.unwrap_or_else(|| unreachable!());
-//     if context.show_capability_explanation() {
-//       println!("create new scratch topic '{}'", topic_id);
-//     }
-//     if let Ok(_) = dsh_api_client.get_topic(&topic_id).await {
-//       println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>> 1");
-//       return Err(format!("scratch topic '{}' already exists", topic_id));
-//     }
-//     println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>> 2");
-//     // let mut line = String::new();
-//     // let stdin = stdin();
-//     // stdin.lock().read_line(&mut line).expect("could not read line");
-//     // println!("{}", line);
-//     let topic = Topic { kafka_properties: Default::default(), partitions: 1, replication_factor: 3 };
-//     let internal_stream = InternalManagedStream { kafka_properties: Default::default(), kind: InternalManagedStreamKind::Internal, partitions: 1, replication_factor: 1 };
-//     dsh_api_client.create_topic(&topic_id, &topic).await?;
-//     println!("ok");
-//     Ok(true)
-//   }
-// }
 
 struct TopicDelete {}
 
