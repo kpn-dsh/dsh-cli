@@ -12,7 +12,7 @@ use dsh_api::types::Application;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_ids, HashMapKey, TableBuilder};
 use crate::formatters::topic::{TOPIC_LABELS, TOPIC_STATUS_LABELS};
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::subject::Subject;
@@ -74,13 +74,12 @@ lazy_static! {
     command_about: "List topics".to_string(),
     command_long_about: Some("Lists all available topics.".to_string()),
     command_executors: vec![
-      (FlagType::All, &TopicListAll {}, None),
       (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
       (FlagType::Configuration, &TopicListConfiguration {}, None),
       (FlagType::Ids, &TopicListIds {}, None),
       (FlagType::Usage, &TopicListUsage {}, None),
     ],
-    default_command_executor: Some(&TopicListAll {}),
+    default_command_executor: Some(&TopicListConfiguration {}),
     run_all_executors: true,
     extra_arguments: vec![],
     filter_flags: vec![],
@@ -91,12 +90,12 @@ lazy_static! {
     command_about: "Show topic configuration".to_string(),
     command_long_about: None,
     command_executors: vec![
-      (FlagType::All, &TopicShowAll {}, None),
       (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
       (FlagType::Configuration, &TopicShowConfiguration {}, None),
+      (FlagType::Properties, &TopicShowProperties {}, None),
       (FlagType::Usage, &TopicShowUsage {}, None),
     ],
-    default_command_executor: Some(&TopicShowAll {}),
+    default_command_executor: Some(&TopicShowConfiguration {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
@@ -123,25 +122,6 @@ impl CommandExecutor for TopicDelete {
     } else {
       println!("cancelled");
     }
-    Ok(false)
-  }
-}
-
-struct TopicListAll {}
-
-#[async_trait]
-impl CommandExecutor for TopicListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all stream and internal topics");
-    }
-    let topic_ids = dsh_api_client.get_topic_ids().await?;
-    let statuses = try_join_all(topic_ids.iter().map(|id| dsh_api_client.get_topic(id.as_str()))).await?;
-    let mut builder = TableBuilder::list(&TOPIC_STATUS_LABELS, context);
-    for (topic_id, status) in topic_ids.iter().zip(statuses) {
-      builder.value(topic_id.to_string(), &status);
-    }
-    builder.print();
     Ok(false)
   }
 }
@@ -222,21 +202,6 @@ impl CommandExecutor for TopicListUsage {
   }
 }
 
-struct TopicShowAll {}
-
-#[async_trait]
-impl CommandExecutor for TopicShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let topic_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all parameters for topic '{}'", topic_id);
-    }
-    let topic = dsh_api_client.get_topic(topic_id.as_str()).await?;
-    println!("{:#?}", topic);
-    Ok(false)
-  }
-}
-
 struct TopicShowAllocationStatus {}
 
 #[async_trait]
@@ -267,6 +232,29 @@ impl CommandExecutor for TopicShowConfiguration {
   }
 }
 
+struct TopicShowProperties {}
+
+#[async_trait]
+impl CommandExecutor for TopicShowProperties {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+    let topic_id = target.unwrap_or_else(|| unreachable!());
+    if context.show_capability_explanation() {
+      println!("show the properties for topic '{}'", topic_id);
+    }
+    let topic_status = dsh_api_client.get_topic(topic_id.as_str()).await?;
+    let kafka_properties = topic_status.actual.unwrap().kafka_properties;
+    let mut hashmap_keys = kafka_properties.keys().map(|key| HashMapKey(key.to_string())).collect::<Vec<_>>();
+    hashmap_keys.sort_by_key(|key| key.0.clone());
+    let labels = vec![HashMapKey("properties".to_string()), HashMapKey("".to_string())];
+    let mut builder: TableBuilder<HashMapKey, HashMap<String, String>> = TableBuilder::list(&labels, context);
+    for hashmap_key in &hashmap_keys {
+      builder._vec(&vec![hashmap_key.0.clone(), kafka_properties.get(&hashmap_key.0).unwrap().clone()]);
+    }
+    builder.print();
+    Ok(false)
+  }
+}
+
 struct TopicShowUsage {}
 
 #[async_trait]
@@ -279,9 +267,11 @@ impl CommandExecutor for TopicShowUsage {
     let applications = dsh_api_client.get_application_configurations().await?;
     let usages: Vec<(String, Vec<String>)> = applications_that_use_topic(topic_id.as_str(), &applications);
     if !usages.is_empty() {
-      let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_LABELS_SHOW, context);
+      let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_SHOW, context);
       for (application_id, envs) in usages {
-        builder.row(&Usage::application(application_id.clone(), application_id.to_string(), envs));
+        if !envs.is_empty() {
+          builder.row(&Usage::application(application_id.clone(), application_id.to_string(), envs));
+        }
       }
       builder.print();
     } else {
@@ -299,8 +289,10 @@ pub(crate) fn applications_that_use_topic(topic_id: &str, applications: &HashMap
     let application = applications.get(&application_id).unwrap();
     if !application.env.is_empty() {
       let mut envs_that_contain_topic_id: Vec<String> = application.env.clone().into_iter().filter(|(_, v)| v.contains(topic_id)).map(|(k, _)| k).collect();
-      envs_that_contain_topic_id.sort();
-      pairs.push((application_id.clone(), envs_that_contain_topic_id));
+      if !envs_that_contain_topic_id.is_empty() {
+        envs_that_contain_topic_id.sort();
+        pairs.push((application_id.clone(), envs_that_contain_topic_id));
+      }
     }
   }
   pairs

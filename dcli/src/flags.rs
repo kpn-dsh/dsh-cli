@@ -10,6 +10,7 @@ pub(crate) enum FlagType {
   AllocationStatus,
   Configuration,
   Ids,
+  Properties,
   Tasks,
   Usage,
   Value,
@@ -23,6 +24,7 @@ impl FlagType {
       AllocationStatus => "status-flag",
       Configuration => "configuration-flag",
       Ids => "ids-flag",
+      Properties => "properties-flag",
       Tasks => "tasks-flag",
       Usage => "usage-flag",
       Value => "value-flag",
@@ -36,6 +38,7 @@ impl FlagType {
       AllocationStatus => "status",
       Configuration => "configuration",
       Ids => "ids",
+      Properties => "properties",
       Tasks => "tasks",
       Usage => "usage",
       Value => "value",
@@ -49,6 +52,7 @@ impl FlagType {
       AllocationStatus => Some('s'),
       Configuration => Some('c'),
       Ids => Some('i'),
+      Properties => Some('p'),
       Tasks => None,
       Usage => Some('u'),
       Value => Some('v'),
@@ -63,6 +67,7 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
     AllocationStatus => allocation_status_flag(subject, long_help),
     Configuration => configuration_flag(subject, long_help),
     Ids => ids_flag(subject, long_help),
+    Properties => properties_flag(subject, long_help),
     Tasks => tasks_flag(subject, long_help),
     Usage => usage_flag(subject, long_help),
     Value => value_flag(subject, long_help),
@@ -104,6 +109,10 @@ fn ids_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(Ids, subject, format!("Include the {}'s ids.", subject.subject()).as_str(), long_help)
 }
 
+fn properties_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Properties, subject, format!("Include the {}'s properties.", subject.subject()).as_str(), long_help)
+}
+
 fn tasks_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(Tasks, subject, format!("Include the {}'s tasks.", subject.subject()).as_str(), long_help)
 }
@@ -115,8 +124,6 @@ fn usage_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
 fn value_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(Value, subject, format!("Include the {}'s value.", subject.subject()).as_str(), long_help)
 }
-
-static ALL_FLAGS: &[FlagType; 8] = &[Actual, All, AllocationStatus, Configuration, Ids, Tasks, Usage, Value];
 
 fn create_clap_flag(flag_type: FlagType, _subject: &dyn Subject, help: &str, long_help: &Option<&str>) -> Arg {
   let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help.to_string());

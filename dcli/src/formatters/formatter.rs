@@ -233,3 +233,30 @@ pub fn print_ids(target_id: String, ids: Vec<String>, context: &DcliContext) {
   }
   println!("{}", table);
 }
+
+#[derive(Eq, Hash, PartialEq)]
+pub struct HashMapKey(pub String);
+
+impl Label for HashMapKey {
+  fn label_list(&self) -> &str {
+    self.0.as_str()
+  }
+
+  fn label_show(&self) -> &str {
+    self.0.as_str()
+  }
+}
+
+impl SubjectFormatter<HashMapKey> for HashMap<String, String> {
+  fn value(&self, label: &HashMapKey, target_id: &str) -> String {
+    self.get(label.0.as_str()).unwrap_or(&"".to_string()).to_string()
+  }
+
+  fn target_id(&self) -> Option<String> {
+    Some("TARGET_ID".to_string())
+  }
+
+  fn target_label(&self) -> Option<HashMapKey> {
+    Some(HashMapKey("TARGET_LABEL".to_string()))
+  }
+}
