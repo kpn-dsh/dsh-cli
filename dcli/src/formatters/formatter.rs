@@ -80,7 +80,7 @@ where
     self
   }
 
-  pub fn _vec(&mut self, vec: &Vec<String>) -> &Self {
+  pub fn vec(&mut self, vec: &Vec<String>) -> &Self {
     self.tabled_builder.push_record(vec);
     self
   }
@@ -248,15 +248,15 @@ impl Label for HashMapKey {
 }
 
 impl SubjectFormatter<HashMapKey> for HashMap<String, String> {
-  fn value(&self, label: &HashMapKey, target_id: &str) -> String {
+  fn value(&self, label: &HashMapKey, _target_id: &str) -> String {
     self.get(label.0.as_str()).unwrap_or(&"".to_string()).to_string()
   }
 
   fn target_id(&self) -> Option<String> {
-    Some("TARGET_ID".to_string())
+    None
   }
 
   fn target_label(&self) -> Option<HashMapKey> {
-    Some(HashMapKey("TARGET_LABEL".to_string()))
+    None
   }
 }

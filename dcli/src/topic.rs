@@ -248,7 +248,7 @@ impl CommandExecutor for TopicShowProperties {
     let labels = vec![HashMapKey("properties".to_string()), HashMapKey("".to_string())];
     let mut builder: TableBuilder<HashMapKey, HashMap<String, String>> = TableBuilder::list(&labels, context);
     for hashmap_key in &hashmap_keys {
-      builder._vec(&vec![hashmap_key.0.clone(), kafka_properties.get(&hashmap_key.0).unwrap().clone()]);
+      builder.vec(&vec![hashmap_key.0.clone(), kafka_properties.get(&hashmap_key.0).unwrap().clone()]);
     }
     builder.print();
     Ok(false)
