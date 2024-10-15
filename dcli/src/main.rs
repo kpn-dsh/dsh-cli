@@ -146,6 +146,7 @@ async fn main() -> DcliExit {
 }
 
 async fn inner_main() -> DcliResult {
+  env_logger::init();
   let halted = Arc::new(AtomicBool::new(false));
   let h = halted.clone();
   let _ = ctrlc::set_handler(move || {
