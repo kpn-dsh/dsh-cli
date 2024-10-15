@@ -6,6 +6,7 @@ use crate::formatters::notifications_to_string;
 #[derive(Eq, Hash, PartialEq)]
 pub enum TopicLabel {
   CleanupPolicy,
+  #[allow(dead_code)]
   DerivedFrom,
   MaxMessageBytes,
   Notifications,

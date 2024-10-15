@@ -88,7 +88,7 @@ impl<'a> Pipeline<'a> {
         PipelineConnectionConfig::ResourcesToProcessor { source_resource_ids, target_processor_junction } => {
           let source_resource_identifiers = Self::get_resource_identifiers(&resources, source_resource_ids, &pipeline_config.pipeline_id)?;
           let (target_processor_realization_id, target_processor_descriptor, inbound_junction_descriptor) =
-            Self::get_processor_inbound_junction(dsh_api_tenant, &pipeline_config, &processors, target_processor_junction)?;
+            Self::get_processor_inbound_junction(dsh_api_tenant, pipeline_config, &processors, target_processor_junction)?;
           if let Some((_, incompatible_resource)) = resources
             .iter()
             .find(|(_, resource)| !inbound_junction_descriptor.is_resource_technology_compatible(&resource.technology))
@@ -118,7 +118,7 @@ impl<'a> Pipeline<'a> {
 
         PipelineConnectionConfig::ProcessorToResources { source_processor_junction, target_resource_ids } => {
           let (source_processor_realization_id, source_processor_descriptor, outbound_junction_descriptor) =
-            Self::get_processor_outbound_junction(dsh_api_tenant, &pipeline_config, &processors, source_processor_junction)?;
+            Self::get_processor_outbound_junction(dsh_api_tenant, pipeline_config, &processors, source_processor_junction)?;
           let target_resource_identifiers = Self::get_resource_identifiers(&resources, target_resource_ids, &pipeline_config.pipeline_id)?;
           let connection = PipelineConnection {
             connection: ConnectionType::ProcessorToResources {
@@ -136,9 +136,9 @@ impl<'a> Pipeline<'a> {
 
         PipelineConnectionConfig::ProcessorToProcessor { source_processor_junction, target_processor_junction } => {
           let (source_processor_realization_id, source_processor_descriptor, outbound_junction_descriptor) =
-            Self::get_processor_outbound_junction(dsh_api_tenant, &pipeline_config, &processors, source_processor_junction)?;
+            Self::get_processor_outbound_junction(dsh_api_tenant, pipeline_config, &processors, source_processor_junction)?;
           let (target_processor_realization_id, target_processor_descriptor, inbound_junction_descriptor) =
-            Self::get_processor_inbound_junction(dsh_api_tenant, &pipeline_config, &processors, target_processor_junction)?;
+            Self::get_processor_inbound_junction(dsh_api_tenant, pipeline_config, &processors, target_processor_junction)?;
           let connection = PipelineConnection {
             connection: ConnectionType::ProcessorToProcessor {
               source_junction: JunctionIdentifier::Processor(

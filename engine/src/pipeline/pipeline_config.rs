@@ -107,15 +107,15 @@ impl PipelineConfig {
     Ok(())
   }
 
-  pub fn add_resource_config(&mut self, resource_config: PipelineResourceConfig) -> () {
+  pub fn add_resource_config(&mut self, resource_config: PipelineResourceConfig) {
     self.resources.push(resource_config);
   }
 
-  pub fn add_processor_config(&mut self, processor_config: PipelineProcessorConfig) -> () {
+  pub fn add_processor_config(&mut self, processor_config: PipelineProcessorConfig) {
     self.processors.push(processor_config);
   }
 
-  pub fn add_connection_config(&mut self, connection_config: PipelineConnectionConfig) -> () {
+  pub fn add_connection_config(&mut self, connection_config: PipelineConnectionConfig) {
     self.connections.push(connection_config)
   }
 }

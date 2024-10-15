@@ -215,14 +215,14 @@ impl Capability for DeclarativeCapability<'_> {
       for (flag_type, executor, _) in &self.command_executors {
         if matches.get_flag(flag_type.id()) {
           last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
-          number_of_executed_capabilities = number_of_executed_capabilities + 1;
+          number_of_executed_capabilities += 1;
         }
       }
     } else {
       for (flag_type, executor, _) in &self.command_executors {
         if matches.get_flag(flag_type.id()) && last_dcli_result.is_none() {
           last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
-          number_of_executed_capabilities = number_of_executed_capabilities + 1;
+          number_of_executed_capabilities += 1;
         }
       }
     }
