@@ -13,7 +13,7 @@ export CERTIFICATE_UNDER_TEST=broker-kafka-proxy-certificate
 export ENV_VALUE_UNDER_TEST=info
 export PROXY_UNDER_TEST=broker
 export SECRET_UNDER_TEST=boss-account-ids
-export TOPIC_UNDER_TEST=cca
+export TOPIC_UNDER_TEST=reference-implementation-compliant
 export VHOST_UNDER_TEST=greenbox-dev
 export VOLUME_UNDER_TEST=github-action-runner-home
 
@@ -83,7 +83,6 @@ dcli -vvv manifest list --all
 dcli -vvv manifest list --configuration
 dcli -vvv manifest list --ids
 
-##dcli -vvv proxy delete
 dcli -vvv proxy list
 dcli -vvv proxy list --all
 dcli -vvv proxy list --ids
@@ -91,10 +90,7 @@ dcli -vvv proxy l
 dcli -vvv proxys
 dcli -vvv proxy show $PROXY_UNDER_TEST
 dcli -vvv proxy show $PROXY_UNDER_TEST --configuration
-##dcli -vvv proxy update
 
-##dcli -vvv secret create
-##dcli -vvv secret delete
 dcli -vvv secret list
 dcli -vvv secret list --all
 dcli -vvv secret list --status
@@ -110,16 +106,15 @@ dcli -vvv secret show $SECRET_UNDER_TEST --usage
 dcli -vvv secret show $SECRET_UNDER_TEST --value
 
 dcli -vvv topic list
-dcli -vvv topic list --all
 dcli -vvv topic list --status
 dcli -vvv topic list --configuration
 dcli -vvv topic list --ids
 dcli -vvv topic list --usage
 dcli -vvv topic show $TOPIC_UNDER_TEST
-dcli -vvv topic show $TOPIC_UNDER_TEST --all
 dcli -vvv topic show $TOPIC_UNDER_TEST --status
 dcli -vvv topic show $TOPIC_UNDER_TEST --configuration
 dcli -vvv topic show $TOPIC_UNDER_TEST --usage
+dcli -vvv topic show $TOPIC_UNDER_TEST --properties
 
 dcli -vvv vhost list
 dcli -vvv vhost list --usage
@@ -130,8 +125,6 @@ dcli -vvv vs
 dcli -vvv vhost show $VHOST_UNDER_TEST
 dcli -vvv vhost show $VHOST_UNDER_TEST --usage
 
-##dcli -vvv volume create
-##dcli -vvv volume delete
 dcli -vvv volume list
 dcli -vvv volume list --all
 dcli -vvv volume list --status
@@ -145,3 +138,10 @@ dcli -vvv volume show $VOLUME_UNDER_TEST --all
 dcli -vvv volume show $VOLUME_UNDER_TEST --status
 dcli -vvv volume show $VOLUME_UNDER_TEST --configuration
 dcli -vvv volume show $VOLUME_UNDER_TEST --usage
+
+##dcli -vvv proxy delete
+##dcli -vvv proxy update
+##dcli -vvv secret create
+##dcli -vvv secret delete
+##dcli -vvv volume create
+##dcli -vvv volume delete
