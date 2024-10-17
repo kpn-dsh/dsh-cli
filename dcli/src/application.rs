@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
-use futures::future::try_join_all;
+use futures::future::{try_join, try_join_all};
 use lazy_static::lazy_static;
 
-use dsh_api::application::application_diff;
+use dsh_api::application::{application_diff, ApplicationDiff};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Application, TaskStatus};
 
@@ -14,7 +14,7 @@ use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::application::{ApplicationLabel, APPLICATION_LABELS_LIST, APPLICATION_LABELS_SHOW};
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::task::TASK_LABELS_LIST;
 use crate::subject::Subject;
 use crate::{to_command_error_with_id, DcliContext, DcliResult};
@@ -115,16 +115,24 @@ impl CommandExecutor for ApplicationDiffAll {
     if context.show_capability_explanation() {
       println!("show difference between configuration and actual status for application '{}'", application_id);
     }
-    let deployed = dsh_api_client.get_application_configuration(application_id.as_str()).await?;
-    let actual = dsh_api_client.get_application_actual_configuration(application_id.as_str()).await?;
-    let diff = application_diff(&deployed, &actual);
+    let diff: ApplicationDiff = get_difference(application_id.as_str(), dsh_api_client).await?;
     if diff.is_empty() {
       println!("equal")
     } else {
-      println!("{:#?}", diff)
+      println!("{:#?}", diff.differences())
     }
     Ok(false)
   }
+}
+
+async fn get_difference(application_id: &str, dsh_api_client: &DshApiClient<'_>) -> Result<ApplicationDiff, String> {
+  try_join(
+    dsh_api_client.get_application_configuration(application_id),
+    dsh_api_client.get_application_actual_configuration(application_id),
+  )
+  .await
+  .map(|(deployed, actual)| application_diff(&deployed, &actual))
+  .map_err(|error| error.to_string())
 }
 
 struct ApplicationListAll {}
@@ -179,7 +187,7 @@ impl CommandExecutor for ApplicationListIds {
     if context.show_capability_explanation() {
       println!("list all application ids");
     }
-    print_ids("application ids".to_string(), dsh_api_client.get_application_ids().await?, context);
+    print_vec("application ids".to_string(), dsh_api_client.get_application_ids().await?, context);
     Ok(false)
   }
 }

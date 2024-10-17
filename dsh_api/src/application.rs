@@ -366,6 +366,52 @@ impl ApplicationDiff {
       && self.volumes.is_none()
       && self.writable_streams.is_none()
   }
+
+  pub fn differences(&self) -> Vec<(String, String)> {
+    vec![
+      self.env.as_ref().map(|value| ("env".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self
+        .exposed_ports
+        .as_ref()
+        .map(|value| ("exposed ports".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self
+        .health_check
+        .as_ref()
+        .map(|value| ("healt check".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.image.as_ref().map(|value| ("image".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self
+        .instances
+        .map(|value| ("number of instances".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.mem.map(|value| ("memory".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.metrics.as_ref().map(|value| ("metrics".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.needs_token.map(|value| ("needs token".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self
+        .readable_streams
+        .as_ref()
+        .map(|value| ("readable streams".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.secrets.as_ref().map(|value| ("secrets".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self
+        .single_instance
+        .map(|value| ("single instance".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self
+        .spread_group
+        .as_ref()
+        .map(|value| ("spread group".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.topics.as_ref().map(|value| ("topics".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.user.as_ref().map(|value| ("user".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self.volumes.as_ref().map(|value| ("volumes".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+      self
+        .writable_streams
+        .as_ref()
+        .map(|value| ("writable streams".to_string(), format!("{:?} / {:?}", value.0, value.1))),
+    ]
+    .iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .iter()
+    .map(|p| p.to_owned().to_owned())
+    .collect::<Vec<_>>()
+  }
 }
 
 pub fn application_diff(baseline: &Application, sample: &Application) -> ApplicationDiff {
@@ -376,7 +422,7 @@ pub fn application_diff(baseline: &Application, sample: &Application) -> Applica
     health_check: if baseline.health_check == sample.health_check { None } else { Some((baseline.health_check.clone(), sample.health_check.clone())) },
     image: if baseline.image == sample.image.clone() { None } else { Some((baseline.image.clone(), sample.image.clone())) },
     instances: if baseline.instances == sample.instances { None } else { Some((baseline.instances, sample.instances)) },
-    mem: if baseline.mem == sample.instances { None } else { Some((baseline.mem, sample.mem)) },
+    mem: if baseline.mem == sample.mem { None } else { Some((baseline.mem, sample.mem)) },
     metrics: if baseline.metrics == sample.metrics { None } else { Some((baseline.metrics.clone(), sample.metrics.clone())) },
     needs_token: if baseline.needs_token == sample.needs_token { None } else { Some((baseline.needs_token, sample.needs_token)) },
     readable_streams: if baseline.readable_streams == sample.readable_streams { None } else { Some((baseline.readable_streams.clone(), sample.readable_streams.clone())) },
