@@ -11,7 +11,7 @@ use crate::capability::{Capability, CapabilityType, CommandExecutor, Declarative
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::print_allocation_statuses;
 use crate::formatters::bucket::{BUCKET_LABELS, BUCKET_STATUS_LABELS};
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
 
@@ -144,7 +144,7 @@ impl CommandExecutor for BucketListIds {
     if context.show_capability_explanation() {
       println!("list all bucket ids");
     }
-    print_ids("bucket ids".to_string(), dsh_api_client.get_bucket_ids().await?, context);
+    print_vec("bucket ids".to_string(), dsh_api_client.get_bucket_ids().await?, context);
     Ok(false)
   }
 }
@@ -159,7 +159,9 @@ impl CommandExecutor for BucketShowAll {
       println!("show all parameters for bucket '{}'", bucket_id);
     }
     let bucket = dsh_api_client.get_bucket(bucket_id.as_str()).await?;
-    println!("{:?}", bucket);
+    let mut builder = TableBuilder::show(&BUCKET_LABELS, context);
+    builder.value(bucket_id, &bucket);
+    builder.print();
     Ok(false)
   }
 }

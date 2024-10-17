@@ -1,7 +1,7 @@
 set -e
 
 #export DSH_API_PLATFORM=nplz
-#export DSH_API_SECRET_NPLZ_GREENBOX_DEV=55hMQcrS7xDw4GxnjptgYWagpNaGOmPp
+#export DSH_API_SECRET_NPLZ_GREENBOX_DEV=...
 #export DSH_API_TENANT=greenbox-dev
 #export DSH_API_USER_GREENBOX_DEV=1903:1903
 #export RUST_LOG=trifonius_engine=info,dsh_api=info
