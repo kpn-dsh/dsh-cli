@@ -13,7 +13,7 @@ use crate::flags::FlagType;
 use crate::formatters::allocation_status::print_allocation_statuses;
 use crate::formatters::app::APP_CATALOG_APP_LABELS;
 use crate::formatters::application::APPLICATION_LABELS_SHOW;
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
 
@@ -121,7 +121,7 @@ impl CommandExecutor for AppListIds {
     if context.show_capability_explanation() {
       println!("list all deployed app ids");
     }
-    print_ids("app ids".to_string(), dsh_api_client.get_app_ids().await?, context);
+    print_vec("app ids".to_string(), dsh_api_client.get_app_ids().await?, context);
     Ok(false)
   }
 }

@@ -15,7 +15,7 @@ use crate::capability::{Capability, CapabilityType, CommandExecutor, Declarative
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::certificate::{CertificateLabel, ACTUAL_CERTIFICATE_LABELS_LIST, ACTUAL_CERTIFICATE_LABELS_SHOW, CERTIFICATE_CONFIGURATION_LABELS};
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
@@ -164,7 +164,7 @@ impl CommandExecutor for CertificateListIds {
     if context.show_capability_explanation() {
       println!("list all certificate ids");
     }
-    print_ids("certificate ids".to_string(), dsh_api_client.get_certificate_ids().await?, context);
+    print_vec("certificate ids".to_string(), dsh_api_client.get_certificate_ids().await?, context);
     Ok(false)
   }
 }

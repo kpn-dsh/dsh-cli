@@ -214,11 +214,11 @@ impl<'a> StringTableBuilder<'a> {
   }
 }
 
-pub fn print_ids(target_id: String, ids: Vec<String>, context: &DcliContext) {
+pub fn print_vec(target_id: String, vec: Vec<String>, context: &DcliContext) {
   let mut tabled_builder = TabledBuilder::default();
   tabled_builder.push_record(vec![target_id]);
-  for id in ids {
-    tabled_builder.push_record(vec![id]);
+  for element in vec {
+    tabled_builder.push_record(vec![element]);
   }
   let mut table = tabled_builder.build();
   if let Ok((columns, _rows)) = terminal_size() {

@@ -15,7 +15,7 @@ use crate::capability::{Capability, CapabilityType, CommandExecutor, Declarative
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::secret::{
   SecretUsage, SecretUsageLabel, SECRET_USAGE_IN_APPLICATIONS_LABELS_LIST, SECRET_USAGE_IN_APPLICATIONS_LABELS_SHOW, SECRET_USAGE_IN_APPS_LABELS_LIST,
   SECRET_USAGE_IN_APPS_LABELS_SHOW,
@@ -203,7 +203,7 @@ impl CommandExecutor for SecretListIds {
     if context.show_capability_explanation() {
       println!("list all secret ids");
     }
-    print_ids("secret ids".to_string(), dsh_api_client.get_secret_ids().await?, context);
+    print_vec("secret ids".to_string(), dsh_api_client.get_secret_ids().await?, context);
     Ok(false)
   }
 }

@@ -13,7 +13,7 @@ use crate::capability::{Capability, CapabilityType, CommandExecutor, Declarative
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::formatters::volume::{VOLUME_LABELS, VOLUME_STATUS_LABELS};
 use crate::subject::Subject;
@@ -219,7 +219,7 @@ impl CommandExecutor for VolumeListIds {
     if context.show_capability_explanation() {
       println!("list volume ids");
     }
-    print_ids("volume ids".to_string(), dsh_api_client.get_volume_ids().await?, context);
+    print_vec("volume ids".to_string(), dsh_api_client.get_volume_ids().await?, context);
     Ok(false)
   }
 }

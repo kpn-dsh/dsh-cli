@@ -12,7 +12,7 @@ use dsh_api::types::Application;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
-use crate::formatters::formatter::{print_ids, HashMapKey, TableBuilder};
+use crate::formatters::formatter::{print_vec, HashMapKey, TableBuilder};
 use crate::formatters::topic::{TOPIC_LABELS, TOPIC_STATUS_LABELS};
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::subject::Subject;
@@ -168,7 +168,7 @@ impl CommandExecutor for TopicListIds {
     if context.show_capability_explanation() {
       println!("list all stream and internal topic ids");
     }
-    print_ids("topic ids".to_string(), dsh_api_client.get_topic_ids().await?, context);
+    print_vec("topic ids".to_string(), dsh_api_client.get_topic_ids().await?, context);
     Ok(false)
   }
 }

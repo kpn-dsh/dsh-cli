@@ -10,7 +10,7 @@ use dsh_api::types::Application;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::stream::{ManagedStream, INTERNAL_STREAM_LABELS, PUBLIC_STREAM_LABELS, STREAM_LABELS};
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::subject::Subject;
@@ -158,7 +158,7 @@ impl CommandExecutor for StreamListIds {
     if context.show_capability_explanation() {
       println!("list all internal and public stream ids");
     }
-    print_ids("stream ids".to_string(), dsh_api_client.get_stream_ids().await?, context);
+    print_vec("stream ids".to_string(), dsh_api_client.get_stream_ids().await?, context);
     Ok(false)
   }
 }

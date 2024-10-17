@@ -10,7 +10,7 @@ use dsh_api::types::AppCatalogManifest;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
-use crate::formatters::formatter::print_ids;
+use crate::formatters::formatter::print_vec;
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
 
@@ -154,7 +154,7 @@ impl CommandExecutor for ManifestListIds {
     if context.show_capability_explanation() {
       println!("list all app catalog manifest ids");
     }
-    print_ids(
+    print_vec(
       "manifest ids".to_string(),
       dsh_api_client
         .get_app_catalog_manifest_ids_with_versions()

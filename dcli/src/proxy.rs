@@ -9,7 +9,7 @@ use dsh_api::dsh_api_client::DshApiClient;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
-use crate::formatters::formatter::{print_ids, TableBuilder};
+use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::proxy::{PROXY_LABELS_LIST, PROXY_LABELS_SHOW};
 use crate::subject::Subject;
 use crate::{confirmed, DcliContext, DcliResult};
@@ -147,7 +147,7 @@ impl CommandExecutor for ProxyListIds {
     if context.show_capability_explanation() {
       println!("list all proxy ids");
     }
-    print_ids("proxy ids".to_string(), dsh_api_client.get_proxy_ids().await?, context);
+    print_vec("proxy ids".to_string(), dsh_api_client.get_proxy_ids().await?, context);
     Ok(false)
   }
 }
