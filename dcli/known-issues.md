@@ -7,10 +7,6 @@
 
 ## The following commands need attention
 
-dcli -vvv application diff cmd
-dcli -vvv bucket show cpr
-dcli -vvv bucket show cpr --all
-dcli -vvv bucket show cpr --status
 dcli -vvv env find info
 dcli -vvv env find info --app
 dcli -vvv env find info --application

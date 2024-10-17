@@ -9,7 +9,7 @@ use dsh_api::dsh_api_client::DshApiClient;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
-use crate::formatters::allocation_status::print_allocation_statuses;
+use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::bucket::{BUCKET_LABELS, BUCKET_STATUS_LABELS};
 use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::subject::Subject;
@@ -159,7 +159,7 @@ impl CommandExecutor for BucketShowAll {
       println!("show all parameters for bucket '{}'", bucket_id);
     }
     let bucket = dsh_api_client.get_bucket(bucket_id.as_str()).await?;
-    let mut builder = TableBuilder::show(&BUCKET_LABELS, context);
+    let mut builder = TableBuilder::show(&BUCKET_STATUS_LABELS, context);
     builder.value(bucket_id, &bucket);
     builder.print();
     Ok(false)
@@ -176,7 +176,7 @@ impl CommandExecutor for BucketShowAllocationStatus {
       println!("show the allocation status for bucket '{}'", bucket_id);
     }
     let allocation_status = dsh_api_client.get_bucket_allocation_status(bucket_id.as_str()).await?;
-    println!("{}", serde_json::to_string_pretty(&allocation_status).unwrap());
+    print_allocation_status(bucket_id, allocation_status, context);
     Ok(false)
   }
 }
