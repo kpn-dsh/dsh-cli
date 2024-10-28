@@ -13,8 +13,11 @@
     * Creating and deleting secrets.
     * Functions for stream topics (disabled by default).
     * Listing volumes with reversed look-up.
-* Improved support for:
-    * Reversed look-up of certificates, secrets and volumes.
+    * Listing images with reversed look-up.
+* Added number of instances to usage tables.
+* Improved support for reversed look-up of certificates, secrets and volumes.
+* Improved support for manifests.
+* Support for regular expressions for (reversed) lookup functions.
 * Features to enable/disable support for streams and Trifonius.
 
 #### Bugfixes and Improvements
