@@ -36,7 +36,7 @@ impl Subject for VhostSubject {
   }
 
   fn subject_command_long_about(&self) -> String {
-    "Show which DSH component use a vhost.".to_string()
+    "Show which DSH components use a vhost.".to_string()
   }
 
   fn subject_command_alias(&self) -> Option<&str> {
@@ -172,41 +172,3 @@ pub(crate) fn parse_vhost_string(vhost_string: &str) -> Option<(String, Option<S
     )
   })
 }
-
-// #[test]
-// fn test_parse_vhost() {
-//   const VHOST_STRINGS: [&str; 26] = [
-//     "{ vhost('broker-schema-store.kafka.greenbox-dev', 'private') }",
-//     "{ vhost('cmd.greenbox-dev', 'private') }",
-//     "{ vhost('cmd.greenbox-dev','private') }",
-//     "{ vhost('dsh-schema-store.greenbox-dev','public') }",
-//     "{ vhost('eavesdropper-092.greenbox-dev', 'public') }",
-//     "{ vhost('greenbox','public') }",
-//     "{ vhost('greenbox-backend-dev') }",
-//     "{ vhost('greenbox-dev','public') }",
-//     "{ vhost('greenbox-lab','private') }",
-//     "{ vhost('greenbox-tutorial-jupyter', 'public') }",
-//     "{ vhost('keyring-050.greenbox-dev', 'public') }",
-//     "{ vhost('keyring-app2.greenbox-dev', 'public') }",
-//     "{ vhost('keyring-dev','public') }",
-//     "{ vhost('keyring-dev-proxy.greenbox-dev', 'public') }",
-//     "{ vhost('keyring-dex','private') }",
-//     "{ vhost('keyring-documentation', 'public') }",
-//     "{ vhost('keyring-service-dev') }",
-//     "{ vhost('monitor-dashboard','public') }",
-//     "{ vhost('schema-registry-console-dev', 'public') }",
-//     "{ vhost('schema-registry-dev') }",
-//     "{ vhost('schema-registry-doc-dev') }",
-//     "{ vhost('simple-keyring-service', 'private') }",
-//     "{ vhost('simple-keyring-service', 'private') }",
-//     "{ vhost('simple-keyring-service','private') }",
-//     "{ vhost('trifonius-be','private') }",
-//     "{ vhost('whoami.greenbox-dev', 'public') }",
-//   ];
-//   for vhost_string in VHOST_STRINGS {
-//     match parse_vhost_string(vhost_string) {
-//       Some((vhost, a_zone)) => println!("{} -> {} -> {:?}", vhost_string, vhost, a_zone),
-//       None => println!(">>>>>>>>>> {}", vhost_string),
-//     }
-//   }
-// }

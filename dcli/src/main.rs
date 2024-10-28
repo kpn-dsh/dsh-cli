@@ -26,6 +26,7 @@ use crate::arguments::{
 use crate::bucket::BUCKET_SUBJECT;
 use crate::certificate::CERTIFICATE_SUBJECT;
 use crate::env::ENV_SUBJECT;
+use crate::image::IMAGE_SUBJECT;
 use crate::manifest::MANIFEST_SUBJECT;
 #[cfg(feature = "trifonius")]
 use crate::processor::PROCESSOR_SUBJECT;
@@ -48,11 +49,13 @@ mod env;
 mod filter_flags;
 mod flags;
 mod formatters;
+mod image;
 mod manifest;
 mod modifier_flags;
 #[cfg(feature = "trifonius")]
 mod processor;
 mod proxy;
+mod query_processor;
 mod secret;
 #[cfg(feature = "stream")]
 mod stream;
@@ -165,6 +168,7 @@ async fn inner_main() -> DcliResult {
     BUCKET_SUBJECT.as_ref(),
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
+    IMAGE_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
     #[cfg(feature = "trifonius")]
     PROCESSOR_SUBJECT.as_ref(),

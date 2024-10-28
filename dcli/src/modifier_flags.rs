@@ -7,6 +7,7 @@ use crate::subject::Subject;
 pub(crate) enum ModifierFlagType {
   Json,
   MultiLine,
+  Regex,
 }
 
 impl ModifierFlagType {
@@ -14,6 +15,7 @@ impl ModifierFlagType {
     match &self {
       Json => "json-flag",
       MultiLine => "multi-line-flag",
+      Regex => "regex-flag",
     }
   }
 
@@ -21,6 +23,7 @@ impl ModifierFlagType {
     match &self {
       Json => "json",
       MultiLine => "multi-line",
+      Regex => "regex",
     }
   }
 
@@ -28,6 +31,7 @@ impl ModifierFlagType {
     match &self {
       Json => Some('j'),
       MultiLine => Some('m'),
+      Regex => Some('r'),
     }
   }
 }
@@ -36,6 +40,7 @@ pub(crate) fn create_modifier_flag(flag_type: &ModifierFlagType, subject: &dyn S
   match flag_type {
     Json => json_flag(subject, long_help),
     MultiLine => multi_line_flag(subject, long_help),
+    Regex => regex_flag(subject, long_help),
   }
 }
 
@@ -48,6 +53,15 @@ fn multi_line_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
     MultiLine,
     subject,
     format!("Enter the {} as multi-line string.", subject.subject()).as_str(),
+    long_help,
+  )
+}
+
+fn regex_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+  create_clap_modifier_flag(
+    Regex,
+    subject,
+    format!("Interpret the query string as a regular expression instead of an exact matching {} value. The regular expression syntax is described on the following web-page: https://docs.rs/regex/latest/regex/#syntax.", subject.subject()).as_str(),
     long_help,
   )
 }

@@ -185,13 +185,13 @@ impl CommandExecutor for TopicListUsage {
     let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
     for topic_id in &topic_ids {
       let mut first = true;
-      let usages: Vec<(String, Vec<String>)> = applications_that_use_topic(topic_id, &applications);
-      for (application_id, envs) in usages {
+      let usages: Vec<(String, u64, Vec<String>)> = applications_that_use_topic(topic_id, &applications);
+      for (application_id, instances, envs) in usages {
         if !envs.is_empty() {
           if first {
-            builder.row(&Usage::application(topic_id.to_string(), application_id, envs));
+            builder.row(&Usage::application(topic_id.to_string(), application_id, instances, envs));
           } else {
-            builder.row(&Usage::application("".to_string(), application_id, envs));
+            builder.row(&Usage::application("".to_string(), application_id, instances, envs));
           }
           first = false;
         }
@@ -265,12 +265,12 @@ impl CommandExecutor for TopicShowUsage {
       println!("show the applications that use topic '{}'", topic_id);
     }
     let applications = dsh_api_client.get_application_configurations().await?;
-    let usages: Vec<(String, Vec<String>)> = applications_that_use_topic(topic_id.as_str(), &applications);
+    let usages: Vec<(String, u64, Vec<String>)> = applications_that_use_topic(topic_id.as_str(), &applications);
     if !usages.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_SHOW, context);
-      for (application_id, envs) in usages {
+      for (application_id, instances, envs) in usages {
         if !envs.is_empty() {
-          builder.row(&Usage::application(application_id.clone(), application_id.to_string(), envs));
+          builder.row(&Usage::application(application_id.clone(), application_id.to_string(), instances, envs));
         }
       }
       builder.print();
@@ -281,17 +281,17 @@ impl CommandExecutor for TopicShowUsage {
   }
 }
 
-pub(crate) fn applications_that_use_topic(topic_id: &str, applications: &HashMap<String, Application>) -> Vec<(String, Vec<String>)> {
+pub(crate) fn applications_that_use_topic(topic_id: &str, applications: &HashMap<String, Application>) -> Vec<(String, u64, Vec<String>)> {
   let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
   application_ids.sort();
-  let mut pairs: Vec<(String, Vec<String>)> = vec![];
+  let mut pairs: Vec<(String, u64, Vec<String>)> = vec![];
   for application_id in application_ids {
     let application = applications.get(&application_id).unwrap();
     if !application.env.is_empty() {
       let mut envs_that_contain_topic_id: Vec<String> = application.env.clone().into_iter().filter(|(_, v)| v.contains(topic_id)).map(|(k, _)| k).collect();
       if !envs_that_contain_topic_id.is_empty() {
         envs_that_contain_topic_id.sort();
-        pairs.push((application_id.clone(), envs_that_contain_topic_id));
+        pairs.push((application_id.clone(), application.instances, envs_that_contain_topic_id));
       }
     }
   }

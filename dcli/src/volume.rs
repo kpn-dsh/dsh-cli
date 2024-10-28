@@ -7,14 +7,17 @@ use futures::try_join;
 use lazy_static::lazy_static;
 
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::types::{Application, Volume};
+use dsh_api::types::Volume;
 
+use crate::app::apps_that_use_volume;
+use crate::application::applications_that_use_volume;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::formatter::{print_vec, TableBuilder};
-use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
+use crate::formatters::list_table::ListTable;
+use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPS_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::formatters::volume::{VOLUME_LABELS, VOLUME_STATUS_LABELS};
 use crate::subject::Subject;
 use crate::{confirmed, read_single_line, DcliContext, DcliResult};
@@ -228,29 +231,61 @@ struct VolumeListUsage {}
 
 #[async_trait]
 impl CommandExecutor for VolumeListUsage {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all volumes with the applications that use them");
-    }
-    let (volume_ids, applications) = try_join!(dsh_api_client.get_volume_ids(), dsh_api_client.get_application_configurations())?;
-    let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
-    for volume_id in &volume_ids {
-      let usages: Vec<(String, String)> = applications_that_use_volume(volume_id, &applications);
-      if usages.is_empty() {
-        builder.row(&Usage::empty(volume_id.to_string()));
-      } else {
+  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+    let (include_app, include_application) = match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
+      (false, false) => (true, true),
+      (false, true) => (false, true),
+      (true, false) => (true, false),
+      (true, true) => (true, true),
+    };
+    if include_app {
+      if context.show_capability_explanation() {
+        println!("list all volumes that are used in apps");
+      }
+      let (volume_ids, apps) = try_join!(dsh_api_client.get_volume_ids(), dsh_api_client.get_app_configurations())?;
+      let mut table = ListTable::new(&USAGE_IN_APPS_LABELS_LIST, context);
+      for volume_id in &volume_ids {
+        let app_usages: Vec<(String, u64, String)> = apps_that_use_volume(volume_id.as_str(), &apps);
         let mut first = true;
-        for (application_id, path) in usages {
+        for (app_id, instances, path) in &app_usages {
           if first {
-            builder.row(&Usage::application(volume_id.to_string(), application_id, vec![path]));
+            table.row(&Usage::app(volume_id.to_string(), app_id.to_string(), *instances, vec![path.clone()]));
           } else {
-            builder.row(&Usage::application("".to_string(), application_id, vec![path]));
+            table.row(&Usage::app("".to_string(), app_id.to_string(), *instances, vec![path.clone()]));
           }
           first = false;
         }
       }
+      if table.is_empty() {
+        println!("no volumes found in apps");
+      } else {
+        table.print();
+      }
     }
-    builder.print();
+    if include_application {
+      if context.show_capability_explanation() {
+        println!("list all volumes that are used in applications");
+      }
+      let (volume_ids, applications) = try_join!(dsh_api_client.get_volume_ids(), dsh_api_client.get_application_configurations())?;
+      let mut table = ListTable::new(&USAGE_IN_APPLICATIONS_LABELS_LIST, context);
+      for volume_id in &volume_ids {
+        let application_usages: Vec<(String, u64, String)> = applications_that_use_volume(volume_id, &applications);
+        let mut first = true;
+        for (application_id, instances, path) in application_usages {
+          if first {
+            table.row(&Usage::application(volume_id.to_string(), application_id, instances, vec![path]));
+          } else {
+            table.row(&Usage::application("".to_string(), application_id, instances, vec![path]));
+          }
+          first = false;
+        }
+      }
+      if table.is_empty() {
+        println!("no volumes found in applications");
+      } else {
+        table.print();
+      }
+    }
     Ok(false)
   }
 }
@@ -311,11 +346,11 @@ impl CommandExecutor for VolumeShowUsage {
       println!("show the applications that use volume '{}'", volume_id);
     }
     let applications = dsh_api_client.get_application_configurations().await?;
-    let usages: Vec<(String, String)> = applications_that_use_volume(volume_id.as_str(), &applications);
+    let usages: Vec<(String, u64, String)> = applications_that_use_volume(volume_id.as_str(), &applications);
     if !usages.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_LABELS_SHOW, context);
-      for (application_id, path) in usages {
-        builder.row(&Usage::application(application_id.clone(), application_id.to_string(), vec![path]));
+      for (application_id, instances, path) in usages {
+        builder.row(&Usage::application(application_id.clone(), application_id.to_string(), instances, vec![path]));
       }
       builder.print();
     } else {
@@ -323,19 +358,4 @@ impl CommandExecutor for VolumeShowUsage {
     }
     Ok(false)
   }
-}
-
-pub(crate) fn applications_that_use_volume(volume_id: &str, applications: &HashMap<String, Application>) -> Vec<(String, String)> {
-  let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
-  application_ids.sort();
-  let mut pairs: Vec<(String, String)> = vec![];
-  for application_id in application_ids {
-    let application = applications.get(&application_id).unwrap();
-    for (path, volume) in application.volumes.clone() {
-      if volume.name.contains(&format!("volume('{}')", volume_id)) {
-        pairs.push((application_id.clone(), path))
-      }
-    }
-  }
-  pairs
 }
