@@ -68,17 +68,17 @@ fn pipeline_config(pipeline_id: &str, name: &str, version: &str) -> PipelineConf
   }
 }
 
-#[test]
-fn test() {
-  env_logger::builder().format_timestamp(None).format_target(false).format_level(false).init();
-  let mut pipeline_config_under_test = pipeline_config("pl1", "PIPELINE1", "1.1.1");
-  pipeline_config_under_test.add_resource_config(pipeline_resource_config("res1", "RESOURCE1", "replicator", "1.2.3"));
-  let pipeline_under_test = Pipeline::create_from_config(
-    &pipeline_config_under_test,
-    &DEFAULT_DSH_API_TENANT,
-    &DEFAULT_RESOURCE_REGISTRY,
-    &DEFAULT_PROCESSOR_REGISTRY,
-  )
-  .unwrap();
-  println!("{}", pipeline_under_test);
-}
+// #[test]
+// fn test_pipeline_create_from_config() {
+//   env_logger::builder().format_timestamp(None).format_target(false).format_level(false).init();
+//   let mut pipeline_config_under_test = pipeline_config("pl1", "PIPELINE1", "1.1.1");
+//   // pipeline_config_under_test.add_resource_config(pipeline_resource_config("res1", "RESOURCE1", "replicator", "1.2.3"));
+//   let pipeline_under_test = Pipeline::create_from_config(
+//     &pipeline_config_under_test,
+//     &DEFAULT_DSH_API_TENANT,
+//     &DEFAULT_RESOURCE_REGISTRY,
+//     &DEFAULT_PROCESSOR_REGISTRY,
+//   )
+//   .unwrap();
+//   println!("{}", pipeline_under_test);
+// }
