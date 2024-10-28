@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use tabled::settings::peaker::PriorityMax;
+use tabled::settings::peaker::{PriorityMax, PriorityMin};
 use tabled::settings::Reverse;
 use tabled::settings::Rotate;
 use tabled::settings::{Padding, Width};
@@ -12,11 +12,13 @@ use termion::terminal_size;
 use crate::DcliContext;
 
 pub trait Label: Eq + Hash + PartialEq {
-  fn label_list(&self) -> &str {
-    self.label_show()
+  fn label_for_list(&self) -> &str {
+    self.label_for_show()
   }
 
-  fn label_show(&self) -> &str;
+  fn label_for_show(&self) -> &str;
+
+  fn is_target_label(&self) -> bool;
 }
 
 pub trait SubjectFormatter<L: Label> {
@@ -46,7 +48,7 @@ where
   pub fn list(labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
     if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.label_list()));
+      tabled_builder.push_record(labels.iter().map(|label| label.label_for_list()));
     }
     Self { list: true, labels, context, tabled_builder, phantom: PhantomData }
   }
@@ -54,7 +56,7 @@ where
   pub fn show(labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
     if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.label_show()));
+      tabled_builder.push_record(labels.iter().map(|label| label.label_for_show()));
     }
     Self { list: false, labels, context, tabled_builder, phantom: PhantomData }
   }
@@ -115,7 +117,7 @@ where
   pub fn print(self) {
     if self.list {
       let mut table = self.tabled_builder.build();
-      if let Ok((columns, _rows)) = terminal_size() {
+      if let Ok((columns, _)) = terminal_size() {
         table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
       }
       if self.context.border {
@@ -128,6 +130,9 @@ where
       println!("{}", table);
     } else {
       let mut table = self.tabled_builder.build();
+      if let Ok((columns, _)) = terminal_size() {
+        table.with(Width::truncate(columns as usize).priority(PriorityMin).suffix("..."));
+      }
       if self.context.border {
         table.with(Padding::new(1, 1, 0, 0));
         table.with(Style::sharp());
@@ -181,6 +186,7 @@ impl<'a> StringTableBuilder<'a> {
     self
   }
 
+  #[allow(dead_code)]
   pub fn print_list(self) {
     let mut table = self.tabled_builder.build();
     if let Ok((columns, _rows)) = terminal_size() {
@@ -199,7 +205,7 @@ impl<'a> StringTableBuilder<'a> {
   pub fn _print_show(self) {
     let mut table = self.tabled_builder.build();
     if let Ok((columns, _rows)) = terminal_size() {
-      table.with(Width::truncate(columns as usize).suffix("..."));
+      table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
     }
     if self.context.border {
       table.with(Padding::new(1, 1, 0, 0));
@@ -238,12 +244,16 @@ pub fn print_vec(target_id: String, vec: Vec<String>, context: &DcliContext) {
 pub struct HashMapKey(pub String);
 
 impl Label for HashMapKey {
-  fn label_list(&self) -> &str {
+  fn label_for_list(&self) -> &str {
     self.0.as_str()
   }
 
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     self.0.as_str()
+  }
+
+  fn is_target_label(&self) -> bool {
+    false
   }
 }
 
