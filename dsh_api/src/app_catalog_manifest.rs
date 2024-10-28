@@ -2,8 +2,9 @@
 //!
 //! Module that contains a function to query the App Catalog for all manifest files.
 //!
+//! * [`get_app_catalog_manifest_ids() -> Vec<String>`](DshApiClient::get_app_catalog_manifest_ids)
+//! * [`get_app_catalog_manifest_ids_with_versions() -> Vec<(String, Vec<String>)>`](DshApiClient::get_app_catalog_manifest_ids_with_versions)
 //! * [`get_app_catalog_manifests() -> Vec<AppCatalogManifest>`](DshApiClient::get_app_catalog_manifests)
-
 use std::collections::{HashMap, HashSet};
 
 use crate::dsh_api_client::DshApiClient;
@@ -30,6 +31,8 @@ pub const VERSION: &str = "version";
 ///
 /// Module that contains a function to query the App Catalog for all manifest files.
 ///
+/// * [`get_app_catalog_manifest_ids() -> Vec<String>`](DshApiClient::get_app_catalog_manifest_ids)
+/// * [`get_app_catalog_manifest_ids_with_versions() -> Vec<(String, Vec<String>)>`](DshApiClient::get_app_catalog_manifest_ids_with_versions)
 /// * [`get_app_catalog_manifests() -> Vec<AppCatalogManifest>`](DshApiClient::get_app_catalog_manifests)
 impl DshApiClient<'_> {
   /// # Return a list of all App Catalog manifests
