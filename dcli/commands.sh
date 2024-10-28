@@ -14,6 +14,7 @@ export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="^info$"
 export IMAGE_UNDER_TEST=registry:eavesdropper:0.9.3
 export IMAGE_UNDER_TEST_REGEX=registry
+export MANIFEST_UNDER_TEST="kpn/eavesdropper"
 export PROXY_UNDER_TEST=broker
 export SECRET_UNDER_TEST=boss-account-ids
 export TOPIC_UNDER_TEST=reference-implementation-compliant
@@ -162,9 +163,11 @@ dcli $VERBOSITY manifest list
 echo
 dcli $VERBOSITY manifest list --all
 echo
-dcli $VERBOSITY manifest list --configuration
-echo
 dcli $VERBOSITY manifest list --ids
+echo
+dcli $VERBOSITY manifest show $MANIFEST_UNDER_TEST
+echo
+dcli $VERBOSITY manifest show $MANIFEST_UNDER_TEST --all
 echo
 
 dcli $VERBOSITY proxy list
