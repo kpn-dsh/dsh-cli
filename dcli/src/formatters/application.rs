@@ -29,7 +29,7 @@ pub(crate) enum ApplicationLabel {
 }
 
 impl Label for ApplicationLabel {
-  fn label_list(&self) -> &str {
+  fn label_for_list(&self) -> &str {
     match self {
       Self::Cpus => "cpus",
       Self::Env => "env",
@@ -53,7 +53,7 @@ impl Label for ApplicationLabel {
     }
   }
 
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       Self::Target => "application",
       Self::Cpus => "cpus",
@@ -75,6 +75,10 @@ impl Label for ApplicationLabel {
       Self::Volumes => "volumes",
       Self::WritableStreams => "writable streams",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 

@@ -18,7 +18,7 @@ pub enum TopicLabel {
 }
 
 impl Label for TopicLabel {
-  fn label_list(&self) -> &str {
+  fn label_for_list(&self) -> &str {
     match self {
       Self::CleanupPolicy => "cleanup",
       Self::DerivedFrom => "derived",
@@ -32,7 +32,7 @@ impl Label for TopicLabel {
     }
   }
 
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       Self::CleanupPolicy => "cleanup policy",
       Self::DerivedFrom => "derived from",
@@ -44,6 +44,10 @@ impl Label for TopicLabel {
       Self::Target => "topic id",
       Self::TimestampType => "timestamp type",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 

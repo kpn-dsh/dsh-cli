@@ -16,7 +16,7 @@ pub enum CertificateLabel {
 }
 
 impl Label for CertificateLabel {
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       CertificateLabel::CertChainSecret => "cert chain secret",
       CertificateLabel::DistinguishedName => "distinguished name",
@@ -28,6 +28,10 @@ impl Label for CertificateLabel {
       CertificateLabel::SerialNumber => "serial number",
       CertificateLabel::Target => "certificate id",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 

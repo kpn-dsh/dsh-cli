@@ -1,7 +1,10 @@
-use crate::formatters::formatter::{Label, SubjectFormatter};
-use dsh_api::types::AppCatalogApp;
-use serde_json::de::from_str;
 use std::collections::HashMap;
+
+use serde_json::de::from_str;
+
+use dsh_api::types::AppCatalogApp;
+
+use crate::formatters::formatter::{Label, SubjectFormatter};
 
 #[derive(Eq, Hash, PartialEq)]
 pub(crate) enum AppCatalogAppLabel {
@@ -11,12 +14,16 @@ pub(crate) enum AppCatalogAppLabel {
 }
 
 impl Label for AppCatalogAppLabel {
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       AppCatalogAppLabel::Configuration => "app configuration",
       AppCatalogAppLabel::ManifestUrl => "manifest url",
       AppCatalogAppLabel::Target => "app",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 

@@ -13,13 +13,17 @@ pub enum AllocationStatusLabel {
 }
 
 impl Label for AllocationStatusLabel {
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       Self::DerivedFrom => "derived from",
       Self::Notifications => "notifications",
       Self::Provisioned => "provisioned",
       Self::Target => "target id",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 

@@ -18,7 +18,7 @@ pub(crate) enum TaskLabel {
 }
 
 impl Label for TaskLabel {
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       Self::Healthy => "healthy",
       Self::HostIpAddress => "host ip address",
@@ -32,7 +32,7 @@ impl Label for TaskLabel {
     }
   }
 
-  fn label_list(&self) -> &str {
+  fn label_for_list(&self) -> &str {
     match self {
       Self::Healthy => "healthy",
       Self::HostIpAddress => "host",
@@ -44,6 +44,10 @@ impl Label for TaskLabel {
       Self::StoppedAt => "stopped",
       Self::Target => "task id",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 

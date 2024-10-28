@@ -18,7 +18,7 @@ pub enum ProxyLabel {
 }
 
 impl Label for ProxyLabel {
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       ProxyLabel::Certificate => "certificate",
       ProxyLabel::Cpus => "number of cpus",
@@ -32,6 +32,10 @@ impl Label for ProxyLabel {
       ProxyLabel::Target => "proxy id",
       ProxyLabel::Validations => "validation",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 

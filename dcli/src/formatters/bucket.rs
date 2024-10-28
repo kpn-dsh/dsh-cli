@@ -14,7 +14,7 @@ pub(crate) enum BucketLabel {
 }
 
 impl Label for BucketLabel {
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
       Self::DerivedFrom => "derived from",
       Self::Encrypted => "encrypted",
@@ -23,6 +23,10 @@ impl Label for BucketLabel {
       Self::Target => "bucket id",
       Self::Versioned => "versioned",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == Self::Target
   }
 }
 
