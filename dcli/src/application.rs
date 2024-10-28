@@ -15,6 +15,7 @@ use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::application::{ApplicationLabel, APPLICATION_LABELS_LIST, APPLICATION_LABELS_SHOW};
 use crate::formatters::formatter::{print_vec, TableBuilder};
+use crate::formatters::show_table::ShowTable;
 use crate::formatters::task::TASK_LABELS_LIST;
 use crate::subject::Subject;
 use crate::{to_command_error_with_id, DcliContext, DcliResult};
@@ -244,9 +245,8 @@ impl CommandExecutor for ApplicationShowAll {
     }
     match dsh_api_client.get_application_actual_configuration(application_id.as_str()).await {
       Ok(application) => {
-        let mut builder = TableBuilder::show(&APPLICATION_LABELS_SHOW, context);
-        builder.value(application_id, &application);
-        builder.print();
+        let table = ShowTable::new(application_id.as_str(), &application, &APPLICATION_LABELS_SHOW, context);
+        table.print();
         Ok(false)
       }
       Err(error) => to_command_error_with_id(error, APPLICATION_SUBJECT_TARGET, application_id.as_str()),
@@ -354,11 +354,11 @@ pub(crate) fn _applications_that_use_value(value: &str, applications: &HashMap<S
   pairs
 }
 
-// Returns vector with pairs (application_id, secret -> environment variables)
-pub(crate) fn applications_with_secret_injections(secrets: &[String], applications: &HashMap<String, Application>) -> Vec<(String, HashMap<String, Vec<String>>)> {
+// Returns vector with pairs (application_id, instances, secret -> environment variables)
+pub(crate) fn applications_with_secret_injections(secrets: &[String], applications: &HashMap<String, Application>) -> Vec<(String, u64, HashMap<String, Vec<String>>)> {
   let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
   application_ids.sort();
-  let mut pairs: Vec<(String, HashMap<String, Vec<String>>)> = vec![];
+  let mut pairs: Vec<(String, u64, HashMap<String, Vec<String>>)> = vec![];
   for application_id in application_ids {
     let application = applications.get(&application_id).unwrap();
     if !application.secrets.is_empty() {
@@ -377,7 +377,22 @@ pub(crate) fn applications_with_secret_injections(secrets: &[String], applicatio
         }
       }
       if !injections.is_empty() {
-        pairs.push((application_id.clone(), injections));
+        pairs.push((application_id.clone(), application.instances, injections));
+      }
+    }
+  }
+  pairs
+}
+
+pub(crate) fn applications_that_use_volume(volume_id: &str, applications: &HashMap<String, Application>) -> Vec<(String, u64, String)> {
+  let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
+  application_ids.sort();
+  let mut pairs: Vec<(String, u64, String)> = vec![];
+  for application_id in application_ids {
+    let application = applications.get(&application_id).unwrap();
+    for (path, volume) in application.volumes.clone() {
+      if volume.name.contains(&format!("volume('{}')", volume_id)) {
+        pairs.push((application_id.clone(), application.instances, path))
       }
     }
   }

@@ -204,11 +204,11 @@ pub(crate) fn _apps_that_use_value(value: &str, apps: &HashMap<String, AppCatalo
   pairs
 }
 
-// Returns vector with pairs (application_id, secret -> environment variables)
-pub(crate) fn apps_with_secret_injections(secrets: &[String], apps: &HashMap<String, AppCatalogApp>) -> Vec<(String, HashMap<String, Vec<String>>)> {
+// Returns vector with pairs (application_id, instances, secret -> environment variables)
+pub(crate) fn apps_with_secret_injections(secrets: &[String], apps: &HashMap<String, AppCatalogApp>) -> Vec<(String, u64, HashMap<String, Vec<String>>)> {
   let mut app_ids: Vec<String> = apps.keys().map(|p| p.to_string()).collect();
   app_ids.sort();
-  let mut pairs: Vec<(String, HashMap<String, Vec<String>>)> = vec![];
+  let mut pairs: Vec<(String, u64, HashMap<String, Vec<String>>)> = vec![];
   for app_id in app_ids {
     let app = apps.get(&app_id).unwrap();
     if let Some((application_id, application)) = get_application_from_app(app) {
@@ -228,7 +228,24 @@ pub(crate) fn apps_with_secret_injections(secrets: &[String], apps: &HashMap<Str
           }
         }
         if !injections.is_empty() {
-          pairs.push((application_id.clone(), injections));
+          pairs.push((application_id.clone(), application.instances, injections));
+        }
+      }
+    }
+  }
+  pairs
+}
+
+pub(crate) fn apps_that_use_volume(volume_id: &str, apps: &HashMap<String, AppCatalogApp>) -> Vec<(String, u64, String)> {
+  let mut app_ids: Vec<String> = apps.keys().map(|p| p.to_string()).collect();
+  app_ids.sort();
+  let mut pairs: Vec<(String, u64, String)> = vec![];
+  for app_id in app_ids {
+    let app = apps.get(&app_id).unwrap();
+    if let Some((application_id, application)) = get_application_from_app(app) {
+      for (path, volume) in application.volumes.clone() {
+        if volume.name.contains(&format!("volume('{}')", volume_id)) {
+          pairs.push((application_id.clone(), application.instances, path))
         }
       }
     }

@@ -14,28 +14,32 @@ pub enum ManagedStreamLabel {
 }
 
 impl Label for ManagedStreamLabel {
-  fn label_list(&self) -> &str {
+  fn label_for_list(&self) -> &str {
     match self {
-      ManagedStreamLabel::CanBeRetained => "ret",
-      ManagedStreamLabel::KafkaProperties => "props",
-      ManagedStreamLabel::Kind => "kind",
-      ManagedStreamLabel::Partitioner => "partnr",
-      ManagedStreamLabel::Partitions => "parts",
-      ManagedStreamLabel::ReplicationFactor => "repl",
-      ManagedStreamLabel::Target => "id",
+      Self::CanBeRetained => "ret",
+      Self::KafkaProperties => "props",
+      Self::Kind => "kind",
+      Self::Partitioner => "partnr",
+      Self::Partitions => "parts",
+      Self::ReplicationFactor => "repl",
+      Self::Target => "id",
     }
   }
 
-  fn label_show(&self) -> &str {
+  fn label_for_show(&self) -> &str {
     match self {
-      ManagedStreamLabel::CanBeRetained => "can be retained",
-      ManagedStreamLabel::KafkaProperties => "kafka properties",
-      ManagedStreamLabel::Kind => "kind",
-      ManagedStreamLabel::Partitioner => "partitioner",
-      ManagedStreamLabel::Partitions => "partitions",
-      ManagedStreamLabel::ReplicationFactor => "replication factor",
-      ManagedStreamLabel::Target => "stream id",
+      Self::CanBeRetained => "can be retained",
+      Self::KafkaProperties => "kafka properties",
+      Self::Kind => "kind",
+      Self::Partitioner => "partitioner",
+      Self::Partitions => "partitions",
+      Self::ReplicationFactor => "replication factor",
+      Self::Target => "stream id",
     }
+  }
+
+  fn is_target_label(&self) -> bool {
+    *self == ManagedStreamLabel::Target
   }
 }
 

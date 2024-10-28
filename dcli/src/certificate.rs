@@ -188,20 +188,20 @@ impl CommandExecutor for CertificateListUsage {
           Some(passphrase_secret) => vec![certificate_configuration.cert_chain_secret, certificate_configuration.key_secret, passphrase_secret],
           None => vec![certificate_configuration.cert_chain_secret, certificate_configuration.key_secret],
         };
-        for (application_id, secret_injections) in applications_with_secret_injections(&secrets, &applications) {
+        for (application_id, instances, secret_injections) in applications_with_secret_injections(&secrets, &applications) {
           let injections = secret_injections
             .iter()
             .map(|(secret, envs)| format!("{}: {}", secret, envs.join(", ")))
             .collect::<Vec<String>>();
-          rows.push(Usage::application(certificate_id.clone(), application_id.clone(), injections));
+          rows.push(Usage::application(certificate_id.clone(), application_id.clone(), instances, injections));
           certificate_used = true;
         }
-        for (app_id, secret_injections) in apps_with_secret_injections(&secrets, &apps) {
+        for (app_id, instances, secret_injections) in apps_with_secret_injections(&secrets, &apps) {
           let injections = secret_injections
             .iter()
             .map(|(secret, envs)| format!("{}: {}", secret, envs.join(", ")))
             .collect::<Vec<String>>();
-          rows.push(Usage::app(certificate_id.clone(), app_id.clone(), injections));
+          rows.push(Usage::app(certificate_id.clone(), app_id.clone(), instances, injections));
           certificate_used = true;
         }
       }
@@ -270,14 +270,14 @@ impl CommandExecutor for CertificateShowUsage {
         Some(passphrase_secret) => vec![configuration.cert_chain_secret, configuration.key_secret, passphrase_secret],
         None => vec![configuration.cert_chain_secret, configuration.key_secret],
       };
-      for (application_id, secret_injections) in applications_with_secret_injections(&secrets, &applications) {
+      for (application_id, instances, secret_injections) in applications_with_secret_injections(&secrets, &applications) {
         for (_, injections) in secret_injections {
-          rows.push(Usage::application(certificate_id.clone(), application_id.to_string(), injections));
+          rows.push(Usage::application(certificate_id.clone(), application_id.to_string(), instances, injections));
         }
       }
-      for (app_id, secret_injections) in apps_with_secret_injections(&secrets, &apps) {
+      for (app_id, instances, secret_injections) in apps_with_secret_injections(&secrets, &apps) {
         for (_, injections) in secret_injections {
-          rows.push(Usage::app(certificate_id.clone(), app_id.clone(), injections));
+          rows.push(Usage::app(certificate_id.clone(), app_id.clone(), instances, injections));
         }
       }
     }
