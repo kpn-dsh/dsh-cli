@@ -1,0 +1,29 @@
+[package]
+name = "dcli"
+
+authors.workspace = true
+description.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[features]
+stream = []
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "0.4" }
+clap = { version = "4.5", features = ["derive", "string", "wrap_help"] }
+ctrlc = "3.4"
+dsh-api = { path = "../dsh_api" }
+env_logger = "0.11"
+futures = "0.3"
+lazy_static = "1.5"
+log = "0.4"
+regex = "1.11"
+serde_json = "1.0"
+tabled = { version = "0.16", features = ["ansi"] }
+termion = "4.0"
+tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros"] }
+itertools = "0.13.0"

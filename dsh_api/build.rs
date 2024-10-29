@@ -1,9 +1,13 @@
+use progenitor::GenerationSettings;
+
 fn main() {
-  let src = "openapi_spec/openapi_1_7_0.json";
+  let src = "openapi_spec/openapi_1_8_0_updated.json";
   println!("cargo:rerun-if-changed={}", src);
   let file = std::fs::File::open(src).unwrap();
   let spec = serde_json::from_reader(file).unwrap();
-  let mut generator = progenitor::Generator::default();
+  let mut generator_settings = GenerationSettings::default();
+  generator_settings.with_derive("PartialEq");
+  let mut generator = progenitor::Generator::new(&generator_settings);
   let tokens = generator.generate_tokens(&spec).unwrap();
   let ast = syn::parse2(tokens).unwrap();
   let content = prettyplease::unparse(&ast);

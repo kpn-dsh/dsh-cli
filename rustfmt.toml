@@ -1,9 +1,7 @@
-fn_args_layout = "Tall"
 fn_params_layout = "Tall"
 format_code_in_doc_comments = true
-group_imports = "StdExternalCrate"
-imports_granularity = "Crate"
-imports_layout = "Vertical"
+#group_imports = "StdExternalCrate"
+imports_layout = "Mixed"
 
 fn_call_width = 100
 
@@ -11,12 +9,11 @@ use_field_init_shorthand = true
 
 max_width = 180
 use_small_heuristics = "Max"
-wrap_comments = true
+wrap_comments = false
 comment_width = 100
 
 tab_spaces = 2
 indent_style = "Block"
-fn_single_line = true
 empty_item_single_line = true
 
 overflow_delimited_expr = true

@@ -1,3 +1,8 @@
+# Packages to publish in dependency order
+PACKAGES := dcli dsh-api
+# Ignore "rus-version" only grep "version" in Cargo.toml
+VERSION = $(shell grep -E "^version\s*="  Cargo.toml | head -n 1 | cut -d '"' -f 2)
+
 build:
 	@echo "Building $*"
 	cargo build
@@ -14,28 +19,40 @@ login:
 	fi; \
 	cargo login --registry artifactory "$$token"
 
+publish-all:
+	@echo "Publishing all packages with version: $(VERSION)"
+	@for package in $(PACKAGES); do \
+		echo "Publishing $$package"; \
+		cargo publish -p $$package --registry artifactory; \
+	done
 
-publish:
-	@echo "Publishing trifonius-engine"
-	cargo publish -p trifonius-engine --registry artifactory
 
-publish-allow-dirty:
-	@echo "Publishing trifonius-engine"
-	cargo publish -p trifonius-engine --registry artifactory --allow-dirty
+publish-all-allow-dirty:
+	@echo "Publishing all packages with version: $(VERSION)"
+	@for package in $(PACKAGES); do \
+		echo "Publishing $$package"; \
+		cargo publish -p $$package --registry artifactory --allow-dirty; \
+	done
 
-publish-dry-run:
-	@echo "Dry-run trifonius-engine"
-	cargo publish -p trifonius-engine --registry artifactory --dry-run
+publish-package-%:
+	cargo publish -p $* --registry artifactory
+
+publish-allow-dirty-%:
+	cargo publish -p $* --registry artifactory --allow-dirty
+
+publish-dry-run-%:
+	cargo publish -p $* --registry artifactory--dry-run
 
 test:
 	cargo test
 
 help:
 	@echo "Targets Cargo:"
-	@echo "  build:                 Build all cargo packages"
-	@echo "  login:                 Login to KPN Artifactory for the cargo registry"
-	@echo "  publish:               Publish to KPN Artifactory"
-	@echo "  publish-allow-dirty:   Publish to KPN Artifactory without checking for uncommited files"
-	@echo "  publish-dry-run:       Dry-run the publish to KPN Artifactory"
-	@echo "  test:                  Run all cargo tests"
-	@echo "  test-<package>:        Run tests for a single cargo package"
+	@echo "  build:                         Build all cargo packages"
+	@echo "  login:                         Login to KPN Artifactory for the cargo registry"
+	@echo "  publish-all:                   Publish all cargo packages to KPN Artifactory"
+	@echo "  publish-all-allow-dirty:       Publish all cargo packages to KPN Artifactory without checking for uncommited files"
+	@echo "  publish-<package>:             Publish a single cargo package to KPN Artifactory"
+	@echo "  publish-allow-dirty-<package>: Publish a single cargo package to KPN Artifactory without checking for uncommited files"
+	@echo "  test:                          Run all cargo tests"
+	@echo "  test-<package>:                Run tests for a single cargo package"

@@ -1,15 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-    "cli",
+    "dcli",
     "dsh_api",
-    "engine",
 ]
 
 [workspace.package]
 authors = ["Wilbert Schelvis <wilbert.schelvis@kpn.com"]
-description = "Business logic for Trifonius project"
+description = "Command line tool for DSH api"
 edition = "2021"
 rust-version = "1.77"
-version = "0.0.6"
+version = "0.1.0"
 publish = ["artifactory"]

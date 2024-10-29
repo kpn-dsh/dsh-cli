@@ -1,11 +1,12 @@
-use trifonius_dsh_api::types::{AllocationStatus, AppCatalogAppConfiguration};
-use trifonius_dsh_api::DshApiClient;
+use dsh_api::dsh_api_client_factory::DEFAULT_DSH_API_CLIENT_FACTORY;
+use dsh_api::types::{AllocationStatus, AppCatalogAppConfiguration};
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
   let app_catalog_id = "keyring-dev-proxy";
 
-  let client = DshApiClient::default_client().await;
+  let client_factory = &DEFAULT_DSH_API_CLIENT_FACTORY;
+  let client = client_factory.client().await?;
 
   // let deleted: () = client.delete_app_catalog_app(app_catalog_id).await?;
   // println!("{}", serde_json::to_string_pretty(&deleted).unwrap());
