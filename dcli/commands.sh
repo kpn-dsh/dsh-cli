@@ -1,11 +1,15 @@
 set -e
 
-#export DSH_API_SECRET_NPLZ_GREENBOX_DEV=...
+# This file can be used as a run test for dcli.
+# It will run a large number of commands and print the output to the console.
+# Note that you have to set the DSH_API_SECRET_NPLZ_GREENBOX_DEV environment variable
+# prior to starting this script.
+#
+# export DSH_API_SECRET_NPLZ_GREENBOX_DEV=...
 
 export DSH_API_PLATFORM=nplz
 export DSH_API_TENANT=greenbox-dev
 export DSH_API_USER_GREENBOX_DEV=1903:1903
-export RUST_LOG=trifonius_engine=info,dsh_api=info
 
 export APP_UNDER_TEST=cmd
 export APPLICATION_UNDER_TEST=cmd
@@ -22,6 +26,7 @@ export TOPIC_UNDER_TEST=reference-implementation-compliant
 export VHOST_UNDER_TEST=greenbox-dev
 export VOLUME_UNDER_TEST=github-action-runner-home
 
+export RUST_LOG=dcli=info,dsh_api=info
 export SEPARATOR="-------------------------------"
 export VERBOSITY="-vvv"
 
