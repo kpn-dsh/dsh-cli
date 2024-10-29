@@ -110,7 +110,7 @@ lazy_static! {
       (FlagType::Usage, &SecretShowUsage {}, None),
       (FlagType::Value, &SecretShowValue {}, None),
     ],
-    default_command_executor: None,
+    default_command_executor: Some(&SecretShowAllocationStatus {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
