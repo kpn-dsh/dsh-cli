@@ -1,10 +1,11 @@
 set -e
 
-#export DSH_API_PLATFORM=nplz
 #export DSH_API_SECRET_NPLZ_GREENBOX_DEV=...
-#export DSH_API_TENANT=greenbox-dev
-#export DSH_API_USER_GREENBOX_DEV=1903:1903
-#export RUST_LOG=trifonius_engine=info,dsh_api=info
+
+export DSH_API_PLATFORM=nplz
+export DSH_API_TENANT=greenbox-dev
+export DSH_API_USER_GREENBOX_DEV=1903:1903
+export RUST_LOG=trifonius_engine=info,dsh_api=info
 
 export APP_UNDER_TEST=cmd
 export APPLICATION_UNDER_TEST=cmd
@@ -21,261 +22,552 @@ export TOPIC_UNDER_TEST=reference-implementation-compliant
 export VHOST_UNDER_TEST=greenbox-dev
 export VOLUME_UNDER_TEST=github-action-runner-home
 
+export SEPARATOR="-------------------------------"
 export VERBOSITY="-vvv"
 
+echo $SEPARATOR
+echo app
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app list
 dcli $VERBOSITY app list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app list --all
 dcli $VERBOSITY app list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app list --status
 dcli $VERBOSITY app list --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app list --configuration
 dcli $VERBOSITY app list --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app list --ids
 dcli $VERBOSITY app list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app l
 dcli $VERBOSITY app l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY apps
 dcli $VERBOSITY apps
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app show $APP_UNDER_TEST
 dcli $VERBOSITY app show $APP_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY app show $APP_UNDER_TEST --all
 dcli $VERBOSITY app show $APP_UNDER_TEST --all
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo application
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application diff cmd
 dcli $VERBOSITY application diff cmd
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list
 dcli $VERBOSITY application list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list --all
 dcli $VERBOSITY application list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list --status
 dcli $VERBOSITY application list --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list --configuration
 dcli $VERBOSITY application list --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list --ids
 dcli $VERBOSITY application list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list --tasks
 dcli $VERBOSITY application list --tasks
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list --started
 dcli $VERBOSITY application list --started
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application list --stopped
 dcli $VERBOSITY application list --stopped
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application l
 dcli $VERBOSITY application l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY a l
 dcli $VERBOSITY a l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY applications
 dcli $VERBOSITY applications
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY as
 dcli $VERBOSITY as
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application show $APPLICATION_UNDER_TEST
 dcli $VERBOSITY application show $APPLICATION_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --all
 dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --status
 dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --configuration
 dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --tasks
 dcli $VERBOSITY application show $APPLICATION_UNDER_TEST --tasks
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo bucket
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket list
 dcli $VERBOSITY bucket list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket list --all
 dcli $VERBOSITY bucket list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket list --status
 dcli $VERBOSITY bucket list --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket list --configuration
 dcli $VERBOSITY bucket list --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket list --ids
 dcli $VERBOSITY bucket list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket l
 dcli $VERBOSITY bucket l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY b l
 dcli $VERBOSITY b l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY buckets
 dcli $VERBOSITY buckets
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bs
 dcli $VERBOSITY bs
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket show $BUCKET_UNDER_TEST
 dcli $VERBOSITY bucket show $BUCKET_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket show $BUCKET_UNDER_TEST --all
 dcli $VERBOSITY bucket show $BUCKET_UNDER_TEST --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY bucket show $BUCKET_UNDER_TEST --status
 dcli $VERBOSITY bucket show $BUCKET_UNDER_TEST --status
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo certificate
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate list
 dcli $VERBOSITY certificate list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate list --all
 dcli $VERBOSITY certificate list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate list --status
 dcli $VERBOSITY certificate list --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate list --configuration
 dcli $VERBOSITY certificate list --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate list --ids
 dcli $VERBOSITY certificate list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate list --usage
 dcli $VERBOSITY certificate list --usage
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate l
 dcli $VERBOSITY certificate l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY c l
 dcli $VERBOSITY c l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificates
 dcli $VERBOSITY certificates
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY cs
 dcli $VERBOSITY cs
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST
 dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST --all
 dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST --status
 dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST --usage
 dcli $VERBOSITY certificate show $CERTIFICATE_UNDER_TEST --usage
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo env
+echo $SEPARATOR
+
+echo dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST
 dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST_REGEX --regex
 dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST_REGEX --regex
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST --app
 dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST --app
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST_REGEX --app --regex
 dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST_REGEX --app --regex
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST --application
 dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST --application
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST_REGEX --application --regex
 dcli $VERBOSITY env find $ENV_VALUE_UNDER_TEST_REGEX --application --regex
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo image
+echo $SEPARATOR
+
+echo dcli $VERBOSITY image find $IMAGE_UNDER_TEST
 dcli $VERBOSITY image find $IMAGE_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY image find $IMAGE_UNDER_TEST_REGEX --regex
 dcli $VERBOSITY image find $IMAGE_UNDER_TEST_REGEX --regex
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY image find $IMAGE_UNDER_TEST --app
 dcli $VERBOSITY image find $IMAGE_UNDER_TEST --app
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY image find $IMAGE_UNDER_TEST_REGEX --app --regex
 dcli $VERBOSITY image find $IMAGE_UNDER_TEST_REGEX --app --regex
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY image find $IMAGE_UNDER_TEST --application
 dcli $VERBOSITY image find $IMAGE_UNDER_TEST --application
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY image find $IMAGE_UNDER_TEST_REGEX --application --regex
 dcli $VERBOSITY image find $IMAGE_UNDER_TEST_REGEX --application --regex
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo manifest
+echo $SEPARATOR
+
+echo dcli $VERBOSITY manifest list
 dcli $VERBOSITY manifest list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY manifest list --all
 dcli $VERBOSITY manifest list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY manifest list --ids
 dcli $VERBOSITY manifest list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY manifest show $MANIFEST_UNDER_TEST
 dcli $VERBOSITY manifest show $MANIFEST_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY manifest show $MANIFEST_UNDER_TEST --all
 dcli $VERBOSITY manifest show $MANIFEST_UNDER_TEST --all
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo proxy
+echo $SEPARATOR
+
+echo dcli $VERBOSITY proxy list
 dcli $VERBOSITY proxy list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY proxy list --all
 dcli $VERBOSITY proxy list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY proxy list --ids
 dcli $VERBOSITY proxy list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY proxy l
 dcli $VERBOSITY proxy l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY proxys
 dcli $VERBOSITY proxys
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY proxy show $PROXY_UNDER_TEST
 dcli $VERBOSITY proxy show $PROXY_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY proxy show $PROXY_UNDER_TEST --configuration
 dcli $VERBOSITY proxy show $PROXY_UNDER_TEST --configuration
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo secret
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret list
 dcli $VERBOSITY secret list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret list --all
 dcli $VERBOSITY secret list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret list --status
 dcli $VERBOSITY secret list --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret list --ids
 dcli $VERBOSITY secret list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret list --usage
 dcli $VERBOSITY secret list --usage
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret l
 dcli $VERBOSITY secret l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY s l
 dcli $VERBOSITY s l
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secrets
 dcli $VERBOSITY secrets
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY ss
 dcli $VERBOSITY ss
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret show $SECRET_UNDER_TEST
 dcli $VERBOSITY secret show $SECRET_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret show $SECRET_UNDER_TEST --status
 dcli $VERBOSITY secret show $SECRET_UNDER_TEST --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret show $SECRET_UNDER_TEST --usage
 dcli $VERBOSITY secret show $SECRET_UNDER_TEST --usage
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY secret show $SECRET_UNDER_TEST --value
 dcli $VERBOSITY secret show $SECRET_UNDER_TEST --value
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo topic
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic list
 dcli $VERBOSITY topic list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic list --status
 dcli $VERBOSITY topic list --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic list --configuration
 dcli $VERBOSITY topic list --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic list --ids
 dcli $VERBOSITY topic list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic list --usage
 dcli $VERBOSITY topic list --usage
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic show $TOPIC_UNDER_TEST
 dcli $VERBOSITY topic show $TOPIC_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --status
 dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --configuration
 dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --usage
 dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --usage
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --properties
 dcli $VERBOSITY topic show $TOPIC_UNDER_TEST --properties
-echo
+echo $SEPARATOR
 
+
+echo $SEPARATOR
+echo vhost
+echo $SEPARATOR
+
+echo dcli $VERBOSITY vhost list
 dcli $VERBOSITY vhost list
-echo
-dcli $VERBOSITY vhost list --usage
-echo
-dcli $VERBOSITY vhost l
-echo
-dcli $VERBOSITY v l
-echo
-dcli $VERBOSITY vhosts
-echo
-dcli $VERBOSITY vs
-echo
-dcli $VERBOSITY vhost show $VHOST_UNDER_TEST
-echo
-dcli $VERBOSITY vhost show $VHOST_UNDER_TEST --usage
-echo
+echo $SEPARATOR
 
+echo dcli $VERBOSITY vhost list --usage
+dcli $VERBOSITY vhost list --usage
+echo $SEPARATOR
+
+echo dcli $VERBOSITY vhost l
+dcli $VERBOSITY vhost l
+echo $SEPARATOR
+
+echo dcli $VERBOSITY v l
+dcli $VERBOSITY v l
+echo $SEPARATOR
+
+echo dcli $VERBOSITY vhosts
+dcli $VERBOSITY vhosts
+echo $SEPARATOR
+
+echo dcli $VERBOSITY vs
+dcli $VERBOSITY vs
+echo $SEPARATOR
+
+echo dcli $VERBOSITY vhost show $VHOST_UNDER_TEST
+dcli $VERBOSITY vhost show $VHOST_UNDER_TEST
+echo $SEPARATOR
+
+echo dcli $VERBOSITY vhost show $VHOST_UNDER_TEST --usage
+dcli $VERBOSITY vhost show $VHOST_UNDER_TEST --usage
+echo $SEPARATOR
+
+
+echo $SEPARATOR
+echo volume
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list
 dcli $VERBOSITY volume list
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list --all
 dcli $VERBOSITY volume list --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list --status
 dcli $VERBOSITY volume list --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list --configuration
 dcli $VERBOSITY volume list --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list --ids
 dcli $VERBOSITY volume list --ids
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list --usage
 dcli $VERBOSITY volume list --usage
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list --usage --app
 dcli $VERBOSITY volume list --usage --app
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume list --usage --application
 dcli $VERBOSITY volume list --usage --application
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST
 dcli $VERBOSITY volume show $VOLUME_UNDER_TEST
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --all
 dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --all
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --status
 dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --status
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --configuration
 dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --configuration
-echo
+echo $SEPARATOR
+
+echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --usage
 dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --usage
-echo
+echo $SEPARATOR
+
 
 ##dcli $VERBOSITY proxy delete
 ##dcli $VERBOSITY proxy update
