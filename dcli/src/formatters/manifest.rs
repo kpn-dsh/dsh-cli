@@ -20,25 +20,22 @@ pub(crate) enum ManifestLabel {
 }
 
 const CONFIGURATION: &str = "configuration";
-const DESCRIPTION: &str = "description";
 const ID: &str = "id";
-const MORE_INFO: &str = "moreInfo";
 const NAME: &str = "name";
-const RESOURCES: &str = "resources";
 const VENDOR: &str = "vendor";
 const VERSION: &str = "version";
 
 impl Label for ManifestLabel {
   fn label_for_show(&self) -> &str {
     match self {
-      Self::Configuration => "configuration",
+      Self::Configuration => CONFIGURATION,
       Self::Target => "app",
       Self::Contact => "contact",
       Self::Draft => "draft",
       Self::LastModified => "last modified",
-      Self::Name => "name",
-      Self::Vendor => "vendor",
-      Self::Version => "version",
+      Self::Name => NAME,
+      Self::Vendor => VENDOR,
+      Self::Version => VERSION,
     }
   }
 

@@ -18,6 +18,7 @@ pub trait Label: Eq + Hash + PartialEq {
 
   fn label_for_show(&self) -> &str;
 
+  #[allow(dead_code)]
   fn is_target_label(&self) -> bool;
 }
 

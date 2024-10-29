@@ -93,8 +93,7 @@ impl DshApiTenant {
   /// # fn main() -> Result<(), String> {
   /// let tenant_name = String::from("greenbox-dev");
   /// let platform = DshPlatform::NpLz;
-  /// let dsh_api_tenant =
-  ///     DshApiTenant::from_tenant_and_platform(tenant_name, platform)?;
+  /// let dsh_api_tenant = DshApiTenant::from_tenant_and_platform(tenant_name, platform)?;
   /// println!("{}@{}", dsh_api_tenant.name(), dsh_api_tenant.platform());
   /// # Ok(())
   /// # }
@@ -127,8 +126,7 @@ impl DshApiTenant {
   /// # fn main() -> Result<(), String> {
   /// let tenant_name = String::from("greenbox-dev");
   /// let platform = DshPlatform::NpLz;
-  /// let dsh_api_tenant =
-  ///     DshApiTenant::from_tenant_and_platform(tenant_name, platform)?;
+  /// let dsh_api_tenant = DshApiTenant::from_tenant_and_platform(tenant_name, platform)?;
   /// println!("{}@{}", dsh_api_tenant.name(), dsh_api_tenant.platform());
   /// # Ok(())
   /// # }
