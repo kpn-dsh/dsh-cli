@@ -28,8 +28,6 @@ use crate::certificate::CERTIFICATE_SUBJECT;
 use crate::env::ENV_SUBJECT;
 use crate::image::IMAGE_SUBJECT;
 use crate::manifest::MANIFEST_SUBJECT;
-#[cfg(feature = "trifonius")]
-use crate::processor::PROCESSOR_SUBJECT;
 use crate::proxy::PROXY_SUBJECT;
 use crate::secret::SECRET_SUBJECT;
 #[cfg(feature = "stream")]
@@ -52,8 +50,6 @@ mod formatters;
 mod image;
 mod manifest;
 mod modifier_flags;
-#[cfg(feature = "trifonius")]
-mod processor;
 mod proxy;
 mod query_processor;
 mod secret;
@@ -64,14 +60,8 @@ mod topic;
 mod vhost;
 mod volume;
 
-#[cfg(feature = "trifonius")]
-static ABOUT: &str = "DSH api command line interface (with Trifonius)";
-#[cfg(not(feature = "trifonius"))]
 static ABOUT: &str = "DSH api command line interface";
 
-#[cfg(feature = "trifonius")]
-static LONG_ABOUT: &str = "DSH api command line interface (with Trifonius support).";
-#[cfg(not(feature = "trifonius"))]
 static LONG_ABOUT: &str = "DSH api command line interface\n\n\
    The DSH api command line tool enables the user to call a subset of the functions \
    in the DSH api from the command line. \
@@ -82,8 +72,7 @@ static LONG_ABOUT: &str = "DSH api command line interface\n\n\
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dcli apps' will be the same \
    as using 'dcli app list'.";
-static BEFORE_HELP: &str = "before help";
-static LONG_VERSION: &str = "version: 0.0.7\ndsh api version: 1.8.0";
+static LONG_VERSION: &str = "version: 0.1.0\ndsh api version: 1.8.0";
 
 type DcliResult = Result<bool, String>;
 
@@ -170,8 +159,6 @@ async fn inner_main() -> DcliResult {
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
-    #[cfg(feature = "trifonius")]
-    PROCESSOR_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     #[cfg(feature = "stream")]
@@ -200,7 +187,6 @@ async fn inner_main() -> DcliResult {
     .about(ABOUT)
     .long_about(LONG_ABOUT)
     .after_help(AFTER_HELP)
-    .before_help(BEFORE_HELP)
     .args(vec![
       no_border_argument(),
       platform_argument(),
@@ -215,7 +201,7 @@ async fn inner_main() -> DcliResult {
     .hide_possible_values(true)
     .styles(styles)
     .subcommands(clap_commands)
-    .version("0.0.7")
+    .version("0.1.0")
     .long_version(LONG_VERSION);
 
   let matches = command.get_matches();
