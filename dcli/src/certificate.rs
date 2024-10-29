@@ -99,7 +99,7 @@ struct CertificateListAll {}
 impl CommandExecutor for CertificateListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("ist all certificates with their parameters");
+      println!("list all certificates with their parameters");
     }
     let certificate_ids = dsh_api_client.get_certificate_ids().await?;
     let certificate_statuses = futures::future::join_all(certificate_ids.iter().map(|id| dsh_api_client.get_certificate(id.as_str()))).await;
