@@ -1,5 +1,5 @@
 # Packages to publish in dependency order
-PACKAGES := dsh-api trifonius-engine
+PACKAGES := dcli dsh-api
 # Ignore "rus-version" only grep "version" in Cargo.toml
 VERSION = $(shell grep -E "^version\s*="  Cargo.toml | head -n 1 | cut -d '"' -f 2)
 
