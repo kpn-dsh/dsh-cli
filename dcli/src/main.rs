@@ -42,6 +42,7 @@ mod application;
 mod arguments;
 mod bucket;
 mod capability;
+mod settings;
 mod certificate;
 mod env;
 mod filter_flags;

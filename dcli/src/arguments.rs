@@ -1,5 +1,6 @@
 use builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction};
+use serde::{Deserialize, Serialize};
 
 use crate::subject::Subject;
 
@@ -12,15 +13,19 @@ pub(crate) const TENANT_ARGUMENT: &str = "tenant-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "verbosity-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 
-#[derive(clap::ValueEnum, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum Verbosity {
   /// Only error messages
+  #[serde(rename = "off")]
   Off = 0,
   /// Basic console log, like number of produced messages
+  #[serde(rename = "low")]
   Low = 1,
   /// All arguments
+  #[serde(rename = "medium")]
   Medium = 2,
   /// Most elaborate console log
+  #[serde(rename = "high")]
   High = 3,
 }
 

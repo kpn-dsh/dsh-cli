@@ -6,23 +6,30 @@ use std::fmt::{Display, Formatter};
 use dsh_sdk::Platform as SdkPlatform;
 use lazy_static::lazy_static;
 use log::info;
+use serde::{Deserialize, Serialize};
 
 use crate::PLATFORM_ENVIRONMENT_VARIABLE;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum DshPlatform {
   /// Test and development landing zone, KPN internal (non-production).
+  #[serde(rename = "nplz")]
   NpLz,
   /// Proof of concept platform (non-production).
+  #[serde(rename = "poc")]
   Poc,
   /// Production platform.
+  #[serde(rename = "prod")]
   Prod,
   /// Azure production platform.
+  #[serde(rename = "prodaz")]
   ProdAz,
-  // TODO ProdCp,
   /// Production landing zone, KPN internal
+  #[serde(rename = "prodlz")]
   ProdLz,
 }
+
+// TODO Rvp, QaLz, Na
 
 impl Display for DshPlatform {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
