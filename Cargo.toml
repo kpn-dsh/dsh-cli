@@ -10,5 +10,5 @@ authors = ["Wilbert Schelvis <wilbert.schelvis@kpn.com"]
 description = "Command line tool for DSH api"
 edition = "2021"
 rust-version = "1.77"
-version = "0.1.0"
+version = "0.1.1"
 publish = ["artifactory"]
