@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::PLATFORM_ENVIRONMENT_VARIABLE;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum DshPlatform {
   /// Test and development landing zone, KPN internal (non-production).
   #[serde(rename = "nplz")]
