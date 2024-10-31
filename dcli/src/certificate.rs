@@ -9,16 +9,17 @@ use lazy_static::lazy_static;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{ActualCertificate, AppCatalogApp, Application, Certificate, CertificateStatus};
 
+use crate::{DcliContext, DcliResult};
 use crate::app::apps_with_secret_injections;
 use crate::application::applications_with_secret_injections;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
-use crate::formatters::certificate::{CertificateLabel, ACTUAL_CERTIFICATE_LABELS_LIST, ACTUAL_CERTIFICATE_LABELS_SHOW, CERTIFICATE_CONFIGURATION_LABELS};
+use crate::formatters::certificate::{CERTIFICATE_CONFIGURATION_LABELS, CERTIFICATE_LABELS_LIST, CERTIFICATE_LABELS_SHOW, CertificateLabel};
 use crate::formatters::formatter::{print_vec, TableBuilder};
-use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
+use crate::formatters::show_table::ShowTable;
+use crate::formatters::usage::{Usage, USAGE_LABELS_LIST, USAGE_LABELS_SHOW, UsageLabel};
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
 
 pub(crate) struct CertificateSubject {}
 
@@ -111,7 +112,7 @@ impl CommandExecutor for CertificateListAll {
       .into_iter()
       .zip(certificates_statuses_unwrapped)
       .collect::<Vec<(String, ActualCertificate)>>();
-    let mut builder = TableBuilder::list(&ACTUAL_CERTIFICATE_LABELS_LIST, context);
+    let mut builder = TableBuilder::list(&CERTIFICATE_LABELS_LIST, context);
     builder.values(&zipped);
     builder.print();
     Ok(false)
@@ -227,9 +228,8 @@ impl CommandExecutor for CertificateShowAll {
     }
     let certificate = dsh_api_client.get_certificate(certificate_id.as_str()).await?;
     if let Some(actual_certificate) = certificate.actual {
-      let mut builder: TableBuilder<CertificateLabel, ActualCertificate> = TableBuilder::show(&ACTUAL_CERTIFICATE_LABELS_SHOW, context);
-      builder.row(&actual_certificate);
-      builder.print();
+      let table = ShowTable::new(&certificate_id, &actual_certificate, &CERTIFICATE_LABELS_SHOW, context);
+      table.print();
     }
     Ok(false)
   }

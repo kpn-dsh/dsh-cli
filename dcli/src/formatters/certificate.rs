@@ -74,7 +74,7 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
 pub static CERTIFICATE_CONFIGURATION_LABELS: [CertificateLabel; 4] =
   [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
 
-pub static ACTUAL_CERTIFICATE_LABELS_LIST: [CertificateLabel; 8] = [
+pub static CERTIFICATE_LABELS_LIST: [CertificateLabel; 8] = [
   CertificateLabel::Target,
   CertificateLabel::CertChainSecret,
   CertificateLabel::KeySecret,
@@ -85,7 +85,7 @@ pub static ACTUAL_CERTIFICATE_LABELS_LIST: [CertificateLabel; 8] = [
   CertificateLabel::DistinguishedName,
 ];
 
-pub static ACTUAL_CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
+pub static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
   CertificateLabel::Target,
   CertificateLabel::CertChainSecret,
   CertificateLabel::DnsNames,
