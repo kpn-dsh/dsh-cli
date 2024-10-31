@@ -346,6 +346,39 @@ echo $SEPARATOR
 
 
 echo $SEPARATOR
+echo metric
+echo $SEPARATOR
+
+echo dcli $VERBOSITY metric list
+dcli $VERBOSITY metric list
+echo $SEPARATOR
+
+echo dcli $VERBOSITY m list
+dcli $VERBOSITY m list
+echo $SEPARATOR
+
+echo dcli $VERBOSITY metrics
+dcli $VERBOSITY metrics
+echo $SEPARATOR
+
+echo dcli $VERBOSITY metric list --app
+dcli $VERBOSITY metric list
+echo $SEPARATOR
+
+echo dcli $VERBOSITY metric list --application
+dcli $VERBOSITY metric list
+echo $SEPARATOR
+
+echo dcli $VERBOSITY metric list --started
+dcli $VERBOSITY metric list
+echo $SEPARATOR
+
+echo dcli $VERBOSITY metric list --stopped
+dcli $VERBOSITY metric list
+echo $SEPARATOR
+
+
+echo $SEPARATOR
 echo proxy
 echo $SEPARATOR
 
