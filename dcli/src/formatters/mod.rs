@@ -13,6 +13,7 @@ pub(crate) mod list_table;
 pub(crate) mod manifest;
 pub(crate) mod proxy;
 pub(crate) mod show_table;
+pub(crate) mod settings;
 #[cfg(feature = "stream")]
 pub(crate) mod stream;
 pub(crate) mod string_table;

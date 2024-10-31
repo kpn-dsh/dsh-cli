@@ -3,33 +3,36 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::{stdin, BufRead};
+use std::io::{BufRead, stdin};
 use std::process::{ExitCode, Termination};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
+use clap::{ArgMatches, Command};
 use clap::builder::styling;
-use clap::Command;
 
-use dsh_api::dsh_api_client_factory::{get_secret_from_platform_and_tenant, DshApiClientFactory};
-use dsh_api::dsh_api_tenant::{get_default_tenant_name, DshApiTenant};
-use dsh_api::platform::DshPlatform;
+use dsh_api::dsh_api_client_factory::{DshApiClientFactory, get_secret_from_platform_and_tenant};
+use dsh_api::dsh_api_tenant::{DshApiTenant, get_default_tenant_name};
 use dsh_api::DshApiError;
+use dsh_api::platform::DshPlatform;
 
 use crate::app::APP_SUBJECT;
 use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{
-  no_border_argument, platform_argument, set_verbosity_argument, tenant_argument, verbosity_argument, Verbosity, NO_BORDER_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT,
-  TENANT_ARGUMENT, VERBOSITY_ARGUMENT,
+  no_border_argument, NO_BORDER_ARGUMENT, platform_argument, PLATFORM_ARGUMENT, set_verbosity_argument, SET_VERBOSITY_ARGUMENT, tenant_argument, TENANT_ARGUMENT, Verbosity,
+  verbosity_argument, VERBOSITY_ARGUMENT,
 };
 use crate::bucket::BUCKET_SUBJECT;
 use crate::certificate::CERTIFICATE_SUBJECT;
 use crate::env::ENV_SUBJECT;
+use crate::filter_flags::FilterFlagType;
 use crate::image::IMAGE_SUBJECT;
 use crate::manifest::MANIFEST_SUBJECT;
+use crate::metric::METRIC_SUBJECT;
 use crate::proxy::PROXY_SUBJECT;
 use crate::secret::SECRET_SUBJECT;
+use crate::set::SET_SUBJECT;
 #[cfg(feature = "stream")]
 use crate::stream::STREAM_SUBJECT;
 use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
@@ -50,10 +53,12 @@ mod flags;
 mod formatters;
 mod image;
 mod manifest;
+mod metric;
 mod modifier_flags;
 mod proxy;
 mod query_processor;
 mod secret;
+mod set;
 #[cfg(feature = "stream")]
 mod stream;
 mod subject;
@@ -73,7 +78,7 @@ static LONG_ABOUT: &str = "DSH api command line interface\n\n\
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dcli apps' will be the same \
    as using 'dcli app list'.";
-static LONG_VERSION: &str = "version: 0.1.0\ndsh api version: 1.8.0";
+static LONG_VERSION: &str = "version: 0.1.1\ndsh api version: 1.8.0";
 
 type DcliResult = Result<bool, String>;
 
@@ -160,8 +165,10 @@ async fn inner_main() -> DcliResult {
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
+    METRIC_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
+    SET_SUBJECT.as_ref(),
     #[cfg(feature = "stream")]
     STREAM_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
@@ -202,7 +209,7 @@ async fn inner_main() -> DcliResult {
     .hide_possible_values(true)
     .styles(styles)
     .subcommands(clap_commands)
-    .version("0.1.0")
+    .version("0.1.1")
     .long_version(LONG_VERSION);
 
   let matches = command.get_matches();
@@ -293,4 +300,22 @@ pub(crate) fn confirmed() -> Result<bool, String> {
   let stdin = stdin();
   stdin.lock().read_line(&mut line).expect("could not read line");
   Ok(line == *"yes\n")
+}
+
+pub(crate) fn include_app_application(matches: &ArgMatches) -> (bool, bool) {
+  match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
+    (false, false) => (true, true),
+    (false, true) => (false, true),
+    (true, false) => (true, false),
+    (true, true) => (true, true),
+  }
+}
+
+pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
+  match (matches.get_flag(FilterFlagType::Started.id()), matches.get_flag(FilterFlagType::Stopped.id())) {
+    (false, false) => (true, true),
+    (false, true) => (false, true),
+    (true, false) => (true, false),
+    (true, true) => (true, true),
+  }
 }
