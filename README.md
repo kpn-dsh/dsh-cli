@@ -93,6 +93,16 @@ listed, queried, searched, created and deleted.
         <td align="center"></td>
     </tr>
     <tr align="top">
+        <td align="left">metric</td>
+        <td align="center"></td>
+        <td align="center"></td>
+        <td align="center"></td>
+        <td align="center"></td>
+        <td align="center">&#x25C9;</td>
+        <td align="center"></td>
+        <td align="center"></td>
+    </tr>
+    <tr align="top">
         <td align="left">proxy</td>
         <td align="center"></td>
         <td align="center">&#x25CE;</td>
@@ -245,6 +255,7 @@ Commands:
   env          Find values used in configurations.
   image        Show image usage.
   manifest     Show App Catalog manifests.
+  metric       Show metric exports.
   proxy        Show, manage and list DSH Kafka proxies.
   secret       Show, manage and list DSH secrets.
   topic        Show, manage and list DSH topics.
