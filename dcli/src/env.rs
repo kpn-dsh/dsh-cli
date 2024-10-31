@@ -7,15 +7,15 @@ use lazy_static::lazy_static;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::AppCatalogApp;
 
+use crate::{DcliContext, DcliResult, include_app_application};
 use crate::app::get_application_from_app;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::filter_flags::FilterFlagType;
+use crate::formatters::{TerminalStyle, wrap_vec_parts};
 use crate::formatters::formatter::StringTableBuilder;
-use crate::formatters::{wrap_vec_parts, TerminalStyle};
 use crate::modifier_flags::ModifierFlagType;
 use crate::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
 
 pub(crate) struct EnvSubject {}
 
@@ -79,12 +79,7 @@ impl CommandExecutor for EnvFind {
     } else {
       (&ExactMatchQueryProcessor::create(query.as_str())?, TerminalStyle::Normal)
     };
-    let (include_app, include_application) = match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
-      (false, false) => (true, true),
-      (false, true) => (false, true),
-      (true, false) => (true, false),
-      (true, true) => (true, true),
-    };
+    let (include_app, include_application) = include_app_application(matches);
     if include_app {
       if context.show_capability_explanation() {
         println!("find environment variables in apps that {}", query_processor.describe());

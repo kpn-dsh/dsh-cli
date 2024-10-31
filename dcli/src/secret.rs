@@ -9,6 +9,7 @@ use lazy_static::lazy_static;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Secret;
 
+use crate::{confirmed, DcliContext, DcliResult, include_app_application, read_multi_line, read_single_line};
 use crate::app::apps_with_secret_injections;
 use crate::application::applications_with_secret_injections;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
@@ -17,10 +18,9 @@ use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::list_table::ListTable;
-use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPLICATIONS_LABELS_SHOW, USAGE_IN_APPS_LABELS_LIST, USAGE_IN_APPS_LABELS_SHOW};
+use crate::formatters::usage::{Usage, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPLICATIONS_LABELS_SHOW, USAGE_IN_APPS_LABELS_LIST, USAGE_IN_APPS_LABELS_SHOW, UsageLabel};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
-use crate::{confirmed, read_multi_line, read_single_line, DcliContext, DcliResult};
 
 pub(crate) struct SecretSubject {}
 
@@ -211,12 +211,7 @@ struct SecretListUsage {}
 #[async_trait]
 impl CommandExecutor for SecretListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let (include_app, include_application) = match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
-      (false, false) => (true, true),
-      (false, true) => (false, true),
-      (true, false) => (true, false),
-      (true, true) => (true, true),
-    };
+    let (include_app, include_application) = include_app_application(matches);
     if include_app {
       if context.show_capability_explanation() {
         println!("list all secrets with their usage in apps");
