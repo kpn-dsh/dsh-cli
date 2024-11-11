@@ -1,7 +1,6 @@
+use dsh_api::query_processor::Part;
+use dsh_api::query_processor::Part::{Matching, NonMatching};
 use dsh_api::types::Notification;
-
-use crate::query_processor::Part;
-use crate::query_processor::Part::{Matching, NonMatching};
 
 pub(crate) mod allocation_status;
 pub(crate) mod app;

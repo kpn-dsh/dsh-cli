@@ -56,7 +56,6 @@ mod manifest;
 mod metric;
 mod modifier_flags;
 mod proxy;
-mod query_processor;
 mod secret;
 mod set;
 #[cfg(feature = "stream")]

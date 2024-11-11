@@ -5,6 +5,7 @@ use clap::ArgMatches;
 use lazy_static::lazy_static;
 
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::AppCatalogApp;
 
 use crate::{DcliContext, DcliResult, include_app_application};
@@ -14,7 +15,6 @@ use crate::filter_flags::FilterFlagType;
 use crate::formatters::{TerminalStyle, wrap_vec_parts};
 use crate::formatters::formatter::StringTableBuilder;
 use crate::modifier_flags::ModifierFlagType;
-use crate::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use crate::subject::Subject;
 
 pub(crate) struct EnvSubject {}
