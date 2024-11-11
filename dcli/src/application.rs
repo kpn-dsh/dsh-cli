@@ -5,7 +5,7 @@ use clap::ArgMatches;
 use futures::future::{try_join, try_join_all};
 use lazy_static::lazy_static;
 
-use dsh_api::application::{application_diff, ApplicationDiff};
+use dsh_api::application::{ApplicationDiff};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Application, TaskStatus};
 
@@ -128,11 +128,11 @@ impl CommandExecutor for ApplicationDiffAll {
 
 async fn get_difference(application_id: &str, dsh_api_client: &DshApiClient<'_>) -> Result<ApplicationDiff, String> {
   try_join(
-    dsh_api_client.get_application_configuration(application_id),
+    dsh_api_client.get_application(application_id),
     dsh_api_client.get_application_actual_configuration(application_id),
   )
   .await
-  .map(|(deployed, actual)| application_diff(&deployed, &actual))
+  .map(|(deployed, actual)| DshApiClient::application_diff(&deployed, &actual))
   .map_err(|error| error.to_string())
 }
 
@@ -156,7 +156,7 @@ impl CommandExecutor for ApplicationListAllocationStatus {
     if context.show_capability_explanation() {
       println!("list all applications with their allocation status");
     }
-    let application_ids = dsh_api_client.get_application_ids().await?;
+    let application_ids = dsh_api_client.list_application_ids().await?;
     let allocation_statuses = try_join_all(
       application_ids
         .iter()
@@ -176,7 +176,7 @@ impl CommandExecutor for ApplicationListConfiguration {
     if context.show_capability_explanation() {
       println!("list all applications with their configuration");
     }
-    print_applications(&dsh_api_client.get_application_configurations().await?, matches, context)
+    print_applications(&dsh_api_client.get_applications().await?, matches, context)
   }
 }
 
@@ -188,7 +188,7 @@ impl CommandExecutor for ApplicationListIds {
     if context.show_capability_explanation() {
       println!("list all application ids");
     }
-    print_vec("application ids".to_string(), dsh_api_client.get_application_ids().await?, context);
+    print_vec("application ids".to_string(), dsh_api_client.list_application_ids().await?, context);
     Ok(false)
   }
 }
@@ -201,11 +201,11 @@ impl CommandExecutor for ApplicationListTasks {
     if context.show_capability_explanation() {
       println!("list all applications with their tasks");
     }
-    let application_ids = dsh_api_client.get_application_ids_with_derived_tasks().await?;
+    let application_ids = dsh_api_client.find_application_ids_with_derived_tasks().await?;
     let tasks: Vec<Vec<String>> = try_join_all(
       application_ids
         .iter()
-        .map(|application_id| dsh_api_client.get_application_derived_task_ids(application_id.as_str())),
+        .map(|application_id| dsh_api_client.list_application_derived_task_ids(application_id.as_str())),
     )
     .await?;
     let mut builder: TableBuilder<ApplicationLabel, HashMap<&ApplicationLabel, String>> = TableBuilder::list(&[ApplicationLabel::Target, ApplicationLabel::Tasks], context);
@@ -278,7 +278,7 @@ impl CommandExecutor for ApplicationShowConfiguration {
     if context.show_capability_explanation() {
       println!("show configuration for application '{}'", application_id);
     }
-    let application = dsh_api_client.get_application_configuration(application_id.as_str()).await?;
+    let application = dsh_api_client.get_application(application_id.as_str()).await?;
     let mut builder = TableBuilder::show(&APPLICATION_LABELS_SHOW, context);
     builder.value(application_id, &application);
     builder.print();
@@ -295,7 +295,7 @@ impl CommandExecutor for ApplicationShowTasks {
     if context.show_capability_explanation() {
       println!("show all tasks for application '{}'", application_id);
     }
-    let task_ids = dsh_api_client.get_application_derived_task_ids(application_id.as_str()).await?;
+    let task_ids = dsh_api_client.list_application_derived_task_ids(application_id.as_str()).await?;
     let task_statuses = try_join_all(
       task_ids
         .iter()
@@ -340,7 +340,7 @@ fn print_applications(applications: &HashMap<String, Application>, matches: &Arg
   Ok(false)
 }
 
-pub(crate) fn _applications_that_use_value(value: &str, applications: &HashMap<String, Application>) -> Vec<(String, Vec<String>)> {
+pub(crate) fn _applications_that_use_env_value(value: &str, applications: &HashMap<String, Application>) -> Vec<(String, Vec<String>)> {
   let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
   application_ids.sort();
   let mut pairs: Vec<(String, Vec<String>)> = vec![];

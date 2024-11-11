@@ -105,7 +105,6 @@ lazy_static! {
     command_executors: vec![
       (FlagType::All, &VolumeShowAll {}, None),
       (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
-      (FlagType::Configuration, &VolumeShowConfiguration {}, None),
       (FlagType::Usage, &VolumeShowUsage {}, None),
     ],
     default_command_executor: Some(&VolumeShowAll {}),
@@ -261,7 +260,7 @@ impl CommandExecutor for VolumeListUsage {
       if context.show_capability_explanation() {
         println!("list all volumes that are used in applications");
       }
-      let (volume_ids, applications) = try_join!(dsh_api_client.get_volume_ids(), dsh_api_client.get_application_configurations())?;
+      let (volume_ids, applications) = try_join!(dsh_api_client.get_volume_ids(), dsh_api_client.get_applications())?;
       let mut table = ListTable::new(&USAGE_IN_APPLICATIONS_LABELS_LIST, context);
       for volume_id in &volume_ids {
         let application_usages: Vec<(String, u64, String)> = applications_that_use_volume(volume_id, &applications);
@@ -315,22 +314,6 @@ impl CommandExecutor for VolumeShowAllocationStatus {
   }
 }
 
-struct VolumeShowConfiguration {}
-
-#[async_trait]
-impl CommandExecutor for VolumeShowConfiguration {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let volume_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the configuration for volume '{}'", volume_id);
-    }
-    let mut builder = TableBuilder::show(&VOLUME_STATUS_LABELS, context);
-    builder.value(volume_id.clone(), &dsh_api_client.get_volume(volume_id.as_str()).await?);
-    builder.print();
-    Ok(false)
-  }
-}
-
 struct VolumeShowUsage {}
 
 #[async_trait]
@@ -340,7 +323,7 @@ impl CommandExecutor for VolumeShowUsage {
     if context.show_capability_explanation() {
       println!("show the applications that use volume '{}'", volume_id);
     }
-    let applications = dsh_api_client.get_application_configurations().await?;
+    let applications = dsh_api_client.get_applications().await?;
     let usages: Vec<(String, u64, String)> = applications_that_use_volume(volume_id.as_str(), &applications);
     if !usages.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_LABELS_SHOW, context);

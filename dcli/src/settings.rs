@@ -4,14 +4,12 @@ use std::fs;
 use std::io::ErrorKind::NotFound;
 use std::path::PathBuf;
 
+use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::platform::DshPlatform;
 use homedir::my_home;
 use serde::{Deserialize, Serialize};
 
-use dsh_api::platform::DshPlatform;
-use dsh_api::platform::DshPlatform::NpLz;
-
 use crate::arguments::Verbosity;
-use crate::arguments::Verbosity::{Medium, Off};
 
 const DCLI_DIRECTORY_ENV_VAR: &str = "DCLI_HOME";
 const DEFAULT_USER_DCLI_DIRECTORY: &str = ".dcli";
@@ -205,6 +203,9 @@ fn _test_settings_filename() -> String {
 }
 
 #[test]
+use crate::arguments::Verbosity::{Medium, Off};
+
+#[test]
 fn test_dcli_directory() {
   println!("{}", dcli_directory().unwrap().to_string_lossy());
 }
@@ -248,13 +249,13 @@ fn test_all_targets() {
 
 #[test]
 fn test_delete_target() {
-  delete_target(&NpLz, "greenbox-dev").unwrap()
+  delete_target(&DshPlatform::NpLz, "greenbox-dev").unwrap()
 }
 
 #[test]
 fn test_upsert_target() {
   let target = Target {
-    platform: NpLz,
+    platform: DshPlatform::NpLz,
     tenant: "greenbox".to_string(),
     group_user_id: "2067:2067".to_string(),
     password: "abcdefghijklmnopqrstuvwxyz".to_string(),
@@ -264,7 +265,7 @@ fn test_upsert_target() {
 
 #[test]
 fn test_read_target() {
-  println!("{:?}",  read_target(&NpLz, "greenbox-dev").unwrap());
+  println!("{:?}",  read_target(&DshPlatform::NpLz, "greenbox-dev").unwrap());
 }
 
 #[test]

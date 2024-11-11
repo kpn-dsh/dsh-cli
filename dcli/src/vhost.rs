@@ -86,7 +86,7 @@ impl CommandExecutor for VhostListUsage {
     if context.show_capability_explanation() {
       println!("list applications with a vhost configuration");
     }
-    let applications = dsh_api_client.get_application_configurations().await?;
+    let applications = dsh_api_client.get_applications().await?;
     let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     application_ids.sort();
     let mut inverse = HashMap::<String, Vec<(String, String, String)>>::new();
@@ -132,7 +132,7 @@ impl CommandExecutor for VhostShowUsage {
     if context.show_capability_explanation() {
       println!("show the applications that use vhost '{}'", vhost_target);
     }
-    let applications = dsh_api_client.get_application_configurations().await?;
+    let applications = dsh_api_client.get_applications().await?;
     let mut builder = StringTableBuilder::new(&["application", "port", "a-zone"], context);
     for (application_id, application) in &applications {
       for (port, port_mapping) in &application.exposed_ports {

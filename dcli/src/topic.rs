@@ -181,7 +181,7 @@ impl CommandExecutor for TopicListUsage {
     if context.show_capability_explanation() {
       println!("list all stream and internal topics with the applications that use them");
     }
-    let (topic_ids, applications) = try_join!(dsh_api_client.get_topic_ids(), dsh_api_client.get_application_configurations())?;
+    let (topic_ids, applications) = try_join!(dsh_api_client.get_topic_ids(), dsh_api_client.get_applications())?;
     let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
     for topic_id in &topic_ids {
       let mut first = true;
@@ -264,7 +264,7 @@ impl CommandExecutor for TopicShowUsage {
     if context.show_capability_explanation() {
       println!("show the applications that use topic '{}'", topic_id);
     }
-    let applications = dsh_api_client.get_application_configurations().await?;
+    let applications = dsh_api_client.get_applications().await?;
     let usages: Vec<(String, u64, Vec<String>)> = applications_that_use_topic(topic_id.as_str(), &applications);
     if !usages.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_SHOW, context);

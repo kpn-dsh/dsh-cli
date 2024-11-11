@@ -106,7 +106,7 @@ impl CommandExecutor for ProxyDelete {
     if context.show_capability_explanation() {
       println!("delete proxy '{}'", proxy_id);
     }
-    if dsh_api_client.get_proxy_configuration(&proxy_id).await.is_err() {
+    if dsh_api_client.get_proxy(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
     println!("type 'yes' and Enter to delete proxy '{}'", proxy_id);
@@ -129,7 +129,7 @@ impl CommandExecutor for ProxyListAll {
       println!("list all proxies with parameters");
     }
     let proxy_ids = dsh_api_client.get_proxy_ids().await?;
-    let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| dsh_api_client.get_proxy_configuration(proxy_id.as_str()))).await?;
+    let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| dsh_api_client.get_proxy(proxy_id.as_str()))).await?;
     let mut builder = TableBuilder::list(&PROXY_LABELS_LIST, context);
     for (proxy_id, proxy) in proxy_ids.iter().zip(proxys) {
       builder.value(proxy_id.to_string(), &proxy);
@@ -161,7 +161,7 @@ impl CommandExecutor for ProxyShowConfiguration {
     if context.show_capability_explanation() {
       println!("show configuration of proxy '{}'", proxy_id);
     }
-    let proxy = dsh_api_client.get_proxy_configuration(proxy_id.as_str()).await?;
+    let proxy = dsh_api_client.get_proxy(proxy_id.as_str()).await?;
     let mut builder = TableBuilder::show(&PROXY_LABELS_SHOW, context);
     builder.value(proxy_id, &proxy);
     builder.print();
@@ -178,7 +178,7 @@ impl CommandExecutor for ProxyUpdateConfiguration {
     if context.show_capability_explanation() {
       println!("update configuration for proxy '{}'", proxy_id);
     }
-    if dsh_api_client.get_proxy_configuration(&proxy_id).await.is_err() {
+    if dsh_api_client.get_proxy(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
     // TODO

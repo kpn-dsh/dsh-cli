@@ -179,7 +179,7 @@ impl CommandExecutor for CertificateListUsage {
       println!("list all certificates with the applications where they are used");
     }
     let certificate_ids = dsh_api_client.get_certificate_ids().await?;
-    let (applications, apps) = try_join!(dsh_api_client.get_application_configurations(), dsh_api_client.get_app_configurations())?;
+    let (applications, apps) = try_join!(dsh_api_client.get_applications(), dsh_api_client.get_app_configurations())?;
     let certificates = futures::future::join_all(certificate_ids.iter().map(|id| dsh_api_client.get_certificate_configuration(id.as_str()))).await;
     let mut rows: Vec<Usage> = vec![];
     for (certificate_id, certificate) in certificate_ids.iter().zip(certificates) {
@@ -261,7 +261,7 @@ impl CommandExecutor for CertificateShowUsage {
     }
     let (certificate_status, applications, apps): (CertificateStatus, HashMap<String, Application>, HashMap<String, AppCatalogApp>) = try_join!(
       dsh_api_client.get_certificate(certificate_id.as_str()),
-      dsh_api_client.get_application_configurations(),
+      dsh_api_client.get_applications(),
       dsh_api_client.get_app_configurations()
     )?;
     let mut rows: Vec<Usage> = vec![];

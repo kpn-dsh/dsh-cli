@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
-use futures::future::try_join_all;
 use lazy_static::lazy_static;
 
 use dsh_api::dsh_api_client::DshApiClient;
@@ -10,7 +9,6 @@ use dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue, Application};
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
-use crate::formatters::allocation_status::print_allocation_statuses;
 use crate::formatters::app::APP_CATALOG_APP_LABELS;
 use crate::formatters::application::APPLICATION_LABELS_SHOW;
 use crate::formatters::formatter::{print_vec, TableBuilder};
@@ -54,7 +52,6 @@ lazy_static! {
     command_long_about: Some("Lists all apps deployed from the DSH app catalog.".to_string()),
     command_executors: vec![
       (FlagType::All, &AppListConfiguration {}, None),
-      (FlagType::AllocationStatus, &AppListAllocationStatus {}, None),
       (FlagType::Configuration, &AppListConfiguration {}, None),
       (FlagType::Ids, &AppListIds {}, None),
     ],
@@ -75,21 +72,6 @@ lazy_static! {
     filter_flags: vec![],
     modifier_flags: vec![],
   });
-}
-
-struct AppListAllocationStatus {}
-
-#[async_trait]
-impl CommandExecutor for AppListAllocationStatus {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all deployed apps and their allocation status");
-    }
-    let app_ids = dsh_api_client.get_app_ids().await?;
-    let allocation_statuses = try_join_all(app_ids.iter().map(|app_id| dsh_api_client.get_app_catalog_app_allocation_status(app_id))).await?;
-    print_allocation_statuses(app_ids, allocation_statuses, context);
-    Ok(false)
-  }
 }
 
 struct AppListConfiguration {}
@@ -121,7 +103,7 @@ impl CommandExecutor for AppListIds {
     if context.show_capability_explanation() {
       println!("list all deployed app ids");
     }
-    print_vec("app ids".to_string(), dsh_api_client.get_app_ids().await?, context);
+    print_vec("app ids".to_string(), dsh_api_client.list_app_ids().await?, context);
     Ok(false)
   }
 }
@@ -188,7 +170,7 @@ pub(crate) fn get_application_from_app(app: &AppCatalogApp) -> Option<(&String, 
   })
 }
 
-pub(crate) fn _apps_that_use_value(value: &str, apps: &HashMap<String, AppCatalogApp>) -> Vec<(String, Vec<String>)> {
+pub(crate) fn _apps_that_use_env_value(value: &str, apps: &HashMap<String, AppCatalogApp>) -> Vec<(String, Vec<String>)> {
   let mut app_ids: Vec<String> = apps.keys().map(|p| p.to_string()).collect();
   app_ids.sort();
   let mut pairs: Vec<(String, Vec<String>)> = vec![];

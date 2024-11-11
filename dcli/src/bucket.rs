@@ -91,7 +91,7 @@ impl CommandExecutor for BucketListAll {
     if context.show_capability_explanation() {
       println!("list all buckets with their parameters");
     }
-    let bucket_ids = dsh_api_client.get_bucket_ids().await?;
+    let bucket_ids = dsh_api_client.list_bucket_ids().await?;
     let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| dsh_api_client.get_bucket(id.as_str()))).await?;
     let mut builder = TableBuilder::list(&BUCKET_STATUS_LABELS, context);
     for (bucket_id, bucket_status) in bucket_ids.iter().zip(bucket_statuses) {
@@ -110,7 +110,7 @@ impl CommandExecutor for BucketListAllocationStatus {
     if context.show_capability_explanation() {
       println!("list all buckets with their allocation status");
     }
-    let bucket_ids = dsh_api_client.get_bucket_ids().await?;
+    let bucket_ids = dsh_api_client.list_bucket_ids().await?;
     let allocation_statuses = try_join_all(bucket_ids.iter().map(|bucket_id| dsh_api_client.get_bucket_allocation_status(bucket_id))).await?;
     print_allocation_statuses(bucket_ids, allocation_statuses, context);
     Ok(false)
@@ -125,7 +125,7 @@ impl CommandExecutor for BucketListConfiguration {
     if context.show_capability_explanation() {
       println!("list all buckets with their configuration");
     }
-    let bucket_ids = dsh_api_client.get_bucket_ids().await?;
+    let bucket_ids = dsh_api_client.list_bucket_ids().await?;
     let buckets = try_join_all(bucket_ids.iter().map(|bucket_id| dsh_api_client.get_bucket_configuration(bucket_id.as_str()))).await?;
     let mut builder = TableBuilder::list(&BUCKET_LABELS, context);
     for (bucket_id, bucket) in bucket_ids.iter().zip(buckets) {
@@ -144,7 +144,7 @@ impl CommandExecutor for BucketListIds {
     if context.show_capability_explanation() {
       println!("list all bucket ids");
     }
-    print_vec("bucket ids".to_string(), dsh_api_client.get_bucket_ids().await?, context);
+    print_vec("bucket ids".to_string(), dsh_api_client.list_bucket_ids().await?, context);
     Ok(false)
   }
 }

@@ -241,7 +241,7 @@ impl CommandExecutor for SecretListUsage {
       if context.show_capability_explanation() {
         println!("list all secrets with their usage in applications");
       }
-      let (secret_ids, applications) = try_join!(dsh_api_client.get_secret_ids(), dsh_api_client.get_application_configurations(),)?;
+      let (secret_ids, applications) = try_join!(dsh_api_client.get_secret_ids(), dsh_api_client.get_applications())?;
       let mut table = ListTable::new(&USAGE_IN_APPLICATIONS_LABELS_LIST, context);
       for secret_id in &secret_ids {
         let mut first = true;
@@ -290,7 +290,7 @@ impl CommandExecutor for SecretShowUsage {
     if context.show_capability_explanation() {
       println!("show applications that use secret '{}'", secret_id);
     }
-    let applications = dsh_api_client.get_application_configurations().await?;
+    let applications = dsh_api_client.get_applications().await?;
     let application_injections: Vec<(String, u64, HashMap<String, Vec<String>>)> = applications_with_secret_injections(&[secret_id.clone()], &applications);
     if !application_injections.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_IN_APPLICATIONS_LABELS_SHOW, context);

@@ -1,9 +1,8 @@
 use chrono::{TimeZone, Utc};
+use dsh_api::app_manifest::CONTACT;
+use dsh_api::types::AppCatalogManifest;
 use serde_json::de::from_str;
 use serde_json::Value;
-
-use dsh_api::app_catalog_manifest::CONTACT;
-use dsh_api::types::AppCatalogManifest;
 
 use crate::formatters::formatter::{Label, SubjectFormatter};
 
