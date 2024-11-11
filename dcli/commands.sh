@@ -9,7 +9,7 @@ set -e
 
 export DSH_API_PLATFORM=nplz
 export DSH_API_TENANT=greenbox-dev
-export DSH_API_USER_GREENBOX_DEV=1903:1903
+export DSH_API_GUID_GREENBOX_DEV=1903:1903
 
 export APP_UNDER_TEST=cmd
 export APPLICATION_UNDER_TEST=cmd
@@ -40,10 +40,6 @@ echo $SEPARATOR
 
 echo dcli $VERBOSITY app list --all
 dcli $VERBOSITY app list --all
-echo $SEPARATOR
-
-echo dcli $VERBOSITY app list --status
-dcli $VERBOSITY app list --status
 echo $SEPARATOR
 
 echo dcli $VERBOSITY app list --configuration
@@ -596,10 +592,6 @@ echo $SEPARATOR
 
 echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --status
 dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --status
-echo $SEPARATOR
-
-echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --configuration
-dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --configuration
 echo $SEPARATOR
 
 echo dcli $VERBOSITY volume show $VOLUME_UNDER_TEST --usage
