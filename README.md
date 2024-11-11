@@ -224,14 +224,14 @@ these environment variables are the same as for the client.
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_API_USER_[tenant]</code></td>
+        <td><code>DSH_API_GUID_[tenant]</code></td>
         <td>
             Group id and user id for the target tenant.
             The placeholder <code>[tenant]</code> needs to be substituted 
             with the tenant name in all capitals, with hyphens (<code>-</code>) 
             replaced by underscores (<code>_</code>).
             E.g. if the tenant name is <code>greenbox-dev</code>, the environment variable must be
-            <code>DSH_API_USER_GREENBOX_DEV = "1903:1903"</code>.
+            <code>DSH_API_GUID_GREENBOX_DEV = "1903:1903"</code>.
         </td>
     </tr>
 </table>
