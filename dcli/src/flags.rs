@@ -5,7 +5,6 @@ use crate::subject::Subject;
 
 #[derive(Debug)]
 pub(crate) enum FlagType {
-  Actual,
   All,
   AllocationStatus,
   Configuration,
@@ -19,7 +18,6 @@ pub(crate) enum FlagType {
 impl FlagType {
   pub(crate) fn id(&self) -> &'static str {
     match &self {
-      Actual => "actual-flag",
       All => "all-flag",
       AllocationStatus => "status-flag",
       Configuration => "configuration-flag",
@@ -33,7 +31,6 @@ impl FlagType {
 
   pub(crate) fn option(&self) -> &'static str {
     match &self {
-      Actual => "actual",
       All => "all",
       AllocationStatus => "status",
       Configuration => "configuration",
@@ -47,7 +44,6 @@ impl FlagType {
 
   pub(crate) fn shortcut(&self) -> Option<char> {
     match &self {
-      Actual => None,
       All => Some('a'),
       AllocationStatus => Some('s'),
       Configuration => Some('c'),
@@ -62,7 +58,6 @@ impl FlagType {
 
 pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   match flag_type {
-    Actual => actual_flag(subject, long_help),
     All => all_flag(subject, long_help),
     AllocationStatus => allocation_status_flag(subject, long_help),
     Configuration => configuration_flag(subject, long_help),
@@ -72,15 +67,6 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
     Usage => usage_flag(subject, long_help),
     Value => value_flag(subject, long_help),
   }
-}
-
-fn actual_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(
-    Actual,
-    subject,
-    format!("Include the {}'s actual configuration.", subject.subject()).as_str(),
-    long_help,
-  )
 }
 
 fn all_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
