@@ -302,7 +302,7 @@ impl CommandExecutor for SecretShowUsage {
     } else {
       println!("secret not used in applications")
     }
-    let apps = dsh_api_client.get_app_actual_configurations().await?;
+    let apps = dsh_api_client.get_app_configurations().await?;
     let app_injections: Vec<(String, u64, HashMap<String, Vec<String>>)> = apps_with_secret_injections(&[secret_id.clone()], &apps);
     if !app_injections.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_IN_APPS_LABELS_SHOW, context);

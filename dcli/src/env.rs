@@ -124,7 +124,7 @@ impl CommandExecutor for EnvFind {
       if context.show_capability_explanation() {
         println!("find environment variables in applications that {}", query_processor.describe());
       }
-      let applications = &dsh_api_client.get_application_actual_configurations().await?;
+      let applications = &dsh_api_client.get_applications().await?;
       let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
       application_ids.sort();
       let mut builder = StringTableBuilder::new(&["application", "#", "environment variable", "value"], context);
