@@ -4,7 +4,6 @@ use std::fs;
 use std::io::ErrorKind::NotFound;
 use std::path::PathBuf;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::DshPlatform;
 use homedir::my_home;
 use serde::{Deserialize, Serialize};
@@ -203,9 +202,6 @@ fn _test_settings_filename() -> String {
 }
 
 #[test]
-use crate::arguments::Verbosity::{Medium, Off};
-
-#[test]
 fn test_dcli_directory() {
   println!("{}", dcli_directory().unwrap().to_string_lossy());
 }
@@ -222,6 +218,7 @@ fn test_read_settings_explicit_filename() {
 
 #[test]
 fn test_upsert_settings_default() {
+  use crate::arguments::Verbosity::Off;
   let settings = Settings {
     show_execution_time: Some(true),
     verbosity: Some(Off),
@@ -232,6 +229,7 @@ fn test_upsert_settings_default() {
 
 #[test]
 fn test_upsert_settings_explicit_filename() {
+  use crate::arguments::Verbosity::Off;
   let settings = Settings {
     show_execution_time: Some(true),
     verbosity: Some(Off),
@@ -270,6 +268,7 @@ fn test_read_target() {
 
 #[test]
 fn test_serialize_and_write_to_toml_file() {
+  use crate::arguments::Verbosity::Medium;
   let settings = Settings {
     show_execution_time: Some(true),
     verbosity: Some(Medium),
@@ -280,10 +279,11 @@ fn test_serialize_and_write_to_toml_file() {
 
 #[test]
 fn test_write_target() {
+  use crate::arguments::Verbosity::Medium;
   let target = Settings {
     show_execution_time: Some(true),
     verbosity: Some(Medium),
     no_border: None,
   };
-  serialize_and_write_to_toml_file(dcli_directory().unwrap().join("settings.toml"), &target).unwrap();
+  serialize_and_write_to_toml_file(dcli_directory().unwrap().join(DEFAULT_DCLI_SETTINGS_FILENAME), &target).unwrap();
 }
