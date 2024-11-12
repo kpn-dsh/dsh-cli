@@ -71,10 +71,6 @@ echo $SEPARATOR
 echo application
 echo $SEPARATOR
 
-echo dcli $VERBOSITY application diff cmd
-dcli $VERBOSITY application diff cmd
-echo $SEPARATOR
-
 echo dcli $VERBOSITY application list
 dcli $VERBOSITY application list
 echo $SEPARATOR

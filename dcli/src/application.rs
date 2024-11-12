@@ -2,10 +2,9 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
-use futures::future::{try_join, try_join_all};
+use futures::future::{try_join_all};
 use lazy_static::lazy_static;
 
-use dsh_api::application::{ApplicationDiff};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Application, TaskStatus};
 
@@ -48,7 +47,6 @@ impl Subject for ApplicationSubject {
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities = HashMap::new();
-    capabilities.insert(CapabilityType::Diff, APPLICATION_DIFF_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::List, APPLICATION_LIST_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::Show, APPLICATION_SHOW_CAPABILITY.as_ref());
     capabilities
@@ -56,17 +54,6 @@ impl Subject for ApplicationSubject {
 }
 
 lazy_static! {
-  pub static ref APPLICATION_DIFF_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Diff,
-    command_about: "Diff applications".to_string(),
-    command_long_about: Some("Compare the deployment configuration of the application against the actual configuration.".to_string()),
-    command_executors: vec![(FlagType::All, &ApplicationDiffAll {}, None),],
-    default_command_executor: Some(&ApplicationDiffAll {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
   pub static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
     command_about: "List applications".to_string(),
@@ -107,35 +94,6 @@ lazy_static! {
   });
 }
 
-struct ApplicationDiffAll {}
-
-#[async_trait]
-impl CommandExecutor for ApplicationDiffAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let application_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show difference between configuration and actual status for application '{}'", application_id);
-    }
-    let diff: ApplicationDiff = get_difference(application_id.as_str(), dsh_api_client).await?;
-    if diff.is_empty() {
-      println!("equal")
-    } else {
-      println!("{:#?}", diff.differences())
-    }
-    Ok(false)
-  }
-}
-
-async fn get_difference(application_id: &str, dsh_api_client: &DshApiClient<'_>) -> Result<ApplicationDiff, String> {
-  try_join(
-    dsh_api_client.get_application(application_id),
-    dsh_api_client.get_application_actual_configuration(application_id),
-  )
-  .await
-  .map(|(deployed, actual)| DshApiClient::application_diff(&deployed, &actual))
-  .map_err(|error| error.to_string())
-}
-
 struct ApplicationListAll {}
 
 #[async_trait]
@@ -144,7 +102,7 @@ impl CommandExecutor for ApplicationListAll {
     if context.show_capability_explanation() {
       println!("list all applications with their parameters");
     }
-    print_applications(&dsh_api_client.get_application_actual_configurations().await?, matches, context)
+    print_applications(&dsh_api_client.get_applications().await?, matches, context)
   }
 }
 
@@ -243,7 +201,7 @@ impl CommandExecutor for ApplicationShowAll {
     if context.show_capability_explanation() {
       println!("show all parameters for application '{}'", application_id);
     }
-    match dsh_api_client.get_application_actual_configuration(application_id.as_str()).await {
+    match dsh_api_client.get_application(application_id.as_str()).await {
       Ok(application) => {
         let table = ShowTable::new(application_id.as_str(), &application, &APPLICATION_LABELS_SHOW, context);
         table.print();
