@@ -77,7 +77,7 @@ static LONG_ABOUT: &str = "DSH api command line interface\n\n\
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dcli apps' will be the same \
    as using 'dcli app list'.";
-static LONG_VERSION: &str = "version: 0.1.1\ndsh api version: 1.8.0";
+static LONG_VERSION: &str = "version: 0.2.0\ndsh-api library version: 0.2.0\ndsh rest api version: 1.8.0";
 
 type DcliResult = Result<bool, String>;
 
@@ -208,7 +208,7 @@ async fn inner_main() -> DcliResult {
     .hide_possible_values(true)
     .styles(styles)
     .subcommands(clap_commands)
-    .version("0.1.1")
+    .version("0.2.0")
     .long_version(LONG_VERSION);
 
   let matches = command.get_matches();
