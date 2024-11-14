@@ -3,30 +3,30 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::{BufRead, stdin};
+use std::io::{stdin, BufRead};
 use std::process::{ExitCode, Termination};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
-use clap::{ArgMatches, Command};
 use clap::builder::styling;
-
-use dsh_api::dsh_api_client_factory::{DshApiClientFactory, get_secret_from_platform_and_tenant};
-use dsh_api::dsh_api_tenant::{DshApiTenant, get_default_tenant_name};
-use dsh_api::DshApiError;
+use clap::{ArgMatches, Command};
+use dsh_api::dsh_api_client_factory::{get_secret_from_platform_and_tenant, DshApiClientFactory};
+use dsh_api::dsh_api_tenant::{get_default_tenant_name, DshApiTenant};
 use dsh_api::platform::DshPlatform;
+use dsh_api::DshApiError;
 
 use crate::app::APP_SUBJECT;
 use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{
-  no_border_argument, NO_BORDER_ARGUMENT, platform_argument, PLATFORM_ARGUMENT, set_verbosity_argument, SET_VERBOSITY_ARGUMENT, tenant_argument, TENANT_ARGUMENT, Verbosity,
-  verbosity_argument, VERBOSITY_ARGUMENT,
+  no_border_argument, platform_argument, set_verbosity_argument, tenant_argument, verbosity_argument, Verbosity, NO_BORDER_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT,
+  TENANT_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::bucket::BUCKET_SUBJECT;
 use crate::certificate::CERTIFICATE_SUBJECT;
 use crate::env::ENV_SUBJECT;
 use crate::filter_flags::FilterFlagType;
+use crate::formatters::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::image::IMAGE_SUBJECT;
 use crate::manifest::MANIFEST_SUBJECT;
 use crate::metric::METRIC_SUBJECT;
@@ -64,6 +64,8 @@ mod subject;
 mod topic;
 mod vhost;
 mod volume;
+
+pub(crate) static APPLICATION_NAME: &str = "dcli";
 
 static ABOUT: &str = "DSH api command line interface";
 
@@ -190,7 +192,7 @@ async fn inner_main() -> DcliResult {
     }
   }
 
-  let command = Command::new("dcli")
+  let mut command = Command::new(APPLICATION_NAME)
     .about(ABOUT)
     .long_about(LONG_ABOUT)
     .after_help(AFTER_HELP)
@@ -200,6 +202,7 @@ async fn inner_main() -> DcliResult {
       set_verbosity_argument(),
       tenant_argument(),
       verbosity_argument(),
+      generate_autocomplete_file_argument(),
     ])
     .arg_required_else_help(true)
     .term_width(80)
@@ -211,7 +214,12 @@ async fn inner_main() -> DcliResult {
     .version("0.2.0")
     .long_version(LONG_VERSION);
 
-  let matches = command.get_matches();
+  let matches = command.clone().get_matches();
+
+  if let Some(shell) = matches.get_one::<AutocompleteShell>(AUTOCOMPLETE_ARGUMENT) {
+    generate_autocomplete_file(&mut command, shell);
+    return Ok(false)
+  }
 
   let border = !matches.get_flag(NO_BORDER_ARGUMENT);
 
