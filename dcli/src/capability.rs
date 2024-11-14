@@ -16,6 +16,7 @@ pub(crate) const DELETE: &str = "delete";
 pub(crate) const FIND: &str = "find";
 pub(crate) const DIFF: &str = "diff";
 pub(crate) const LIST: &str = "list";
+pub(crate) const NEW: &str = "new";
 pub(crate) const SHOW: &str = "show";
 pub(crate) const START: &str = "start";
 pub(crate) const STOP: &str = "stop";
@@ -28,13 +29,14 @@ pub(crate) enum CapabilityType {
   Diff,
   Find,
   List,
+  New,
   Show,
   Start,
   Stop,
   Update,
 }
 
-pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 9] = [Create, Delete, Diff, Find, List, Show, Start, Stop, Update];
+pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 10] = [Create, Delete, Diff, Find, List, New, Show, Start, Stop, Update];
 
 impl TryFrom<&str> for CapabilityType {
   type Error = String;
@@ -46,6 +48,7 @@ impl TryFrom<&str> for CapabilityType {
       DIFF => Ok(Diff),
       FIND => Ok(Find),
       LIST => Ok(List),
+      NEW => Ok(New),
       SHOW => Ok(Show),
       START => Ok(Start),
       STOP => Ok(Stop),
@@ -63,6 +66,7 @@ impl CapabilityType {
       Diff => DIFF,
       Find => FIND,
       List => LIST,
+      New => NEW,
       Show => SHOW,
       Start => START,
       Stop => STOP,
@@ -81,6 +85,7 @@ impl CapabilityType {
       Diff => Some("d"),
       Find => Some("f"),
       List => Some("l"),
+      New => None,
       Show => Some("s"),
       Start => None,
       Stop => None,
@@ -95,6 +100,7 @@ impl CapabilityType {
       Diff => vec![target_argument(subject, None)],
       Find => vec![query_argument(None)],
       List => vec![],
+      New => vec![],
       Show => vec![target_argument(subject, None)],
       Start => vec![target_argument(subject, None)],
       Stop => vec![target_argument(subject, None)],
@@ -109,6 +115,7 @@ impl CapabilityType {
       Diff => &[TARGET_ARGUMENT],
       Find => &[QUERY_ARGUMENT],
       List => &[],
+      New => &[],
       Show => &[TARGET_ARGUMENT],
       Start => &[TARGET_ARGUMENT],
       Stop => &[TARGET_ARGUMENT],
