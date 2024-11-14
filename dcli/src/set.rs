@@ -1,20 +1,18 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::types::Secret;
+use dsh_api::platform::DshPlatform;
 
-use crate::{confirmed, DcliContext, DcliResult, read_multi_line, read_single_line};
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::formatters::allocation_status::print_allocation_status;
 use crate::formatters::list_table::ListTable;
 use crate::formatters::settings::TARGET_LABELS;
-use crate::modifier_flags::ModifierFlagType;
-use crate::settings::all_targets;
+use crate::settings::{all_targets, delete_target, read_target, upsert_target, Target};
 use crate::subject::Subject;
+use crate::{confirmed, read_single_line, DcliContext, DcliResult};
 
 pub(crate) struct SetSubject {}
 
@@ -44,32 +42,21 @@ impl Subject for SetSubject {
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Create, SET_CREATE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Delete, SET_DELETE_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::Delete, SET_DELETE_TARGET_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::List, SET_LIST_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::New, SET_NEW_TARGET_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::Show, SET_SHOW_CAPABILITY.as_ref());
     capabilities
   }
 }
 
 lazy_static! {
-  pub static ref SET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Create,
-    command_about: "Create setting".to_string(),
-    command_long_about: Some("Create a setting.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&SetCreate {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref SET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+  pub static ref SET_DELETE_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Delete,
-    command_about: "Delete setting".to_string(),
-    command_long_about: Some("Delete a setting.".to_string()),
+    command_about: "Delete target".to_string(),
+    command_long_about: Some("Delete a target.".to_string()),
     command_executors: vec![],
-    default_command_executor: Some(&SetDelete {}),
+    default_command_executor: Some(&SetDeleteTarget {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
@@ -81,6 +68,17 @@ lazy_static! {
     command_long_about: Some("Lists all dcli settings.".to_string()),
     command_executors: vec![],
     default_command_executor: Some(&SetList {}),
+    run_all_executors: false,
+    extra_arguments: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
+  });
+  pub static ref SET_NEW_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::New,
+    command_about: "Create new target".to_string(),
+    command_long_about: Some("Create a new target.".to_string()),
+    command_executors: vec![],
+    default_command_executor: Some(&SetNewTarget {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
@@ -99,62 +97,31 @@ lazy_static! {
   });
 }
 
-struct SetCreate {}
+struct SetDeleteTarget {}
 
 #[async_trait]
-impl CommandExecutor for SetCreate {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if matches.get_flag(ModifierFlagType::MultiLine.id()) {
-      let secret_id = target.unwrap_or_else(|| unreachable!());
-      if context.show_capability_explanation() {
-        println!("create new multi-line secret '{}'", secret_id);
-      }
-      if dsh_api_client.get_secret(&secret_id).await.is_ok() {
-        return Err(format!("secret '{}' already exists", secret_id));
-      }
-      println!("enter multi-line secret (terminate input with ctrl-d after last line)");
-      let value = read_multi_line()?;
-      let secret = Secret { name: secret_id, value };
-      dsh_api_client.create_secret(&secret).await?;
-      println!("ok");
-      Ok(true)
-    } else {
-      let secret_id = target.unwrap_or_else(|| unreachable!());
-      if context.show_capability_explanation() {
-        println!("create new single line secret '{}'", secret_id);
-      }
-      if dsh_api_client.get_secret(&secret_id).await.is_ok() {
-        return Err(format!("secret '{}' already exists", secret_id));
-      }
-      println!("enter secret followed by newline");
-      let value = read_single_line()?;
-      let secret = Secret { name: secret_id, value };
-      dsh_api_client.create_secret(&secret).await?;
-      println!("ok");
-      Ok(true)
-    }
-  }
-}
-
-struct SetDelete {}
-
-#[async_trait]
-impl CommandExecutor for SetDelete {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
+impl CommandExecutor for SetDeleteTarget {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("delete secret '{}'", secret_id);
+      println!("delete existing target");
     }
-    if dsh_api_client.get_secret_configuration(&secret_id).await.is_err() {
-      return Err(format!("secret '{}' does not exists", secret_id));
+    let platform = read_single_line("enter platform: ")?;
+    let platform = DshPlatform::try_from(platform.as_str())?;
+    let tenant = read_single_line("enter tenant: ")?;
+    match read_target(&platform, &tenant)? {
+      Some(target) => {
+        if confirmed(format!("type 'yes' to delete target '{}': ", target).as_str())? {
+          delete_target(&platform, &tenant)?;
+          println!("target '{}' deleted", target);
+        } else {
+          println!("cancelled");
+        }
+      }
+      None => {
+        return Err(format!("target {}@{} does not exist", tenant, platform));
+      }
     }
-    println!("type 'yes' and Enter to delete secret '{}'", secret_id);
-    if confirmed()? {
-      dsh_api_client.delete_secret(&secret_id).await?;
-      println!("ok");
-    } else {
-      println!("cancelled");
-    }
+
     Ok(false)
   }
 }
@@ -170,6 +137,40 @@ impl CommandExecutor for SetList {
     let mut table = ListTable::new(&TARGET_LABELS, context);
     table.rows(all_targets()?.as_slice());
     table.print();
+    Ok(false)
+  }
+}
+
+struct SetNewTarget {}
+
+#[async_trait]
+impl CommandExecutor for SetNewTarget {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+    if context.show_capability_explanation() {
+      println!("create new target");
+    }
+    let platform = read_single_line("enter platform: ")?;
+    let platform = DshPlatform::try_from(platform.as_str())?;
+    let tenant = read_single_line("enter tenant: ")?;
+    if let Some(existing_target) = read_target(&platform, &tenant)? {
+      return Err(format!("target {} already exists (first delete the existing target)", existing_target));
+    }
+    let guid = read_single_line("enter group/user id: ")?;
+    let guid = match guid.parse::<u32>() {
+      Ok(guid) => {
+        if guid > 0 && guid < 32768 {
+          // TODO Check these bounds
+          format!("{}:{}", guid, guid)
+        } else {
+          return Err("group/user id must be greater than 0 and smaller than 32768".to_string());
+        }
+      }
+      Err(_) => return Err("invalid group/user id (single integer required)".to_string()),
+    };
+    let password = read_single_line("enter password: ")?;
+    let target = Target::new(platform, tenant, guid, password)?;
+    upsert_target(&target)?;
+    println!("target {} created", target);
     Ok(false)
   }
 }

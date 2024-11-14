@@ -461,6 +461,15 @@ echo $SEPARATOR
 
 
 echo $SEPARATOR
+echo set
+echo $SEPARATOR
+
+echo dcli $VERBOSITY set list
+dcli $VERBOSITY set list
+echo $SEPARATOR
+
+
+echo $SEPARATOR
 echo topic
 echo $SEPARATOR
 
