@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::{stdin, BufRead};
+use std::io::{stdin, stdout, BufRead, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -219,7 +219,7 @@ async fn inner_main() -> DcliResult {
 
   if let Some(shell) = matches.get_one::<AutocompleteShell>(AUTOCOMPLETE_ARGUMENT) {
     generate_autocomplete_file(&mut command, shell);
-    return Ok(false)
+    return Ok(false);
   }
 
   let border = !matches.get_flag(NO_BORDER_ARGUMENT);
@@ -296,17 +296,19 @@ pub(crate) fn read_multi_line() -> Result<String, String> {
   Ok(multi_line)
 }
 
-pub(crate) fn read_single_line() -> Result<String, String> {
+pub(crate) fn read_single_line(prompt: &str) -> Result<String, String> {
+  print!("{}", prompt);
+  let _ = stdout().lock().flush();
   let mut line = String::new();
-  let stdin = stdin();
-  stdin.lock().read_line(&mut line).expect("could not read line");
+  stdin().lock().read_line(&mut line).expect("could not read line");
   Ok(line.trim().to_string())
 }
 
-pub(crate) fn confirmed() -> Result<bool, String> {
+pub(crate) fn confirmed(prompt: &str) -> Result<bool, String> {
+  print!("{}", prompt);
+  let _ = stdout().lock().flush();
   let mut line = String::new();
-  let stdin = stdin();
-  stdin.lock().read_line(&mut line).expect("could not read line");
+  stdin().lock().read_line(&mut line).expect("could not read line");
   Ok(line == *"yes\n")
 }
 

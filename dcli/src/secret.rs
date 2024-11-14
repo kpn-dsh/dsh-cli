@@ -9,7 +9,6 @@ use lazy_static::lazy_static;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Secret;
 
-use crate::{confirmed, DcliContext, DcliResult, include_app_application, read_multi_line, read_single_line};
 use crate::app::apps_with_secret_injections;
 use crate::application::applications_with_secret_injections;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
@@ -18,9 +17,10 @@ use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::list_table::ListTable;
-use crate::formatters::usage::{Usage, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPLICATIONS_LABELS_SHOW, USAGE_IN_APPS_LABELS_LIST, USAGE_IN_APPS_LABELS_SHOW, UsageLabel};
+use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPLICATIONS_LABELS_SHOW, USAGE_IN_APPS_LABELS_LIST, USAGE_IN_APPS_LABELS_SHOW};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
+use crate::{confirmed, include_app_application, read_multi_line, read_single_line, DcliContext, DcliResult};
 
 pub(crate) struct SecretSubject {}
 
@@ -145,8 +145,7 @@ impl CommandExecutor for SecretCreate {
       if dsh_api_client.get_secret(&secret_id).await.is_ok() {
         return Err(format!("secret '{}' already exists", secret_id));
       }
-      println!("enter secret followed by newline");
-      let value = read_single_line()?;
+      let value = read_single_line("enter secret: ")?;
       let secret = Secret { name: secret_id, value };
       dsh_api_client.create_secret(&secret).await?;
       println!("ok");
@@ -167,8 +166,7 @@ impl CommandExecutor for SecretDelete {
     if dsh_api_client.get_secret_configuration(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exists", secret_id));
     }
-    println!("type 'yes' and Enter to delete secret '{}'", secret_id);
-    if confirmed()? {
+    if confirmed(format!("type 'yes' to delete secret '{}': ", secret_id).as_str())? {
       dsh_api_client.delete_secret(&secret_id).await?;
       println!("ok");
     } else {

@@ -115,8 +115,7 @@ impl CommandExecutor for TopicDelete {
     if dsh_api_client.get_topic(&topic_id).await.is_err() {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }
-    println!("type 'yes' and Enter to delete scratch topic '{}'", topic_id);
-    if confirmed()? {
+    if confirmed(format!("type 'yes' to delete scratch topic '{}': ", topic_id).as_str())? {
       dsh_api_client.delete_topic(&topic_id).await?;
       println!("ok");
     } else {

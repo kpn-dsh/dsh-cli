@@ -9,7 +9,6 @@ use lazy_static::lazy_static;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Volume;
 
-use crate::{confirmed, DcliContext, DcliResult, include_app_application, read_single_line};
 use crate::app::apps_that_use_volume;
 use crate::application::applications_that_use_volume;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
@@ -18,9 +17,10 @@ use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::list_table::ListTable;
-use crate::formatters::usage::{Usage, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPS_LABELS_LIST, USAGE_LABELS_SHOW, UsageLabel};
+use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPS_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::formatters::volume::{VOLUME_LABELS, VOLUME_STATUS_LABELS};
 use crate::subject::Subject;
+use crate::{confirmed, include_app_application, read_single_line, DcliContext, DcliResult};
 
 pub(crate) struct VolumeSubject {}
 
@@ -127,8 +127,7 @@ impl CommandExecutor for VolumeCreate {
     if dsh_api_client.get_volume(&volume_id).await.is_ok() {
       return Err(format!("volume '{}' already exists", volume_id));
     }
-    println!("enter size in gigabytes, followed by Enter");
-    let line = read_single_line()?;
+    let line = read_single_line("enter size in gigabytes: ")?;
     let size_gi_b = line.parse::<i64>().map_err(|_| format!("could not parse '{}' as a valid integer", line))?;
     let volume = Volume { size_gi_b };
     dsh_api_client.create_volume(&volume_id, &volume).await?;
@@ -149,8 +148,7 @@ impl CommandExecutor for VolumeDelete {
     if dsh_api_client.get_volume(&volume_id).await.is_err() {
       return Err(format!("volume '{}' does not exists", volume_id));
     }
-    println!("type 'yes' and Enter to delete volume '{}'", volume_id);
-    if confirmed()? {
+    if confirmed(format!("type 'yes' to delete volume '{}': ", volume_id).as_str())? {
       dsh_api_client.delete_volume(&volume_id).await?;
       println!("ok");
     } else {

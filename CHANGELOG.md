@@ -6,7 +6,7 @@ All notable changes to the dcli tool project will be documented in this file.
 
 ### Security
 
-* At this time the api credentials must be configured by specifying environment variables. 
+* At this time the api credentials must be configured by specifying environment variables.
   This must be replaced by a more secure (encrypted) solution.
 
 ## [0.2.0]
@@ -17,9 +17,13 @@ All notable changes to the dcli tool project will be documented in this file.
 * Save settings in application directory.
 * Capability to generate autocomplete files.
 
+### Changed
+
+* Added prompts for user input.
+
 ### Removed
 
-The dsh-api subproject is removed and is now in its own repo at 
+The dsh-api subproject is removed and is now in its own repo at
 [github.com/kpn-dsh/dsh-api](https://github.com/kpn-dsh/dsh-api).
 
 ## [0.1.0] - 2024-10-29

@@ -109,8 +109,7 @@ impl CommandExecutor for ProxyDelete {
     if dsh_api_client.get_proxy(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
-    println!("type 'yes' and Enter to delete proxy '{}'", proxy_id);
-    if confirmed()? {
+    if confirmed(format!("type 'yes' to delete proxy '{}': ", proxy_id).as_str())? {
       dsh_api_client.delete_proxy(&proxy_id).await?;
       println!("ok");
     } else {
