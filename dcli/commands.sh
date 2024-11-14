@@ -461,11 +461,11 @@ echo $SEPARATOR
 
 
 echo $SEPARATOR
-echo set
+echo setting
 echo $SEPARATOR
 
-echo dcli $VERBOSITY set list
-dcli $VERBOSITY set list
+echo dcli $VERBOSITY setting list
+dcli $VERBOSITY setting list
 echo $SEPARATOR
 
 

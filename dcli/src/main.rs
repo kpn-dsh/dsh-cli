@@ -32,7 +32,7 @@ use crate::manifest::MANIFEST_SUBJECT;
 use crate::metric::METRIC_SUBJECT;
 use crate::proxy::PROXY_SUBJECT;
 use crate::secret::SECRET_SUBJECT;
-use crate::set::SET_SUBJECT;
+use crate::setting::SETTING_SUBJECT;
 #[cfg(feature = "stream")]
 use crate::stream::STREAM_SUBJECT;
 use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
@@ -57,7 +57,7 @@ mod metric;
 mod modifier_flags;
 mod proxy;
 mod secret;
-mod set;
+mod setting;
 mod settings;
 #[cfg(feature = "stream")]
 mod stream;
@@ -170,7 +170,7 @@ async fn inner_main() -> DcliResult {
     METRIC_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
-    SET_SUBJECT.as_ref(),
+    SETTING_SUBJECT.as_ref(),
     #[cfg(feature = "stream")]
     STREAM_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),

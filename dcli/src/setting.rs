@@ -14,22 +14,22 @@ use crate::settings::{all_targets, delete_target, read_target, upsert_target, Ta
 use crate::subject::Subject;
 use crate::{confirmed, read_single_line, DcliContext, DcliResult};
 
-pub(crate) struct SetSubject {}
+pub(crate) struct SettingSubject {}
 
-const SET_SUBJECT_TARGET: &str = "set";
+const SETTING_SUBJECT_TARGET: &str = "setting";
 
 lazy_static! {
-  pub static ref SET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SetSubject {});
+  pub static ref SETTING_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SettingSubject {});
 }
 
 #[async_trait]
-impl Subject for SetSubject {
+impl Subject for SettingSubject {
   fn subject(&self) -> &'static str {
-    SET_SUBJECT_TARGET
+    SETTING_SUBJECT_TARGET
   }
 
   fn subject_first_upper(&self) -> &'static str {
-    "Set"
+    "Setting"
   }
 
   fn subject_command_about(&self) -> String {
@@ -42,54 +42,54 @@ impl Subject for SetSubject {
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Delete, SET_DELETE_TARGET_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::List, SET_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::New, SET_NEW_TARGET_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, SET_SHOW_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::Delete, SETTING_DELETE_TARGET_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::List, SETTING_LIST_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::New, SETTING_NEW_TARGET_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::Show, SETTING_SHOW_CAPABILITY.as_ref());
     capabilities
   }
 }
 
 lazy_static! {
-  pub static ref SET_DELETE_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+  pub static ref SETTING_DELETE_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Delete,
     command_about: "Delete target".to_string(),
     command_long_about: Some("Delete a target.".to_string()),
     command_executors: vec![],
-    default_command_executor: Some(&SetDeleteTarget {}),
+    default_command_executor: Some(&SettingDeleteTarget {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
     modifier_flags: vec![],
   });
-  pub static ref SET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+  pub static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
     command_about: "List settings".to_string(),
     command_long_about: Some("Lists all dcli settings.".to_string()),
     command_executors: vec![],
-    default_command_executor: Some(&SetList {}),
+    default_command_executor: Some(&SettingList {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
     modifier_flags: vec![],
   });
-  pub static ref SET_NEW_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+  pub static ref SETTING_NEW_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::New,
     command_about: "Create new target".to_string(),
     command_long_about: Some("Create a new target.".to_string()),
     command_executors: vec![],
-    default_command_executor: Some(&SetNewTarget {}),
+    default_command_executor: Some(&SettingNewTarget {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
     modifier_flags: vec![],
   });
-  pub static ref SET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+  pub static ref SETTING_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::Show,
     command_about: "Show setting".to_string(),
     command_long_about: None,
     command_executors: vec![],
-    default_command_executor: Some(&SetShow {}),
+    default_command_executor: Some(&SettingShow {}),
     run_all_executors: false,
     extra_arguments: vec![],
     filter_flags: vec![],
@@ -97,10 +97,10 @@ lazy_static! {
   });
 }
 
-struct SetDeleteTarget {}
+struct SettingDeleteTarget {}
 
 #[async_trait]
-impl CommandExecutor for SetDeleteTarget {
+impl CommandExecutor for SettingDeleteTarget {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
       println!("delete existing target");
@@ -126,10 +126,10 @@ impl CommandExecutor for SetDeleteTarget {
   }
 }
 
-struct SetList {}
+struct SettingList {}
 
 #[async_trait]
-impl CommandExecutor for SetList {
+impl CommandExecutor for SettingList {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all targets");
@@ -141,10 +141,10 @@ impl CommandExecutor for SetList {
   }
 }
 
-struct SetNewTarget {}
+struct SettingNewTarget {}
 
 #[async_trait]
-impl CommandExecutor for SetNewTarget {
+impl CommandExecutor for SettingNewTarget {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     if context.show_capability_explanation() {
       println!("create new target");
@@ -175,10 +175,10 @@ impl CommandExecutor for SetNewTarget {
   }
 }
 
-struct SetShow {}
+struct SettingShow {}
 
 #[async_trait]
-impl CommandExecutor for SetShow {
+impl CommandExecutor for SettingShow {
   async fn execute(&self, argument: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     let secret_id = argument.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
