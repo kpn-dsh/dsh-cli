@@ -21,7 +21,7 @@ pub(crate) fn generate_autocomplete_file_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<AutocompleteShell>::new())
     .value_name("SHELL")
-    .help("Generate autocompletion file for the provided SHELL")
+    .help("Generate autocomplete file")
     .long_help(
       "If this option is provided, \
           the application will write an autocomplete file for the selected shell to stdout. \

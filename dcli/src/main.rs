@@ -22,11 +22,11 @@ use crate::arguments::{
   no_border_argument, platform_argument, set_verbosity_argument, tenant_argument, verbosity_argument, Verbosity, NO_BORDER_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT,
   TENANT_ARGUMENT, VERBOSITY_ARGUMENT,
 };
+use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::bucket::BUCKET_SUBJECT;
 use crate::certificate::CERTIFICATE_SUBJECT;
 use crate::env::ENV_SUBJECT;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::image::IMAGE_SUBJECT;
 use crate::manifest::MANIFEST_SUBJECT;
 use crate::metric::METRIC_SUBJECT;
@@ -43,9 +43,9 @@ use crate::volume::VOLUME_SUBJECT;
 mod app;
 mod application;
 mod arguments;
+mod autocomplete;
 mod bucket;
 mod capability;
-mod settings;
 mod certificate;
 mod env;
 mod filter_flags;
@@ -58,6 +58,7 @@ mod modifier_flags;
 mod proxy;
 mod secret;
 mod set;
+mod settings;
 #[cfg(feature = "stream")]
 mod stream;
 mod subject;

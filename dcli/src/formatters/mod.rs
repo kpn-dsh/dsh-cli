@@ -3,7 +3,6 @@ use dsh_api::query_processor::Part::{Matching, NonMatching};
 use dsh_api::types::Notification;
 
 pub(crate) mod allocation_status;
-pub(crate) mod autocomplete;
 pub(crate) mod app;
 pub(crate) mod application;
 pub(crate) mod bucket;
