@@ -1,8 +1,8 @@
+use crate::APPLICATION_NAME;
 use clap::builder::EnumValueParser;
 use clap::{Arg, ArgAction, Command};
-use clap_complete::{generate, shells, Generator};
+use clap_complete::{generate, shells};
 use std::io;
-use crate::APPLICATION_NAME;
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub(crate) enum AutocompleteShell {
@@ -26,18 +26,17 @@ pub(crate) fn generate_autocomplete_file_argument() -> Arg {
       "If this option is provided, \
           the application will write an autocomplete file for the selected shell to stdout. \
           See the documentation for your shell on how to install the autocomplete file. \
-          The supported shells are 'bash', 'elvish', 'fish', `powershell' and 'zsh'. \
+          The supported shells are 'bash', 'elvish', 'fish', 'powershell' and 'zsh'. \
           Any other provided commands or options will be ignored.",
     )
 }
 
 pub(crate) fn generate_autocomplete_file(command: &mut Command, shell: &AutocompleteShell) {
-  let generator: impl Generator = match shell {
-    AutocompleteShell::Bash => shells::Bash,
-    AutocompleteShell::Elvish => shells::Elvish,
-    AutocompleteShell::Fish => shells::Fish,
-    AutocompleteShell::PowerShell => shells::PowerShell,
-    AutocompleteShell::Zsh => shells::Zsh
-  };
-  generate(generator, command, APPLICATION_NAME, &mut io::stdout())
+  match shell {
+    AutocompleteShell::Bash => generate(shells::Bash, command, APPLICATION_NAME, &mut io::stdout()),
+    AutocompleteShell::Elvish => generate(shells::Elvish, command, APPLICATION_NAME, &mut io::stdout()),
+    AutocompleteShell::Fish => generate(shells::Fish, command, APPLICATION_NAME, &mut io::stdout()),
+    AutocompleteShell::PowerShell => generate(shells::PowerShell, command, APPLICATION_NAME, &mut io::stdout()),
+    AutocompleteShell::Zsh => generate(shells::Zsh, command, APPLICATION_NAME, &mut io::stdout()),
+  }
 }
