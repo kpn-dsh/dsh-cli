@@ -12,7 +12,7 @@ use crate::formatters::list_table::ListTable;
 use crate::formatters::settings::TARGET_LABELS;
 use crate::settings::{all_targets, delete_target, read_target, upsert_target, Target};
 use crate::subject::Subject;
-use crate::{confirmed, read_single_line, DcliContext, DcliResult};
+use crate::{confirmed, read_single_line, validate_guid, DcliContext, DcliResult};
 
 pub(crate) struct SettingSubject {}
 
@@ -155,18 +155,7 @@ impl CommandExecutor for SettingNewTarget {
     if let Some(existing_target) = read_target(&platform, &tenant)? {
       return Err(format!("target {} already exists (first delete the existing target)", existing_target));
     }
-    let guid = read_single_line("enter group/user id: ")?;
-    let guid = match guid.parse::<u32>() {
-      Ok(guid) => {
-        if guid > 0 && guid < 32768 {
-          // TODO Check these bounds
-          format!("{}:{}", guid, guid)
-        } else {
-          return Err("group/user id must be greater than 0 and smaller than 32768".to_string());
-        }
-      }
-      Err(_) => return Err("invalid group/user id (single integer required)".to_string()),
-    };
+    let guid = validate_guid(read_single_line("enter group/user id: ")?.as_str())?;
     let password = read_single_line("enter password: ")?;
     let target = Target::new(platform, tenant, guid, password)?;
     upsert_target(&target)?;

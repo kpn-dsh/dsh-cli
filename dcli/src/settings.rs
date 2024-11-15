@@ -19,15 +19,15 @@ const TOML_FILENAME_EXTENSION: &str = "toml";
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Settings {
   #[serde(rename = "default-platform", skip_serializing_if = "Option::is_none")]
-  default_platform: Option<String>,
+  pub(crate) default_platform: Option<String>,
   #[serde(rename = "default-tenant", skip_serializing_if = "Option::is_none")]
-  default_tenant: Option<String>,
+  pub(crate) default_tenant: Option<String>,
   #[serde(rename = "show-execution-time", skip_serializing_if = "Option::is_none")]
-  show_execution_time: Option<bool>,
+  pub(crate) show_execution_time: Option<bool>,
   #[serde(rename = "no-border", skip_serializing_if = "Option::is_none")]
-  no_border: Option<bool>,
+  pub(crate) no_border: Option<bool>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  verbosity: Option<Verbosity>,
+  pub(crate) verbosity: Option<Verbosity>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -35,7 +35,7 @@ pub(crate) struct Target {
   pub(crate) platform: DshPlatform,
   pub(crate) tenant: String,
   pub(crate) group_user_id: String,
-  password: String,
+  pub(crate) password: String,
 }
 
 impl Target {
@@ -50,7 +50,7 @@ impl Display for Target {
   }
 }
 
-pub(crate) fn _read_settings(explicit_settings_filename: Option<&str>) -> Result<Option<Settings>, String> {
+pub(crate) fn read_settings(explicit_settings_filename: Option<&str>) -> Result<Option<Settings>, String> {
   match explicit_settings_filename {
     Some(explicit_name) => {
       log::debug!("read settings from explicit file '{}'", explicit_name);
@@ -218,12 +218,12 @@ fn test_dcli_directory() {
 
 #[test]
 fn test_read_settings_default() {
-  println!("settings default: {:?}", _read_settings(None));
+  println!("settings default: {:?}", read_settings(None));
 }
 
 #[test]
 fn test_read_settings_explicit_filename() {
-  println!("settings explicit filename: {:?}", _read_settings(Some(_test_settings_filename().as_str())));
+  println!("settings explicit filename: {:?}", read_settings(Some(_test_settings_filename().as_str())));
 }
 
 #[test]

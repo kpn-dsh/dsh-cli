@@ -2,9 +2,9 @@ use builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction};
 use serde::{Deserialize, Serialize};
 
-use crate::subject::Subject;
-
+pub(crate) const GUID_ARGUMENT: &str = "guid-argument";
 pub(crate) const NO_BORDER_ARGUMENT: &str = "no-border-argument";
+pub(crate) const PASSWORD_ARGUMENT: &str = "password-argument";
 pub(crate) const PLATFORM_ARGUMENT: &str = "platform-argument";
 pub(crate) const SET_VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
 pub(crate) const _SUBTARGET_ARGUMENT: &str = "subtarget-argument";
@@ -29,12 +29,35 @@ pub(crate) enum Verbosity {
   High = 3,
 }
 
+pub(crate) fn guid_argument() -> Arg {
+  Arg::new(GUID_ARGUMENT)
+    .long("guid")
+    .short('g')
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("GUID")
+    .help("Target group and user id")
+    .long_help(
+      "This option specifies the group and user id of the target tenant. \
+    If this argument is not provided, \
+    the tenant must be specified via the environment variable 'DSH_API_TENANT'.",
+    )
+}
+
 pub(crate) fn no_border_argument() -> Arg {
   Arg::new(NO_BORDER_ARGUMENT)
     .long("no-border")
     .action(ArgAction::SetTrue)
     .help("Omit output border")
     .long_help("When this option is provided table borders will be omitted from the output.")
+}
+
+pub(crate) fn password_argument() -> Arg {
+  Arg::new(PASSWORD_ARGUMENT)
+    .long("secret")
+    .action(ArgAction::SetTrue)
+    .help("Ask for secret")
+    .long_help("When this option is provided the user will always be asked to provide the api secret.")
 }
 
 pub(crate) fn platform_argument() -> Arg {
@@ -95,13 +118,13 @@ pub(crate) fn verbosity_argument() -> Arg {
     .conflicts_with(SET_VERBOSITY_ARGUMENT)
 }
 
-pub(crate) fn target_argument(subject: &dyn Subject, long_help: Option<&str>) -> Arg {
+pub(crate) fn target_argument(subject: String, long_help: Option<&str>) -> Arg {
   let mut target_argument = Arg::new(TARGET_ARGUMENT)
     .action(ArgAction::Set)
     .required(true)
     .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name(subject.subject_first_upper())
-    .help(format!("{} name", subject.subject_first_upper()));
+    .help(format!("{} name", subject))
+    .value_name(subject);
   if let Some(long_help) = long_help {
     target_argument = target_argument.long_help(long_help.to_string())
   }

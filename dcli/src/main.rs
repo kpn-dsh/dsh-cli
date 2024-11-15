@@ -3,24 +3,17 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::{stdin, stdout, BufRead, Write};
+use std::io::{stdin, stdout, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use clap::builder::styling;
-use clap::{ArgMatches, Command};
-use dsh_api::dsh_api_client_factory::{get_secret_from_platform_and_tenant, DshApiClientFactory};
-use dsh_api::dsh_api_tenant::{get_default_tenant_name, DshApiTenant};
-use dsh_api::platform::DshPlatform;
-use dsh_api::DshApiError;
-
 use crate::app::APP_SUBJECT;
 use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{
-  no_border_argument, platform_argument, set_verbosity_argument, tenant_argument, verbosity_argument, Verbosity, NO_BORDER_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT,
-  TENANT_ARGUMENT, VERBOSITY_ARGUMENT,
+  guid_argument, no_border_argument, password_argument, platform_argument, set_verbosity_argument, tenant_argument, verbosity_argument, Verbosity, GUID_ARGUMENT,
+  NO_BORDER_ARGUMENT, PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT, TENANT_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::bucket::BUCKET_SUBJECT;
@@ -33,12 +26,20 @@ use crate::metric::METRIC_SUBJECT;
 use crate::proxy::PROXY_SUBJECT;
 use crate::secret::SECRET_SUBJECT;
 use crate::setting::SETTING_SUBJECT;
+use crate::settings::{read_settings, read_target, Settings};
 #[cfg(feature = "stream")]
 use crate::stream::STREAM_SUBJECT;
 use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
 use crate::topic::TOPIC_SUBJECT;
 use crate::vhost::VHOST_SUBJECT;
 use crate::volume::VOLUME_SUBJECT;
+use clap::builder::styling;
+use clap::{ArgMatches, Command};
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_tenant::DshApiTenant;
+use dsh_api::platform::DshPlatform;
+use dsh_api::{guid_environment_variable, secret_environment_variable, DshApiError, PLATFORM_ENVIRONMENT_VARIABLE, TENANT_ENVIRONMENT_VARIABLE};
+use termion::input::TermRead;
 
 mod app;
 mod application;
@@ -153,6 +154,8 @@ async fn inner_main() -> DcliResult {
     h.store(true, Ordering::SeqCst);
   });
 
+  let settings = read_settings(None)?;
+
   let styles = styling::Styles::styled()
     .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
     .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
@@ -198,10 +201,12 @@ async fn inner_main() -> DcliResult {
     .long_about(LONG_ABOUT)
     .after_help(AFTER_HELP)
     .args(vec![
-      no_border_argument(),
       platform_argument(),
-      set_verbosity_argument(),
       tenant_argument(),
+      guid_argument(),
+      password_argument(),
+      no_border_argument(),
+      set_verbosity_argument(),
       verbosity_argument(),
       generate_autocomplete_file_argument(),
     ])
@@ -239,22 +244,15 @@ async fn inner_main() -> DcliResult {
 
   let context = DcliContext { verbosity, border };
 
-  let tenant_name = matches
-    .get_one::<String>(TENANT_ARGUMENT)
-    .map(|a| a.to_string())
-    .unwrap_or(get_default_tenant_name()?);
-  let platform = match matches.get_one::<String>(PLATFORM_ARGUMENT) {
-    Some(platform_name) => DshPlatform::try_from(platform_name.as_str())?,
-    None => DshPlatform::try_from(())?,
-  };
-  let secret = get_secret_from_platform_and_tenant(platform.to_string().as_str(), tenant_name.as_str())?;
-  let dsh_api_tenant = DshApiTenant::from_tenant_and_platform(tenant_name.clone(), platform.clone())?;
+  let dsh_api_tenant: DshApiTenant = get_dsh_api_tenant(&matches, &settings)?;
+  if context.show_settings() {
+    println!("tenant {}", dsh_api_tenant);
+  }
+
+  let secret = get_password(&matches, &dsh_api_tenant)?;
+
   let dsh_api_client_factory = DshApiClientFactory::create(dsh_api_tenant, secret)?;
   let dsh_api_client = dsh_api_client_factory.client().await?;
-
-  if context.show_settings() {
-    println!("tenant {}@{}", tenant_name, platform);
-  }
 
   let start_instant = Instant::now();
 
@@ -275,6 +273,87 @@ async fn inner_main() -> DcliResult {
   Ok(false)
 }
 
+fn get_platform(matches: &ArgMatches, settings: &Option<Settings>) -> Result<DshPlatform, String> {
+  match matches.get_one::<String>(PLATFORM_ARGUMENT) {
+    Some(name_from_argument) => DshPlatform::try_from(name_from_argument.as_str()),
+    None => match std::env::var(PLATFORM_ENVIRONMENT_VARIABLE) {
+      Ok(name_from_env_var) => DshPlatform::try_from(name_from_env_var.as_str()),
+      Err(_) => match settings {
+        Some(settings) => match settings.default_platform.clone() {
+          Some(name_from_settings) => DshPlatform::try_from(name_from_settings.as_str()),
+          None => DshPlatform::try_from(read_single_line("platform name: ")?.as_str()),
+        },
+        None => DshPlatform::try_from(read_single_line("platform name: ")?.as_str()),
+      },
+    },
+  }
+}
+
+fn get_tenant_name(matches: &ArgMatches, settings: &Option<Settings>) -> Result<String, String> {
+  match matches.get_one::<String>(TENANT_ARGUMENT) {
+    Some(name_from_argument) => Ok(name_from_argument.to_string()),
+    None => match std::env::var(TENANT_ENVIRONMENT_VARIABLE) {
+      Ok(name_from_env_var) => Ok(name_from_env_var),
+      Err(_) => match settings {
+        Some(settings) => match settings.default_tenant.clone() {
+          Some(name_from_settings) => Ok(name_from_settings),
+          None => read_single_line("tenant: "),
+        },
+        None => read_single_line("tenant: "),
+      },
+    },
+  }
+}
+
+// Return format "1903:1903"
+fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> Result<String, String> {
+  match matches.get_one::<String>(GUID_ARGUMENT) {
+    Some(guid_from_argument) => Ok(validate_guid(guid_from_argument)?),
+    None => match std::env::var(guid_environment_variable(tenant_name)) {
+      Ok(guid_from_env_var) => Ok(validate_guid(&guid_from_env_var)?),
+      Err(_) => match read_target(platform, tenant_name)? {
+        Some(target) => Ok(target.group_user_id),
+        None => read_single_line(format!("group and user id for tenant {}: ", tenant_name).as_str()),
+      },
+    },
+  }
+}
+
+fn get_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
+  if matches.get_flag(PASSWORD_ARGUMENT) {
+    read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
+  } else {
+    match std::env::var(secret_environment_variable(dsh_api_tenant.platform().to_string().as_str(), dsh_api_tenant.name())) {
+      Ok(password_from_env_var) => Ok(password_from_env_var),
+      Err(_) => match read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
+        Some(target) => Ok(target.password),
+        None => read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str()),
+      },
+    }
+  }
+}
+
+fn get_dsh_api_tenant(matches: &ArgMatches, settings: &Option<Settings>) -> Result<DshApiTenant, String> {
+  let platform = get_platform(matches, settings)?;
+  let tenant_name = get_tenant_name(matches, settings)?;
+  let guid = get_guid(matches, &platform, &tenant_name)?;
+  Ok(DshApiTenant::new(tenant_name, guid, platform))
+}
+
+pub(crate) fn validate_guid(guid: &str) -> Result<String, String> {
+  match guid.parse::<u32>() {
+    Ok(guid) => {
+      if guid > 0 && guid < 32768 {
+        // TODO Check these bounds
+        Ok(format!("{}:{}", guid, guid))
+      } else {
+        Err("group/user id must be greater than 0 and smaller than 32768".to_string())
+      }
+    }
+    Err(_) => Err("invalid group/user id (single integer required)".to_string()),
+  }
+}
+
 pub(crate) fn to_command_error_with_id(error: DshApiError, subject: &str, which: &str) -> DcliResult {
   match error {
     DshApiError::NotAuthorized => Err("not authorized".to_string()),
@@ -287,7 +366,7 @@ pub(crate) fn read_multi_line() -> Result<String, String> {
   let mut multi_line = String::new();
   let stdin = stdin();
   loop {
-    match stdin.lock().read_line(&mut multi_line) {
+    match stdin.read_line(&mut multi_line) {
       Ok(0) => break,
       Ok(_) => continue,
       Err(_) => return Err("error reading line".to_string()),
@@ -300,15 +379,27 @@ pub(crate) fn read_single_line(prompt: &str) -> Result<String, String> {
   print!("{}", prompt);
   let _ = stdout().lock().flush();
   let mut line = String::new();
-  stdin().lock().read_line(&mut line).expect("could not read line");
+  stdin().read_line(&mut line).expect("could not read line");
   Ok(line.trim().to_string())
+}
+
+// TODO Don't show the entered password
+pub(crate) fn read_single_line_password(prompt: &str) -> Result<String, String> {
+  print!("{}", prompt);
+  let mut stdout = stdout();
+  let _ = stdout.flush();
+  let mut stdin = stdin();
+  match stdin.read_passwd(&mut stdout).map_err(|error| error.to_string())? {
+    Some(line) => Ok(line.trim().to_string()),
+    None => Err("empty input".to_string()),
+  }
 }
 
 pub(crate) fn confirmed(prompt: &str) -> Result<bool, String> {
   print!("{}", prompt);
   let _ = stdout().lock().flush();
   let mut line = String::new();
-  stdin().lock().read_line(&mut line).expect("could not read line");
+  stdin().read_line(&mut line).expect("could not read line");
   Ok(line == *"yes\n")
 }
 
