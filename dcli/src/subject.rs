@@ -24,6 +24,7 @@ pub trait Subject {
     None
   }
 
+  // Map of capabilities that are supported for this Subject
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)>;
 
   async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, context: &DcliContext, dsh_api_client: &'a DshApiClient<'_>) -> DcliResult {
