@@ -70,13 +70,12 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
 }
 
 fn all_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(All, subject, format!("Include all {} parameters.", subject.subject()).as_str(), long_help)
+  create_clap_flag(All, format!("Include all {} parameters.", subject.subject()).as_str(), long_help)
 }
 
 fn allocation_status_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(
     AllocationStatus,
-    subject,
     format!("Include the {}'s allocation status.", subject.subject()).as_str(),
     long_help,
   )
@@ -85,33 +84,32 @@ fn allocation_status_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Ar
 fn configuration_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
   create_clap_flag(
     Configuration,
-    subject,
     format!("Include the {}'s initial configuration.", subject.subject()).as_str(),
     long_help,
   )
 }
 
 fn ids_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Ids, subject, format!("Include the {}'s ids.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Ids, format!("Include the {}'s ids.", subject.subject()).as_str(), long_help)
 }
 
 fn properties_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Properties, subject, format!("Include the {}'s properties.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Properties, format!("Include the {}'s properties.", subject.subject()).as_str(), long_help)
 }
 
 fn tasks_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Tasks, subject, format!("Include the {}'s tasks.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Tasks, format!("Include the {}'s tasks.", subject.subject()).as_str(), long_help)
 }
 
 fn usage_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Usage, subject, format!("Include the {}'s usages.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Usage, format!("Include the {}'s usages.", subject.subject()).as_str(), long_help)
 }
 
 fn value_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Value, subject, format!("Include the {}'s value.", subject.subject()).as_str(), long_help)
+  create_clap_flag(Value, format!("Include the {}'s value.", subject.subject()).as_str(), long_help)
 }
 
-fn create_clap_flag(flag_type: FlagType, _subject: &dyn Subject, help: &str, long_help: &Option<&str>) -> Arg {
+fn create_clap_flag(flag_type: FlagType, help: &str, long_help: &Option<&str>) -> Arg {
   let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help.to_string());
   if let Some(shortcut) = flag_type.shortcut() {
     flag_arg = flag_arg.short(shortcut)

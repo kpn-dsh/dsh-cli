@@ -93,18 +93,18 @@ impl CapabilityType {
     }
   }
 
-  pub(crate) fn command_target_arguments(&self, subject: &dyn Subject) -> Vec<Arg> {
+  pub(crate) fn command_target_arguments(&self, subject: &str) -> Vec<Arg> {
     match self {
-      Create => vec![target_argument(subject, None)],
-      Delete => vec![target_argument(subject, None)],
-      Diff => vec![target_argument(subject, None)],
+      Create => vec![target_argument(subject.to_string(), None)],
+      Delete => vec![target_argument(subject.to_string(), None)],
+      Diff => vec![target_argument(subject.to_string(), None)],
       Find => vec![query_argument(None)],
       List => vec![],
       New => vec![],
-      Show => vec![target_argument(subject, None)],
-      Start => vec![target_argument(subject, None)],
-      Stop => vec![target_argument(subject, None)],
-      Update => vec![target_argument(subject, None)],
+      Show => vec![target_argument(subject.to_string(), None)],
+      Start => vec![target_argument(subject.to_string(), None)],
+      Stop => vec![target_argument(subject.to_string(), None)],
+      Update => vec![target_argument(subject.to_string(), None)],
     }
   }
 
@@ -134,6 +134,8 @@ pub trait Capability {
 
   fn long_about(&self) -> Option<String>;
 
+  // fn command_target_argument_ids(&self) -> &[&str];
+
   async fn execute_capability(
     &self,
     argument: Option<String>,
@@ -146,6 +148,10 @@ pub trait Capability {
 
 #[async_trait]
 pub(crate) trait CommandExecutor {
+  // fn get_flag(&self);
+  // fn get_help(&self);
+  // fn get_long_help(&self);
+
   async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult;
 }
 
@@ -171,7 +177,7 @@ impl Capability for DeclarativeCapability<'_> {
     let mut capability_command = Command::new(self.capability_type().command_id())
       .name(self.capability_type.command_name())
       .about(&self.command_about)
-      .args(self.capability_type.command_target_arguments(subject))
+      .args(self.capability_type.command_target_arguments(subject.subject_first_upper()))
       .args(self.clap_flags(subject))
       .args(&self.extra_arguments);
     if let Some(alias) = self.capability_type.command_alias() {
