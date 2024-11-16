@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 
-use dsh_api::dsh_api_client::DshApiClient;
-
 use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT, TARGET_ARGUMENT};
 use crate::capability::CapabilityType::*;
 use crate::filter_flags::{create_filter_flag, FilterFlagType};
@@ -134,16 +132,7 @@ pub trait Capability {
 
   fn long_about(&self) -> Option<String>;
 
-  // fn command_target_argument_ids(&self) -> &[&str];
-
-  async fn execute_capability(
-    &self,
-    argument: Option<String>,
-    sub_argument: Option<String>,
-    matches: &ArgMatches,
-    context: &DcliContext,
-    dsh_api_client: &DshApiClient<'_>,
-  ) -> DcliResult;
+  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult;
 }
 
 #[async_trait]
@@ -152,7 +141,7 @@ pub(crate) trait CommandExecutor {
   // fn get_help(&self);
   // fn get_long_help(&self);
 
-  async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult;
+  async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult;
 }
 
 pub(crate) struct DeclarativeCapability<'a> {
@@ -214,27 +203,20 @@ impl Capability for DeclarativeCapability<'_> {
     self.command_long_about.clone()
   }
 
-  async fn execute_capability(
-    &self,
-    argument: Option<String>,
-    sub_argument: Option<String>,
-    matches: &ArgMatches,
-    context: &DcliContext,
-    dsh_api_client: &DshApiClient<'_>,
-  ) -> DcliResult {
+  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
     let mut last_dcli_result: Option<DcliResult> = None;
     let mut number_of_executed_capabilities = 0;
     if self.run_all_executors {
       for (flag_type, executor, _) in &self.command_executors {
         if matches.get_flag(flag_type.id()) {
-          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
+          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
           number_of_executed_capabilities += 1;
         }
       }
     } else {
       for (flag_type, executor, _) in &self.command_executors {
         if matches.get_flag(flag_type.id()) && last_dcli_result.is_none() {
-          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client).await);
+          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
           number_of_executed_capabilities += 1;
         }
       }
@@ -249,9 +231,7 @@ impl Capability for DeclarativeCapability<'_> {
       }
       None => {
         if let Some(default_executor) = self.default_command_executor {
-          default_executor
-            .execute(argument.clone(), sub_argument.clone(), matches, context, dsh_api_client)
-            .await
+          default_executor.execute(argument.clone(), sub_argument.clone(), matches, context).await
         } else {
           Ok(true)
         }

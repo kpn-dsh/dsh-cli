@@ -4,18 +4,17 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::AppCatalogApp;
 
-use crate::{DcliContext, DcliResult, include_app_application};
 use crate::app::get_application_from_app;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::{TerminalStyle, wrap_vec_parts};
 use crate::formatters::formatter::StringTableBuilder;
+use crate::formatters::{wrap_vec_parts, TerminalStyle};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
+use crate::{include_app_application, DcliContext, DcliResult};
 
 pub(crate) struct EnvSubject {}
 
@@ -47,6 +46,10 @@ impl Subject for EnvSubject {
     Some("e")
   }
 
+  fn requires_dsh_api_client(&self) -> bool {
+    true
+  }
+
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::Find, ENV_FIND_CAPABILITY.as_ref());
@@ -72,7 +75,7 @@ struct EnvFind {}
 
 #[async_trait]
 impl CommandExecutor for EnvFind {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
     let query = target.unwrap_or_else(|| unreachable!());
     let (query_processor, terminal_style): (&dyn QueryProcessor, TerminalStyle) = if matches.get_flag(ModifierFlagType::Regex.id()) {
       (&RegexQueryProcessor::create(query.as_str())?, TerminalStyle::Bold)
@@ -84,7 +87,7 @@ impl CommandExecutor for EnvFind {
       if context.show_capability_explanation() {
         println!("find environment variables in apps that {}", query_processor.describe());
       }
-      let apps: &HashMap<String, AppCatalogApp> = &dsh_api_client.get_app_configurations().await?;
+      let apps: &HashMap<String, AppCatalogApp> = &context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
       let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
       app_ids.sort();
       let mut builder = StringTableBuilder::new(&["app", "application resource", "#", "environment variable", "value"], context);
@@ -124,7 +127,7 @@ impl CommandExecutor for EnvFind {
       if context.show_capability_explanation() {
         println!("find environment variables in applications that {}", query_processor.describe());
       }
-      let applications = &dsh_api_client.get_applications().await?;
+      let applications = &context.dsh_api_client.as_ref().unwrap().get_applications().await?;
       let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
       application_ids.sort();
       let mut builder = StringTableBuilder::new(&["application", "#", "environment variable", "value"], context);

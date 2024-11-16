@@ -6,7 +6,6 @@ use futures::future::try_join_all;
 use futures::try_join;
 use lazy_static::lazy_static;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Application;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
@@ -46,6 +45,10 @@ impl Subject for TopicSubject {
 
   fn subject_command_alias(&self) -> Option<&str> {
     Some("t")
+  }
+
+  fn requires_dsh_api_client(&self) -> bool {
+    true
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
@@ -107,16 +110,16 @@ struct TopicDelete {}
 
 #[async_trait]
 impl CommandExecutor for TopicDelete {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("delete topic '{}'", topic_id);
     }
-    if dsh_api_client.get_topic(&topic_id).await.is_err() {
+    if context.dsh_api_client.as_ref().unwrap().get_topic(&topic_id).await.is_err() {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }
     if confirmed(format!("type 'yes' to delete scratch topic '{}': ", topic_id).as_str())? {
-      dsh_api_client.delete_topic(&topic_id).await?;
+      context.dsh_api_client.as_ref().unwrap().delete_topic(&topic_id).await?;
       println!("ok");
     } else {
       println!("cancelled");
@@ -129,12 +132,17 @@ struct TopicListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for TopicListAllocationStatus {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all stream and internal topics with their allocation status");
     }
-    let topic_ids = dsh_api_client.get_topic_ids().await?;
-    let allocation_statuses = try_join_all(topic_ids.iter().map(|id| dsh_api_client.get_topic_allocation_status(id.as_str()))).await?;
+    let topic_ids = context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?;
+    let allocation_statuses = try_join_all(
+      topic_ids
+        .iter()
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_topic_allocation_status(id.as_str())),
+    )
+    .await?;
     print_allocation_statuses(topic_ids, allocation_statuses, context);
     Ok(false)
   }
@@ -144,12 +152,17 @@ struct TopicListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for TopicListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all stream and internal topics with their configurations");
     }
-    let topic_ids = dsh_api_client.get_topic_ids().await?;
-    let configurations = try_join_all(topic_ids.iter().map(|id| dsh_api_client.get_topic_configuration(id.as_str()))).await?;
+    let topic_ids = context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?;
+    let configurations = try_join_all(
+      topic_ids
+        .iter()
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_topic_configuration(id.as_str())),
+    )
+    .await?;
     let mut builder = TableBuilder::list(&TOPIC_LABELS, context);
     for (topic_id, configuration) in topic_ids.iter().zip(configurations) {
       builder.value(topic_id.to_string(), &configuration);
@@ -163,11 +176,11 @@ struct TopicListIds {}
 
 #[async_trait]
 impl CommandExecutor for TopicListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all stream and internal topic ids");
     }
-    print_vec("topic ids".to_string(), dsh_api_client.get_topic_ids().await?, context);
+    print_vec("topic ids".to_string(), context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?, context);
     Ok(false)
   }
 }
@@ -176,11 +189,14 @@ struct TopicListUsage {}
 
 #[async_trait]
 impl CommandExecutor for TopicListUsage {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all stream and internal topics with the applications that use them");
     }
-    let (topic_ids, applications) = try_join!(dsh_api_client.get_topic_ids(), dsh_api_client.get_applications())?;
+    let (topic_ids, applications) = try_join!(
+      context.dsh_api_client.as_ref().unwrap().get_topic_ids(),
+      context.dsh_api_client.as_ref().unwrap().get_applications()
+    )?;
     let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
     for topic_id in &topic_ids {
       let mut first = true;
@@ -205,12 +221,16 @@ struct TopicShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowAllocationStatus {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show the allocation status for topic '{}'", topic_id);
     }
-    print_allocation_status(topic_id.clone(), dsh_api_client.get_topic_allocation_status(topic_id.as_str()).await?, context);
+    print_allocation_status(
+      topic_id.clone(),
+      context.dsh_api_client.as_ref().unwrap().get_topic_allocation_status(topic_id.as_str()).await?,
+      context,
+    );
     Ok(false)
   }
 }
@@ -219,13 +239,13 @@ struct TopicShowConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowConfiguration {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show the configuration for topic '{}'", topic_id);
     }
     let mut builder = TableBuilder::show(&TOPIC_STATUS_LABELS, context);
-    builder.value(topic_id.clone(), &dsh_api_client.get_topic(topic_id.as_str()).await?);
+    builder.value(topic_id.clone(), &context.dsh_api_client.as_ref().unwrap().get_topic(topic_id.as_str()).await?);
     builder.print();
     Ok(false)
   }
@@ -235,12 +255,12 @@ struct TopicShowProperties {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowProperties {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show the properties for topic '{}'", topic_id);
     }
-    let topic_status = dsh_api_client.get_topic(topic_id.as_str()).await?;
+    let topic_status = context.dsh_api_client.as_ref().unwrap().get_topic(topic_id.as_str()).await?;
     let kafka_properties = topic_status.actual.unwrap().kafka_properties;
     let mut hashmap_keys = kafka_properties.keys().map(|key| HashMapKey(key.to_string())).collect::<Vec<_>>();
     hashmap_keys.sort_by_key(|key| key.0.clone());
@@ -258,12 +278,12 @@ struct TopicShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowUsage {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show the applications that use topic '{}'", topic_id);
     }
-    let applications = dsh_api_client.get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
     let usages: Vec<(String, u64, Vec<String>)> = applications_that_use_topic(topic_id.as_str(), &applications);
     if !usages.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_SHOW, context);

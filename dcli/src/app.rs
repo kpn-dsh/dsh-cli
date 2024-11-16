@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue, Application};
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
@@ -37,6 +36,10 @@ impl Subject for AppSubject {
     "Show, manage and list apps deployed from the DSH app catalog.".to_string()
   }
 
+  fn requires_dsh_api_client(&self) -> bool {
+    true
+  }
+
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::List, APP_LIST_CAPABILITY.as_ref());
@@ -50,11 +53,7 @@ lazy_static! {
     capability_type: CapabilityType::List,
     command_about: "List deployed apps".to_string(),
     command_long_about: Some("Lists all apps deployed from the DSH app catalog.".to_string()),
-    command_executors: vec![
-      (FlagType::All, &AppListConfiguration {}, None),
-      (FlagType::Configuration, &AppListConfiguration {}, None),
-      (FlagType::Ids, &AppListIds {}, None),
-    ],
+    command_executors: vec![(FlagType::All, &AppListConfiguration {}, None), (FlagType::Configuration, &AppListConfiguration {}, None), (FlagType::Ids, &AppListIds {}, None)],
     default_command_executor: Some(&AppListConfiguration {}),
     run_all_executors: true,
     extra_arguments: vec![],
@@ -78,11 +77,11 @@ struct AppListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for AppListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all deployed apps and their configurations");
     }
-    let apps = &dsh_api_client.get_app_configurations().await?;
+    let apps = context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     app_ids.sort();
     let mut builder = TableBuilder::list(&APP_CATALOG_APP_LABELS, context);
@@ -99,11 +98,11 @@ struct AppListIds {}
 
 #[async_trait]
 impl CommandExecutor for AppListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all deployed app ids");
     }
-    print_vec("app ids".to_string(), dsh_api_client.list_app_ids().await?, context);
+    print_vec("app ids".to_string(), context.dsh_api_client.as_ref().unwrap().list_app_ids().await?, context);
     Ok(false)
   }
 }
@@ -112,12 +111,12 @@ struct AppShowAll {}
 
 #[async_trait]
 impl CommandExecutor for AppShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let app_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show all parameters for app '{}'", app_id);
     }
-    let app = dsh_api_client.get_app_configuration(app_id.as_str()).await?;
+    let app = context.dsh_api_client.as_ref().unwrap().get_app_configuration(app_id.as_str()).await?;
     println!("name:                 {}", app.name);
     println!("manifest urn:         {}", app.manifest_urn);
     println!("configuration:        {}", app.configuration.clone().unwrap_or("none".to_string()));

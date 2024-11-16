@@ -36,7 +36,7 @@ pub trait SubjectFormatter<L: Label> {
 pub struct TableBuilder<'a, L: Label, V: SubjectFormatter<L>> {
   list: bool,
   labels: &'a [L],
-  context: &'a DcliContext,
+  context: &'a DcliContext<'a>,
   tabled_builder: TabledBuilder,
   phantom: PhantomData<&'a V>,
 }
@@ -162,7 +162,7 @@ where
 }
 
 pub struct StringTableBuilder<'a> {
-  context: &'a DcliContext,
+  context: &'a DcliContext<'a>,
   tabled_builder: TabledBuilder,
 }
 

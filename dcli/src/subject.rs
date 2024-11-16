@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
 
-use dsh_api::dsh_api_client::DshApiClient;
-
 use crate::capability::{Capability, CapabilityType, ALL_CAPABILITY_TYPES};
 use crate::{DcliContext, DcliResult};
 
@@ -24,10 +22,12 @@ pub trait Subject {
     None
   }
 
+  fn requires_dsh_api_client(&self) -> bool;
+
   // Map of capabilities that are supported for this Subject
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)>;
 
-  async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, context: &DcliContext, dsh_api_client: &'a DshApiClient<'_>) -> DcliResult {
+  async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, context: &DcliContext) -> DcliResult {
     match matches.subcommand() {
       Some((capability_command_id, matches)) => match CapabilityType::try_from(capability_command_id) {
         Ok(ref capability_type) => match self.capabilities().get(capability_type) {
@@ -35,7 +35,7 @@ pub trait Subject {
             let arguments = capability_type.command_target_argument_ids();
             let argument = arguments.first().and_then(|argument| matches.get_one::<String>(argument)).cloned();
             let sub_argument = arguments.get(1).and_then(|argument| matches.get_one::<String>(argument)).cloned();
-            capability.execute_capability(argument, sub_argument, matches, context, dsh_api_client).await
+            capability.execute_capability(argument, sub_argument, matches, context).await
           }
           None => unreachable!(),
         },
@@ -45,9 +45,9 @@ pub trait Subject {
     }
   }
 
-  async fn execute_subject_list_shortcut<'a>(&self, matches: &'a ArgMatches, context: &DcliContext, dsh_api_client: &'a DshApiClient<'_>) -> DcliResult {
+  async fn execute_subject_list_shortcut<'a>(&self, matches: &'a ArgMatches, context: &DcliContext) -> DcliResult {
     match self.capabilities().get(&CapabilityType::List) {
-      Some(capability) => capability.execute_capability(None, None, matches, context, dsh_api_client).await,
+      Some(capability) => capability.execute_capability(None, None, matches, context).await,
       None => unreachable!(),
     }
   }

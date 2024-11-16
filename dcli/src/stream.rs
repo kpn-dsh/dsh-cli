@@ -47,6 +47,10 @@ impl Subject for StreamSubject {
     self.subject()
   }
 
+  fn requires_dsh_api_client(&self) -> bool {
+    true
+  }
+
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     // capabilities.insert(CapabilityType::Create, STREAM_CREATE_CAPABILITY.as_ref());

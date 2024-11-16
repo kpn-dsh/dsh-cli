@@ -5,7 +5,6 @@ use clap::ArgMatches;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::AppCatalogManifest;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
@@ -43,6 +42,10 @@ impl Subject for ManifestSubject {
     "Show the manifest files for the apps in the DSH App Catalog.".to_string()
   }
 
+  fn requires_dsh_api_client(&self) -> bool {
+    true
+  }
+
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::List, MANIFEST_LIST_CAPABILITY.as_ref());
@@ -76,17 +79,15 @@ lazy_static! {
   });
 }
 
-// list_app_catalog_manifests() ->
-
 struct ManifestListAll {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all app catalog manifests");
     }
-    let app_catalog_manifests: Vec<AppCatalogManifest> = dsh_api_client.list_app_catalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifests().await?;
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
     let manifests_grouped = manifests_with_id.clone().into_iter().into_group_map();
@@ -115,14 +116,17 @@ struct ManifestListIds {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all app catalog manifest ids");
     }
     print_vec(
       "manifest ids".to_string(),
-      dsh_api_client
-          .list_app_catalog_manifest_ids_with_versions()
+      context
+        .dsh_api_client
+        .as_ref()
+        .unwrap()
+        .list_app_catalog_manifest_ids_with_versions()
         .await?
         .iter()
         .map(|p| p.0.clone())
@@ -137,12 +141,12 @@ struct ManifestShowAll {}
 
 #[async_trait]
 impl CommandExecutor for ManifestShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show all parameters for app catalog manifest '{}'", manifest_id);
     }
-    let app_catalog_manifests: Vec<AppCatalogManifest> = dsh_api_client.list_app_catalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifests().await?;
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
     let manifests_grouped = manifests_with_id.clone().into_iter().into_group_map();

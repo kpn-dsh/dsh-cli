@@ -4,15 +4,14 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::AppCatalogApp;
 
-use crate::{DcliContext, DcliResult, include_app_application, include_started_stopped};
 use crate::app::get_application_from_app;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::subject::Subject;
+use crate::{include_app_application, include_started_stopped, DcliContext, DcliResult};
 
 pub(crate) struct MetricSubject {}
 
@@ -44,6 +43,10 @@ impl Subject for MetricSubject {
     Some("m")
   }
 
+  fn requires_dsh_api_client(&self) -> bool {
+    true
+  }
+
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
     capabilities.insert(CapabilityType::List, METRIC_LIST_CAPABILITY.as_ref());
@@ -69,14 +72,14 @@ struct MetricList {}
 
 #[async_trait]
 impl CommandExecutor for MetricList {
-  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
     let (include_app, include_application) = include_app_application(matches);
     let (include_started, include_stopped) = include_started_stopped(matches);
     if include_app {
       if context.show_capability_explanation() {
         println!("find exported metrics in apps");
       }
-      let apps: &HashMap<String, AppCatalogApp> = &dsh_api_client.get_app_configurations().await?;
+      let apps: &HashMap<String, AppCatalogApp> = &context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
       let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
       app_ids.sort();
       let mut builder = StringTableBuilder::new(&["app", "application resource", "#", "path", "port"], context);
@@ -108,7 +111,7 @@ impl CommandExecutor for MetricList {
       if context.show_capability_explanation() {
         println!("find exported metrics in applications");
       }
-      let applications = &dsh_api_client.get_applications().await?;
+      let applications = &context.dsh_api_client.as_ref().unwrap().get_applications().await?;
       let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
       application_ids.sort();
       let mut builder = StringTableBuilder::new(&["application", "#", "path", "port"], context);

@@ -8,7 +8,7 @@ use termion::terminal_size;
 use crate::DcliContext;
 
 pub struct _StringTable<'a> {
-  context: &'a DcliContext,
+  context: &'a DcliContext<'a>,
   tabled_builder: TabledBuilder,
 }
 

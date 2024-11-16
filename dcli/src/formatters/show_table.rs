@@ -10,7 +10,7 @@ use crate::DcliContext;
 
 pub struct ShowTable<'a, L: Label, V: SubjectFormatter<L>> {
   _labels: &'a [L],
-  context: &'a DcliContext,
+  context: &'a DcliContext<'a>,
   tabled_builder: TabledBuilder,
   phantom: PhantomData<&'a V>,
 }

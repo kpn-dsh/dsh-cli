@@ -5,8 +5,6 @@ use clap::ArgMatches;
 use lazy_static::lazy_static;
 use regex::Regex;
 
-use dsh_api::dsh_api_client::DshApiClient;
-
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::formatter::StringTableBuilder;
@@ -41,6 +39,10 @@ impl Subject for VhostSubject {
 
   fn subject_command_alias(&self) -> Option<&str> {
     Some("v")
+  }
+
+  fn requires_dsh_api_client(&self) -> bool {
+    true
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
@@ -82,11 +84,11 @@ struct VhostListUsage {}
 
 #[async_trait]
 impl CommandExecutor for VhostListUsage {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list applications with a vhost configuration");
     }
-    let applications = dsh_api_client.get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
     let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
     application_ids.sort();
     let mut inverse = HashMap::<String, Vec<(String, String, String)>>::new();
@@ -127,12 +129,12 @@ struct VhostShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for VhostShowUsage {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let vhost_target = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show the applications that use vhost '{}'", vhost_target);
     }
-    let applications = dsh_api_client.get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
     let mut builder = StringTableBuilder::new(&["application", "port", "a-zone"], context);
     for (application_id, application) in &applications {
       for (port, port_mapping) in &application.exposed_ports {

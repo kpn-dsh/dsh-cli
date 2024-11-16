@@ -35,6 +35,7 @@ use crate::vhost::VHOST_SUBJECT;
 use crate::volume::VOLUME_SUBJECT;
 use clap::builder::styling;
 use clap::{ArgMatches, Command};
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
@@ -85,12 +86,13 @@ static LONG_VERSION: &str = "version: 0.2.0\ndsh-api library version: 0.2.0\ndsh
 
 type DcliResult = Result<bool, String>;
 
-pub(crate) struct DcliContext {
+pub(crate) struct DcliContext<'a> {
   pub(crate) verbosity: Verbosity,
   pub(crate) border: bool,
+  pub(crate) dsh_api_client: Option<DshApiClient<'a>>,
 }
 
-impl DcliContext {
+impl DcliContext<'_> {
   pub(crate) fn show_capability_explanation(&self) -> bool {
     match self.verbosity {
       Verbosity::Off | Verbosity::Low => false,
@@ -227,8 +229,60 @@ async fn inner_main() -> DcliResult {
     return Ok(false);
   }
 
-  let border = !matches.get_flag(NO_BORDER_ARGUMENT);
+  let start_instant = Instant::now();
 
+  match matches.subcommand() {
+    Some((command_name, sub_matches)) => match subject_registry.get(command_name) {
+      Some(subject) => {
+        if subject.requires_dsh_api_client() {
+          let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
+          let context = get_dcli_context(&matches, Some(factory.client().await?))?;
+          let suppress_show_execution_time = subject.execute_subject_command(sub_matches, &context).await?;
+          if !suppress_show_execution_time && context.show_execution_time() {
+            println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+          }
+        } else {
+          let context = get_dcli_context(&matches, None)?;
+          let suppress_show_execution_time = subject.execute_subject_command(sub_matches, &context).await?;
+          if !suppress_show_execution_time && context.show_execution_time() {
+            println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+          }
+        };
+      }
+      None => match subject_list_shortcut_registry.get(command_name) {
+        Some(subject) => {
+          if subject.requires_dsh_api_client() {
+            let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
+            let context = get_dcli_context(&matches, Some(factory.client().await?))?;
+            let suppress_show_execution_time = subject.execute_subject_list_shortcut(sub_matches, &context).await?;
+            if !suppress_show_execution_time && context.show_execution_time() {
+              println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+            }
+          } else {
+            let context = get_dcli_context(&matches, None)?;
+            let suppress_show_execution_time = subject.execute_subject_list_shortcut(sub_matches, &context).await?;
+            if !suppress_show_execution_time && context.show_execution_time() {
+              println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+            }
+          };
+        }
+        None => return Err("unexpected error, list shortcut not found".to_string()),
+      },
+    },
+    None => return Err("unexpected error, no subcommand".to_string()),
+  };
+
+  Ok(false)
+}
+
+async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiClientFactory, String> {
+  let dsh_api_tenant: DshApiTenant = get_dsh_api_tenant(&matches, settings)?;
+  let secret = get_password(&matches, &dsh_api_tenant)?;
+  DshApiClientFactory::create(dsh_api_tenant, secret)
+}
+
+fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<DcliContext<'a>, String> {
+  let border = !matches.get_flag(NO_BORDER_ARGUMENT);
   let verbosity: Verbosity = matches
     .get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT)
     .cloned()
@@ -241,39 +295,10 @@ async fn inner_main() -> DcliResult {
       },
       None => Verbosity::Low,
     });
-
-  let context = DcliContext { verbosity, border };
-
-  let dsh_api_tenant: DshApiTenant = get_dsh_api_tenant(&matches, &settings)?;
-  if context.show_settings() {
-    println!("tenant {}", dsh_api_tenant);
-  }
-
-  let secret = get_password(&matches, &dsh_api_tenant)?;
-
-  let dsh_api_client_factory = DshApiClientFactory::create(dsh_api_tenant, secret)?;
-  let dsh_api_client = dsh_api_client_factory.client().await?;
-
-  let start_instant = Instant::now();
-
-  let suppress_show_execution_time = match matches.subcommand() {
-    Some((command_name, sub_matches)) => match subject_registry.get(command_name) {
-      Some(subject) => subject.execute_subject_command(sub_matches, &context, &dsh_api_client).await?,
-      None => match subject_list_shortcut_registry.get(command_name) {
-        Some(subject) => subject.execute_subject_list_shortcut(sub_matches, &context, &dsh_api_client).await?,
-        None => return Err("unexpected error, list shortcut not found".to_string()),
-      },
-    },
-    None => return Err("unexpected error, no subcommand".to_string()),
-  };
-
-  if !suppress_show_execution_time && context.show_execution_time() {
-    println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
-  }
-  Ok(false)
+  Ok(DcliContext { verbosity, border, dsh_api_client })
 }
 
-fn get_platform(matches: &ArgMatches, settings: &Option<Settings>) -> Result<DshPlatform, String> {
+fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshPlatform, String> {
   match matches.get_one::<String>(PLATFORM_ARGUMENT) {
     Some(name_from_argument) => DshPlatform::try_from(name_from_argument.as_str()),
     None => match std::env::var(PLATFORM_ENVIRONMENT_VARIABLE) {
@@ -289,7 +314,7 @@ fn get_platform(matches: &ArgMatches, settings: &Option<Settings>) -> Result<Dsh
   }
 }
 
-fn get_tenant_name(matches: &ArgMatches, settings: &Option<Settings>) -> Result<String, String> {
+fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<String, String> {
   match matches.get_one::<String>(TENANT_ARGUMENT) {
     Some(name_from_argument) => Ok(name_from_argument.to_string()),
     None => match std::env::var(TENANT_ENVIRONMENT_VARIABLE) {
@@ -333,7 +358,7 @@ fn get_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<S
   }
 }
 
-fn get_dsh_api_tenant(matches: &ArgMatches, settings: &Option<Settings>) -> Result<DshApiTenant, String> {
+fn get_dsh_api_tenant(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiTenant, String> {
   let platform = get_platform(matches, settings)?;
   let tenant_name = get_tenant_name(matches, settings)?;
   let guid = get_guid(matches, &platform, &tenant_name)?;
@@ -344,7 +369,6 @@ pub(crate) fn validate_guid(guid: &str) -> Result<String, String> {
   match guid.parse::<u32>() {
     Ok(guid) => {
       if guid > 0 && guid < 32768 {
-        // TODO Check these bounds
         Ok(format!("{}:{}", guid, guid))
       } else {
         Err("group/user id must be greater than 0 and smaller than 32768".to_string())

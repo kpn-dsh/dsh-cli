@@ -3,11 +3,9 @@ use clap::ArgMatches;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::DshPlatform;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
-use crate::formatters::allocation_status::print_allocation_status;
 use crate::formatters::list_table::ListTable;
 use crate::formatters::settings::TARGET_LABELS;
 use crate::settings::{all_targets, delete_target, read_target, upsert_target, Target};
@@ -38,6 +36,10 @@ impl Subject for SettingSubject {
 
   fn subject_command_long_about(&self) -> String {
     "Show, manage and list dcli settings.".to_string()
+  }
+
+  fn requires_dsh_api_client(&self) -> bool {
+    false
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
@@ -101,7 +103,7 @@ struct SettingDeleteTarget {}
 
 #[async_trait]
 impl CommandExecutor for SettingDeleteTarget {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("delete existing target");
     }
@@ -130,7 +132,7 @@ struct SettingList {}
 
 #[async_trait]
 impl CommandExecutor for SettingList {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all targets");
     }
@@ -145,7 +147,7 @@ struct SettingNewTarget {}
 
 #[async_trait]
 impl CommandExecutor for SettingNewTarget {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &DcliContext, _dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("create new target");
     }
@@ -168,13 +170,7 @@ struct SettingShow {}
 
 #[async_trait]
 impl CommandExecutor for SettingShow {
-  async fn execute(&self, argument: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    let secret_id = argument.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show allocation status for secret '{}'", secret_id);
-    }
-    let allocation_status = dsh_api_client.get_secret_allocation_status(secret_id.as_str()).await?;
-    print_allocation_status(secret_id, allocation_status, context);
+  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, _context: &DcliContext) -> DcliResult {
     Ok(false)
   }
 }

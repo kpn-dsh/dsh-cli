@@ -6,20 +6,19 @@ use futures::future::try_join_all;
 use futures::try_join;
 use lazy_static::lazy_static;
 
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{ActualCertificate, AppCatalogApp, Application, Certificate, CertificateStatus};
 
-use crate::{DcliContext, DcliResult};
 use crate::app::apps_with_secret_injections;
 use crate::application::applications_with_secret_injections;
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
-use crate::formatters::certificate::{CERTIFICATE_CONFIGURATION_LABELS, CERTIFICATE_LABELS_LIST, CERTIFICATE_LABELS_SHOW, CertificateLabel};
+use crate::formatters::certificate::{CertificateLabel, CERTIFICATE_CONFIGURATION_LABELS, CERTIFICATE_LABELS_LIST, CERTIFICATE_LABELS_SHOW};
 use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::show_table::ShowTable;
-use crate::formatters::usage::{Usage, USAGE_LABELS_LIST, USAGE_LABELS_SHOW, UsageLabel};
+use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::subject::Subject;
+use crate::{DcliContext, DcliResult};
 
 pub(crate) struct CertificateSubject {}
 
@@ -49,6 +48,10 @@ impl Subject for CertificateSubject {
 
   fn subject_command_alias(&self) -> Option<&str> {
     Some("c")
+  }
+
+  fn requires_dsh_api_client(&self) -> bool {
+    true
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
@@ -98,12 +101,17 @@ struct CertificateListAll {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all certificates with their parameters");
     }
-    let certificate_ids = dsh_api_client.get_certificate_ids().await?;
-    let certificate_statuses = futures::future::join_all(certificate_ids.iter().map(|id| dsh_api_client.get_certificate(id.as_str()))).await;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificate_statuses = futures::future::join_all(
+      certificate_ids
+        .iter()
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_certificate(id.as_str())),
+    )
+    .await;
     let certificates_statuses_unwrapped = certificate_statuses
       .iter()
       .map(|certificate_status| certificate_status.as_ref().unwrap().to_owned().actual.unwrap())
@@ -123,15 +131,15 @@ struct CertificateListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListAllocationStatus {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all certificates with their allocation status");
     }
-    let certificate_ids = dsh_api_client.get_certificate_ids().await?;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     let allocation_statuses = try_join_all(
       certificate_ids
         .iter()
-        .map(|certificate_id| dsh_api_client.get_certificate_allocation_status(certificate_id)),
+        .map(|certificate_id| context.dsh_api_client.as_ref().unwrap().get_certificate_allocation_status(certificate_id)),
     )
     .await?;
     print_allocation_statuses(certificate_ids, allocation_statuses, context);
@@ -143,12 +151,17 @@ struct CertificateListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all certificates with their configuration");
     }
-    let certificate_ids = dsh_api_client.get_certificate_ids().await?;
-    let certificates = try_join_all(certificate_ids.iter().map(|id| dsh_api_client.get_certificate_configuration(id.as_str()))).await?;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificates = try_join_all(
+      certificate_ids
+        .iter()
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_certificate_configuration(id.as_str())),
+    )
+    .await?;
     let zipped: Vec<(String, Certificate)> = certificate_ids.into_iter().zip(certificates).collect::<Vec<(String, Certificate)>>();
     let mut builder: TableBuilder<CertificateLabel, Certificate> = TableBuilder::list(&CERTIFICATE_CONFIGURATION_LABELS, context);
     builder.values(&zipped);
@@ -161,11 +174,15 @@ struct CertificateListIds {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all certificate ids");
     }
-    print_vec("certificate ids".to_string(), dsh_api_client.get_certificate_ids().await?, context);
+    print_vec(
+      "certificate ids".to_string(),
+      context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?,
+      context,
+    );
     Ok(false)
   }
 }
@@ -174,13 +191,21 @@ struct CertificateListUsage {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListUsage {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all certificates with the applications where they are used");
     }
-    let certificate_ids = dsh_api_client.get_certificate_ids().await?;
-    let (applications, apps) = try_join!(dsh_api_client.get_applications(), dsh_api_client.get_app_configurations())?;
-    let certificates = futures::future::join_all(certificate_ids.iter().map(|id| dsh_api_client.get_certificate_configuration(id.as_str()))).await;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let (applications, apps) = try_join!(
+      context.dsh_api_client.as_ref().unwrap().get_applications(),
+      context.dsh_api_client.as_ref().unwrap().get_app_configurations()
+    )?;
+    let certificates = futures::future::join_all(
+      certificate_ids
+        .iter()
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_certificate_configuration(id.as_str())),
+    )
+    .await;
     let mut rows: Vec<Usage> = vec![];
     for (certificate_id, certificate) in certificate_ids.iter().zip(certificates) {
       let mut certificate_used = false;
@@ -221,12 +246,12 @@ struct CertificateShowAll {}
 
 #[async_trait]
 impl CommandExecutor for CertificateShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show all parameters for certificate '{}'", certificate_id);
     }
-    let certificate = dsh_api_client.get_certificate(certificate_id.as_str()).await?;
+    let certificate = context.dsh_api_client.as_ref().unwrap().get_certificate(certificate_id.as_str()).await?;
     if let Some(actual_certificate) = certificate.actual {
       let table = ShowTable::new(&certificate_id, &actual_certificate, &CERTIFICATE_LABELS_SHOW, context);
       table.print();
@@ -239,12 +264,17 @@ struct CertificateShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for CertificateShowAllocationStatus {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show the allocation status for certificate '{}'", certificate_id);
     }
-    let allocation_status = dsh_api_client.get_certificate_allocation_status(certificate_id.as_str()).await?;
+    let allocation_status = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .get_certificate_allocation_status(certificate_id.as_str())
+      .await?;
     print_allocation_status(certificate_id, allocation_status, context);
     Ok(false)
   }
@@ -254,15 +284,15 @@ struct CertificateShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for CertificateShowUsage {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show all applications and apps that use certificate '{}'", certificate_id);
     }
     let (certificate_status, applications, apps): (CertificateStatus, HashMap<String, Application>, HashMap<String, AppCatalogApp>) = try_join!(
-      dsh_api_client.get_certificate(certificate_id.as_str()),
-      dsh_api_client.get_applications(),
-      dsh_api_client.get_app_configurations()
+      context.dsh_api_client.as_ref().unwrap().get_certificate(certificate_id.as_str()),
+      context.dsh_api_client.as_ref().unwrap().get_applications(),
+      context.dsh_api_client.as_ref().unwrap().get_app_configurations()
     )?;
     let mut rows: Vec<Usage> = vec![];
     if let Some(configuration) = certificate_status.configuration {

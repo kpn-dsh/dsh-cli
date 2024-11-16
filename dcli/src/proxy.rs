@@ -5,8 +5,6 @@ use clap::ArgMatches;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 
-use dsh_api::dsh_api_client::DshApiClient;
-
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
 use crate::flags::FlagType;
 use crate::formatters::formatter::{print_vec, TableBuilder};
@@ -38,6 +36,10 @@ impl Subject for ProxySubject {
 
   fn subject_command_long_about(&self) -> String {
     "Show, manage and list Kafka proxies used by the applications/services and apps on the DSH.".to_string()
+  }
+
+  fn requires_dsh_api_client(&self) -> bool {
+    true
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
@@ -101,16 +103,16 @@ struct ProxyDelete {}
 
 #[async_trait]
 impl CommandExecutor for ProxyDelete {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("delete proxy '{}'", proxy_id);
     }
-    if dsh_api_client.get_proxy(&proxy_id).await.is_err() {
+    if context.dsh_api_client.as_ref().unwrap().get_proxy(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
     if confirmed(format!("type 'yes' to delete proxy '{}': ", proxy_id).as_str())? {
-      dsh_api_client.delete_proxy(&proxy_id).await?;
+      context.dsh_api_client.as_ref().unwrap().delete_proxy(&proxy_id).await?;
       println!("ok");
     } else {
       println!("cancelled");
@@ -123,12 +125,17 @@ struct ProxyListAll {}
 
 #[async_trait]
 impl CommandExecutor for ProxyListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all proxies with parameters");
     }
-    let proxy_ids = dsh_api_client.get_proxy_ids().await?;
-    let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| dsh_api_client.get_proxy(proxy_id.as_str()))).await?;
+    let proxy_ids = context.dsh_api_client.as_ref().unwrap().get_proxy_ids().await?;
+    let proxys = try_join_all(
+      proxy_ids
+        .iter()
+        .map(|proxy_id| context.dsh_api_client.as_ref().unwrap().get_proxy(proxy_id.as_str())),
+    )
+    .await?;
     let mut builder = TableBuilder::list(&PROXY_LABELS_LIST, context);
     for (proxy_id, proxy) in proxy_ids.iter().zip(proxys) {
       builder.value(proxy_id.to_string(), &proxy);
@@ -142,11 +149,11 @@ struct ProxyListIds {}
 
 #[async_trait]
 impl CommandExecutor for ProxyListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
       println!("list all proxy ids");
     }
-    print_vec("proxy ids".to_string(), dsh_api_client.get_proxy_ids().await?, context);
+    print_vec("proxy ids".to_string(), context.dsh_api_client.as_ref().unwrap().get_proxy_ids().await?, context);
     Ok(false)
   }
 }
@@ -155,12 +162,12 @@ struct ProxyShowConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for ProxyShowConfiguration {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("show configuration of proxy '{}'", proxy_id);
     }
-    let proxy = dsh_api_client.get_proxy(proxy_id.as_str()).await?;
+    let proxy = context.dsh_api_client.as_ref().unwrap().get_proxy(proxy_id.as_str()).await?;
     let mut builder = TableBuilder::show(&PROXY_LABELS_SHOW, context);
     builder.value(proxy_id, &proxy);
     builder.print();
@@ -172,12 +179,12 @@ struct ProxyUpdateConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for ProxyUpdateConfiguration {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     if context.show_capability_explanation() {
       println!("update configuration for proxy '{}'", proxy_id);
     }
-    if dsh_api_client.get_proxy(&proxy_id).await.is_err() {
+    if context.dsh_api_client.as_ref().unwrap().get_proxy(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
     // TODO
