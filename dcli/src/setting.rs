@@ -3,14 +3,12 @@ use clap::ArgMatches;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use dsh_api::platform::DshPlatform;
-
 use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
-use crate::formatters::list_table::ListTable;
-use crate::formatters::settings::TARGET_LABELS;
-use crate::settings::{all_targets, delete_target, read_target, upsert_target, Target};
+use crate::formatters::settings::SETTING_LABELS;
+use crate::formatters::show_table::ShowTable;
+use crate::settings::read_settings;
 use crate::subject::Subject;
-use crate::{confirmed, read_single_line, validate_guid, DcliContext, DcliResult};
+use crate::{DcliContext, DcliResult};
 
 pub(crate) struct SettingSubject {}
 
@@ -34,36 +32,18 @@ impl Subject for SettingSubject {
     "Show, manage and list dcli settings.".to_string()
   }
 
-  fn subject_command_long_about(&self) -> String {
-    "Show, manage and list dcli settings.".to_string()
-  }
-
   fn requires_dsh_api_client(&self) -> bool {
     false
   }
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Delete, SETTING_DELETE_TARGET_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::List, SETTING_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::New, SETTING_NEW_TARGET_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, SETTING_SHOW_CAPABILITY.as_ref());
     capabilities
   }
 }
 
 lazy_static! {
-  pub static ref SETTING_DELETE_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Delete,
-    command_about: "Delete target".to_string(),
-    command_long_about: Some("Delete a target.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&SettingDeleteTarget {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
   pub static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
     capability_type: CapabilityType::List,
     command_about: "List settings".to_string(),
@@ -75,57 +55,6 @@ lazy_static! {
     filter_flags: vec![],
     modifier_flags: vec![],
   });
-  pub static ref SETTING_NEW_TARGET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::New,
-    command_about: "Create new target".to_string(),
-    command_long_about: Some("Create a new target.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&SettingNewTarget {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref SETTING_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show setting".to_string(),
-    command_long_about: None,
-    command_executors: vec![],
-    default_command_executor: Some(&SettingShow {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-}
-
-struct SettingDeleteTarget {}
-
-#[async_trait]
-impl CommandExecutor for SettingDeleteTarget {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("delete existing target");
-    }
-    let platform = read_single_line("enter platform: ")?;
-    let platform = DshPlatform::try_from(platform.as_str())?;
-    let tenant = read_single_line("enter tenant: ")?;
-    match read_target(&platform, &tenant)? {
-      Some(target) => {
-        if confirmed(format!("type 'yes' to delete target '{}': ", target).as_str())? {
-          delete_target(&platform, &tenant)?;
-          println!("target '{}' deleted", target);
-        } else {
-          println!("cancelled");
-        }
-      }
-      None => {
-        return Err(format!("target {}@{} does not exist", tenant, platform));
-      }
-    }
-
-    Ok(false)
-  }
 }
 
 struct SettingList {}
@@ -134,43 +63,12 @@ struct SettingList {}
 impl CommandExecutor for SettingList {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all targets");
+      println!("list default settings");
     }
-    let mut table = ListTable::new(&TARGET_LABELS, context);
-    table.rows(all_targets()?.as_slice());
-    table.print();
-    Ok(false)
-  }
-}
-
-struct SettingNewTarget {}
-
-#[async_trait]
-impl CommandExecutor for SettingNewTarget {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("create new target");
+    match read_settings(None)? {
+      Some(settings) => ShowTable::new("settings", &settings, &SETTING_LABELS, context).print(),
+      None => println!("no default settings found"),
     }
-    let platform = read_single_line("enter platform: ")?;
-    let platform = DshPlatform::try_from(platform.as_str())?;
-    let tenant = read_single_line("enter tenant: ")?;
-    if let Some(existing_target) = read_target(&platform, &tenant)? {
-      return Err(format!("target {} already exists (first delete the existing target)", existing_target));
-    }
-    let guid = validate_guid(read_single_line("enter group/user id: ")?.as_str())?;
-    let password = read_single_line("enter password: ")?;
-    let target = Target::new(platform, tenant, guid, password)?;
-    upsert_target(&target)?;
-    println!("target {} created", target);
-    Ok(false)
-  }
-}
-
-struct SettingShow {}
-
-#[async_trait]
-impl CommandExecutor for SettingShow {
-  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, _context: &DcliContext) -> DcliResult {
     Ok(false)
   }
 }

@@ -1,0 +1,184 @@
+use async_trait::async_trait;
+use clap::ArgMatches;
+use dsh_api::dsh_api_tenant::parse_and_validate_guid;
+use dsh_api::platform::DshPlatform;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+
+use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::formatters::list_table::ListTable;
+use crate::formatters::target::TARGET_LABELS;
+use crate::settings::{all_targets, delete_target, read_target, upsert_target, Target};
+use crate::subject::Subject;
+use crate::{confirmed, read_single_line, read_single_line_password, DcliContext, DcliResult};
+
+pub(crate) struct TargetSubject {}
+
+const TARGET_SUBJECT_TARGET: &str = "target";
+
+lazy_static! {
+  pub static ref TARGET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TargetSubject {});
+}
+
+#[async_trait]
+impl Subject for TargetSubject {
+  fn subject(&self) -> &'static str {
+    TARGET_SUBJECT_TARGET
+  }
+
+  fn subject_first_upper(&self) -> &'static str {
+    "Target"
+  }
+
+  fn subject_command_about(&self) -> String {
+    "Show, manage and list dcli target configurations.".to_string()
+  }
+
+  fn requires_dsh_api_client(&self) -> bool {
+    false
+  }
+
+  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
+    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    capabilities.insert(CapabilityType::Delete, TARGET_DELETE_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::List, TARGET_LIST_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::New, TARGET_NEW_CAPABILITY.as_ref());
+    capabilities.insert(CapabilityType::Show, TARGET_SHOW_CAPABILITY.as_ref());
+    capabilities
+  }
+}
+
+lazy_static! {
+  pub static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::Delete,
+    command_about: "Delete target".to_string(),
+    command_long_about: Some("Delete a target.".to_string()),
+    command_executors: vec![],
+    default_command_executor: Some(&TargetDelete {}),
+    run_all_executors: false,
+    extra_arguments: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
+  });
+  pub static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::List,
+    command_about: "List targets".to_string(),
+    command_long_about: Some("Lists all dcli target configurations.".to_string()),
+    command_executors: vec![],
+    default_command_executor: Some(&TargetList {}),
+    run_all_executors: false,
+    extra_arguments: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
+  });
+  pub static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::New,
+    command_about: "Create new target".to_string(),
+    command_long_about: Some("Create a new target configuration.".to_string()),
+    command_executors: vec![],
+    default_command_executor: Some(&TargetNew {}),
+    run_all_executors: false,
+    extra_arguments: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
+  });
+  pub static ref TARGET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
+    capability_type: CapabilityType::Show,
+    command_about: "Show target configuration".to_string(),
+    command_long_about: None,
+    command_executors: vec![],
+    default_command_executor: Some(&TargetShow {}),
+    run_all_executors: false,
+    extra_arguments: vec![],
+    filter_flags: vec![],
+    modifier_flags: vec![],
+  });
+}
+
+struct TargetDelete {}
+
+#[async_trait]
+impl CommandExecutor for TargetDelete {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
+    if context.show_capability_explanation() {
+      println!("delete existing target");
+    }
+    let platform = read_single_line("enter platform: ")?;
+    let platform = DshPlatform::try_from(platform.as_str())?;
+    let tenant = read_single_line("enter tenant: ")?;
+    match read_target(&platform, &tenant)? {
+      Some(target) => {
+        let prompt = if target.password.is_some() {
+          format!("type 'yes' to delete target '{}' and password from the keyring: ", target)
+        } else {
+          format!("type 'yes' to delete target '{}': ", target)
+        };
+        if confirmed(prompt)? {
+          delete_target(&platform, &tenant)?;
+          if target.password.is_some() {
+            println!("target '{}' and password deleted", target);
+          } else {
+            println!("target '{}' deleted", target);
+          }
+        } else {
+          println!("cancelled");
+        }
+      }
+      None => {
+        return Err(format!("target {}@{} does not exist", tenant, platform));
+      }
+    }
+
+    Ok(false)
+  }
+}
+
+struct TargetList {}
+
+#[async_trait]
+impl CommandExecutor for TargetList {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
+    if context.show_capability_explanation() {
+      println!("list all target configurations");
+    }
+    let mut table = ListTable::new(&TARGET_LABELS, context);
+    table.rows(all_targets()?.as_slice());
+    table.print();
+    Ok(false)
+  }
+}
+
+struct TargetNew {}
+
+#[async_trait]
+impl CommandExecutor for TargetNew {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &DcliContext) -> DcliResult {
+    if context.show_capability_explanation() {
+      println!("create new target configuration");
+    }
+    let platform = read_single_line("enter platform: ")?;
+    let platform = DshPlatform::try_from(platform.as_str())?;
+    let tenant = read_single_line("enter tenant: ")?;
+    if let Some(existing_target) = read_target(&platform, &tenant)? {
+      return Err(format!(
+        "target configuration {} already exists (first delete the existing target configuration)",
+        existing_target
+      ));
+    }
+    let guid = parse_and_validate_guid(read_single_line("enter group/user id: ")?)?;
+    let password = read_single_line_password("enter password: ")?;
+    let target = Target::new(platform, tenant, guid, Some(password))?;
+    upsert_target(&target)?;
+    println!("target {} created", target);
+    Ok(false)
+  }
+}
+
+struct TargetShow {}
+
+#[async_trait]
+impl CommandExecutor for TargetShow {
+  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, _context: &DcliContext) -> DcliResult {
+    Ok(false)
+  }
+}

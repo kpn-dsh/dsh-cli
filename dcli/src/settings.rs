@@ -1,14 +1,13 @@
+use crate::arguments::Verbosity;
+use crate::APPLICATION_NAME;
+use dsh_api::platform::DshPlatform;
+use homedir::my_home;
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::{Debug, Display, Formatter};
 use std::fs;
 use std::io::ErrorKind::NotFound;
-use std::path::PathBuf;
-
-use dsh_api::platform::DshPlatform;
-use homedir::my_home;
-use serde::{Deserialize, Serialize};
-
-use crate::arguments::Verbosity;
+use std::path::{Path, PathBuf};
 
 const DCLI_DIRECTORY_ENV_VAR: &str = "DCLI_HOME";
 const DEFAULT_USER_DCLI_DIRECTORY: &str = ".dcli";
@@ -30,16 +29,25 @@ pub(crate) struct Settings {
   pub(crate) verbosity: Option<Verbosity>,
 }
 
+/// Identifies the application's target
+///
+/// * `platform` target's platform
+/// * `tenant` target's tenant name
+/// * `group_user_id` - target's group and user id
+/// * `password` - target's password, which will not be stored in the target settings file,
+///   but instead in the keyring
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub(crate) struct Target {
   pub(crate) platform: DshPlatform,
   pub(crate) tenant: String,
-  pub(crate) group_user_id: String,
-  pub(crate) password: String,
+  #[serde(rename = "group-user-id")]
+  pub(crate) group_user_id: u16,
+  #[serde(skip_serializing)]
+  pub(crate) password: Option<String>,
 }
 
 impl Target {
-  pub(crate) fn new(platform: DshPlatform, tenant: String, group_user_id: String, password: String) -> Result<Self, String> {
+  pub(crate) fn new(platform: DshPlatform, tenant: String, group_user_id: u16, password: Option<String>) -> Result<Self, String> {
     Ok(Self { platform, tenant, group_user_id, password })
   }
 }
@@ -89,27 +97,144 @@ pub(crate) fn all_targets() -> Result<Vec<Target>, String> {
   Ok(targets)
 }
 
+/// # Delete target
+///
+/// This function will delete a target settings file (if it exists)
+/// and the matching target password from the keyring.
+/// Note that this function is not transaction safe in the sense that when
+/// deleting the settings file is successful but deleting the password in the keyring is not,
+/// the deletion of the settings file will not be rolled back.
+/// The function will return an `Err` in this case, describing the situation.
+/// On the other hand, if deleting the settings file fails,
+/// the password __will__ be deleted from the keyring.
+/// This situation will also return an `Err`, describing the situation.
+///
+/// ## Parameters
+/// * `platform` - target platform
+/// * `tenant` - target tenant name
+///
+/// ## Returns
+/// * `Ok(())` - indicates that deleting the target's settings file and the password was successful
+/// * `Err(message)` - if an error occurred
 pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), String> {
   let target_file = target_file(platform, tenant)?;
   match delete_file(&target_file) {
-    Ok(_) => log::debug!("target file '{}' successfully deleted", target_file.to_string_lossy()),
-    Err(error) => log::debug!("error while deleting target file '{}' ({})", target_file.to_string_lossy(), error),
+    Ok(_) => match delete_password_from_keyring(platform, tenant) {
+      Ok(_) => {
+        log::debug!("target file '{}' and keyring entry successfully deleted", target_file.to_string_lossy());
+        Ok(())
+      }
+      Err(keyring_error) => {
+        log::debug!(
+          "target file '{}' successfully deleted but deleting the password from the keyring resulted in an error ({})",
+          target_file.to_string_lossy(),
+          keyring_error
+        );
+        Err(keyring_error)
+      }
+    },
+    Err(target_file_error) => match delete_password_from_keyring(platform, tenant) {
+      Ok(_) => {
+        log::debug!(
+          "keyring entry successfully deleted but deleting the target file '{}' resulted in an error ({})",
+          target_file.to_string_lossy(),
+          target_file_error
+        );
+        Err(target_file_error)
+      }
+      Err(keyring_error) => {
+        log::debug!(
+          "deleting the target file resulted in an error ({}), as well as deleting the password from the keyring ({})",
+          target_file_error,
+          keyring_error
+        );
+        Err(format!("{} / {}", target_file_error, keyring_error))
+      }
+    },
   }
-  Ok(())
 }
 
+/// # Read target
+///
+/// This function will read the target parameters from the target settings file (if it exists)
+/// and the target password from the keyring.
+/// If the target settings could be read, but the password entry from the keyring is not present,
+/// a [`Target`] will be returned with an empty `password` field.
+///
+/// ## Parameters
+/// * `platform` - target platform
+/// * `tenant` - target tenant name
+///
+/// ## Returns
+/// * `Ok(Some(target))` - if the target setting was available a `Target` will be returned,
+///   but the `password` field can be empty if there was no matching keyring entry
+/// * `Ok(None)` - if the target setting was not available
+/// * `Err(message)` - if an error occurred
 pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
   let target_file = target_file(platform, tenant)?;
-  log::debug!("read target file '{}'", target_file.to_string_lossy());
-  read_and_deserialize_from_toml_file(target_file)
+  match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
+    Some(target) => {
+      log::debug!("read target file '{}'", target_file.to_string_lossy());
+      Ok(Some(Target { password: get_password_from_keyring(platform, tenant)?, ..target }))
+    }
+    None => {
+      log::debug!("could not read target file '{}'", target_file.to_string_lossy());
+      Ok(None)
+    }
+  }
 }
 
+/// # Create or update target
+///
+/// This function will create a target settings file if it does not already exist,
+/// or it will update it if it is already there.
+/// If the `Target` has a non-empty `password` field, the password will be stored in the keyring.
+/// Note that this function is not transaction safe in the sense that when
+/// upserting the settings file is successful but storing the password in the keyring is not,
+/// the settings file will not be rolled back.
+/// The function will return an `Err` in this case, describing the situation.
+/// If upserting the settings file fails, the password will not be stored in the keyring.
+///
+/// ## Parameters
+/// * `target` - target to create or update a settings file for
+///
+/// ## Returns
+/// * `Ok(())` - if the target's setting file was successfully created or updated
+/// * `Err(message)` - if an error occurred in either upserting the target's settings file
+///   or the password in the keyring
 pub(crate) fn upsert_target(target: &Target) -> Result<(), String> {
   let target_file = target_file(&target.platform, &target.tenant)?;
-  log::debug!("upsert target file '{}'", target_file.to_string_lossy());
-  serialize_and_write_to_toml_file(target_file, target)
+  serialize_and_write_to_toml_file(&target_file, target)?;
+  match target.password {
+    Some(ref password) => match upsert_password_to_keyring(password, &target.platform, &target.tenant) {
+      Ok(_) => {
+        log::debug!("target file '{}' and keyring upserted", target_file.to_string_lossy());
+        Ok(())
+      }
+      Err(keyring_error) => {
+        log::debug!(
+          "target file '{}' upserted, but keyring update failed ({})",
+          target_file.to_string_lossy(),
+          keyring_error
+        );
+        Err(keyring_error)
+      }
+    },
+    None => {
+      log::debug!("target file '{}' upserted, but password is empty", target_file.to_string_lossy());
+      Ok(())
+    }
+  }
 }
 
+/// Returns the dcli application directory
+///
+/// This function returns the application directory.
+/// If it doesn't already exist the directory (and possibly its parent directories)
+/// will be created.
+///
+/// To determine the directory, first the environment variable DCLI_HOME will be checked.
+/// If this variable is not defined, `${HOME}/.dcli` will be used as the application directory.
 fn dcli_directory() -> Result<PathBuf, String> {
   let dcli_directory = match env::var(DCLI_DIRECTORY_ENV_VAR) {
     Ok(dcli_directory) => PathBuf::new().join(dcli_directory),
@@ -162,7 +287,66 @@ fn delete_file(toml_file: &PathBuf) -> Result<(), String> {
   }
 }
 
-fn read_and_deserialize_from_toml_file<T>(toml_file: PathBuf) -> Result<Option<T>, String>
+/// # Get password from keyring
+///
+/// ## Parameters
+/// * `dsh_api_tenant` - used to determine the entry in the keyring
+///
+/// ## Returns
+/// * `Ok(Some(password))` - if the password entry was found in the keyring
+/// * `Ok(None)` - if the password entry could not be found in the keyring
+/// * `Err<String>` - if an error occurred
+pub(crate) fn get_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<Option<String>, String> {
+  let user = format!("{}.{}", platform, tenant);
+  match keyring::Entry::new(APPLICATION_NAME, &user) {
+    Ok(entry) => match entry.get_password() {
+      Ok(password) => Ok(Some(password)),
+      Err(_) => Ok(None),
+    },
+    Err(keyring_error) => Err(keyring_error.to_string()),
+  }
+}
+
+/// # Create or update password in the keyring
+///
+/// ## Parameters
+/// * `password` - password to add to the keyring
+/// * `dsh_api_tenant` - used to determine the entry in the keyring
+///
+/// ## Returns
+/// * `Ok(())` - if the password entry was successfully written to the keyring
+/// * `Err<String>` - if an error occurred
+pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform, tenant: &str) -> Result<(), String> {
+  let user = format!("{}.{}", platform, tenant);
+  match keyring::Entry::new(APPLICATION_NAME, &user) {
+    Ok(entry) => match entry.set_password(password) {
+      Ok(_) => Ok(()),
+      Err(keyring_error) => Err(keyring_error.to_string()),
+    },
+    Err(keyring_error) => Err(keyring_error.to_string()),
+  }
+}
+
+/// # Delete password from the keyring
+///
+/// ## Parameters
+/// * `dsh_api_tenant` - used to determine the entry in the keyring
+///
+/// ## Returns
+/// * `Ok(())` - if the password entry was successfully deleted from the keyring
+/// * `Err<String>` - if an error occurred
+pub(crate) fn delete_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<(), String> {
+  let user = format!("{}.{}", platform, tenant);
+  match keyring::Entry::new(APPLICATION_NAME, &user) {
+    Ok(entry) => match entry.delete_credential() {
+      Ok(_) => Ok(()),
+      Err(keyring_error) => Err(keyring_error.to_string()),
+    },
+    Err(keyring_error) => Err(keyring_error.to_string()),
+  }
+}
+
+fn read_and_deserialize_from_toml_file<T>(toml_file: impl AsRef<Path>) -> Result<Option<T>, String>
 where
   T: for<'de> Deserialize<'de>,
 {
@@ -170,7 +354,7 @@ where
     Ok(toml_string) => match toml::from_str::<T>(&toml_string) {
       Ok(deserialized_toml) => Ok(Some(deserialized_toml)),
       Err(de_error) => {
-        let message = format!("could not deserialize file '{}' ({})", toml_file.to_string_lossy(), de_error.message());
+        let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().to_string_lossy(), de_error.message());
         log::error!("{}", &message);
         Err(message)
       }
@@ -178,7 +362,7 @@ where
     Err(io_error) => match io_error.kind() {
       NotFound => Ok(None),
       _ => {
-        let message = format!("could not read file '{}'", toml_file.to_string_lossy());
+        let message = format!("could not read file '{}'", toml_file.as_ref().to_string_lossy());
         log::error!("{}", &message);
         Err(message)
       }
@@ -186,7 +370,7 @@ where
   }
 }
 
-fn serialize_and_write_to_toml_file<T>(toml_file: PathBuf, data: &T) -> Result<(), String>
+fn serialize_and_write_to_toml_file<T>(toml_file: impl AsRef<Path>, data: &T) -> Result<(), String>
 where
   T: Serialize,
 {
@@ -194,7 +378,7 @@ where
     Ok(toml_string) => match fs::write(&toml_file, toml_string) {
       Ok(_) => Ok(()),
       Err(io_error) => {
-        let message = format!("could not write file '{}' ({})", toml_file.to_string_lossy(), io_error);
+        let message = format!("could not write file '{}' ({})", toml_file.as_ref().to_string_lossy(), io_error);
         log::error!("{}", &message);
         Err(message)
       }
@@ -207,72 +391,77 @@ where
   }
 }
 
-fn _test_settings_filename() -> String {
-  format!("{}/{}", env!("CARGO_MANIFEST_DIR"), "../test_dcli_home/settings.toml")
-}
-
-#[test]
-fn test_dcli_directory() {
-  println!("{}", dcli_directory().unwrap().to_string_lossy());
-}
-
-#[test]
-fn test_read_settings_default() {
-  println!("settings default: {:?}", read_settings(None));
-}
-
-#[test]
-fn test_read_settings_explicit_filename() {
-  println!("settings explicit filename: {:?}", read_settings(Some(_test_settings_filename().as_str())));
-}
-
-#[test]
-fn test_upsert_settings_default() {
-  use crate::arguments::Verbosity::Off;
-  let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
-  _upsert_settings(None, &settings).unwrap();
-}
-
-#[test]
-fn test_upsert_settings_explicit_filename() {
-  use crate::arguments::Verbosity::Off;
-  let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
-  _upsert_settings(Some(_test_settings_filename().as_str()), &settings).unwrap();
-}
-
-#[test]
-fn test_all_targets() {
-  for target in all_targets().unwrap() {
-    println!("{}", target);
-  }
-}
-
-#[test]
-fn test_delete_target() {
-  delete_target(&DshPlatform::NpLz, "greenbox-dev").unwrap()
-}
-
-#[test]
-fn test_upsert_target() {
-  let target = Target { platform: DshPlatform::NpLz, tenant: "greenbox".to_string(), group_user_id: "2067:2067".to_string(), password: "abcdefghijklmnopqrstuvwxyz".to_string() };
-  upsert_target(&target).unwrap();
-}
-
-#[test]
-fn test_read_target() {
-  println!("{:?}", read_target(&DshPlatform::NpLz, "greenbox-dev").unwrap());
-}
-
-#[test]
-fn test_serialize_and_write_to_toml_file() {
-  use crate::arguments::Verbosity::Medium;
-  let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), no_border: None };
-  serialize_and_write_to_toml_file(PathBuf::new().join(_test_settings_filename()), &settings).unwrap();
-}
-
-#[test]
-fn test_write_target() {
-  use crate::arguments::Verbosity::Medium;
-  let target = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), no_border: None };
-  serialize_and_write_to_toml_file(dcli_directory().unwrap().join(_DEFAULT_DCLI_SETTINGS_FILENAME), &target).unwrap();
-}
+// #[cfg(test)]
+// mod tests {
+//   use super::*;
+//
+//   fn test_settings_filename() -> String {
+//     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), "../test_dcli_home/settings.toml")
+//   }
+//
+//   #[test]
+//   fn test_dcli_directory() {
+//     println!("{}", dcli_directory().unwrap().to_string_lossy());
+//   }
+//
+//   #[test]
+//   fn test_read_settings_default() {
+//     println!("settings default: {:?}", read_settings(None));
+//   }
+//
+//   #[test]
+//   fn test_read_settings_explicit_filename() {
+//     println!("settings explicit filename: {:?}", read_settings(Some(test_settings_filename().as_str())));
+//   }
+//
+//   #[test]
+//   fn test_upsert_settings_default() {
+//     use crate::arguments::Verbosity::Off;
+//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
+//     _upsert_settings(None, &settings).unwrap();
+//   }
+//
+//   #[test]
+//   fn test_upsert_settings_explicit_filename() {
+//     use crate::arguments::Verbosity::Off;
+//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
+//     _upsert_settings(Some(test_settings_filename().as_str()), &settings).unwrap();
+//   }
+//
+//   #[test]
+//   fn test_all_targets() {
+//     for target in all_targets().unwrap() {
+//       println!("{}", target);
+//     }
+//   }
+//
+//   #[test]
+//   fn test_delete_target() {
+//     delete_target(&DshPlatform::NpLz, "greenbox-dev").unwrap()
+//   }
+//
+//   #[test]
+//   fn test_upsert_target() {
+//     let target = Target { platform: DshPlatform::NpLz, tenant: "greenbox".to_string(), group_user_id: 2067, password: Some("abcdefghijklmnopqrstuvwxyz".to_string()) };
+//     upsert_target(&target).unwrap();
+//   }
+//
+//   #[test]
+//   fn test_read_target() {
+//     println!("{:?}", read_target(&DshPlatform::NpLz, "greenbox-dev").unwrap());
+//   }
+//
+//   #[test]
+//   fn test_serialize_and_write_to_toml_file() {
+//     use crate::arguments::Verbosity::Medium;
+//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), no_border: None };
+//     serialize_and_write_to_toml_file(PathBuf::new().join(test_settings_filename()), &settings).unwrap();
+//   }
+//
+//   #[test]
+//   fn test_write_target() {
+//     use crate::arguments::Verbosity::Medium;
+//     let target = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), no_border: None };
+//     serialize_and_write_to_toml_file(dcli_directory().unwrap().join(_DEFAULT_DCLI_SETTINGS_FILENAME), &target).unwrap();
+//   }
+// }

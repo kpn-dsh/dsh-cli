@@ -6,15 +6,15 @@ All notable changes to the dcli tool project will be documented in this file.
 
 ### Security
 
-* At this time the api credentials must be configured by specifying environment variables.
-  This must be replaced by a more secure (encrypted) solution.
+* Credentials are now stored in the keyring (only supported for OsX).
 
 ## [0.2.0]
 
 ### Added
 
 * New subject for exposed metrics.
-* Save settings in application directory.
+* Save settings and targets in application directory.
+* Capability to manage settings and targets from within the tool.
 * Capability to generate autocomplete files.
 
 ### Changed

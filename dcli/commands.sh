@@ -9,7 +9,7 @@ set -e
 
 export DSH_API_PLATFORM=nplz
 export DSH_API_TENANT=greenbox-dev
-export DSH_API_GUID_GREENBOX_DEV=1903:1903
+export DSH_API_GUID_GREENBOX_DEV=1903
 
 export APP_UNDER_TEST=cmd
 export APPLICATION_UNDER_TEST=cmd

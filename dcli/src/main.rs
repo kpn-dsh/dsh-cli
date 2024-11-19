@@ -26,10 +26,11 @@ use crate::metric::METRIC_SUBJECT;
 use crate::proxy::PROXY_SUBJECT;
 use crate::secret::SECRET_SUBJECT;
 use crate::setting::SETTING_SUBJECT;
-use crate::settings::{read_settings, read_target, Settings};
+use crate::settings::{get_password_from_keyring, read_settings, read_target, Settings};
 #[cfg(feature = "stream")]
 use crate::stream::STREAM_SUBJECT;
 use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
+use crate::target::TARGET_SUBJECT;
 use crate::topic::TOPIC_SUBJECT;
 use crate::vhost::VHOST_SUBJECT;
 use crate::volume::VOLUME_SUBJECT;
@@ -37,7 +38,7 @@ use clap::builder::styling;
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
-use dsh_api::dsh_api_tenant::DshApiTenant;
+use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
 use dsh_api::platform::DshPlatform;
 use dsh_api::{guid_environment_variable, secret_environment_variable, DshApiError, PLATFORM_ENVIRONMENT_VARIABLE, TENANT_ENVIRONMENT_VARIABLE};
 use termion::input::TermRead;
@@ -64,6 +65,7 @@ mod settings;
 #[cfg(feature = "stream")]
 mod stream;
 mod subject;
+mod target;
 mod topic;
 mod vhost;
 mod volume;
@@ -114,7 +116,7 @@ impl DcliContext<'_> {
     }
   }
 
-  pub(crate) fn show_settings(&self) -> bool {
+  pub(crate) fn _show_settings(&self) -> bool {
     match self.verbosity {
       Verbosity::Off | Verbosity::Low => false,
       Verbosity::Medium | Verbosity::High => true,
@@ -178,6 +180,7 @@ async fn inner_main() -> DcliResult {
     SETTING_SUBJECT.as_ref(),
     #[cfg(feature = "stream")]
     STREAM_SUBJECT.as_ref(),
+    TARGET_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
     VOLUME_SUBJECT.as_ref(),
@@ -276,9 +279,9 @@ async fn inner_main() -> DcliResult {
 }
 
 async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiClientFactory, String> {
-  let dsh_api_tenant: DshApiTenant = get_dsh_api_tenant(&matches, settings)?;
-  let secret = get_password(&matches, &dsh_api_tenant)?;
-  DshApiClientFactory::create(dsh_api_tenant, secret)
+  let dsh_api_tenant: DshApiTenant = get_dsh_api_tenant(matches, settings)?;
+  let secret = get_password(matches, &dsh_api_tenant)?;
+  Ok(DshApiClientFactory::create(dsh_api_tenant, secret)?)
 }
 
 fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<DcliContext<'a>, String> {
@@ -298,6 +301,21 @@ fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiCl
   Ok(DcliContext { verbosity, border, dsh_api_client })
 }
 
+/// # Get the target platform
+///
+/// This method will get the target platform.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--platform`
+/// 1. Environment variable `DSH_API_PLATFORM`
+/// 1. Parameter `default-platform` from settings file, if available
+/// 1. Ask the user to enter the value
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
 fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshPlatform, String> {
   match matches.get_one::<String>(PLATFORM_ARGUMENT) {
     Some(name_from_argument) => DshPlatform::try_from(name_from_argument.as_str()),
@@ -314,6 +332,21 @@ fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Dsh
   }
 }
 
+/// # Get the target tenant
+///
+/// This method will get the target tenant.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--tenant`
+/// 1. Environment variable `DSH_API_TENANT`
+/// 1. Parameter `default-tenant` from settings file, if available
+/// 1. Ask the user to enter the value
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// An `Ok<String>` containing the tenant name, or an `Err<String>`.
 fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<String, String> {
   match matches.get_one::<String>(TENANT_ARGUMENT) {
     Some(name_from_argument) => Ok(name_from_argument.to_string()),
@@ -330,29 +363,68 @@ fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<
   }
 }
 
-// Return format "1903:1903"
-fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> Result<String, String> {
+/// # Get the target guid
+///
+/// This method will get the target group and user id.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--guid`
+/// 1. Environment variable `DSH_API_GUID_[tenant_name]`
+/// 1. Parameter `group-user-id` from the target settings file, if available
+/// 1. Ask the user to enter the value
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `platform` - used to determine the target settings file
+/// * `tenant_name` - used to determine the environment variable or the target settings file
+///
+/// ## Returns
+/// An `Ok<u16>` containing the group and user id, or an `Err<String>`.
+fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> Result<u16, String> {
   match matches.get_one::<String>(GUID_ARGUMENT) {
-    Some(guid_from_argument) => Ok(validate_guid(guid_from_argument)?),
+    Some(guid_from_argument) => Ok(parse_and_validate_guid(guid_from_argument.clone())?),
     None => match std::env::var(guid_environment_variable(tenant_name)) {
-      Ok(guid_from_env_var) => Ok(validate_guid(&guid_from_env_var)?),
+      Ok(guid_from_env_var) => Ok(parse_and_validate_guid(guid_from_env_var)?),
       Err(_) => match read_target(platform, tenant_name)? {
         Some(target) => Ok(target.group_user_id),
-        None => read_single_line(format!("group and user id for tenant {}: ", tenant_name).as_str()),
+        None => read_single_line(format!("group and user id for tenant {}: ", tenant_name).as_str()).and_then(|guid| parse_and_validate_guid(guid).map_err(|e| e.to_string())),
       },
     },
   }
 }
 
+/// # Get the target password
+///
+/// This method will get the target password.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. If the command line argument `--password` is present, ask the user to enter the value
+///    and stop if the user doesn't provide the password
+/// 1. Environment variable `DSH_API_SECRET_[platform]_[tenant_name]`
+/// 1. Entry `dcli.[platform].[tenant_name]` from the keystore, if available
+/// 1. Parameter `password` from the target settings file, if available
+/// 1. Ask the user to enter the value
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `platform` - used to determine the target settings file
+/// * `tenant_name` - used to determine the environment variable or the target settings file
+///
+/// ## Returns
+/// An `Ok<u16>` containing the group and user id, or an `Err<String>`.
 fn get_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
   if matches.get_flag(PASSWORD_ARGUMENT) {
     read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
   } else {
     match std::env::var(secret_environment_variable(dsh_api_tenant.platform().to_string().as_str(), dsh_api_tenant.name())) {
       Ok(password_from_env_var) => Ok(password_from_env_var),
-      Err(_) => match read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
-        Some(target) => Ok(target.password),
-        None => read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str()),
+      Err(_) => match get_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
+        Some(password_from_keyring) => Ok(password_from_keyring),
+        None => match read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
+          Some(target) => match target.password {
+            Some(password_from_target) => Ok(password_from_target),
+            None => read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str()),
+          },
+          None => read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str()),
+        },
       },
     }
   }
@@ -365,24 +437,12 @@ fn get_dsh_api_tenant(matches: &ArgMatches, settings: Option<&Settings>) -> Resu
   Ok(DshApiTenant::new(tenant_name, guid, platform))
 }
 
-pub(crate) fn validate_guid(guid: &str) -> Result<String, String> {
-  match guid.parse::<u32>() {
-    Ok(guid) => {
-      if guid > 0 && guid < 32768 {
-        Ok(format!("{}:{}", guid, guid))
-      } else {
-        Err("group/user id must be greater than 0 and smaller than 32768".to_string())
-      }
-    }
-    Err(_) => Err("invalid group/user id (single integer required)".to_string()),
-  }
-}
-
 pub(crate) fn to_command_error_with_id(error: DshApiError, subject: &str, which: &str) -> DcliResult {
   match error {
+    DshApiError::Configuration(message) => Err(message),
     DshApiError::NotAuthorized => Err("not authorized".to_string()),
     DshApiError::NotFound => Err(format!("{} {} not found", subject, which)),
-    DshApiError::Unexpected(error) => Err(format!("unexpected error, {}", error)),
+    DshApiError::Unexpected(error, _) => Err(format!("unexpected error, {}", error)),
   }
 }
 
@@ -399,28 +459,30 @@ pub(crate) fn read_multi_line() -> Result<String, String> {
   Ok(multi_line)
 }
 
-pub(crate) fn read_single_line(prompt: &str) -> Result<String, String> {
-  print!("{}", prompt);
+pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String> {
+  print!("{}", prompt.as_ref());
   let _ = stdout().lock().flush();
   let mut line = String::new();
   stdin().read_line(&mut line).expect("could not read line");
   Ok(line.trim().to_string())
 }
 
-// TODO Don't show the entered password
-pub(crate) fn read_single_line_password(prompt: &str) -> Result<String, String> {
-  print!("{}", prompt);
+pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<String, String> {
+  print!("{}", prompt.as_ref());
   let mut stdout = stdout();
   let _ = stdout.flush();
   let mut stdin = stdin();
   match stdin.read_passwd(&mut stdout).map_err(|error| error.to_string())? {
-    Some(line) => Ok(line.trim().to_string()),
+    Some(line) => {
+      let _ = stdout.write("\n".as_bytes());
+      Ok(line.trim().to_string())
+    }
     None => Err("empty input".to_string()),
   }
 }
 
-pub(crate) fn confirmed(prompt: &str) -> Result<bool, String> {
-  print!("{}", prompt);
+pub(crate) fn confirmed(prompt: impl AsRef<str>) -> Result<bool, String> {
+  print!("{}", prompt.as_ref());
   let _ = stdout().lock().flush();
   let mut line = String::new();
   stdin().read_line(&mut line).expect("could not read line");

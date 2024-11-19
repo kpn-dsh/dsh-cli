@@ -1,6 +1,7 @@
 use builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 pub(crate) const GUID_ARGUMENT: &str = "guid-argument";
 pub(crate) const NO_BORDER_ARGUMENT: &str = "no-border-argument";
@@ -153,4 +154,15 @@ pub(crate) fn query_argument(long_help: Option<&str>) -> Arg {
     query_argument = query_argument.long_help(long_help.to_string())
   }
   query_argument
+}
+
+impl Display for Verbosity {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Verbosity::Off => write!(f, "off"),
+      Verbosity::Low => write!(f, "low"),
+      Verbosity::Medium => write!(f, "medium"),
+      Verbosity::High => write!(f, "high"),
+    }
+  }
 }
