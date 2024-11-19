@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
+use std::fmt::{Display, Formatter};
 
 use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT, TARGET_ARGUMENT};
 use crate::capability::CapabilityType::*;
@@ -57,25 +58,6 @@ impl TryFrom<&str> for CapabilityType {
 }
 
 impl CapabilityType {
-  fn command_name(&self) -> &'static str {
-    match self {
-      Create => CREATE,
-      Delete => DELETE,
-      Diff => DIFF,
-      Find => FIND,
-      List => LIST,
-      New => NEW,
-      Show => SHOW,
-      Start => START,
-      Stop => STOP,
-      Update => UPDATE,
-    }
-  }
-
-  fn command_id(&self) -> &'static str {
-    self.command_name()
-  }
-
   fn command_alias(&self) -> Option<&'static str> {
     match self {
       Create => None,
@@ -122,13 +104,32 @@ impl CapabilityType {
   }
 }
 
+impl Display for CapabilityType {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}",
+      match self {
+        Create => CREATE,
+        Delete => DELETE,
+        Diff => DIFF,
+        Find => FIND,
+        List => LIST,
+        New => NEW,
+        Show => SHOW,
+        Start => START,
+        Stop => STOP,
+        Update => UPDATE,
+      }
+    )
+  }
+}
+
 #[async_trait]
 pub trait Capability {
-  fn capability_type(&self) -> CapabilityType;
-
   fn clap_capability_command(&self, subject: &dyn Subject) -> Command;
 
-  fn clap_flags(&self, subject: &dyn Subject) -> Vec<Arg>;
+  fn clap_flags(&self, subject: &str) -> Vec<Arg>;
 
   fn long_about(&self) -> Option<String>;
 
@@ -158,16 +159,12 @@ pub(crate) struct DeclarativeCapability<'a> {
 
 #[async_trait]
 impl Capability for DeclarativeCapability<'_> {
-  fn capability_type(&self) -> CapabilityType {
-    self.capability_type.clone()
-  }
-
   fn clap_capability_command(&self, subject: &dyn Subject) -> Command {
-    let mut capability_command = Command::new(self.capability_type().command_id())
-      .name(self.capability_type.command_name())
+    let mut capability_command = Command::new(self.capability_type.to_string())
+      .name(self.capability_type.to_string())
       .about(&self.command_about)
       .args(self.capability_type.command_target_arguments(subject.subject_first_upper()))
-      .args(self.clap_flags(subject))
+      .args(self.clap_flags(subject.subject()))
       .args(&self.extra_arguments);
     if let Some(alias) = self.capability_type.command_alias() {
       capability_command = capability_command.alias(alias)
@@ -178,7 +175,7 @@ impl Capability for DeclarativeCapability<'_> {
     capability_command
   }
 
-  fn clap_flags(&self, subject: &dyn Subject) -> Vec<Arg> {
+  fn clap_flags(&self, subject: &str) -> Vec<Arg> {
     [
       self
         .command_executors

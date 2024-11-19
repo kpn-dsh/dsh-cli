@@ -74,7 +74,7 @@ pub(crate) fn clap_subject_command(subject: &dyn Subject) -> (String, Command) {
 pub(crate) fn clap_list_shortcut_command(subject: &dyn Subject) -> Option<(String, Command)> {
   if let Some(list_capability) = subject.capabilities().get(&CapabilityType::List) {
     let list_shortcut_name = format!("{}s", subject.subject());
-    let list_flags = list_capability.clap_flags(subject);
+    let list_flags = list_capability.clap_flags(subject.subject());
     let mut list_shortcut_command = Command::new(list_shortcut_name.to_string())
       .about(subject.subject_command_about())
       .args(list_flags)

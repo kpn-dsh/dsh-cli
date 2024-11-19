@@ -1,7 +1,6 @@
 use clap::{Arg, ArgAction};
 
 use crate::flags::FlagType::*;
-use crate::subject::Subject;
 
 #[derive(Debug)]
 pub(crate) enum FlagType {
@@ -56,7 +55,7 @@ impl FlagType {
   }
 }
 
-pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
+pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: &Option<&str>) -> Arg {
   match flag_type {
     All => all_flag(subject, long_help),
     AllocationStatus => allocation_status_flag(subject, long_help),
@@ -69,48 +68,40 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &dyn Subject, long_help
   }
 }
 
-fn all_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(All, format!("Include all {} parameters.", subject.subject()).as_str(), long_help)
+fn all_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(All, format!("Include all {} parameters.", subject), long_help)
 }
 
-fn allocation_status_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(
-    AllocationStatus,
-    format!("Include the {}'s allocation status.", subject.subject()).as_str(),
-    long_help,
-  )
+fn allocation_status_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(AllocationStatus, format!("Include the {}'s allocation status.", subject), long_help)
 }
 
-fn configuration_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(
-    Configuration,
-    format!("Include the {}'s initial configuration.", subject.subject()).as_str(),
-    long_help,
-  )
+fn configuration_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Configuration, format!("Include the {}'s initial configuration.", subject), long_help)
 }
 
-fn ids_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Ids, format!("Include the {}'s ids.", subject.subject()).as_str(), long_help)
+fn ids_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Ids, format!("Include the {}'s ids.", subject), long_help)
 }
 
-fn properties_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Properties, format!("Include the {}'s properties.", subject.subject()).as_str(), long_help)
+fn properties_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Properties, format!("Include the {}'s properties.", subject), long_help)
 }
 
-fn tasks_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Tasks, format!("Include the {}'s tasks.", subject.subject()).as_str(), long_help)
+fn tasks_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Tasks, format!("Include the {}'s tasks.", subject), long_help)
 }
 
-fn usage_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Usage, format!("Include the {}'s usages.", subject.subject()).as_str(), long_help)
+fn usage_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Usage, format!("Include the {}'s usages.", subject), long_help)
 }
 
-fn value_flag(subject: &dyn Subject, long_help: &Option<&str>) -> Arg {
-  create_clap_flag(Value, format!("Include the {}'s value.", subject.subject()).as_str(), long_help)
+fn value_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+  create_clap_flag(Value, format!("Include the {}'s value.", subject), long_help)
 }
 
-fn create_clap_flag(flag_type: FlagType, help: &str, long_help: &Option<&str>) -> Arg {
-  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help.to_string());
+fn create_clap_flag(flag_type: FlagType, help: String, long_help: &Option<&str>) -> Arg {
+  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help);
   if let Some(shortcut) = flag_type.shortcut() {
     flag_arg = flag_arg.short(shortcut)
   }
