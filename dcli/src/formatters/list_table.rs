@@ -72,7 +72,7 @@ where
     self
   }
 
-  pub fn rows(&mut self, rows: &[V]) -> &Self {
+  pub fn _rows(&mut self, rows: &[V]) -> &Self {
     for row in rows {
       self
         .tabled_builder

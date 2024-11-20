@@ -119,13 +119,13 @@ pub(crate) fn verbosity_argument() -> Arg {
     .conflicts_with(SET_VERBOSITY_ARGUMENT)
 }
 
-pub(crate) fn target_argument(subject: String, long_help: Option<&str>) -> Arg {
+pub(crate) fn target_argument(subject: &str, long_help: Option<&str>) -> Arg {
   let mut target_argument = Arg::new(TARGET_ARGUMENT)
     .action(ArgAction::Set)
     .required(true)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .help(format!("{} name", subject))
-    .value_name(subject);
+    .value_name(subject.to_string());
   if let Some(long_help) = long_help {
     target_argument = target_argument.long_help(long_help.to_string())
   }

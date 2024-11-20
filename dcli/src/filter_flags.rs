@@ -43,7 +43,7 @@ impl FilterFlagType {
   }
 }
 
-pub(crate) fn create_filter_flag(flag_type: &FilterFlagType, subject: &str, long_help: &Option<&str>) -> Arg {
+pub(crate) fn create_filter_flag(flag_type: &FilterFlagType, subject: &str, long_help: Option<&str>) -> Arg {
   match flag_type {
     App => app_flag(subject, long_help),
     Application => application_flag(subject, long_help),
@@ -53,27 +53,27 @@ pub(crate) fn create_filter_flag(flag_type: &FilterFlagType, subject: &str, long
   }
 }
 
-fn app_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+fn app_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_filter_flag(App, subject, format!("Include apps related to this {}.", subject), long_help)
 }
 
-fn application_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+fn application_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_filter_flag(Application, subject, format!("Include applications related to this {}.", subject), long_help)
 }
 
-fn killed_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+fn killed_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_filter_flag(Killed, subject, format!("Include killed {}'s.", subject), long_help)
 }
 
-fn started_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+fn started_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_filter_flag(Started, subject, format!("Include started {}'s.", subject), long_help)
 }
 
-fn stopped_flag(subject: &str, long_help: &Option<&str>) -> Arg {
+fn stopped_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_filter_flag(Stopped, subject, format!("Include stopped {}'s.", subject), long_help)
 }
 
-fn create_clap_filter_flag(flag_type: FilterFlagType, _subject: &str, help: String, long_help: &Option<&str>) -> Arg {
+fn create_clap_filter_flag(flag_type: FilterFlagType, _subject: &str, help: String, long_help: Option<&str>) -> Arg {
   let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help);
   if let Some(shortcut) = flag_type.shortcut() {
     flag_arg = flag_arg.short(shortcut)
