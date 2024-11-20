@@ -58,7 +58,7 @@ impl TryFrom<&str> for CapabilityType {
 }
 
 impl CapabilityType {
-  fn command_alias(&self) -> Option<&'static str> {
+  pub(crate) fn command_alias(&self) -> Option<&'static str> {
     match self {
       Create => None,
       Delete => None,
@@ -75,20 +75,20 @@ impl CapabilityType {
 
   pub(crate) fn command_target_arguments(&self, subject: &str) -> Vec<Arg> {
     match self {
-      Create => vec![target_argument(subject.to_string(), None)],
-      Delete => vec![target_argument(subject.to_string(), None)],
-      Diff => vec![target_argument(subject.to_string(), None)],
+      Create => vec![target_argument(subject, None)],
+      Delete => vec![target_argument(subject, None)],
+      Diff => vec![target_argument(subject, None)],
       Find => vec![query_argument(None)],
       List => vec![],
       New => vec![],
-      Show => vec![target_argument(subject.to_string(), None)],
-      Start => vec![target_argument(subject.to_string(), None)],
-      Stop => vec![target_argument(subject.to_string(), None)],
-      Update => vec![target_argument(subject.to_string(), None)],
+      Show => vec![target_argument(subject, None)],
+      Start => vec![target_argument(subject, None)],
+      Stop => vec![target_argument(subject, None)],
+      Update => vec![target_argument(subject, None)],
     }
   }
 
-  pub(crate) fn command_target_argument_ids(&self) -> &[&str] {
+  fn command_target_argument_ids(&self) -> &[&str] {
     match self {
       Create => &[TARGET_ARGUMENT],
       Delete => &[TARGET_ARGUMENT],
@@ -132,6 +132,8 @@ pub trait Capability {
   fn clap_flags(&self, subject: &str) -> Vec<Arg>;
 
   fn long_about(&self) -> Option<String>;
+
+  fn command_target_argument_ids(&self) -> Vec<String>;
 
   async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult;
 }
@@ -180,17 +182,17 @@ impl Capability for DeclarativeCapability<'_> {
       self
         .command_executors
         .iter()
-        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help))
+        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, *long_help))
         .collect::<Vec<Arg>>(),
       self
         .filter_flags
         .iter()
-        .map(|(flag_type, long_help)| create_filter_flag(flag_type, subject, long_help))
+        .map(|(flag_type, long_help)| create_filter_flag(flag_type, subject, *long_help))
         .collect::<Vec<_>>(),
       self
         .modifier_flags
         .iter()
-        .map(|(flag_type, long_help)| create_modifier_flag(flag_type, subject, long_help))
+        .map(|(flag_type, long_help)| create_modifier_flag(flag_type, subject, *long_help))
         .collect::<Vec<_>>(),
     ]
     .concat()
@@ -198,6 +200,15 @@ impl Capability for DeclarativeCapability<'_> {
 
   fn long_about(&self) -> Option<String> {
     self.command_long_about.clone()
+  }
+
+  fn command_target_argument_ids(&self) -> Vec<String> {
+    self
+      .capability_type
+      .command_target_argument_ids()
+      .iter()
+      .map(|id| id.to_string())
+      .collect::<Vec<_>>()
   }
 
   async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {

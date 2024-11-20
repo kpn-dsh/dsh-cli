@@ -6,11 +6,11 @@ use futures::future::try_join_all;
 use futures::try_join;
 use lazy_static::lazy_static;
 
-use dsh_api::types::Secret;
-
 use crate::app::apps_with_secret_injections;
 use crate::application::applications_with_secret_injections;
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
@@ -20,6 +20,7 @@ use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_L
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
 use crate::{confirmed, include_app_application, read_multi_line, read_single_line, DcliContext, DcliResult};
+use dsh_api::types::Secret;
 
 pub(crate) struct SecretSubject {}
 
@@ -66,59 +67,44 @@ impl Subject for SecretSubject {
 }
 
 lazy_static! {
-  pub static ref SECRET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Create,
-    command_about: "Create secret".to_string(),
-    command_long_about: Some("Create a secret.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&SecretCreate {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![(ModifierFlagType::MultiLine, None)],
-  });
-  pub static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Delete,
-    command_about: "Delete secret".to_string(),
-    command_long_about: Some("Delete a secret.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&SecretDelete {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List secrets".to_string(),
-    command_long_about: Some("Lists all secrets used by the applications/services and apps on the DSH.".to_string()),
-    command_executors: vec![
-      (FlagType::All, &SecretListIds {}, None),
-      (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
-      (FlagType::Ids, &SecretListIds {}, None),
-      (FlagType::Usage, &SecretListUsage {}, None),
-    ],
-    default_command_executor: Some(&SecretListIds {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![(FilterFlagType::App, Some("List all apps that use the secret.")), (FilterFlagType::Application, Some("List all applications that use the secret."))],
-    modifier_flags: vec![],
-  });
-  pub static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show secret configuration or value".to_string(),
-    command_long_about: None,
-    command_executors: vec![
-      (FlagType::AllocationStatus, &SecretShowAllocationStatus {}, None),
-      (FlagType::Usage, &SecretShowUsage {}, None),
-      (FlagType::Value, &SecretShowValue {}, None),
-    ],
-    default_command_executor: Some(&SecretShowAllocationStatus {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref SECRET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Create, "Create secret")
+      .set_long_about("Create a secret.")
+      .set_default_command_executor(&SecretCreate {})
+      .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
+      .add_modifier_flag(ModifierFlagType::MultiLine, None),
+  );
+  pub static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Delete, "Delete secret")
+      .set_long_about("Delete a secret.")
+      .set_default_command_executor(&SecretDelete {})
+      .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
+  );
+  pub static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List secrets")
+      .set_long_about("Lists all secrets used by the applications/services and apps on the DSH.")
+      .add_command_executors(vec![
+        (FlagType::All, &SecretListIds {}, None),
+        (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
+        (FlagType::Ids, &SecretListIds {}, None),
+        (FlagType::Usage, &SecretListUsage {}, None),
+      ])
+      .set_default_command_executor(&SecretListIds {})
+      .add_filter_flags(vec![
+        (FilterFlagType::App, Some("List all apps that use the secret.".to_string())),
+        (FilterFlagType::Application, Some("List all applications that use the secret.".to_string())),
+      ])
+  );
+  pub static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show secret configuration or value")
+      .add_command_executors(vec![
+        (FlagType::AllocationStatus, &SecretShowAllocationStatus {}, None),
+        (FlagType::Usage, &SecretShowUsage {}, None),
+        (FlagType::Value, &SecretShowValue {}, None),
+      ])
+      .set_default_command_executor(&SecretShowAllocationStatus {})
+      .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
+  );
 }
 
 struct SecretCreate {}

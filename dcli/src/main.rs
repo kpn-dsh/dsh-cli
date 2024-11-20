@@ -4,9 +4,8 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{stdin, stdout, Write};
+use std::process;
 use std::process::{ExitCode, Termination};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::Instant;
 
 use crate::app::APP_SUBJECT;
@@ -49,6 +48,7 @@ mod arguments;
 mod autocomplete;
 mod bucket;
 mod capability;
+mod capability_builder;
 mod certificate;
 mod env;
 mod filter_flags;
@@ -152,10 +152,9 @@ async fn main() -> DcliExit {
 
 async fn inner_main() -> DcliResult {
   env_logger::init();
-  let halted = Arc::new(AtomicBool::new(false));
-  let h = halted.clone();
   let _ = ctrlc::set_handler(move || {
-    h.store(true, Ordering::SeqCst);
+    println!("interrupted");
+    process::exit(0);
   });
 
   let settings = read_settings(None)?;

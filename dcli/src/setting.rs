@@ -3,8 +3,9 @@ use clap::ArgMatches;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
-use crate::formatters::settings::SETTING_LABELS;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
+use crate::formatters::setting::SETTING_LABELS;
 use crate::formatters::show_table::ShowTable;
 use crate::settings::read_settings;
 use crate::subject::Subject;
@@ -44,17 +45,11 @@ impl Subject for SettingSubject {
 }
 
 lazy_static! {
-  pub static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List settings".to_string(),
-    command_long_about: Some("Lists all dcli settings.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&SettingList {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List settings")
+      .set_long_about("Lists all dcli settings.")
+      .set_default_command_executor(&SettingList {})
+  );
 }
 
 struct SettingList {}
