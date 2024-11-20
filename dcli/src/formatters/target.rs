@@ -1,16 +1,17 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::settings::Target;
 
 #[derive(Eq, Hash, PartialEq)]
-pub(crate) enum TargetLabel {
+pub(crate) enum TargetFormatterLabel {
+  Default,
+  GroupUserId,
   Platform,
   Tenant,
-  GroupUserId,
 }
 
-impl Label for TargetLabel {
+impl Label for TargetFormatterLabel {
   fn label_for_show(&self) -> &str {
     match self {
+      Self::Default => "default",
       Self::GroupUserId => "id",
       Self::Platform => "platform",
       Self::Tenant => "tenant",
@@ -22,18 +23,33 @@ impl Label for TargetLabel {
   }
 }
 
-impl SubjectFormatter<TargetLabel> for Target {
-  fn value(&self, label: &TargetLabel, _target_id: &str) -> String {
+pub struct TargetFormatter {
+  pub(crate) platform: String,
+  pub(crate) tenant: String,
+  pub(crate) group_user_id: u16,
+  pub(crate) is_default: bool,
+}
+
+impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
+  fn value(&self, label: &TargetFormatterLabel, _target_id: &str) -> String {
     match label {
-      TargetLabel::GroupUserId => self.group_user_id.to_string(),
-      TargetLabel::Platform => self.platform.to_string(),
-      TargetLabel::Tenant => self.tenant.clone(),
+      TargetFormatterLabel::Default => {
+        if self.is_default {
+          "*".to_string()
+        } else {
+          "".to_string()
+        }
+      }
+      TargetFormatterLabel::GroupUserId => format!("{}:{}", self.group_user_id.to_string(), self.group_user_id.to_string()),
+      TargetFormatterLabel::Platform => self.platform.to_string(),
+      TargetFormatterLabel::Tenant => self.tenant.clone(),
     }
   }
 
-  fn target_label(&self) -> Option<TargetLabel> {
+  fn target_label(&self) -> Option<TargetFormatterLabel> {
     None
   }
 }
 
-pub static TARGET_LABELS: [TargetLabel; 3] = [TargetLabel::Platform, TargetLabel::Tenant, TargetLabel::GroupUserId];
+pub static TARGET_LABELS: [TargetFormatterLabel; 4] =
+  [TargetFormatterLabel::Tenant, TargetFormatterLabel::Platform, TargetFormatterLabel::GroupUserId, TargetFormatterLabel::Default];
