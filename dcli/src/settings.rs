@@ -290,7 +290,8 @@ fn delete_file(toml_file: &PathBuf) -> Result<(), String> {
 /// # Get password from keyring
 ///
 /// ## Parameters
-/// * `dsh_api_tenant` - used to determine the entry in the keyring
+/// * `platform` - platform of the target
+/// * `tenant` - tenant of the target
 ///
 /// ## Returns
 /// * `Ok(Some(password))` - if the password entry was found in the keyring
@@ -311,7 +312,8 @@ pub(crate) fn get_password_from_keyring(platform: &DshPlatform, tenant: &str) ->
 ///
 /// ## Parameters
 /// * `password` - password to add to the keyring
-/// * `dsh_api_tenant` - used to determine the entry in the keyring
+/// * `platform` - platform of the target
+/// * `tenant` - tenant of the target
 ///
 /// ## Returns
 /// * `Ok(())` - if the password entry was successfully written to the keyring
@@ -330,7 +332,8 @@ pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform,
 /// # Delete password from the keyring
 ///
 /// ## Parameters
-/// * `dsh_api_tenant` - used to determine the entry in the keyring
+/// * `platform` - platform of the target
+/// * `tenant` - tenant of the target
 ///
 /// ## Returns
 /// * `Ok(())` - if the password entry was successfully deleted from the keyring
