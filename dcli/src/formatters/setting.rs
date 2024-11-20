@@ -2,7 +2,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::settings::Settings;
 
 #[derive(Eq, Hash, PartialEq)]
-pub(crate) enum SettingsLabel {
+pub(crate) enum SettingLabel {
   DefaultPlatform,
   DefaultTenant,
   ShowExecutionTime,
@@ -10,14 +10,14 @@ pub(crate) enum SettingsLabel {
   Verbosity,
 }
 
-impl Label for SettingsLabel {
+impl Label for SettingLabel {
   fn label_for_show(&self) -> &str {
     match self {
-      SettingsLabel::DefaultPlatform => "default-platform",
-      SettingsLabel::DefaultTenant => "default-tenant",
-      SettingsLabel::ShowExecutionTime => "show-execution-time",
-      SettingsLabel::NoBorder => "no-border",
-      SettingsLabel::Verbosity => "verbosity",
+      SettingLabel::DefaultPlatform => "default-platform",
+      SettingLabel::DefaultTenant => "default-tenant",
+      SettingLabel::ShowExecutionTime => "show-execution-time",
+      SettingLabel::NoBorder => "no-border",
+      SettingLabel::Verbosity => "verbosity",
     }
   }
 
@@ -26,26 +26,26 @@ impl Label for SettingsLabel {
   }
 }
 
-impl SubjectFormatter<SettingsLabel> for Settings {
-  fn value(&self, label: &SettingsLabel, _target_id: &str) -> String {
+impl SubjectFormatter<SettingLabel> for Settings {
+  fn value(&self, label: &SettingLabel, _target_id: &str) -> String {
     match label {
-      SettingsLabel::DefaultPlatform => self
+      SettingLabel::DefaultPlatform => self
         .default_platform
         .clone()
         .unwrap_or("not set, provide platform as a command line argument, else the user will be promted".to_string()),
-      SettingsLabel::DefaultTenant => self
+      SettingLabel::DefaultTenant => self
         .default_tenant
         .clone()
         .unwrap_or("not set, provide platform as a command line argument, else the user will be promted".to_string()),
-      SettingsLabel::ShowExecutionTime => self
+      SettingLabel::ShowExecutionTime => self
         .show_execution_time
         .map(|show_execution_time| show_execution_time.to_string())
         .unwrap_or("not set, default depends on 'verbosity' setting".to_string()),
-      SettingsLabel::NoBorder => self
+      SettingLabel::NoBorder => self
         .no_border
         .map(|no_border| no_border.to_string())
         .unwrap_or("not set, default is to show borders".to_string()),
-      SettingsLabel::Verbosity => self
+      SettingLabel::Verbosity => self
         .verbosity
         .clone()
         .map(|verbosity| verbosity.to_string())
@@ -53,10 +53,10 @@ impl SubjectFormatter<SettingsLabel> for Settings {
     }
   }
 
-  fn target_label(&self) -> Option<SettingsLabel> {
+  fn target_label(&self) -> Option<SettingLabel> {
     None
   }
 }
 
-pub static SETTING_LABELS: [SettingsLabel; 5] =
-  [SettingsLabel::DefaultPlatform, SettingsLabel::DefaultTenant, SettingsLabel::ShowExecutionTime, SettingsLabel::NoBorder, SettingsLabel::Verbosity];
+pub static SETTING_LABELS: [SettingLabel; 5] =
+  [SettingLabel::DefaultPlatform, SettingLabel::DefaultTenant, SettingLabel::ShowExecutionTime, SettingLabel::NoBorder, SettingLabel::Verbosity];

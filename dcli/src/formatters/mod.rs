@@ -11,7 +11,7 @@ pub(crate) mod formatter;
 pub(crate) mod list_table;
 pub(crate) mod manifest;
 pub(crate) mod proxy;
-pub(crate) mod settings;
+pub(crate) mod setting;
 pub(crate) mod show_table;
 #[cfg(feature = "stream")]
 pub(crate) mod stream;
