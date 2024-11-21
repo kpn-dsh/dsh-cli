@@ -48,17 +48,13 @@ where
 {
   pub fn list(labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.label_for_list()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.label_for_list()));
     Self { list: true, labels, context, tabled_builder, phantom: PhantomData }
   }
 
   pub fn show(labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.label_for_show()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.label_for_show()));
     Self { list: false, labels, context, tabled_builder, phantom: PhantomData }
   }
 
@@ -169,9 +165,7 @@ pub struct StringTableBuilder<'a> {
 impl<'a> StringTableBuilder<'a> {
   pub fn new(labels: &'a [&'a str], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.to_string()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.to_string()));
     Self { context, tabled_builder }
   }
 

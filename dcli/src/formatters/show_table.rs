@@ -22,17 +22,15 @@ where
 {
   pub fn new(target_id: &str, subject: &V, labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record([
-        subject
-          .target_label()
-          .map(|target_label| target_label.label_for_show().to_owned())
-          .unwrap_or_default(),
-        target_id.to_string(),
-      ]);
-    }
+    tabled_builder.push_record([
+      subject
+        .target_label()
+        .map(|target_label| target_label.label_for_show().to_owned())
+        .unwrap_or_default(),
+      target_id.to_string(),
+    ]);
     for label in labels {
-      if !(context.show_headers() && subject.target_label().is_some_and(|target_label| target_label == *label)) {
+      if !subject.target_label().is_some_and(|target_label| target_label == *label) {
         tabled_builder.push_record([label.label_for_show().to_string(), subject.value(label, target_id)]);
       }
     }
@@ -40,11 +38,7 @@ where
   }
 
   pub fn _is_empty(&self) -> bool {
-    if self.context.show_headers() {
-      self.tabled_builder.count_records() == 1
-    } else {
-      self.tabled_builder.count_records() == 0
-    }
+    self.tabled_builder.count_records() == 1
   }
 
   pub fn print(self) {

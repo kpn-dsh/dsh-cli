@@ -15,9 +15,7 @@ pub struct _StringTable<'a> {
 impl<'a> _StringTable<'a> {
   pub fn _new(labels: &'a [&'a str], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.to_string()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.to_string()));
     Self { context, tabled_builder }
   }
 

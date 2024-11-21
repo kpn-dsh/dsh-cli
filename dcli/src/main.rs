@@ -98,28 +98,21 @@ pub(crate) struct DcliContext<'a> {
 impl DcliContext<'_> {
   pub(crate) fn show_capability_explanation(&self) -> bool {
     match self.verbosity {
-      Verbosity::Off | Verbosity::Low => false,
+      Verbosity::Low => false,
       Verbosity::Medium | Verbosity::High => true,
     }
   }
 
   pub(crate) fn show_execution_time(&self) -> bool {
     match self.verbosity {
-      Verbosity::Off | Verbosity::Low => false,
+      Verbosity::Low => false,
       Verbosity::Medium | Verbosity::High => true,
-    }
-  }
-
-  pub(crate) fn show_headers(&self) -> bool {
-    match self.verbosity {
-      Verbosity::Off => false,
-      Verbosity::Low | Verbosity::Medium | Verbosity::High => true,
     }
   }
 
   pub(crate) fn _show_settings(&self) -> bool {
     match self.verbosity {
-      Verbosity::Off | Verbosity::Low => false,
+      Verbosity::Low => false,
       Verbosity::Medium | Verbosity::High => true,
     }
   }

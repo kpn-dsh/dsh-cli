@@ -23,18 +23,12 @@ where
 {
   pub fn new(labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.label_for_list()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.label_for_list()));
     Self { labels, context, tabled_builder, phantom: PhantomData }
   }
 
   pub fn is_empty(&self) -> bool {
-    if self.context.show_headers() {
-      self.tabled_builder.count_records() == 1
-    } else {
-      self.tabled_builder.count_records() == 0
-    }
+    self.tabled_builder.count_records() == 1
   }
 
   pub fn _values(&mut self, values: &[(String, V)]) -> &Self {
