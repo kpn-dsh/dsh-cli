@@ -40,7 +40,7 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
           "".to_string()
         }
       }
-      TargetFormatterLabel::GroupUserId => format!("{}:{}", self.group_user_id.to_string(), self.group_user_id.to_string()),
+      TargetFormatterLabel::GroupUserId => format!("{}:{}", self.group_user_id, self.group_user_id),
       TargetFormatterLabel::Platform => self.platform.to_string(),
       TargetFormatterLabel::Tenant => self.tenant.clone(),
     }
