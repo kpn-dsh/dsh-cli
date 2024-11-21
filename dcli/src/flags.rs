@@ -9,6 +9,7 @@ pub(crate) enum FlagType {
   Configuration,
   Ids,
   Properties,
+  System,
   Tasks,
   Usage,
   Value,
@@ -22,6 +23,7 @@ impl FlagType {
       Configuration => "configuration-flag",
       Ids => "ids-flag",
       Properties => "properties-flag",
+      System => "system-flag",
       Tasks => "tasks-flag",
       Usage => "usage-flag",
       Value => "value-flag",
@@ -35,6 +37,7 @@ impl FlagType {
       Configuration => "configuration",
       Ids => "ids",
       Properties => "properties",
+      System => "system",
       Tasks => "tasks",
       Usage => "usage",
       Value => "value",
@@ -48,6 +51,7 @@ impl FlagType {
       Configuration => Some('c'),
       Ids => Some('i'),
       Properties => Some('p'),
+      System => None,
       Tasks => None,
       Usage => Some('u'),
       Value => Some('v'),
@@ -62,6 +66,7 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     Configuration => configuration_flag(subject, long_help),
     Ids => ids_flag(subject, long_help),
     Properties => properties_flag(subject, long_help),
+    System => system_flag(subject, long_help),
     Tasks => tasks_flag(subject, long_help),
     Usage => usage_flag(subject, long_help),
     Value => value_flag(subject, long_help),
@@ -86,6 +91,10 @@ fn ids_flag(subject: &str, long_help: Option<&str>) -> Arg {
 
 fn properties_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_flag(Properties, format!("Include the {}'s properties.", subject), long_help)
+}
+
+fn system_flag(subject: &str, long_help: Option<&str>) -> Arg {
+  create_clap_flag(System, format!("Include the system {}'s.", subject), long_help)
 }
 
 fn tasks_flag(subject: &str, long_help: Option<&str>) -> Arg {
