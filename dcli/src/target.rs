@@ -27,14 +27,12 @@ impl Subject for TargetSubject {
     TARGET_SUBJECT_TARGET
   }
 
-  fn subject_first_upper(&self) -> &'static str {
-    "Target"
-  }
-
+  /// Help text printed for -h flag
   fn subject_command_about(&self) -> String {
     "Show, manage and list dcli target configurations.".to_string()
   }
 
+  /// Help text printed for --help flag
   fn subject_command_long_about(&self) -> String {
     "Show, manage and list dcli target configurations. \
     A target configuration consists of a platform name, a tenant name, \
@@ -61,21 +59,21 @@ impl Subject for TargetSubject {
 
 lazy_static! {
   pub static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Delete, "Delete target")
+    CapabilityBuilder::new(CapabilityType::Delete, "Delete target configuration.")
       .set_long_about(
-        "Delete a target. \
+        "Delete a target configuration. \
         You will be prompted for the target's platform and tenant, \
         and you need to explicitly confirm the action.",
       )
       .set_default_command_executor(&TargetDelete {})
   );
   pub static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List targets")
-      .set_long_about("Lists all dcli target configurations.")
+    CapabilityBuilder::new(CapabilityType::List, "List all target configurations.")
+      .set_long_about("Lists all target configurations.")
       .set_default_command_executor(&TargetList {})
   );
   pub static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::New, "Create new target")
+    CapabilityBuilder::new(CapabilityType::New, "Create a new target configuration.")
       .set_long_about(
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant, group/user id and password. \
@@ -140,8 +138,8 @@ impl CommandExecutor for TargetList {
     };
     let targets = all_targets()?;
     for target in targets {
-      let is_default = default_platform.clone().is_some_and(|ref platform| target.platform.to_string() == *platform)
-        && default_tenant.clone().is_some_and(|ref tenant| target.tenant.to_string() == *tenant);
+      let is_default =
+        default_platform.clone().is_some_and(|ref platform| target.platform.to_string() == *platform) && default_tenant.clone().is_some_and(|ref tenant| target.tenant == *tenant);
       let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, group_user_id: target.group_user_id, is_default };
       table.value("", &target_formatter);
     }
