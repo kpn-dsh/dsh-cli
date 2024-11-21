@@ -20,6 +20,7 @@ All notable changes to the dcli tool project will be documented in this file.
 ### Changed
 
 * Added prompts for user input.
+* System secrets no longer listed by default.
 
 ### Removed
 

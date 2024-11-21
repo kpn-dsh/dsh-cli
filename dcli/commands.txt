@@ -1,45 +1,43 @@
 app l
 app list
-app list --ids
 apps
+app list --ids
 app show $APP_UNDER_TEST
 
 a l
 application l
 application list
-application list --configuration
+as
+applications
 application list --ids
 application list --started
 application list --status
 application list --stopped
 application list --tasks
-as
 application show $APPLICATION_UNDER_TEST
-application show $APPLICATION_UNDER_TEST --configuration
 application show $APPLICATION_UNDER_TEST --status
 application show $APPLICATION_UNDER_TEST --tasks
-applications
 
 b l
 bs
 bucket l
 bucket list
+buckets
 bucket list --configuration
 bucket list --ids
 bucket list --status
-buckets
 bucket show $BUCKET_UNDER_TEST
 bucket show $BUCKET_UNDER_TEST --status
 
 c l
 certificate l
 certificate list
+certificates
+cs
 certificate list --configuration
 certificate list --ids
 certificate list --status
 certificate list --usage
-certificates
-cs
 certificate show $CERTIFICATE_UNDER_TEST
 certificate show $CERTIFICATE_UNDER_TEST --status
 certificate show $CERTIFICATE_UNDER_TEST --usage
@@ -63,26 +61,27 @@ manifest list --ids
 manifest show $MANIFEST_UNDER_TEST
 
 metric list
+m list
+metrics
 metric list --app
 metric list --application
 metric list --started
 metric list --stopped
-m list
-metrics
 
 proxy l
 proxy list
-proxy list --ids
 proxys
+proxy list --ids
 proxy show $PROXY_UNDER_TEST
 
 s l
 secret l
 secret list
-secret list --status
-secret list --usage
 secrets
 ss
+secret list --system
+secret list --status
+secret list --usage
 secret show $SECRET_UNDER_TEST
 secret show $SECRET_UNDER_TEST --usage
 secret show $SECRET_UNDER_TEST --value
@@ -90,10 +89,10 @@ secret show $SECRET_UNDER_TEST --value
 setting list
 
 topic list
+ts
 topic list --ids
 topic list --status
 topic list --usage
-ts
 topic show $TOPIC_UNDER_TEST
 topic show $TOPIC_UNDER_TEST --properties
 topic show $TOPIC_UNDER_TEST --status
