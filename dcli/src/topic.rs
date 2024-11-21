@@ -8,7 +8,9 @@ use lazy_static::lazy_static;
 
 use dsh_api::types::Application;
 
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::formatter::{print_vec, HashMapKey, TableBuilder};
@@ -29,10 +31,6 @@ lazy_static! {
 impl Subject for TopicSubject {
   fn subject(&self) -> &'static str {
     TOPIC_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Topic"
   }
 
   fn subject_command_about(&self) -> String {
@@ -61,49 +59,35 @@ impl Subject for TopicSubject {
 }
 
 lazy_static! {
-  pub static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Delete,
-    command_about: "Delete scratch topic".to_string(),
-    command_long_about: Some("Delete a scratch topic.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&TopicDelete {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List topics".to_string(),
-    command_long_about: Some("Lists all available topics.".to_string()),
-    command_executors: vec![
-      (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
-      (FlagType::Configuration, &TopicListConfiguration {}, None),
-      (FlagType::Ids, &TopicListIds {}, None),
-      (FlagType::Usage, &TopicListUsage {}, None),
-    ],
-    default_command_executor: Some(&TopicListConfiguration {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show topic configuration".to_string(),
-    command_long_about: None,
-    command_executors: vec![
-      (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
-      (FlagType::Configuration, &TopicShowConfiguration {}, None),
-      (FlagType::Properties, &TopicShowProperties {}, None),
-      (FlagType::Usage, &TopicShowUsage {}, None),
-    ],
-    default_command_executor: Some(&TopicShowConfiguration {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Delete, "Delete scratch topic")
+      .set_long_about("Delete a scratch topic.")
+      .set_default_command_executor(&TopicDelete {})
+      .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
+  );
+  pub static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List topics")
+      .set_long_about("Lists all available scratch topics.")
+      .add_command_executors(vec![
+        (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
+        (FlagType::Configuration, &TopicListConfiguration {}, None),
+        (FlagType::Ids, &TopicListIds {}, None),
+        (FlagType::Usage, &TopicListUsage {}, None),
+      ])
+      .set_default_command_executor(&TopicListConfiguration {})
+      .set_run_all_executors(true)
+  );
+  pub static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show topic configuration")
+      .add_command_executors(vec![
+        (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
+        (FlagType::Configuration, &TopicShowConfiguration {}, None),
+        (FlagType::Properties, &TopicShowProperties {}, None),
+        (FlagType::Usage, &TopicShowUsage {}, None),
+      ])
+      .set_default_command_executor(&TopicShowConfiguration {})
+      .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
+  );
 }
 
 struct TopicDelete {}

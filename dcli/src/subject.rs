@@ -10,8 +10,6 @@ use crate::{DcliContext, DcliResult};
 pub trait Subject {
   fn subject(&self) -> &'static str;
 
-  fn subject_first_upper(&self) -> &'static str;
-
   fn subject_command_about(&self) -> String;
 
   fn subject_command_long_about(&self) -> String {
@@ -57,7 +55,8 @@ pub(crate) fn clap_subject_command(subject: &dyn Subject) -> (String, Command) {
   let mut capability_subcommands: Vec<Command> = vec![];
   for capability_type in &ALL_CAPABILITY_TYPES {
     if let Some(capability) = subject.capabilities().get(capability_type) {
-      capability_subcommands.push(capability.clap_capability_command(subject))
+      let capability_command = capability.clap_capability_command(subject);
+      capability_subcommands.push(capability_command)
     }
   }
   let mut subject_command = Command::new(subject.subject().to_string())

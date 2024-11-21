@@ -36,10 +36,6 @@ impl Subject for SecretSubject {
     SECRET_SUBJECT_TARGET
   }
 
-  fn subject_first_upper(&self) -> &'static str {
-    "Secret"
-  }
-
   fn subject_command_about(&self) -> String {
     "Show, manage and list DSH secrets.".to_string()
   }

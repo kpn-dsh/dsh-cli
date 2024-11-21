@@ -5,7 +5,9 @@ use clap::ArgMatches;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::bucket::{BUCKET_LABELS, BUCKET_STATUS_LABELS};
@@ -25,10 +27,6 @@ lazy_static! {
 impl Subject for BucketSubject {
   fn subject(&self) -> &'static str {
     BUCKET_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Bucket"
   }
 
   fn subject_command_about(&self) -> String {
@@ -56,33 +54,27 @@ impl Subject for BucketSubject {
 }
 
 lazy_static! {
-  pub static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List buckets".to_string(),
-    command_long_about: Some("Lists all available buckets.".to_string()),
-    command_executors: vec![
-      (FlagType::All, &BucketListAll {}, None),
-      (FlagType::AllocationStatus, &BucketListAllocationStatus {}, None),
-      (FlagType::Configuration, &BucketListConfiguration {}, None),
-      (FlagType::Ids, &BucketListIds {}, None),
-    ],
-    default_command_executor: Some(&BucketListAll {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show bucket configuration".to_string(),
-    command_long_about: None,
-    command_executors: vec![(FlagType::All, &BucketShowAll {}, None), (FlagType::AllocationStatus, &BucketShowAllocationStatus {}, None),],
-    default_command_executor: Some(&BucketShowAll {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List buckets")
+      .set_long_about("Lists all available buckets.")
+      .add_command_executors(vec![
+        (FlagType::All, &BucketListAll {}, None),
+        (FlagType::AllocationStatus, &BucketListAllocationStatus {}, None),
+        (FlagType::Configuration, &BucketListConfiguration {}, None),
+        (FlagType::Ids, &BucketListIds {}, None),
+      ])
+      .set_default_command_executor(&BucketListAll {})
+      .set_run_all_executors(true)
+  );
+  pub static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show bucket configuration")
+      .add_command_executors(vec![
+        (FlagType::All, &BucketShowAll {}, None),
+        (FlagType::AllocationStatus, &BucketShowAllocationStatus {}, None)
+      ])
+      .set_default_command_executor(&BucketShowAll {})
+      .add_target_argument(target_argument(BUCKET_SUBJECT_TARGET, None))
+  );
 }
 
 struct BucketListAll {}

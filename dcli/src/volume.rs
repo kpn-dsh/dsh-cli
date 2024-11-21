@@ -10,7 +10,9 @@ use dsh_api::types::Volume;
 
 use crate::app::apps_that_use_volume;
 use crate::application::applications_that_use_volume;
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
@@ -33,10 +35,6 @@ lazy_static! {
 impl Subject for VolumeSubject {
   fn subject(&self) -> &'static str {
     VOLUME_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Volume"
   }
 
   fn subject_command_about(&self) -> String {
@@ -62,60 +60,45 @@ impl Subject for VolumeSubject {
 }
 
 lazy_static! {
-  pub static ref VOLUME_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Create,
-    command_about: "Create volume".to_string(),
-    command_long_about: Some("Create a volume.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&VolumeCreate {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Delete,
-    command_about: "Delete volume".to_string(),
-    command_long_about: Some("Delete a volume.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&VolumeDelete {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List volumes".to_string(),
-    command_long_about: Some("Lists all available volumes.".to_string()),
-    command_executors: vec![
-      (FlagType::All, &VolumeListAll {}, None),
-      (FlagType::AllocationStatus, &VolumeListAllocationStatus {}, None),
-      (FlagType::Configuration, &VolumeListConfiguration {}, None),
-      (FlagType::Ids, &VolumeListIds {}, None),
-      (FlagType::Usage, &VolumeListUsage {}, None),
-    ],
-    default_command_executor: Some(&VolumeListAll {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![(FilterFlagType::App, Some("List all apps that use the volume.")), (FilterFlagType::Application, Some("List all applications that use the volume."))],
-    modifier_flags: vec![],
-  });
-  pub static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show volume configuration".to_string(),
-    command_long_about: None,
-    command_executors: vec![
-      (FlagType::All, &VolumeShowAll {}, None),
-      (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
-      (FlagType::Usage, &VolumeShowUsage {}, None),
-    ],
-    default_command_executor: Some(&VolumeShowAll {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref VOLUME_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Create, "Create volume")
+      .set_long_about("Create a volume.")
+      .set_default_command_executor(&VolumeCreate {})
+      .add_target_argument(target_argument(VOLUME_SUBJECT_TARGET, None))
+  );
+  pub static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Delete, "Delete volume")
+      .set_long_about("Delete a volume.")
+      .set_default_command_executor(&VolumeDelete {})
+      .add_target_argument(target_argument(VOLUME_SUBJECT_TARGET, None))
+  );
+  pub static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List volumes")
+      .set_long_about("Lists all available volumes.")
+      .add_command_executors(vec![
+        (FlagType::All, &VolumeListAll {}, None),
+        (FlagType::AllocationStatus, &VolumeListAllocationStatus {}, None),
+        (FlagType::Configuration, &VolumeListConfiguration {}, None),
+        (FlagType::Ids, &VolumeListIds {}, None),
+        (FlagType::Usage, &VolumeListUsage {}, None),
+      ])
+      .set_default_command_executor(&VolumeListAll {})
+      .set_run_all_executors(true)
+      .add_filter_flags(vec![
+        (FilterFlagType::App, Some("List all apps that use the volume.".to_string())),
+        (FilterFlagType::Application, Some("List all applications that use the volume.".to_string()))
+      ])
+  );
+  pub static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show secret configuration")
+      .add_command_executors(vec![
+        (FlagType::All, &VolumeShowAll {}, None),
+        (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
+        (FlagType::Usage, &VolumeShowUsage {}, None),
+      ])
+      .set_default_command_executor(&VolumeShowAll {})
+      .add_target_argument(target_argument(VOLUME_SUBJECT_TARGET, None))
+  );
 }
 
 struct VolumeCreate {}

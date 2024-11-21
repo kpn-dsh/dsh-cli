@@ -2,11 +2,7 @@ use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 use std::fmt::{Display, Formatter};
 
-use crate::arguments::{query_argument, target_argument, QUERY_ARGUMENT, TARGET_ARGUMENT};
 use crate::capability::CapabilityType::*;
-use crate::filter_flags::{create_filter_flag, FilterFlagType};
-use crate::flags::{create_flag, FlagType};
-use crate::modifier_flags::{create_modifier_flag, ModifierFlagType};
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
 
@@ -62,7 +58,7 @@ impl CapabilityType {
     match self {
       Create => None,
       Delete => None,
-      Diff => Some("d"),
+      Diff => None,
       Find => Some("f"),
       List => Some("l"),
       New => None,
@@ -70,36 +66,6 @@ impl CapabilityType {
       Start => None,
       Stop => None,
       Update => None,
-    }
-  }
-
-  pub(crate) fn command_target_arguments(&self, subject: &str) -> Vec<Arg> {
-    match self {
-      Create => vec![target_argument(subject, None)],
-      Delete => vec![target_argument(subject, None)],
-      Diff => vec![target_argument(subject, None)],
-      Find => vec![query_argument(None)],
-      List => vec![],
-      New => vec![],
-      Show => vec![target_argument(subject, None)],
-      Start => vec![target_argument(subject, None)],
-      Stop => vec![target_argument(subject, None)],
-      Update => vec![target_argument(subject, None)],
-    }
-  }
-
-  fn command_target_argument_ids(&self) -> &[&str] {
-    match self {
-      Create => &[TARGET_ARGUMENT],
-      Delete => &[TARGET_ARGUMENT],
-      Diff => &[TARGET_ARGUMENT],
-      Find => &[QUERY_ARGUMENT],
-      List => &[],
-      New => &[],
-      Show => &[TARGET_ARGUMENT],
-      Start => &[TARGET_ARGUMENT],
-      Stop => &[TARGET_ARGUMENT],
-      Update => &[TARGET_ARGUMENT],
     }
   }
 }
@@ -136,6 +102,67 @@ pub trait Capability {
   fn command_target_argument_ids(&self) -> Vec<String>;
 
   async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult;
+
+  // name: "delete",
+  // about: Some(
+  //     StyledStr(
+  //         "Delete target configuration.",
+  //     ),
+  // ),
+  // long_about: Some(
+  //     StyledStr(
+  //         "Delete a target configuration. You will be prompted for the target's platform and tenant, and you need to explicitly confirm the action.",
+  //     ),
+  // ),
+
+  // long_flag: None,
+  // short_flag: None,
+  // display_name: None,
+  // bin_name: None,
+  // author: None,
+  // version: None,
+  // long_version: None,
+  // before_help: None,
+  // before_long_help: None,
+  // after_help: None,
+  // after_long_help: None,
+  // aliases: [],
+  // short_flag_aliases: [],
+  // long_flag_aliases: [],
+  // usage_str: None,
+  // usage_name: None,
+  // help_str: None,
+  // disp_ord: Some(
+  //     0,
+  // ),
+  // template: None,
+  // settings: AppFlags(
+  //     0,
+  // ),
+  // g_settings: AppFlags(
+  //     0,
+  // ),
+  // args: MKeyMap {
+  //     args: [],
+  //     keys: [],
+  // },
+  // subcommands: [],
+  // groups: [],
+  // current_help_heading: None,
+  // current_disp_ord: Some(
+  //     0,
+  // ),
+  // subcommand_value_name: None,
+  // subcommand_heading: None,
+  // external_value_parser: None,
+  // long_help_exists: false,
+  // deferred: None,
+  // app_ext: Extensions {
+  //     extensions: FlatMap {
+  //         keys: [],
+  //         values: [],
+  //     },
+  // },
 }
 
 #[async_trait]
@@ -145,105 +172,4 @@ pub(crate) trait CommandExecutor {
   // fn get_long_help(&self);
 
   async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult;
-}
-
-pub(crate) struct DeclarativeCapability<'a> {
-  pub(crate) capability_type: CapabilityType,
-  pub(crate) command_about: String,
-  pub(crate) command_long_about: Option<String>,
-  pub(crate) command_executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<&'a str>)>,
-  pub(crate) default_command_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
-  pub(crate) run_all_executors: bool,
-  pub(crate) extra_arguments: Vec<Arg>,
-  pub(crate) filter_flags: Vec<(FilterFlagType, Option<&'a str>)>,
-  pub(crate) modifier_flags: Vec<(ModifierFlagType, Option<&'a str>)>,
-}
-
-#[async_trait]
-impl Capability for DeclarativeCapability<'_> {
-  fn clap_capability_command(&self, subject: &dyn Subject) -> Command {
-    let mut capability_command = Command::new(self.capability_type.to_string())
-      .name(self.capability_type.to_string())
-      .about(&self.command_about)
-      .args(self.capability_type.command_target_arguments(subject.subject_first_upper()))
-      .args(self.clap_flags(subject.subject()))
-      .args(&self.extra_arguments);
-    if let Some(alias) = self.capability_type.command_alias() {
-      capability_command = capability_command.alias(alias)
-    }
-    if let Some(ref long_about) = self.command_long_about {
-      capability_command = capability_command.long_about(long_about)
-    }
-    capability_command
-  }
-
-  fn clap_flags(&self, subject: &str) -> Vec<Arg> {
-    [
-      self
-        .command_executors
-        .iter()
-        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, *long_help))
-        .collect::<Vec<Arg>>(),
-      self
-        .filter_flags
-        .iter()
-        .map(|(flag_type, long_help)| create_filter_flag(flag_type, subject, *long_help))
-        .collect::<Vec<_>>(),
-      self
-        .modifier_flags
-        .iter()
-        .map(|(flag_type, long_help)| create_modifier_flag(flag_type, subject, *long_help))
-        .collect::<Vec<_>>(),
-    ]
-    .concat()
-  }
-
-  fn long_about(&self) -> Option<String> {
-    self.command_long_about.clone()
-  }
-
-  fn command_target_argument_ids(&self) -> Vec<String> {
-    self
-      .capability_type
-      .command_target_argument_ids()
-      .iter()
-      .map(|id| id.to_string())
-      .collect::<Vec<_>>()
-  }
-
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
-    let mut last_dcli_result: Option<DcliResult> = None;
-    let mut number_of_executed_capabilities = 0;
-    if self.run_all_executors {
-      for (flag_type, executor, _) in &self.command_executors {
-        if matches.get_flag(flag_type.id()) {
-          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
-          number_of_executed_capabilities += 1;
-        }
-      }
-    } else {
-      for (flag_type, executor, _) in &self.command_executors {
-        if matches.get_flag(flag_type.id()) && last_dcli_result.is_none() {
-          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
-          number_of_executed_capabilities += 1;
-        }
-      }
-    }
-    match last_dcli_result {
-      Some(dcli_result) => {
-        if number_of_executed_capabilities > 1 {
-          Ok(true)
-        } else {
-          dcli_result
-        }
-      }
-      None => {
-        if let Some(default_executor) = self.default_command_executor {
-          default_executor.execute(argument.clone(), sub_argument.clone(), matches, context).await
-        } else {
-          Ok(true)
-        }
-      }
-    }
-  }
 }

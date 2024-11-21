@@ -25,10 +25,6 @@ impl Subject for SettingSubject {
     SETTING_SUBJECT_TARGET
   }
 
-  fn subject_first_upper(&self) -> &'static str {
-    "Setting"
-  }
-
   fn subject_command_about(&self) -> String {
     "Show, manage and list dcli settings.".to_string()
   }

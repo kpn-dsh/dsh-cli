@@ -7,7 +7,8 @@ use lazy_static::lazy_static;
 use dsh_api::types::AppCatalogApp;
 
 use crate::app::get_application_from_app;
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::subject::Subject;
@@ -25,10 +26,6 @@ lazy_static! {
 impl Subject for MetricSubject {
   fn subject(&self) -> &'static str {
     METRIC_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Metric"
   }
 
   fn subject_command_about(&self) -> String {
@@ -55,17 +52,17 @@ impl Subject for MetricSubject {
 }
 
 lazy_static! {
-  pub static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List exported metrics".to_string(),
-    command_long_about: None,
-    command_executors: vec![],
-    default_command_executor: Some(&MetricList {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![(FilterFlagType::App, None), (FilterFlagType::Application, None), (FilterFlagType::Started, None), (FilterFlagType::Stopped, None)],
-    modifier_flags: vec![],
-  });
+  pub static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List exported metrics")
+      .set_long_about("List all applications/apps that have metrics export configured.")
+      .set_default_command_executor(&MetricList {})
+      .add_filter_flags(vec![
+        (FilterFlagType::App, None),
+        (FilterFlagType::Application, None),
+        (FilterFlagType::Started, None),
+        (FilterFlagType::Stopped, None)
+      ])
+  );
 }
 
 struct MetricList {}

@@ -7,7 +7,9 @@ use lazy_static::lazy_static;
 
 use dsh_api::types::AppCatalogManifest;
 
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::flags::FlagType;
 use crate::formatters::formatter::print_vec;
 use crate::formatters::list_table::ListTable;
@@ -28,10 +30,6 @@ lazy_static! {
 impl Subject for ManifestSubject {
   fn subject(&self) -> &'static str {
     MANIFEST_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Manifest"
   }
 
   fn subject_command_about(&self) -> String {
@@ -55,28 +53,19 @@ impl Subject for ManifestSubject {
 }
 
 lazy_static! {
-  pub static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List manifests".to_string(),
-    command_long_about: Some("Lists all manifest files from the App Catalog.".to_string()),
-    command_executors: vec![(FlagType::All, &ManifestListAll {}, None), (FlagType::Ids, &ManifestListIds {}, None),],
-    default_command_executor: Some(&ManifestListAll {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![]
-  });
-  pub static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show manifest configuration".to_string(),
-    command_long_about: None,
-    command_executors: vec![(FlagType::All, &ManifestShowAll {}, None)],
-    default_command_executor: Some(&ManifestShowAll {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![]
-  });
+  pub static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List manifests")
+      .set_long_about("Lists all manifest files from the App Catalog.")
+      .add_command_executors(vec![(FlagType::All, &ManifestListAll {}, None), (FlagType::Ids, &ManifestListIds {}, None)])
+      .set_default_command_executor(&ManifestListAll {})
+      .set_run_all_executors(true)
+  );
+  pub static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show manifest configuration")
+      .add_command_executor(FlagType::All, &ManifestShowAll {}, None)
+      .set_default_command_executor(&ManifestShowAll {})
+      .add_target_argument(target_argument(MANIFEST_SUBJECT_TARGET, None))
+  );
 }
 
 struct ManifestListAll {}

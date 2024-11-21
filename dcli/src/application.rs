@@ -7,7 +7,9 @@ use lazy_static::lazy_static;
 
 use dsh_api::types::{Application, TaskStatus};
 
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
@@ -32,10 +34,6 @@ impl Subject for ApplicationSubject {
     APPLICATION_SUBJECT_TARGET
   }
 
-  fn subject_first_upper(&self) -> &'static str {
-    "Application"
-  }
-
   fn subject_command_about(&self) -> String {
     "Show, manage and list applications deployed on the DSH.".to_string()
   }
@@ -57,44 +55,39 @@ impl Subject for ApplicationSubject {
 }
 
 lazy_static! {
-  pub static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List applications".to_string(),
-    command_long_about: Some(
-      "Lists all deployed DSH applications. \
-    This will also include applications that are stopped \
-    (deployed with 0 instances)."
-        .to_string()
-    ),
-    command_executors: vec![
-      (FlagType::All, &ApplicationListAll {}, None),
-      (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
-      (FlagType::Configuration, &ApplicationListConfiguration {}, None),
-      (FlagType::Ids, &ApplicationListIds {}, None),
-      (FlagType::Tasks, &ApplicationListTasks {}, None),
-    ],
-    default_command_executor: Some(&ApplicationListAll {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![(FilterFlagType::Started, Some("List all started applications.")), (FilterFlagType::Stopped, Some("List all stopped applications."))],
-    modifier_flags: vec![],
-  });
-  pub static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show application configuration".to_string(),
-    command_long_about: Some("".to_string()),
-    command_executors: vec![
-      (FlagType::All, &ApplicationShowAll {}, None),
-      (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
-      (FlagType::Configuration, &ApplicationShowConfiguration {}, None),
-      (FlagType::Tasks, &ApplicationShowTasks {}, None),
-    ],
-    default_command_executor: Some(&ApplicationShowAll {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List applications")
+      .set_long_about(
+        "Lists all deployed DSH applications. \
+        This will also include applications that are stopped \
+        (deployed with 0 instances)."
+      )
+      .add_command_executors(vec![
+        (FlagType::All, &ApplicationListAll {}, None),
+        (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
+        (FlagType::Configuration, &ApplicationListConfiguration {}, None),
+        (FlagType::Ids, &ApplicationListIds {}, None),
+        (FlagType::Tasks, &ApplicationListTasks {}, None),
+      ])
+      .set_default_command_executor(&ApplicationListAll {})
+      .set_run_all_executors(true)
+      .add_filter_flags(vec![
+        (FilterFlagType::Started, Some("List all started applications.".to_string())),
+        (FilterFlagType::Stopped, Some("List all stopped applications.".to_string()))
+      ])
+  );
+  pub static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show application configuration")
+      .set_long_about("Show the configuration of an application deployed on the DSH.")
+      .add_command_executors(vec![
+        (FlagType::All, &ApplicationShowAll {}, None),
+        (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
+        (FlagType::Configuration, &ApplicationShowConfiguration {}, None),
+        (FlagType::Tasks, &ApplicationShowTasks {}, None),
+      ])
+      .set_default_command_executor(&ApplicationShowAll {})
+      .add_target_argument(target_argument(APPLICATION_SUBJECT_TARGET, None))
+  );
 }
 
 struct ApplicationListAll {}

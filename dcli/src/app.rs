@@ -6,7 +6,9 @@ use lazy_static::lazy_static;
 
 use dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue, Application};
 
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::flags::FlagType;
 use crate::formatters::app::APP_CATALOG_APP_LABELS;
 use crate::formatters::application::APPLICATION_LABELS_SHOW;
@@ -28,10 +30,6 @@ impl Subject for AppSubject {
     APP_SUBJECT_TARGET
   }
 
-  fn subject_first_upper(&self) -> &'static str {
-    "App"
-  }
-
   fn subject_command_about(&self) -> String {
     "Show, manage and list apps deployed from the DSH app catalog.".to_string()
   }
@@ -49,28 +47,24 @@ impl Subject for AppSubject {
 }
 
 lazy_static! {
-  pub static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List deployed apps".to_string(),
-    command_long_about: Some("Lists all apps deployed from the DSH app catalog.".to_string()),
-    command_executors: vec![(FlagType::All, &AppListConfiguration {}, None), (FlagType::Configuration, &AppListConfiguration {}, None), (FlagType::Ids, &AppListIds {}, None)],
-    default_command_executor: Some(&AppListConfiguration {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show app configuration".to_string(),
-    command_long_about: Some("Show the configuration of an app deployed from the DSH app catalog.".to_string()),
-    command_executors: vec![(FlagType::All, &AppShowAll {}, None)],
-    default_command_executor: Some(&AppShowAll {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List deployed apps")
+      .set_long_about("Lists all apps deployed from the DSH app catalog.")
+      .add_command_executors(vec![
+        (FlagType::All, &AppListConfiguration {}, None),
+        (FlagType::Configuration, &AppListConfiguration {}, None),
+        (FlagType::Ids, &AppListIds {}, None)
+      ])
+      .set_default_command_executor(&AppListConfiguration {})
+      .set_run_all_executors(true)
+  );
+  pub static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show app configuration")
+      .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
+      .add_command_executors(vec![(FlagType::All, &AppShowAll {}, None)])
+      .set_default_command_executor(&AppShowAll {})
+      .add_target_argument(target_argument(APP_SUBJECT_TARGET, None))
+  );
 }
 
 struct AppListConfiguration {}

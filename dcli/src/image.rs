@@ -8,7 +8,9 @@ use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQu
 use dsh_api::types::AppCatalogApp;
 
 use crate::app::get_application_from_app;
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::query_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::formatters::{wrap_vec_parts, TerminalStyle};
@@ -28,10 +30,6 @@ lazy_static! {
 impl Subject for ImageSubject {
   fn subject(&self) -> &'static str {
     IMAGE_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Image"
   }
 
   fn subject_command_about(&self) -> String {
@@ -58,17 +56,15 @@ impl Subject for ImageSubject {
 }
 
 lazy_static! {
-  pub static ref IMAGE_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Find,
-    command_about: "Find used images".to_string(),
-    command_long_about: None,
-    command_executors: vec![],
-    default_command_executor: Some(&ImageFind {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![(FilterFlagType::App, None), (FilterFlagType::Application, None),],
-    modifier_flags: vec![(ModifierFlagType::Regex, None)],
-  });
+  // TODO Add list capability
+    pub static ref IMAGE_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Find, "Find used images")
+    .set_long_about("Find all applications and/or apps that use a given Harbor image.")
+    .set_default_command_executor(&ImageFind {})
+    .add_target_argument(query_argument(None))
+    .add_filter_flags(vec![(FilterFlagType::App, None), (FilterFlagType::Application, None)])
+    .add_modifier_flag(ModifierFlagType::Regex, None)
+  );
 }
 
 struct ImageFind {}

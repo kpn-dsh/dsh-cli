@@ -8,7 +8,9 @@ use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQu
 use dsh_api::types::AppCatalogApp;
 
 use crate::app::get_application_from_app;
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::query_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::formatters::{wrap_vec_parts, TerminalStyle};
@@ -28,10 +30,6 @@ lazy_static! {
 impl Subject for EnvSubject {
   fn subject(&self) -> &'static str {
     ENV_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Env"
   }
 
   fn subject_command_about(&self) -> String {
@@ -58,17 +56,14 @@ impl Subject for EnvSubject {
 }
 
 lazy_static! {
-  pub static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Find,
-    command_about: "Find environment variable values".to_string(),
-    command_long_about: Some("Find values used in environment variables used to configure applications/services and apps deployed on the DSH.".to_string()),
-    command_executors: vec![],
-    default_command_executor: Some(&EnvFind {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![(FilterFlagType::App, None), (FilterFlagType::Application, None),],
-    modifier_flags: vec![(ModifierFlagType::Regex, None)],
-  });
+  pub static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Find, "Find environment variable values")
+      .set_long_about("Find values used in environment variables used to configure applications/services and apps deployed on the DSH.")
+      .set_default_command_executor(&EnvFind {})
+      .add_target_argument(query_argument(None))
+      .add_filter_flags(vec![(FilterFlagType::App, None), (FilterFlagType::Application, None)])
+      .add_modifier_flag(ModifierFlagType::Regex, None)
+  );
 }
 
 struct EnvFind {}

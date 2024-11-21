@@ -21,6 +21,11 @@ pub struct CapabilityBuilder<'a> {
 }
 
 impl<'a> CapabilityBuilder<'a> {
+  /// # Create a new `CapabilityBuilder`
+  ///
+  /// ## Parameters
+  /// * `capability_type` -
+  /// * `about` - help text printed when -h flag is provided
   pub fn new(capability_type: CapabilityType, about: impl Into<String>) -> Self {
     Self {
       capability_type,
@@ -36,19 +41,25 @@ impl<'a> CapabilityBuilder<'a> {
     }
   }
 
+  /// # Set long help text
+  ///
+  /// Set the long help text, which is shown when the `--help` flag was provided.
+  ///
+  /// ## Parameters
+  /// * `long_about` - long help text
   pub fn set_long_about(mut self, long_about: impl Into<String>) -> Self {
     self.long_about = Some(long_about.into());
     self
   }
 
   pub fn add_command_executor(mut self, flag_type: FlagType, executor: &'a (dyn CommandExecutor + Send + Sync), long_help: Option<String>) -> Self {
-    self.executors.push((flag_type, executor, long_help.map(|long_help| long_help.into())));
+    self.executors.push((flag_type, executor, long_help));
     self
   }
 
   pub fn add_command_executors(mut self, executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<String>)>) -> Self {
     for (flag_type, executor, long_help) in executors {
-      self.executors.push((flag_type, executor, long_help.map(|s| s.into())))
+      self.executors.push((flag_type, executor, long_help))
     }
     self
   }
@@ -68,29 +79,29 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn add_target_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
+  pub fn _add_target_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
     self.target_arguments.append(&mut arguments);
     self
   }
 
-  pub fn add_extra_argument(mut self, argument: Arg) -> Self {
+  pub fn _add_extra_argument(mut self, argument: Arg) -> Self {
     self.extra_arguments.push(argument);
     self
   }
 
-  pub fn add_extra_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
+  pub fn _add_extra_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
     self.extra_arguments.append(&mut arguments);
     self
   }
 
-  pub fn add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
-    self.filter_flags.push((flag_type, long_help.map(|long_help| long_help.into())));
+  pub fn _add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
+    self.filter_flags.push((flag_type, long_help));
     self
   }
 
   pub fn add_filter_flags(mut self, flags: Vec<(FilterFlagType, Option<String>)>) -> Self {
     for (flag_type, long_help) in flags {
-      self.filter_flags.push((flag_type, long_help.map(|s| s.into())))
+      self.filter_flags.push((flag_type, long_help))
     }
     self
   }
@@ -100,9 +111,9 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn add_modifier_flags(mut self, flags: Vec<(ModifierFlagType, Option<String>)>) -> Self {
+  pub fn _add_modifier_flags(mut self, flags: Vec<(ModifierFlagType, Option<String>)>) -> Self {
     for (flag_type, long_help) in flags {
-      self.modifier_flags.push((flag_type, long_help.map(|s| s.into())))
+      self.modifier_flags.push((flag_type, long_help))
     }
     self
   }

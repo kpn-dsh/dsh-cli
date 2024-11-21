@@ -10,7 +10,9 @@ use dsh_api::types::{ActualCertificate, AppCatalogApp, Application, Certificate,
 
 use crate::app::apps_with_secret_injections;
 use crate::application::applications_with_secret_injections;
-use crate::capability::{Capability, CapabilityType, CommandExecutor, DeclarativeCapability};
+use crate::arguments::target_argument;
+use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability_builder::CapabilityBuilder;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::certificate::{CertificateLabel, CERTIFICATE_CONFIGURATION_LABELS, CERTIFICATE_LABELS_LIST, CERTIFICATE_LABELS_SHOW};
@@ -32,10 +34,6 @@ lazy_static! {
 impl Subject for CertificateSubject {
   fn subject(&self) -> &'static str {
     CERTIFICATE_SUBJECT_TARGET
-  }
-
-  fn subject_first_upper(&self) -> &'static str {
-    "Certificate"
   }
 
   fn subject_command_about(&self) -> String {
@@ -63,38 +61,29 @@ impl Subject for CertificateSubject {
 }
 
 lazy_static! {
-  pub static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::List,
-    command_about: "List certificates".to_string(),
-    command_long_about: Some("Lists all available certificates.".to_string()),
-    command_executors: vec![
-      (FlagType::All, &CertificateListAll {}, None),
-      (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
-      (FlagType::Configuration, &CertificateListConfiguration {}, None),
-      (FlagType::Ids, &CertificateListIds {}, None),
-      (FlagType::Usage, &CertificateListUsage {}, None),
-    ],
-    default_command_executor: Some(&CertificateListAll {}),
-    run_all_executors: true,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
-  pub static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(DeclarativeCapability {
-    capability_type: CapabilityType::Show,
-    command_about: "Show certificate configuration".to_string(),
-    command_long_about: None,
-    command_executors: vec![
-      (FlagType::All, &CertificateShowAll {}, None),
-      (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
-      (FlagType::Usage, &CertificateShowUsage {}, None)
-    ],
-    default_command_executor: Some(&CertificateShowAll {}),
-    run_all_executors: false,
-    extra_arguments: vec![],
-    filter_flags: vec![],
-    modifier_flags: vec![],
-  });
+  pub static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::List, "List certificates")
+      .set_long_about("Lists all available certificates.")
+      .add_command_executors(vec![
+        (FlagType::All, &CertificateListAll {}, None),
+        (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
+        (FlagType::Configuration, &CertificateListConfiguration {}, None),
+        (FlagType::Ids, &CertificateListIds {}, None),
+        (FlagType::Usage, &CertificateListUsage {}, None),
+      ])
+      .set_default_command_executor(&CertificateListAll {})
+      .set_run_all_executors(true)
+  );
+  pub static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Show, "Show certificate configuration")
+      .add_command_executors(vec![
+        (FlagType::All, &CertificateShowAll {}, None),
+        (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
+        (FlagType::Usage, &CertificateShowUsage {}, None)
+      ])
+      .set_default_command_executor(&CertificateShowAll {})
+      .add_target_argument(target_argument(CERTIFICATE_SUBJECT_TARGET, None))
+  );
 }
 
 struct CertificateListAll {}
