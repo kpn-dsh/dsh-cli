@@ -82,6 +82,7 @@ lazy_static! {
       .set_default_command_executor(&SecretListIds {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
+        (FlagType::System, &SecretListSystem {}, None),
         (FlagType::Usage, &SecretListUsage {}, None),
       ])
       .add_filter_flags(vec![
@@ -163,14 +164,50 @@ impl CommandExecutor for SecretListAllocationStatus {
     if context.show_capability_explanation() {
       println!("list all secrets with their allocation status");
     }
-    let secret_ids = context.dsh_api_client.as_ref().unwrap().get_secret_ids().await?;
+    let non_system_secret_ids = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .get_secret_ids()
+      .await?
+      .into_iter()
+      .filter(|id| !is_system_secret(id))
+      .collect::<Vec<_>>();
     let allocation_statusses = try_join_all(
-      secret_ids
+      non_system_secret_ids
         .iter()
         .map(|id| context.dsh_api_client.as_ref().unwrap().get_secret_allocation_status(id.as_str())),
     )
     .await?;
-    print_allocation_statuses(secret_ids, allocation_statusses, context);
+    print_allocation_statuses(non_system_secret_ids, allocation_statusses, context);
+    Ok(false)
+  }
+}
+
+struct SecretListSystem {}
+
+#[async_trait]
+impl CommandExecutor for SecretListSystem {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
+    if context.show_capability_explanation() {
+      println!("list all system secret ids");
+    }
+    let system_secret_ids = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .get_secret_ids()
+      .await?
+      .into_iter()
+      .filter(|id| is_system_secret(id))
+      .collect::<Vec<_>>();
+    let allocation_statusses = try_join_all(
+      system_secret_ids
+        .iter()
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_secret_allocation_status(id.as_str())),
+    )
+    .await?;
+    print_allocation_statuses(system_secret_ids, allocation_statusses, context);
     Ok(false)
   }
 }
@@ -183,7 +220,16 @@ impl CommandExecutor for SecretListIds {
     if context.show_capability_explanation() {
       println!("list all secret ids");
     }
-    print_vec("secret ids".to_string(), context.dsh_api_client.as_ref().unwrap().get_secret_ids().await?, context);
+    let non_system_secrets = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .get_secret_ids()
+      .await?
+      .into_iter()
+      .filter(|id| !is_system_secret(id))
+      .collect::<Vec<_>>();
+    print_vec("secret ids".to_string(), non_system_secrets, context);
     Ok(false)
   }
 }
@@ -320,4 +366,8 @@ impl CommandExecutor for SecretShowValue {
     println!("{}", secret);
     Ok(false)
   }
+}
+
+fn is_system_secret(secret_id: &str) -> bool {
+  secret_id.contains('!')
 }
