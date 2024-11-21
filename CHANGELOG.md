@@ -23,8 +23,9 @@ All notable changes to the dcli tool project will be documented in this file.
 
 ### Removed
 
-The dsh-api subproject is removed and is now in its own repo at
-[github.com/kpn-dsh/dsh-api](https://github.com/kpn-dsh/dsh-api).
+* The dsh-api subproject is removed and is now in its own repo at
+  [github.com/kpn-dsh/dsh-api](https://github.com/kpn-dsh/dsh-api).
+* Removed redundant flags.
 
 ## [0.1.0] - 2024-10-29
 
