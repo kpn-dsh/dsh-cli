@@ -75,14 +75,13 @@ lazy_static! {
   pub static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List volumes")
       .set_long_about("Lists all available volumes.")
+      .set_default_command_executor(&VolumeListAll {})
       .add_command_executors(vec![
-        (FlagType::All, &VolumeListAll {}, None),
         (FlagType::AllocationStatus, &VolumeListAllocationStatus {}, None),
         (FlagType::Configuration, &VolumeListConfiguration {}, None),
         (FlagType::Ids, &VolumeListIds {}, None),
         (FlagType::Usage, &VolumeListUsage {}, None),
       ])
-      .set_default_command_executor(&VolumeListAll {})
       .set_run_all_executors(true)
       .add_filter_flags(vec![
         (FilterFlagType::App, Some("List all apps that use the volume.".to_string())),
@@ -91,12 +90,11 @@ lazy_static! {
   );
   pub static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show secret configuration")
+      .set_default_command_executor(&VolumeShowAll {})
       .add_command_executors(vec![
-        (FlagType::All, &VolumeShowAll {}, None),
         (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
         (FlagType::Usage, &VolumeShowUsage {}, None),
       ])
-      .set_default_command_executor(&VolumeShowAll {})
       .add_target_argument(target_argument(VOLUME_SUBJECT_TARGET, None))
   );
 }

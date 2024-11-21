@@ -56,13 +56,12 @@ lazy_static! {
   pub static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List manifests")
       .set_long_about("Lists all manifest files from the App Catalog.")
-      .add_command_executors(vec![(FlagType::All, &ManifestListAll {}, None), (FlagType::Ids, &ManifestListIds {}, None)])
       .set_default_command_executor(&ManifestListAll {})
+      .add_command_executor(FlagType::Ids, &ManifestListIds {}, None)
       .set_run_all_executors(true)
   );
   pub static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show manifest configuration")
-      .add_command_executor(FlagType::All, &ManifestShowAll {}, None)
       .set_default_command_executor(&ManifestShowAll {})
       .add_target_argument(target_argument(MANIFEST_SUBJECT_TARGET, None))
   );

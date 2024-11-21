@@ -57,22 +57,18 @@ lazy_static! {
   pub static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List buckets")
       .set_long_about("Lists all available buckets.")
+      .set_default_command_executor(&BucketListAll {})
       .add_command_executors(vec![
-        (FlagType::All, &BucketListAll {}, None),
         (FlagType::AllocationStatus, &BucketListAllocationStatus {}, None),
         (FlagType::Configuration, &BucketListConfiguration {}, None),
         (FlagType::Ids, &BucketListIds {}, None),
       ])
-      .set_default_command_executor(&BucketListAll {})
       .set_run_all_executors(true)
   );
   pub static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show bucket configuration")
-      .add_command_executors(vec![
-        (FlagType::All, &BucketShowAll {}, None),
-        (FlagType::AllocationStatus, &BucketShowAllocationStatus {}, None)
-      ])
       .set_default_command_executor(&BucketShowAll {})
+      .add_command_executor(FlagType::AllocationStatus, &BucketShowAllocationStatus {}, None)
       .add_target_argument(target_argument(BUCKET_SUBJECT_TARGET, None))
   );
 }

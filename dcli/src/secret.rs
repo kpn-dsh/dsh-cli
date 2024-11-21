@@ -79,13 +79,11 @@ lazy_static! {
   pub static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List secrets")
       .set_long_about("Lists all secrets used by the applications/services and apps on the DSH.")
+      .set_default_command_executor(&SecretListIds {})
       .add_command_executors(vec![
-        (FlagType::All, &SecretListIds {}, None),
         (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
-        (FlagType::Ids, &SecretListIds {}, None),
         (FlagType::Usage, &SecretListUsage {}, None),
       ])
-      .set_default_command_executor(&SecretListIds {})
       .add_filter_flags(vec![
         (FilterFlagType::App, Some("List all apps that use the secret.".to_string())),
         (FilterFlagType::Application, Some("List all applications that use the secret.".to_string())),
@@ -93,12 +91,8 @@ lazy_static! {
   );
   pub static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show secret configuration or value")
-      .add_command_executors(vec![
-        (FlagType::AllocationStatus, &SecretShowAllocationStatus {}, None),
-        (FlagType::Usage, &SecretShowUsage {}, None),
-        (FlagType::Value, &SecretShowValue {}, None),
-      ])
       .set_default_command_executor(&SecretShowAllocationStatus {})
+      .add_command_executors(vec![(FlagType::Usage, &SecretShowUsage {}, None), (FlagType::Value, &SecretShowValue {}, None),])
       .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
   );
 }

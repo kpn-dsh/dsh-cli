@@ -8,7 +8,6 @@ use regex::Regex;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
-use crate::flags::FlagType;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
@@ -55,12 +54,10 @@ lazy_static! {
   pub static ref VHOST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List configured vhosts")
       .set_long_about("List applications that have vhosts configured. Vhosts that are provisioned but are not configured in any applications will not be shown.")
-      .add_command_executor(FlagType::Usage, &VhostListUsage {}, None)
       .set_default_command_executor(&VhostListUsage {})
   );
   pub static ref VHOST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show vhost usage")
-      .add_command_executor(FlagType::Usage, &VhostShowUsage {}, None)
       .set_default_command_executor(&VhostShowUsage {})
       .add_target_argument(target_argument(VHOST_SUBJECT_TARGET, None))
   );

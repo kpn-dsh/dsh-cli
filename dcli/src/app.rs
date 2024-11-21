@@ -50,18 +50,13 @@ lazy_static! {
   pub static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List deployed apps")
       .set_long_about("Lists all apps deployed from the DSH app catalog.")
-      .add_command_executors(vec![
-        (FlagType::All, &AppListConfiguration {}, None),
-        (FlagType::Configuration, &AppListConfiguration {}, None),
-        (FlagType::Ids, &AppListIds {}, None)
-      ])
       .set_default_command_executor(&AppListConfiguration {})
+      .add_command_executor(FlagType::Ids, &AppListIds {}, None)
       .set_run_all_executors(true)
   );
   pub static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
-      .add_command_executors(vec![(FlagType::All, &AppShowAll {}, None)])
       .set_default_command_executor(&AppShowAll {})
       .add_target_argument(target_argument(APP_SUBJECT_TARGET, None))
   );

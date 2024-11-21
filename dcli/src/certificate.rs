@@ -64,24 +64,22 @@ lazy_static! {
   pub static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List certificates")
       .set_long_about("Lists all available certificates.")
+      .set_default_command_executor(&CertificateListAll {})
       .add_command_executors(vec![
-        (FlagType::All, &CertificateListAll {}, None),
         (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
         (FlagType::Configuration, &CertificateListConfiguration {}, None),
         (FlagType::Ids, &CertificateListIds {}, None),
         (FlagType::Usage, &CertificateListUsage {}, None),
       ])
-      .set_default_command_executor(&CertificateListAll {})
       .set_run_all_executors(true)
   );
   pub static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show certificate configuration")
+      .set_default_command_executor(&CertificateShowAll {})
       .add_command_executors(vec![
-        (FlagType::All, &CertificateShowAll {}, None),
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
         (FlagType::Usage, &CertificateShowUsage {}, None)
       ])
-      .set_default_command_executor(&CertificateShowAll {})
       .add_target_argument(target_argument(CERTIFICATE_SUBJECT_TARGET, None))
   );
 }

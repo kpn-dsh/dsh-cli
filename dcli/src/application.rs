@@ -62,14 +62,13 @@ lazy_static! {
         This will also include applications that are stopped \
         (deployed with 0 instances)."
       )
+      .set_default_command_executor(&ApplicationListAll {})
       .add_command_executors(vec![
-        (FlagType::All, &ApplicationListAll {}, None),
         (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
         (FlagType::Configuration, &ApplicationListConfiguration {}, None),
         (FlagType::Ids, &ApplicationListIds {}, None),
         (FlagType::Tasks, &ApplicationListTasks {}, None),
       ])
-      .set_default_command_executor(&ApplicationListAll {})
       .set_run_all_executors(true)
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("List all started applications.".to_string())),
@@ -79,13 +78,12 @@ lazy_static! {
   pub static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show application configuration")
       .set_long_about("Show the configuration of an application deployed on the DSH.")
+      .set_default_command_executor(&ApplicationShowAll {})
       .add_command_executors(vec![
-        (FlagType::All, &ApplicationShowAll {}, None),
         (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
         (FlagType::Configuration, &ApplicationShowConfiguration {}, None),
         (FlagType::Tasks, &ApplicationShowTasks {}, None),
       ])
-      .set_default_command_executor(&ApplicationShowAll {})
       .add_target_argument(target_argument(APPLICATION_SUBJECT_TARGET, None))
   );
 }

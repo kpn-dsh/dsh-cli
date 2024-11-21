@@ -68,24 +68,22 @@ lazy_static! {
   pub static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List topics")
       .set_long_about("Lists all available scratch topics.")
+      .set_default_command_executor(&TopicListConfiguration {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
-        (FlagType::Configuration, &TopicListConfiguration {}, None),
         (FlagType::Ids, &TopicListIds {}, None),
         (FlagType::Usage, &TopicListUsage {}, None),
       ])
-      .set_default_command_executor(&TopicListConfiguration {})
       .set_run_all_executors(true)
   );
   pub static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show topic configuration")
+      .set_default_command_executor(&TopicShowConfiguration {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
-        (FlagType::Configuration, &TopicShowConfiguration {}, None),
         (FlagType::Properties, &TopicShowProperties {}, None),
         (FlagType::Usage, &TopicShowUsage {}, None),
       ])
-      .set_default_command_executor(&TopicShowConfiguration {})
       .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
   );
 }

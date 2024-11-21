@@ -60,13 +60,12 @@ lazy_static! {
   pub static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the applications/services and apps on the DSH.")
-      .add_command_executors(vec![(FlagType::All, &ProxyListAll {}, None), (FlagType::Ids, &ProxyListIds {}, None)])
       .set_default_command_executor(&ProxyListAll {})
+      .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
       .set_run_all_executors(true)
   );
   pub static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Show, "Show Kafka proxy configuration")
-      .add_command_executor(FlagType::Configuration, &ProxyShowConfiguration {}, None)
       .set_default_command_executor(&ProxyShowConfiguration {})
       .add_target_argument(target_argument(PROXY_SUBJECT_TARGET, None))
   );
