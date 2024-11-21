@@ -419,14 +419,12 @@ where
 //
 //   #[test]
 //   fn test_upsert_settings_default() {
-//     use crate::arguments::Verbosity::Off;
 //     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
 //     _upsert_settings(None, &settings).unwrap();
 //   }
 //
 //   #[test]
 //   fn test_upsert_settings_explicit_filename() {
-//     use crate::arguments::Verbosity::Off;
 //     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
 //     _upsert_settings(Some(test_settings_filename().as_str()), &settings).unwrap();
 //   }

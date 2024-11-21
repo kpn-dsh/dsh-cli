@@ -15,9 +15,6 @@ pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum Verbosity {
-  /// Only error messages
-  #[serde(rename = "off")]
-  Off = 0,
   /// Basic console log, like number of produced messages
   #[serde(rename = "low")]
   Low = 1,
@@ -164,7 +161,6 @@ pub(crate) fn query_argument(long_help: Option<&str>) -> Arg {
 impl Display for Verbosity {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      Verbosity::Off => write!(f, "off"),
       Verbosity::Low => write!(f, "low"),
       Verbosity::Medium => write!(f, "medium"),
       Verbosity::High => write!(f, "high"),
