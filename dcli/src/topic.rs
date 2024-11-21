@@ -116,7 +116,7 @@ struct TopicListAllocationStatus {}
 impl CommandExecutor for TopicListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all stream and internal topics with their allocation status");
+      println!("list all scratch topics with their allocation status");
     }
     let topic_ids = context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?;
     let allocation_statuses = try_join_all(
@@ -136,7 +136,7 @@ struct TopicListConfiguration {}
 impl CommandExecutor for TopicListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all stream and internal topics with their configurations");
+      println!("list all scratch topics with their configurations");
     }
     let topic_ids = context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?;
     let configurations = try_join_all(
@@ -160,7 +160,7 @@ struct TopicListIds {}
 impl CommandExecutor for TopicListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all stream and internal topic ids");
+      println!("list all scratch topic ids");
     }
     print_vec("topic ids".to_string(), context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?, context);
     Ok(false)
@@ -173,7 +173,7 @@ struct TopicListUsage {}
 impl CommandExecutor for TopicListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     if context.show_capability_explanation() {
-      println!("list all stream and internal topics with the applications that use them");
+      println!("list all scratch topics with the applications that use them");
     }
     let (topic_ids, applications) = try_join!(
       context.dsh_api_client.as_ref().unwrap().get_topic_ids(),
