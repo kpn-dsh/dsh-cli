@@ -11,7 +11,6 @@ pub(crate) const SET_VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
 pub(crate) const _SUBTARGET_ARGUMENT: &str = "subtarget-argument";
 pub(crate) const TARGET_ARGUMENT: &str = "target-argument";
 pub(crate) const TENANT_ARGUMENT: &str = "tenant-argument";
-pub(crate) const VERBOSITY_ARGUMENT: &str = "verbosity-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
@@ -30,6 +29,25 @@ pub(crate) enum Verbosity {
   High = 3,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+pub(crate) enum PlatformArgument {
+  /// Non-production landing zone
+  #[serde(rename = "nplz")]
+  Nplz,
+  /// Proof of concept
+  #[serde(rename = "poc")]
+  Poc,
+  /// Production landing zone
+  #[serde(rename = "prod")]
+  Prod,
+  /// Production AZ
+  #[serde(rename = "prodaz")]
+  Prodaz,
+  /// Production LZ
+  #[serde(rename = "prodlz")]
+  Prodlz,
+}
+
 pub(crate) fn guid_argument() -> Arg {
   Arg::new(GUID_ARGUMENT)
     .long("guid")
@@ -41,7 +59,7 @@ pub(crate) fn guid_argument() -> Arg {
     .long_help(
       "This option specifies the group and user id of the target tenant. \
     If this argument is not provided, \
-    the tenant must be specified via the environment variable 'DSH_API_TENANT'.",
+    the tenant must be specified via the environment variable DSH_API_TENANT.",
     )
 }
 
@@ -66,20 +84,20 @@ pub(crate) fn platform_argument() -> Arg {
     .long("platform")
     .short('p')
     .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_parser(EnumValueParser::<PlatformArgument>::new())
     .value_name("PLATFORM")
     .help("Target platform")
     .long_help(
       "This option specifies the name of the target platform. \
-    Supported values are 'nplz', 'poc', 'prod', 'prodaz' and 'prodlz'. \
     If this argument is not provided, \
-    the platform must be specified via the environment variable 'DSH_API_PLATFORM'.",
+    the platform must be specified via the environment variable DSH_API_PLATFORM.",
     )
 }
 
 pub(crate) fn set_verbosity_argument() -> Arg {
   Arg::new(SET_VERBOSITY_ARGUMENT)
     .long("verbosity")
+    .short('v')
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<Verbosity>::new())
     .value_name("VERBOSITY")
@@ -87,7 +105,6 @@ pub(crate) fn set_verbosity_argument() -> Arg {
     .long_help(
       "If this option is provided, \
     it will set the verbosity level. \
-    Supported values are 'off', 'low', 'medium' and 'high'. \
     The default verbosity setting is 'low'.",
     )
 }
@@ -103,20 +120,8 @@ pub(crate) fn tenant_argument() -> Arg {
     .long_help(
       "This option specifies the name of the target tenant. \
     If this argument is not provided, \
-    the tenant must be specified via the environment variable 'DSH_API_TENANT'.",
+    the tenant must be specified via the environment variable DSH_API_TENANT.",
     )
-}
-
-pub(crate) fn verbosity_argument() -> Arg {
-  Arg::new(VERBOSITY_ARGUMENT)
-    .short('v')
-    .action(ArgAction::Count)
-    .help("Verbosity level")
-    .long_help(
-      "This option determines the verbosity of the information \
-    that will be written to the output.",
-    )
-    .conflicts_with(SET_VERBOSITY_ARGUMENT)
 }
 
 pub(crate) fn target_argument(subject: &str, long_help: Option<&str>) -> Arg {
@@ -163,6 +168,18 @@ impl Display for Verbosity {
       Verbosity::Low => write!(f, "low"),
       Verbosity::Medium => write!(f, "medium"),
       Verbosity::High => write!(f, "high"),
+    }
+  }
+}
+
+impl Display for PlatformArgument {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      PlatformArgument::Nplz => write!(f, "nplz"),
+      PlatformArgument::Poc => write!(f, "poc"),
+      PlatformArgument::Prod => write!(f, "prod"),
+      PlatformArgument::Prodaz => write!(f, "prodaz"),
+      PlatformArgument::Prodlz => write!(f, "prodlz"),
     }
   }
 }

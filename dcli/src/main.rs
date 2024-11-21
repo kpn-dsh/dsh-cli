@@ -11,8 +11,8 @@ use std::time::Instant;
 use crate::app::APP_SUBJECT;
 use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{
-  guid_argument, no_border_argument, password_argument, platform_argument, set_verbosity_argument, tenant_argument, verbosity_argument, Verbosity, GUID_ARGUMENT,
-  NO_BORDER_ARGUMENT, PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT, TENANT_ARGUMENT, VERBOSITY_ARGUMENT,
+  guid_argument, no_border_argument, password_argument, platform_argument, set_verbosity_argument, tenant_argument, PlatformArgument, Verbosity, GUID_ARGUMENT, NO_BORDER_ARGUMENT,
+  PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT, TENANT_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::bucket::BUCKET_SUBJECT;
@@ -72,15 +72,16 @@ mod volume;
 
 pub(crate) static APPLICATION_NAME: &str = "dcli";
 
-static ABOUT: &str = "DSH api command line interface";
-
-static LONG_ABOUT: &str = "DSH api command line interface\n\n\
+/// Short help text, shown when `-h` was provided
+static ABOUT: &str = "DSH resource management api command line interface.";
+/// Long help text, shown when `--help` was provided
+static LONG_ABOUT: &str = "DSH resource management api command line interface\n\n\
    The DSH api command line tool enables the user to call a subset of the functions \
    in the DSH api from the command line. \
    It also supports functions that are not supported directly from the DSH api, \
    such as finding all applications that use a certain resource (e.g. a secret) or showing a \
    list of all resources of a certain type (e.g. list all volumes).";
-
+/// Will be shown after normal help text, when `-h` was provided
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dcli apps' will be the same \
    as using 'dcli app list'.";
@@ -176,13 +177,13 @@ async fn inner_main() -> DcliResult {
     METRIC_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
-    SETTING_SUBJECT.as_ref(),
     #[cfg(feature = "stream")]
     STREAM_SUBJECT.as_ref(),
-    TARGET_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
     VOLUME_SUBJECT.as_ref(),
+    SETTING_SUBJECT.as_ref(),
+    TARGET_SUBJECT.as_ref(),
   ];
 
   let mut subject_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
@@ -202,23 +203,27 @@ async fn inner_main() -> DcliResult {
 
   let mut command = Command::new(APPLICATION_NAME)
     .about(ABOUT)
+    // .author(AUTHOR)
+    // .display_name(APPLICATION_NAME)
     .long_about(LONG_ABOUT)
     .after_help(AFTER_HELP)
+    // .after_long_help(AFTER_LONG_HELP)
+    // .before_help("BEFORE_HELP")
+    // .before_long_help("BEFORE_LONG_HELP")
     .args(vec![
       platform_argument(),
       tenant_argument(),
       guid_argument(),
       password_argument(),
-      no_border_argument(),
       set_verbosity_argument(),
-      verbosity_argument(),
+      no_border_argument(),
       generate_autocomplete_file_argument(),
     ])
+    .subcommand_value_name("SUBJECT/COMMAND")
+    .subcommand_help_heading("Subjects/commands")
     .arg_required_else_help(true)
-    .term_width(80)
-    .disable_help_subcommand(true)
-    .max_term_width(100)
-    .hide_possible_values(true)
+    .max_term_width(120)
+    .hide_possible_values(false)
     .styles(styles)
     .subcommands(clap_commands)
     .version("0.2.0")
@@ -285,18 +290,7 @@ async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings
 
 fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<DcliContext<'a>, String> {
   let border = !matches.get_flag(NO_BORDER_ARGUMENT);
-  let verbosity: Verbosity = matches
-    .get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT)
-    .cloned()
-    .unwrap_or(match matches.get_one::<u8>(VERBOSITY_ARGUMENT) {
-      Some(verbosity) => match verbosity {
-        0 => Verbosity::Low,
-        1 => Verbosity::Low,
-        2 => Verbosity::Medium,
-        _ => Verbosity::High,
-      },
-      None => Verbosity::Low,
-    });
+  let verbosity: Verbosity = matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT).unwrap_or(&Verbosity::Low).to_owned();
   Ok(DcliContext { verbosity, border, dsh_api_client })
 }
 
@@ -316,8 +310,8 @@ fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiCl
 /// ## Returns
 /// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
 fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshPlatform, String> {
-  match matches.get_one::<String>(PLATFORM_ARGUMENT) {
-    Some(name_from_argument) => DshPlatform::try_from(name_from_argument.as_str()),
+  match matches.get_one::<PlatformArgument>(PLATFORM_ARGUMENT) {
+    Some(name_from_argument) => DshPlatform::try_from(name_from_argument.to_string().as_str()),
     None => match std::env::var(PLATFORM_ENVIRONMENT_VARIABLE) {
       Ok(name_from_env_var) => DshPlatform::try_from(name_from_env_var.as_str()),
       Err(_) => match settings {
