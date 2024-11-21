@@ -65,7 +65,6 @@ lazy_static! {
       .set_default_command_executor(&ApplicationListAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &ApplicationListAllocationStatus {}, None),
-        (FlagType::Configuration, &ApplicationListConfiguration {}, None),
         (FlagType::Ids, &ApplicationListIds {}, None),
         (FlagType::Tasks, &ApplicationListTasks {}, None),
       ])
@@ -81,7 +80,6 @@ lazy_static! {
       .set_default_command_executor(&ApplicationShowAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
-        (FlagType::Configuration, &ApplicationShowConfiguration {}, None),
         (FlagType::Tasks, &ApplicationShowTasks {}, None),
       ])
       .add_target_argument(target_argument(APPLICATION_SUBJECT_TARGET, None))
@@ -117,18 +115,6 @@ impl CommandExecutor for ApplicationListAllocationStatus {
     .await?;
     print_allocation_statuses(application_ids, allocation_statuses, context);
     Ok(false)
-  }
-}
-
-struct ApplicationListConfiguration {}
-
-#[async_trait]
-impl CommandExecutor for ApplicationListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all applications with their configuration");
-    }
-    print_applications(&context.dsh_api_client.as_ref().unwrap().get_applications().await?, matches, context)
   }
 }
 
@@ -226,23 +212,6 @@ impl CommandExecutor for ApplicationShowAllocationStatus {
       .get_application_allocation_status(application_id.as_str())
       .await?;
     print_allocation_status(application_id, allocation_status, context);
-    Ok(false)
-  }
-}
-
-struct ApplicationShowConfiguration {}
-
-#[async_trait]
-impl CommandExecutor for ApplicationShowConfiguration {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    let application_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show configuration for application '{}'", application_id);
-    }
-    let application = context.dsh_api_client.as_ref().unwrap().get_application(application_id.as_str()).await?;
-    let mut builder = TableBuilder::show(&APPLICATION_LABELS_SHOW, context);
-    builder.value(application_id, &application);
-    builder.print();
     Ok(false)
   }
 }
