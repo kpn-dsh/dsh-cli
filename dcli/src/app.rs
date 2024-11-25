@@ -12,7 +12,12 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::flags::FlagType;
 use crate::formatters::app::APP_CATALOG_APP_LABELS;
 use crate::formatters::application::APPLICATION_LABELS_SHOW;
-use crate::formatters::formatter::{print_vec, TableBuilder};
+use crate::formatters::bucket::BUCKET_LABELS;
+use crate::formatters::certificate::CERTIFICATE_LABELS_SHOW;
+use crate::formatters::formatter::{print_vec, StringTableBuilder, TableBuilder};
+use crate::formatters::show_table::ShowTable;
+use crate::formatters::topic::TOPIC_LABELS;
+use crate::formatters::volume::VOLUME_LABELS;
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
 
@@ -106,40 +111,33 @@ impl CommandExecutor for AppShowAll {
       println!("show all parameters for app '{}'", app_id);
     }
     let app = context.dsh_api_client.as_ref().unwrap().get_app_configuration(app_id.as_str()).await?;
-    println!("name:                 {}", app.name);
-    println!("manifest urn:         {}", app.manifest_urn);
-    println!("configuration:        {}", app.configuration.clone().unwrap_or("none".to_string()));
+    ShowTable::new(app_id.as_str(), &app, &APP_CATALOG_APP_LABELS, context).print();
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(application) => {
-          println!("resource/application: {}", resource_name);
-          let mut builder = TableBuilder::show(&APPLICATION_LABELS_SHOW, context);
-          builder.value("".to_string(), application);
-          builder.print();
+          ShowTable::new(resource_name.as_str(), application, &APPLICATION_LABELS_SHOW, context).print();
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
-          println!("resource/bucket:      {}", resource_name);
-          println!("  {:?}", bucket)
+          ShowTable::new(resource_name.as_str(), bucket, &BUCKET_LABELS, context).print();
         }
         AppCatalogAppResourcesValue::Certificate(certificate) => {
-          println!("resource/certificate: {}", resource_name);
-          println!("  {:?}", certificate)
+          ShowTable::new(resource_name.as_str(), certificate, &CERTIFICATE_LABELS_SHOW, context).print();
         }
         AppCatalogAppResourcesValue::Secret(secret) => {
-          println!("resource/secret:      {}", resource_name);
-          println!("  {:?}", secret)
+          let mut builder = StringTableBuilder::new(&["resource", "secret"], context);
+          builder.vec(&vec![resource_name.to_string(), secret.to_string()]);
+          builder.print_show();
         }
         AppCatalogAppResourcesValue::Topic(topic) => {
-          println!("resource/topic:       {}", resource_name);
-          println!("  {:?}", topic)
+          ShowTable::new(resource_name.as_str(), topic, &TOPIC_LABELS, context).print();
         }
         AppCatalogAppResourcesValue::Vhost(vhost) => {
-          println!("resource/vhost:       {}", resource_name);
-          println!("                      {:?}", vhost)
+          let mut builder = StringTableBuilder::new(&["resource", "vhost"], context);
+          builder.vec(&vec![resource_name.to_string(), vhost.to_string()]);
+          builder.print_show();
         }
         AppCatalogAppResourcesValue::Volume(volume) => {
-          println!("resource/volume:      {}", resource_name);
-          println!("  {:?}", volume)
+          ShowTable::new(resource_name.as_str(), volume, &VOLUME_LABELS, context).print();
         }
       }
     }
