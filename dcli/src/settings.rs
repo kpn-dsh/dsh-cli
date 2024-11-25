@@ -27,6 +27,8 @@ pub(crate) struct Settings {
   pub(crate) no_border: Option<bool>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) verbosity: Option<Verbosity>,
+  #[serde(skip_serializing)]
+  pub(crate) file_name: Option<String>,
 }
 
 /// Identifies the application's target
@@ -62,12 +64,15 @@ pub(crate) fn read_settings(explicit_settings_filename: Option<&str>) -> Result<
   match explicit_settings_filename {
     Some(explicit_name) => {
       log::debug!("read settings from explicit file '{}'", explicit_name);
-      read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(explicit_name))
+      let settings = read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(explicit_name))?;
+      Ok(settings.map(|settings| Settings { file_name: Some(explicit_name.to_string()), ..settings }))
     }
     None => {
       let default_settings_file = dcli_directory()?.join(_DEFAULT_DCLI_SETTINGS_FILENAME);
       log::debug!("read settings from default file '{}'", default_settings_file.to_string_lossy());
-      read_and_deserialize_from_toml_file::<Settings>(default_settings_file)
+      let settings = read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))?;
+      Ok(settings.map(|settings| Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings }))
+      // read_and_deserialize_from_toml_file::<Settings>(default_settings_file)
     }
   }
 }
