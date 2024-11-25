@@ -8,7 +8,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub(crate) enum ManifestLabel {
-  Configuration,
+  _Configuration,
   Contact,
   Draft,
   LastModified,
@@ -18,7 +18,7 @@ pub(crate) enum ManifestLabel {
   Target,
 }
 
-const CONFIGURATION: &str = "configuration";
+const _CONFIGURATION: &str = "configuration";
 const ID: &str = "id";
 const NAME: &str = "name";
 const VENDOR: &str = "vendor";
@@ -27,7 +27,7 @@ const VERSION: &str = "version";
 impl Label for ManifestLabel {
   fn label_for_show(&self) -> &str {
     match self {
-      Self::Configuration => CONFIGURATION,
+      Self::_Configuration => _CONFIGURATION,
       Self::Target => "app",
       Self::Contact => "contact",
       Self::Draft => "draft",
@@ -79,7 +79,7 @@ impl TryFrom<&AppCatalogManifest> for Manifest {
 impl SubjectFormatter<ManifestLabel> for Manifest {
   fn value(&self, label: &ManifestLabel, target_id: &str) -> String {
     match label {
-      ManifestLabel::Configuration => "".to_string(),
+      ManifestLabel::_Configuration => "".to_string(),
       ManifestLabel::Contact => self.contact.clone(),
       ManifestLabel::Draft => self.draft.to_string(),
       ManifestLabel::LastModified => self.last_modified.clone(),
@@ -98,16 +98,8 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
 pub static MANIFEST_LABELS_LIST: [ManifestLabel; 6] =
   [ManifestLabel::Target, ManifestLabel::Version, ManifestLabel::Name, ManifestLabel::Draft, ManifestLabel::Vendor, ManifestLabel::LastModified];
 
-pub static MANIFEST_LABELS_SHOW: [ManifestLabel; 8] = [
-  ManifestLabel::Target,
-  ManifestLabel::Configuration,
-  ManifestLabel::Contact,
-  ManifestLabel::Draft,
-  ManifestLabel::LastModified,
-  ManifestLabel::Name,
-  ManifestLabel::Vendor,
-  ManifestLabel::Version,
-];
+pub static MANIFEST_LABELS_SHOW: [ManifestLabel; 7] =
+  [ManifestLabel::Target, ManifestLabel::Contact, ManifestLabel::Draft, ManifestLabel::LastModified, ManifestLabel::Name, ManifestLabel::Vendor, ManifestLabel::Version];
 
 //   {
 //     "apiVersion": String("v0-alpha"),

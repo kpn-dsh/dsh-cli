@@ -13,18 +13,18 @@ pub enum VolumeLabel {
 impl Label for VolumeLabel {
   fn label_for_list(&self) -> &str {
     match self {
-      Self::ActualSize => "actual size",
-      Self::ConfigurationSize => "conf size",
+      Self::ActualSize => "actual",
+      Self::ConfigurationSize => "conf",
       Self::Size => "size",
-      Self::Target => "id",
+      Self::Target => "volume id",
     }
   }
 
   fn label_for_show(&self) -> &str {
     match self {
       Self::ActualSize => "actual size",
-      Self::ConfigurationSize => "configuration size",
-      Self::Size => "volume size",
+      Self::ConfigurationSize => "configured size",
+      Self::Size => "size",
       Self::Target => "volume id",
     }
   }

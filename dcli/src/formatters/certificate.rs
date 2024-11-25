@@ -16,6 +16,20 @@ pub enum CertificateLabel {
 }
 
 impl Label for CertificateLabel {
+  fn label_for_list(&self) -> &str {
+    match self {
+      CertificateLabel::CertChainSecret => "cert secret",
+      CertificateLabel::DistinguishedName => "distinguished name",
+      CertificateLabel::DnsNames => "dns names",
+      CertificateLabel::KeySecret => "key secret",
+      CertificateLabel::NotAfter => "not after",
+      CertificateLabel::NotBefore => "not before",
+      CertificateLabel::PassphraseSecret => "pass phrase secret",
+      CertificateLabel::SerialNumber => "serial number",
+      CertificateLabel::Target => "certificate id",
+    }
+  }
+
   fn label_for_show(&self) -> &str {
     match self {
       CertificateLabel::CertChainSecret => "cert chain secret",
@@ -74,16 +88,8 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
 pub static CERTIFICATE_CONFIGURATION_LABELS: [CertificateLabel; 4] =
   [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
 
-pub static CERTIFICATE_LABELS_LIST: [CertificateLabel; 8] = [
-  CertificateLabel::Target,
-  CertificateLabel::CertChainSecret,
-  CertificateLabel::KeySecret,
-  CertificateLabel::NotAfter,
-  CertificateLabel::NotBefore,
-  CertificateLabel::PassphraseSecret,
-  CertificateLabel::SerialNumber,
-  CertificateLabel::DistinguishedName,
-];
+pub static CERTIFICATE_LABELS_LIST: [CertificateLabel; 4] =
+  [CertificateLabel::Target, CertificateLabel::DistinguishedName, CertificateLabel::NotBefore, CertificateLabel::NotAfter];
 
 pub static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
   CertificateLabel::Target,

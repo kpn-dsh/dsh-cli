@@ -130,7 +130,7 @@ impl CommandExecutor for VhostShowUsage {
         }
       }
     }
-    builder.print_list();
+    builder.print_show();
     Ok(false)
   }
 }

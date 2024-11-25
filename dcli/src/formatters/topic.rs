@@ -27,7 +27,7 @@ impl Label for TopicLabel {
       Self::Partitions => "part",
       Self::Provisioned => "prov",
       Self::ReplicationFactor => "repl",
-      Self::Target => "id",
+      Self::Target => "topic id",
       Self::TimestampType => "ts",
     }
   }

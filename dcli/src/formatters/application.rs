@@ -44,7 +44,7 @@ impl Label for ApplicationLabel {
       Self::Secrets => "secrets",
       Self::SingleInstance => "single",
       Self::SpreadGroup => "spread group",
-      Self::Target => "application",
+      Self::Target => "application id",
       Self::Tasks => "tasks",
       Self::Topics => "topics",
       Self::User => "user",
@@ -55,7 +55,7 @@ impl Label for ApplicationLabel {
 
   fn label_for_show(&self) -> &str {
     match self {
-      Self::Target => "application",
+      Self::Target => "application id",
       Self::Cpus => "cpus",
       Self::Env => "env",
       Self::ExposedPorts => "exposed ports",

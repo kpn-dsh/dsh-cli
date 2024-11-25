@@ -57,7 +57,7 @@ impl CommandExecutor for SettingList {
       println!("list default settings");
     }
     match read_settings(None)? {
-      Some(settings) => ShowTable::new("settings", &settings, &SETTING_LABELS, context).print(),
+      Some(settings) => ShowTable::new("current values", &settings, &SETTING_LABELS, context).print(),
       None => println!("no default settings found"),
     }
     Ok(false)
