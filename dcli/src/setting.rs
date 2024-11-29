@@ -5,11 +5,12 @@ use std::collections::HashMap;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::formatters::formatter::StringTableBuilder;
 use crate::formatters::setting::SETTING_LABELS;
 use crate::formatters::show_table::ShowTable;
 use crate::settings::read_settings;
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::{get_environment_variables, DcliContext, DcliResult};
 
 pub(crate) struct SettingSubject {}
 
@@ -59,6 +60,21 @@ impl CommandExecutor for SettingList {
     match read_settings(None)? {
       Some(settings) => ShowTable::new("current values", &settings, &SETTING_LABELS, context).print(),
       None => println!("no default settings found"),
+    }
+    let env_vars = get_environment_variables();
+    if !env_vars.is_empty() {
+      if context.show_capability_explanation() {
+        println!("list environment variables");
+      }
+      let mut builder = StringTableBuilder::new(&["environment variable", "value"], context);
+      for (env_var, value) in env_vars {
+        if env_var.contains("_SECRET_") {
+          builder.vec(&vec![env_var, "********".to_string()]);
+        } else {
+          builder.vec(&vec![env_var, value]);
+        }
+      }
+      builder.print_list();
     }
     Ok(false)
   }

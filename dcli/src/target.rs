@@ -9,7 +9,7 @@ use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
 use crate::formatters::list_table::ListTable;
 use crate::formatters::target::{TargetFormatter, TARGET_LABELS};
-use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, Target};
+use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
 use crate::subject::Subject;
 use crate::{confirmed, read_single_line, read_single_line_password, DcliContext, DcliResult};
 
@@ -50,6 +50,7 @@ impl Subject for TargetSubject {
 
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
     let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
+    capabilities.insert(CapabilityType::Default, TARGET_DEFAULT_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::Delete, TARGET_DELETE_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::List, TARGET_LIST_CAPABILITY.as_ref());
     capabilities.insert(CapabilityType::New, TARGET_NEW_CAPABILITY.as_ref());
@@ -58,6 +59,14 @@ impl Subject for TargetSubject {
 }
 
 lazy_static! {
+  pub static ref TARGET_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CapabilityType::Default, "Set default target.")
+      .set_long_about(
+        "Set the default target. If you set a default target, \
+        you won't be prompted for the platform and tenant name."
+      )
+      .set_default_command_executor(&TargetDefault {})
+  );
   pub static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Delete, "Delete target configuration.")
       .set_long_about(
@@ -82,6 +91,39 @@ lazy_static! {
       )
       .set_default_command_executor(&TargetNew {})
   );
+}
+
+struct TargetDefault {}
+
+#[async_trait]
+impl CommandExecutor for TargetDefault {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
+    if context.show_capability_explanation() {
+      println!("set default target");
+    }
+    let platform = read_single_line("enter platform: ")?;
+    let platform = DshPlatform::try_from(platform.as_str())?;
+    let tenant = read_single_line("enter tenant: ")?;
+    match read_target(&platform, &tenant)? {
+      Some(ref target) => {
+        match read_settings(None)? {
+          Some(settings) => {
+            let settings = Settings { default_platform: Some(target.platform.to_string()), default_tenant: Some(target.tenant.clone()), ..settings };
+            write_settings(None, settings)?;
+          }
+          None => {
+            let settings = Settings { default_platform: Some(target.platform.to_string()), default_tenant: Some(target.tenant.clone()), ..Settings::default() };
+            write_settings(None, settings)?;
+          }
+        }
+        println!("target {} has been set as default", target);
+      }
+      None => {
+        return Err(format!("target {}@{} does not exist", tenant, platform));
+      }
+    }
+    Ok(false)
+  }
 }
 
 struct TargetDelete {}
@@ -143,7 +185,11 @@ impl CommandExecutor for TargetList {
       let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, group_user_id: target.group_user_id, is_default };
       table.value("", &target_formatter);
     }
-    table.print();
+    if table.is_empty() {
+      println!("no targets configured");
+    } else {
+      table.print();
+    }
     Ok(false)
   }
 }
