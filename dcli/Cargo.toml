@@ -33,11 +33,8 @@ itertools = "0.13.0"
 serde = { version = "1.0.214", features = ["derive"] }
 
 # While developing
-# * simultaneously with the library: use the relative path dependency
-# * dcli only: use either the crates.io or the git dependency
-# When publishing
-# * if possible/available, use the crates.io dependency
-# * else use the git dependency
-dsh-api = { path = "../../dsh-api/dsh-api" }
-#dsh-api = "0.2.0"
-#dsh-api = { git = "ssh://git@github.com/kpn-dsh/dsh-api.git", branch = "0.2.0" }
+# * simultaneously on dcli and the library: use the relative path dependency
+# * dcli only: use either the git dependency
+# When publishing, alway use the git dependency
+#dsh-api = { path = "../../dsh-api/dsh-api" }
+dsh-api = { git = "ssh://git@github.com/kpn-dsh/dsh-api.git", branch = "0.2.0" }
