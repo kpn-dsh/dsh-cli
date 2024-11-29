@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# This file can be used as a run test for dcli.
-# It will run a large number of commands and print the output to the console.
+# This script can be used as a run test for dcli.
+# It will run a large number of commands from a file and print the output to the console.
 # Note that you have to set the DSH_API_SECRET_NPLZ_GREENBOX_DEV environment variable
 # prior to starting this script.
 #
@@ -31,12 +31,13 @@ export RUST_LOG=dcli=info,dsh_api=info
 
 export SEPARATOR="-------------------------------"
 export VERBOSITY="-v medium"
-export NO_BORDER=""
+#export HIDE_BORDER="--hide-border"
+export SHOW_EXECUTION_TIME="--show-execution-time"
 
 IFS=$'\n'
 set -f
 for i in $(cat < "$1"); do
-  CMD=`echo "dcli $VERBOSITY $NO_BORDER $i" | envsubst`
+  CMD=`echo "dcli $VERBOSITY $HIDE_BORDER $SHOW_EXECUTION_TIME $i" | envsubst`
   echo "$SEPARATOR"
   echo "$CMD"
   echo "$SEPARATOR"

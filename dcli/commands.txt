@@ -23,11 +23,8 @@ bs
 bucket l
 bucket list
 buckets
-bucket list --configuration
 bucket list --ids
-bucket list --status
 bucket show $BUCKET_UNDER_TEST
-bucket show $BUCKET_UNDER_TEST --status
 
 c l
 certificate l
