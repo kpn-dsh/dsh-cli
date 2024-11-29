@@ -2,14 +2,11 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use futures::future::try_join_all;
 use futures::try_join;
 use lazy_static::lazy_static;
 
-use dsh_api::types::{ActualCertificate, AppCatalogApp, Application, Certificate, CertificateStatus};
-
-use crate::app::apps_with_secret_injections;
-use crate::application::applications_with_secret_injections;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
@@ -18,9 +15,12 @@ use crate::formatters::allocation_status::{print_allocation_status, print_alloca
 use crate::formatters::certificate::{CertificateLabel, CERTIFICATE_CONFIGURATION_LABELS, CERTIFICATE_LABELS_LIST, CERTIFICATE_LABELS_SHOW};
 use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::show_table::ShowTable;
-use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
+use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST};
+use crate::formatters::used_by::{UsedByLabel, USED_BY_LABELS_LIST};
 use crate::subject::Subject;
 use crate::{DcliContext, DcliResult};
+use dsh_api::types::Certificate;
+use dsh_api::UsedBy;
 
 pub(crate) struct CertificateSubject {}
 
@@ -102,11 +102,8 @@ impl CommandExecutor for CertificateListAll {
     let certificates_statuses_unwrapped = certificate_statuses
       .iter()
       .map(|certificate_status| certificate_status.as_ref().unwrap().to_owned().actual.unwrap())
-      .collect::<Vec<ActualCertificate>>();
-    let zipped = certificate_ids
-      .into_iter()
-      .zip(certificates_statuses_unwrapped)
-      .collect::<Vec<(String, ActualCertificate)>>();
+      .collect::<Vec<_>>();
+    let zipped = certificate_ids.into_iter().zip(certificates_statuses_unwrapped).collect::<Vec<_>>();
     let mut builder = TableBuilder::list(&CERTIFICATE_LABELS_LIST, context);
     builder.values(&zipped);
     builder.print();
@@ -182,8 +179,8 @@ impl CommandExecutor for CertificateListUsage {
     if context.show_capability_explanation() {
       println!("list all certificates with the applications where they are used");
     }
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
-    let (applications, apps) = try_join!(
+    let (certificate_ids, applications, apps) = try_join!(
+      context.dsh_api_client.as_ref().unwrap().get_certificate_ids(),
       context.dsh_api_client.as_ref().unwrap().get_applications(),
       context.dsh_api_client.as_ref().unwrap().get_app_configurations()
     )?;
@@ -201,20 +198,25 @@ impl CommandExecutor for CertificateListUsage {
           Some(passphrase_secret) => vec![certificate_configuration.cert_chain_secret, certificate_configuration.key_secret, passphrase_secret],
           None => vec![certificate_configuration.cert_chain_secret, certificate_configuration.key_secret],
         };
-        for (application_id, instances, secret_injections) in applications_with_secret_injections(&secrets, &applications) {
+        for (application_id, application, secret_injections) in DshApiClient::applications_with_secrets_injections(&secrets, &applications) {
           let injections = secret_injections
             .iter()
-            .map(|(secret, envs)| format!("{}: {}", secret, envs.join(", ")))
-            .collect::<Vec<String>>();
-          rows.push(Usage::application(certificate_id.clone(), application_id.clone(), instances, injections));
+            .map(|(secret, envs)| format!("{}: {}", secret, envs.iter().map(|env| env.to_string()).collect::<Vec<_>>().join(", ")))
+            .collect::<Vec<_>>();
+          rows.push(Usage::application(
+            certificate_id.clone(),
+            application_id.clone(),
+            application.instances,
+            injections,
+          ));
           certificate_used = true;
         }
-        for (app_id, instances, secret_injections) in apps_with_secret_injections(&secrets, &apps) {
+        for (app_id, _, _, application, secret_injections) in DshApiClient::apps_with_secrets_injections(&secrets, &apps) {
           let injections = secret_injections
             .iter()
-            .map(|(secret, envs)| format!("{}: {}", secret, envs.join(", ")))
-            .collect::<Vec<String>>();
-          rows.push(Usage::app(certificate_id.clone(), app_id.clone(), instances, injections));
+            .map(|(secret, envs)| format!("{}: {}", secret, envs.iter().map(|env| env.to_string()).collect::<Vec<_>>().join(", ")))
+            .collect::<Vec<_>>();
+          rows.push(Usage::app(certificate_id.clone(), app_id.clone(), application.instances, injections));
           certificate_used = true;
         }
       }
@@ -276,30 +278,9 @@ impl CommandExecutor for CertificateShowUsage {
     if context.show_capability_explanation() {
       println!("show all applications and apps that use certificate '{}'", certificate_id);
     }
-    let (certificate_status, applications, apps): (CertificateStatus, HashMap<String, Application>, HashMap<String, AppCatalogApp>) = try_join!(
-      context.dsh_api_client.as_ref().unwrap().get_certificate(certificate_id.as_str()),
-      context.dsh_api_client.as_ref().unwrap().get_applications(),
-      context.dsh_api_client.as_ref().unwrap().get_app_configurations()
-    )?;
-    let mut rows: Vec<Usage> = vec![];
-    if let Some(configuration) = certificate_status.configuration {
-      let secrets = match configuration.passphrase_secret {
-        Some(passphrase_secret) => vec![configuration.cert_chain_secret, configuration.key_secret, passphrase_secret],
-        None => vec![configuration.cert_chain_secret, configuration.key_secret],
-      };
-      for (application_id, instances, secret_injections) in applications_with_secret_injections(&secrets, &applications) {
-        for (_, injections) in secret_injections {
-          rows.push(Usage::application(certificate_id.clone(), application_id.to_string(), instances, injections));
-        }
-      }
-      for (app_id, instances, secret_injections) in apps_with_secret_injections(&secrets, &apps) {
-        for (_, injections) in secret_injections {
-          rows.push(Usage::app(certificate_id.clone(), app_id.clone(), instances, injections));
-        }
-      }
-    }
-    let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_LABELS_SHOW, context);
-    builder.rows(&rows);
+    let (_, used_bys) = context.dsh_api_client.as_ref().unwrap().get_certificate_with_usage(certificate_id.as_str()).await?;
+    let mut builder: TableBuilder<UsedByLabel, UsedBy> = TableBuilder::list(&USED_BY_LABELS_LIST, context);
+    builder.rows(&used_bys);
     builder.print();
     Ok(false)
   }

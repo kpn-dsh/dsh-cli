@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::Injection;
 use futures::future::try_join_all;
 use futures::try_join;
 use lazy_static::lazy_static;
 
-use crate::app::apps_with_secret_injections;
-use crate::application::applications_with_secret_injections;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
@@ -20,7 +20,7 @@ use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_L
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
 use crate::{confirmed, include_app_application, read_multi_line, read_single_line, DcliContext, DcliResult};
-use dsh_api::types::Secret;
+use dsh_api::types::{AppCatalogApp, Application, Secret};
 
 pub(crate) struct SecretSubject {}
 
@@ -168,7 +168,7 @@ impl CommandExecutor for SecretListAllocationStatus {
       .dsh_api_client
       .as_ref()
       .unwrap()
-      .get_secret_ids()
+      .list_secret_ids()
       .await?
       .into_iter()
       .filter(|id| !is_system_secret(id))
@@ -196,7 +196,7 @@ impl CommandExecutor for SecretListSystem {
       .dsh_api_client
       .as_ref()
       .unwrap()
-      .get_secret_ids()
+      .list_secret_ids()
       .await?
       .into_iter()
       .filter(|id| is_system_secret(id))
@@ -224,7 +224,7 @@ impl CommandExecutor for SecretListIds {
       .dsh_api_client
       .as_ref()
       .unwrap()
-      .get_secret_ids()
+      .list_secret_ids()
       .await?
       .into_iter()
       .filter(|id| !is_system_secret(id))
@@ -245,19 +245,23 @@ impl CommandExecutor for SecretListUsage {
         println!("list all secrets with their usage in apps");
       }
       let (secret_ids, apps) = try_join!(
-        context.dsh_api_client.as_ref().unwrap().get_secret_ids(),
+        context.dsh_api_client.as_ref().unwrap().list_secret_ids(),
         context.dsh_api_client.as_ref().unwrap().get_app_configurations()
       )?;
       let mut table = ListTable::new(&USAGE_IN_APPS_LABELS_LIST, context);
       for secret_id in &secret_ids {
-        let app_usages: Vec<(String, u64, HashMap<String, Vec<String>>)> = apps_with_secret_injections(&[secret_id.to_string()], &apps);
+        let app_usages: Vec<(String, &AppCatalogApp, String, &Application, HashMap<String, Vec<Injection>>)> =
+          DshApiClient::apps_with_secrets_injections(&[secret_id.to_string()], &apps);
         let mut first = true;
-        for (app_id, instances, secret_injections) in &app_usages {
-          let injections = secret_injections.values().map(|envs| envs.join(", ")).collect::<Vec<String>>();
+        for (app_id, _, _, application, secret_injections) in app_usages {
+          let injections = secret_injections
+            .values()
+            .map(|envs| envs.iter().map(|env| env.to_string()).collect::<Vec<_>>().join(", "))
+            .collect::<Vec<_>>();
           if first {
-            table.row(&Usage::app(secret_id.to_string(), app_id.to_string(), *instances, injections));
+            table.row(&Usage::app(secret_id.to_string(), app_id.to_string(), application.instances, injections));
           } else {
-            table.row(&Usage::app("".to_string(), app_id.to_string(), *instances, injections));
+            table.row(&Usage::app("".to_string(), app_id.to_string(), application.instances, injections));
           }
           first = false;
         }
@@ -273,19 +277,28 @@ impl CommandExecutor for SecretListUsage {
         println!("list all secrets with their usage in applications");
       }
       let (secret_ids, applications) = try_join!(
-        context.dsh_api_client.as_ref().unwrap().get_secret_ids(),
+        context.dsh_api_client.as_ref().unwrap().list_secret_ids(),
         context.dsh_api_client.as_ref().unwrap().get_applications()
       )?;
       let mut table = ListTable::new(&USAGE_IN_APPLICATIONS_LABELS_LIST, context);
       for secret_id in &secret_ids {
         let mut first = true;
-        let application_usages: Vec<(String, u64, HashMap<String, Vec<String>>)> = applications_with_secret_injections(&[secret_id.to_string()], &applications);
-        for (application_id, instances, secret_injections) in &application_usages {
-          let injections = secret_injections.values().map(|envs| envs.join(", ")).collect::<Vec<String>>();
+        let application_usages: Vec<(String, &Application, HashMap<String, Vec<Injection>>)> =
+          DshApiClient::applications_with_secrets_injections(&[secret_id.to_string()], &applications);
+        for (application_id, application, secret_injections) in &application_usages {
+          let injections = secret_injections
+            .values()
+            .map(|envs| envs.iter().map(|env| env.to_string()).collect::<Vec<_>>().join(", "))
+            .collect::<Vec<_>>();
           if first {
-            table.row(&Usage::application(secret_id.to_string(), application_id.to_string(), *instances, injections));
+            table.row(&Usage::application(
+              secret_id.to_string(),
+              application_id.to_string(),
+              application.instances,
+              injections,
+            ));
           } else {
-            table.row(&Usage::application("".to_string(), application_id.to_string(), *instances, injections));
+            table.row(&Usage::application("".to_string(), application_id.to_string(), application.instances, injections));
           }
           first = false;
         }
@@ -325,24 +338,32 @@ impl CommandExecutor for SecretShowUsage {
       println!("show applications that use secret '{}'", secret_id);
     }
     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
-    let application_injections: Vec<(String, u64, HashMap<String, Vec<String>>)> = applications_with_secret_injections(&[secret_id.clone()], &applications);
+    let application_injections: Vec<(String, &Application, HashMap<String, Vec<Injection>>)> =
+      DshApiClient::applications_with_secrets_injections(&[secret_id.clone()], &applications);
     if !application_injections.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_IN_APPLICATIONS_LABELS_SHOW, context);
-      for (application_id, instances, secret_injections) in application_injections {
-        let injections = secret_injections.values().map(|envs| envs.join("\n")).collect();
-        builder.row(&Usage::application(secret_id.clone(), application_id, instances, injections));
+      for (application_id, application, secret_injections) in application_injections {
+        let injections = secret_injections
+          .values()
+          .map(|envs| envs.iter().map(|env| env.to_string()).collect::<Vec<_>>().join("\n"))
+          .collect();
+        builder.row(&Usage::application(secret_id.clone(), application_id, application.instances, injections));
       }
       builder.print();
     } else {
       println!("secret not used in applications")
     }
     let apps = context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
-    let app_injections: Vec<(String, u64, HashMap<String, Vec<String>>)> = apps_with_secret_injections(&[secret_id.clone()], &apps);
+    let app_injections: Vec<(String, &AppCatalogApp, String, &Application, HashMap<String, Vec<Injection>>)> =
+      DshApiClient::apps_with_secrets_injections(&[secret_id.clone()], &apps);
     if !app_injections.is_empty() {
       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_IN_APPS_LABELS_SHOW, context);
-      for (app_id, instances, secret_injections) in app_injections {
-        let injections = secret_injections.iter().map(|(secret, envs)| format!("{}:{}", secret, envs.join(", "))).collect();
-        builder.row(&Usage::app(secret_id.clone(), app_id, instances, injections));
+      for (app_id, _, _, application, secret_injections) in app_injections {
+        let injections = secret_injections
+          .iter()
+          .map(|(secret, envs)| format!("{}:{}", secret, envs.iter().map(|env| env.to_string()).collect::<Vec<_>>().join(", ")))
+          .collect();
+        builder.row(&Usage::app(secret_id.clone(), app_id, application.instances, injections));
       }
       builder.print();
     } else {
