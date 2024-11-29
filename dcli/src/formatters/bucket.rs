@@ -69,6 +69,6 @@ impl SubjectFormatter<BucketLabel> for Bucket {
 }
 
 pub static BUCKET_STATUS_LABELS: [BucketLabel; 6] =
-  [BucketLabel::Target, BucketLabel::Provisioned, BucketLabel::DerivedFrom, BucketLabel::Notifications, BucketLabel::Encrypted, BucketLabel::Versioned];
+  [BucketLabel::Target, BucketLabel::Encrypted, BucketLabel::Versioned, BucketLabel::Provisioned, BucketLabel::Notifications, BucketLabel::DerivedFrom];
 
 pub static BUCKET_LABELS: [BucketLabel; 3] = [BucketLabel::Target, BucketLabel::Encrypted, BucketLabel::Versioned];

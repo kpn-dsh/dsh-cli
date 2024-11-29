@@ -34,6 +34,22 @@ impl Label for ProxyLabel {
     }
   }
 
+  fn label_for_list(&self) -> &str {
+    match self {
+      ProxyLabel::Certificate => "certificate",
+      ProxyLabel::Cpus => "cpus",
+      ProxyLabel::Instances => "instances",
+      ProxyLabel::KafkaProxyZone => "zone",
+      ProxyLabel::Mem => "memory",
+      ProxyLabel::Name => "certificate name",
+      ProxyLabel::SchemaStore => "schema store",
+      ProxyLabel::SchemaStoreEnabled => "schema store",
+      ProxyLabel::SecretNameCaChain => "secret name",
+      ProxyLabel::Target => "proxy id",
+      ProxyLabel::Validations => "validation",
+    }
+  }
+
   fn is_target_label(&self) -> bool {
     *self == Self::Target
   }
@@ -62,12 +78,18 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
       ProxyLabel::SchemaStoreEnabled => self.schema_store.map(|enabled| enabled.to_string()).unwrap_or("NA".to_string()),
       ProxyLabel::SecretNameCaChain => self.secret_name_ca_chain.to_string(),
       ProxyLabel::Target => target_id.to_string(),
-      ProxyLabel::Validations => self
-        .validations
-        .iter()
-        .map(|validation| validation.common_name.clone().unwrap_or_default())
-        .collect::<Vec<String>>()
-        .join("\n"),
+      ProxyLabel::Validations => {
+        if self.validations.is_empty() {
+          "none".to_string()
+        } else {
+          self
+            .validations
+            .iter()
+            .map(|validation| validation.common_name.clone().unwrap_or_default())
+            .collect::<Vec<_>>()
+            .join("\n")
+        }
+      }
     }
   }
 

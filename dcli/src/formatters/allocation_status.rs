@@ -49,10 +49,10 @@ impl SubjectFormatter<AllocationStatusLabel> for AllocationStatus {
 }
 
 pub static _ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
-  [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::DerivedFrom, AllocationStatusLabel::Notifications];
+  [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::Notifications, AllocationStatusLabel::DerivedFrom];
 
 pub static DEFAULT_ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
-  [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::DerivedFrom, AllocationStatusLabel::Notifications];
+  [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::Notifications, AllocationStatusLabel::DerivedFrom];
 
 pub fn print_allocation_statuses(target_ids: Vec<String>, allocation_statuses: Vec<AllocationStatus>, context: &DcliContext) {
   let zipped = target_ids.into_iter().zip(allocation_statuses).collect::<Vec<(String, AllocationStatus)>>();

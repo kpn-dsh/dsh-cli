@@ -1,3 +1,3 @@
 # Known issues
 
-There are no known issues at this time.
+* Verbosity level `off` sometimes gives strange results, e.g. `dcli -v off targets`

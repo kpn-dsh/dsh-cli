@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
-
 use tabled::settings::peaker::{PriorityMax, PriorityMin};
 use tabled::settings::Reverse;
 use tabled::settings::Rotate;
@@ -36,7 +35,7 @@ pub trait SubjectFormatter<L: Label> {
 pub struct TableBuilder<'a, L: Label, V: SubjectFormatter<L>> {
   list: bool,
   labels: &'a [L],
-  context: &'a DcliContext,
+  context: &'a DcliContext<'a>,
   tabled_builder: TabledBuilder,
   phantom: PhantomData<&'a V>,
 }
@@ -48,17 +47,13 @@ where
 {
   pub fn list(labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.label_for_list()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.label_for_list()));
     Self { list: true, labels, context, tabled_builder, phantom: PhantomData }
   }
 
   pub fn show(labels: &'a [L], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.label_for_show()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.label_for_show()));
     Self { list: false, labels, context, tabled_builder, phantom: PhantomData }
   }
 
@@ -121,12 +116,12 @@ where
       if let Ok((columns, _)) = terminal_size() {
         table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
       }
-      if self.context.border {
-        table.with(Padding::new(1, 1, 0, 0));
-        table.with(Style::sharp());
-      } else {
+      if self.context.hide_border {
         table.with(Padding::new(0, 2, 0, 0));
         table.with(Style::empty());
+      } else {
+        table.with(Padding::new(1, 1, 0, 0));
+        table.with(Style::sharp());
       }
       println!("{}", table);
     } else {
@@ -134,12 +129,12 @@ where
       if let Ok((columns, _)) = terminal_size() {
         table.with(Width::truncate(columns as usize).priority(PriorityMin).suffix("..."));
       }
-      if self.context.border {
-        table.with(Padding::new(1, 1, 0, 0));
-        table.with(Style::sharp());
-      } else {
+      if self.context.hide_border {
         table.with(Padding::new(0, 2, 0, 0));
         table.with(Style::empty());
+      } else {
+        table.with(Padding::new(1, 1, 0, 0));
+        table.with(Style::sharp());
       }
       table.with(Rotate::Left);
       table.with(Reverse::default());
@@ -162,16 +157,14 @@ where
 }
 
 pub struct StringTableBuilder<'a> {
-  context: &'a DcliContext,
+  context: &'a DcliContext<'a>,
   tabled_builder: TabledBuilder,
 }
 
 impl<'a> StringTableBuilder<'a> {
   pub fn new(labels: &'a [&'a str], context: &'a DcliContext) -> Self {
     let mut tabled_builder = TabledBuilder::default();
-    if context.show_headers() {
-      tabled_builder.push_record(labels.iter().map(|label| label.to_string()));
-    }
+    tabled_builder.push_record(labels.iter().map(|label| label.to_string()));
     Self { context, tabled_builder }
   }
 
@@ -193,27 +186,27 @@ impl<'a> StringTableBuilder<'a> {
     if let Ok((columns, _rows)) = terminal_size() {
       table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
     }
-    if self.context.border {
-      table.with(Padding::new(1, 1, 0, 0));
-      table.with(Style::sharp());
-    } else {
+    if self.context.hide_border {
       table.with(Padding::new(0, 2, 0, 0));
       table.with(Style::empty());
+    } else {
+      table.with(Padding::new(1, 1, 0, 0));
+      table.with(Style::sharp());
     }
     println!("{}", table);
   }
 
-  pub fn _print_show(self) {
+  pub fn print_show(self) {
     let mut table = self.tabled_builder.build();
     if let Ok((columns, _rows)) = terminal_size() {
       table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
     }
-    if self.context.border {
-      table.with(Padding::new(1, 1, 0, 0));
-      table.with(Style::sharp());
-    } else {
+    if self.context.hide_border {
       table.with(Padding::new(0, 2, 0, 0));
       table.with(Style::empty());
+    } else {
+      table.with(Padding::new(1, 1, 0, 0));
+      table.with(Style::sharp());
     }
     table.with(Rotate::Left);
     table.with(Reverse::default());
@@ -231,12 +224,12 @@ pub fn print_vec(target_id: String, vec: Vec<String>, context: &DcliContext) {
   if let Ok((columns, _rows)) = terminal_size() {
     table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
   }
-  if context.border {
-    table.with(Padding::new(1, 1, 0, 0));
-    table.with(Style::sharp());
-  } else {
+  if context.hide_border {
     table.with(Padding::new(0, 2, 0, 0));
     table.with(Style::empty());
+  } else {
+    table.with(Padding::new(1, 1, 0, 0));
+    table.with(Style::sharp());
   }
   println!("{}", table);
 }

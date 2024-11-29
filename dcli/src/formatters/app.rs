@@ -18,7 +18,7 @@ impl Label for AppCatalogAppLabel {
     match self {
       AppCatalogAppLabel::Configuration => "app configuration",
       AppCatalogAppLabel::ManifestUrl => "manifest url",
-      AppCatalogAppLabel::Target => "app",
+      AppCatalogAppLabel::Target => "app id",
     }
   }
 
@@ -40,8 +40,8 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
             keys.sort();
             keys
               .iter()
-              .map(|key| format!("{} : {}", key, map.get(key).map(|v| v.to_string()).unwrap_or("".to_string())))
-              .collect::<Vec<String>>()
+              .map(|key| format!("{}: {}", key, map.get(key).map(|v| v.to_string()).unwrap_or("".to_string())))
+              .collect::<Vec<_>>()
               .join("\n")
           }
           Err(_) => "error".to_string(),
