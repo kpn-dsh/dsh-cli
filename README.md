@@ -2,13 +2,13 @@
 
 > **NOTE**  
 > This tool is still under development and will most likely contain many bugs.
-> If you encounter any of these bugs (and you will), you can report them to `unibox@kpn.com`. 
+> If you encounter any of these bugs (and you will), you can report them to `unibox@kpn.com`.
 > Please include the exact command, the erroneous output and an explanation of the expected output.
-> 
+>
 > You can also send requests for new features to this e-mail address.
 
-This project provides a tool to call functions on the DSH resource management API from the 
-command line of your workstation. The following DSH resources can be 
+This project provides a tool to call functions on the DSH resource management API from the
+command line of your workstation. The following DSH resources can be
 listed, queried, searched, created and deleted.
 
 <table>
@@ -238,16 +238,16 @@ these environment variables are the same as for the client.
 
 ### Run
 
-When installation completed without any errors and the environment variables are set, 
+When installation completed without any errors and the environment variables are set,
 you should be able to start the tool from the command line.
 
 ```bash
 > dcli
-DSH api command line interface
+DSH resource management api command line interface.
 
-Usage: dcli [OPTIONS] [COMMAND]
+Usage: dcli [OPTIONS] [SUBJECT/COMMAND]
 
-Commands:
+Subjects/commands:
   app          Show, manage and list apps deployed from the DSH app catalog.
   application  Show, manage and list applications deployed on the DSH.
   bucket       Show, manage and list DSH buckets.
@@ -261,36 +261,62 @@ Commands:
   topic        Show, manage and list DSH topics.
   vhost        Show vhost usage.
   volume       Show, manage and list DSH volumes.
+  setting      Show, manage and list dcli settings.
+  target       Show, manage and list dcli target configurations.
+  help         Print this message or the help of the given subcommand(s)
 
 Options:
-      --no-border              Omit output border
-  -p, --platform <PLATFORM>    Target platform
-      --verbosity <VERBOSITY>  Verbosity level
-  -t, --tenant <TENANT>        Target tenant
-  -v...                        Verbosity level
-  -h, --help                   Print help (see more with '--help')
-  -V, --version                Print version
+  -p, --platform <PLATFORM>                 Provide target platform. [possible values: nplz, poc, prod, prodaz, prodlz]
+  -t, --tenant <TENANT>                     Provide target tenant.
+  -g, --guid <GUID>                         Provide target group and user id.
+      --secret                              Prompt for secret.
+  -v, --verbosity <VERBOSITY>               Set verbosity level. [possible values: low, medium, high]
+      --hide-border                         Hide output border.
+      --show-execution-time                 Show execution time.
+      --generate-autocomplete-file <SHELL>  Generate autocomplete file [possible values: bash, elvish, fish, powershell,
+                                            zsh]
+  -h, --help                                Print help (see more with '--help')
+  -V, --version                             Print version
 
-For most commands adding an 's' as a postfix will yield the same result as using
-the 'list' subcommand, e.g. using 'dcli apps' will be the same as using 'dcli
-app list'.
+For most commands adding an 's' as a postfix will yield the same result as using the 'list' subcommand, e.g. using 'dcli
+apps' will be the same as using 'dcli app list'.```
 ```
-You can have a more comprehensive explanation by adding the `--help` command line option, 
-and all available commands also have their own help text.
 
-```bash
+You can have a more comprehensive explanation by using the `--help` command line option.
+Commands also have their own help text.
+
+```
 > dcli --help
 > dcli secret --help
 > dcli secret list --help
 ```
 
-## DSH Api Client
+## Development
 
-The command line tool is based on [DSH Api Client](dsh_api).
+### Dependencies
 
-## Coding guidelines
+The `dcli` tool has a strong dependency on the [`dsh-api`](dsh_api) library,
+that provides the client for the DSH resource management API.
+This library is still being worked on, and it is not (yet) published to `crates.io`.
+Hence, at this time `dcli` depends on the [github](https://github.com/kpn-dsh/dsh-api)
+version of the library.
 
-Before pushing code to github, make sure that you adhere to the code formatting defined in 
+```toml
+# Cargo.toml
+dsh-api = { git = "ssh://git@github.com/kpn-dsh/dsh-api.git", branch = "0.2.0" }
+```
+
+When developing simultaneously on `dcli` and `dsh-api` consider changing the library dependency
+to your local copy.
+
+```toml
+# Cargo.toml
+dsh-api = { path = "../../dsh-api/dsh-api" }
+```
+
+### Coding guidelines
+
+Before pushing code to github, make sure that you adhere to the code formatting defined in
 `rustfmt.toml`. The following command shoud return without any remarks:
 
 ```bash
