@@ -41,7 +41,7 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
             keys
               .iter()
               .map(|key| format!("{}: {}", key, map.get(key).map(|v| v.to_string()).unwrap_or("".to_string())))
-              .collect::<Vec<String>>()
+              .collect::<Vec<_>>()
               .join("\n")
           }
           Err(_) => "error".to_string(),

@@ -118,7 +118,7 @@ impl CommandExecutor for ManifestListIds {
         .await?
         .iter()
         .map(|p| p.0.clone())
-        .collect::<Vec<String>>(),
+        .collect::<Vec<_>>(),
       context,
     );
     Ok(false)

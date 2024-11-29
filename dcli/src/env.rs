@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use lazy_static::lazy_static;
 
 use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::AppCatalogApp;
 
-use crate::app::get_application_from_app;
 use crate::arguments::query_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
@@ -83,13 +83,13 @@ impl CommandExecutor for EnvFind {
         println!("find environment variables in apps that {}", query_processor.describe());
       }
       let apps: &HashMap<String, AppCatalogApp> = &context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
-      let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+      let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
       app_ids.sort();
       let mut builder = StringTableBuilder::new(&["app", "application resource", "#", "environment variable", "value"], context);
       let mut found = false;
       for app_id in app_ids {
         let app = apps.get(&app_id).unwrap();
-        if let Some((resource_id, application)) = get_application_from_app(app) {
+        if let Some((resource_id, application)) = DshApiClient::application_from_app(app) {
           let mut envs: Vec<(String, String)> = application
             .env
             .iter()
@@ -123,7 +123,7 @@ impl CommandExecutor for EnvFind {
         println!("find environment variables in applications that {}", query_processor.describe());
       }
       let applications = &context.dsh_api_client.as_ref().unwrap().get_applications().await?;
-      let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+      let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<_>>();
       application_ids.sort();
       let mut builder = StringTableBuilder::new(&["application", "#", "environment variable", "value"], context);
       let mut found = false;

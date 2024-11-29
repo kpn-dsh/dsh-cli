@@ -1,6 +1,5 @@
-use dsh_api::types::{ActualCertificate, Certificate};
-
 use crate::formatters::formatter::{Label, SubjectFormatter};
+use dsh_api::types::{ActualCertificate, Certificate};
 
 #[derive(Eq, Hash, PartialEq)]
 pub enum CertificateLabel {
@@ -53,7 +52,7 @@ impl SubjectFormatter<CertificateLabel> for ActualCertificate {
   fn value(&self, label: &CertificateLabel, target_id: &str) -> String {
     match label {
       CertificateLabel::CertChainSecret => self.cert_chain_secret.clone(),
-      CertificateLabel::DistinguishedName => self.distinguished_name.clone(),
+      CertificateLabel::DistinguishedName => self.distinguished_name.clone().split(",").collect::<Vec<_>>().join("\n"),
       CertificateLabel::DnsNames => self.dns_names.join("\n"),
       CertificateLabel::KeySecret => self.key_secret.clone(),
       CertificateLabel::NotAfter => self.not_after.to_string(),
@@ -94,11 +93,11 @@ pub static CERTIFICATE_LABELS_LIST: [CertificateLabel; 4] =
 pub static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
   CertificateLabel::Target,
   CertificateLabel::CertChainSecret,
-  CertificateLabel::DnsNames,
   CertificateLabel::KeySecret,
   CertificateLabel::NotAfter,
   CertificateLabel::NotBefore,
   CertificateLabel::PassphraseSecret,
   CertificateLabel::SerialNumber,
   CertificateLabel::DistinguishedName,
+  CertificateLabel::DnsNames,
 ];

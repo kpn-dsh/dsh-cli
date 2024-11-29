@@ -251,7 +251,7 @@ impl CommandExecutor for ApplicationShowTasks {
 }
 
 fn print_applications(applications: &HashMap<String, Application>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
-  let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+  let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<_>>();
   application_ids.sort();
   let mut builder = TableBuilder::list(&APPLICATION_LABELS_LIST, context);
   for application_id in application_ids {
@@ -286,36 +286,6 @@ pub(crate) fn _applications_that_use_env_value(value: &str, applications: &HashM
     if !application.env.is_empty() {
       let envs_that_contain_certificate_id: Vec<String> = application.env.clone().into_iter().filter(|(_, v)| v.contains(value)).map(|(k, _)| k).collect();
       pairs.push((application_id.clone(), envs_that_contain_certificate_id));
-    }
-  }
-  pairs
-}
-
-// Returns vector with pairs (application_id, instances, secret -> environment variables)
-pub(crate) fn applications_with_secret_injections(secrets: &[String], applications: &HashMap<String, Application>) -> Vec<(String, u64, HashMap<String, Vec<String>>)> {
-  let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
-  application_ids.sort();
-  let mut pairs: Vec<(String, u64, HashMap<String, Vec<String>>)> = vec![];
-  for application_id in application_ids {
-    let application = applications.get(&application_id).unwrap();
-    if !application.secrets.is_empty() {
-      let mut injections = HashMap::<String, Vec<String>>::new();
-      for application_secret in &application.secrets {
-        if secrets.contains(&application_secret.name) {
-          let mut env_injections = vec![];
-          for application_secret_injection in &application_secret.injections {
-            if let Some(env_injection) = application_secret_injection.get("env") {
-              env_injections.push(env_injection.to_string());
-            }
-          }
-          if !env_injections.is_empty() {
-            injections.insert(application_secret.name.clone(), env_injections);
-          }
-        }
-      }
-      if !injections.is_empty() {
-        pairs.push((application_id.clone(), application.instances, injections));
-      }
     }
   }
   pairs

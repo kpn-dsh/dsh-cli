@@ -86,7 +86,7 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
             .validations
             .iter()
             .map(|validation| validation.common_name.clone().unwrap_or_default())
-            .collect::<Vec<String>>()
+            .collect::<Vec<_>>()
             .join("\n")
         }
       }

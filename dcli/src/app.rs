@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use lazy_static::lazy_static;
 
-use dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue, Application};
+use dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue};
 
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
@@ -76,7 +77,7 @@ impl CommandExecutor for AppListConfiguration {
       println!("list all deployed apps and their configurations");
     }
     let apps = context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
-    let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+    let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     app_ids.sort();
     let mut builder = TableBuilder::list(&APP_CATALOG_APP_LABELS, context);
     for app_id in app_ids {
@@ -125,7 +126,7 @@ impl CommandExecutor for AppShowAll {
         }
         AppCatalogAppResourcesValue::Secret(secret) => {
           let mut builder = StringTableBuilder::new(&["resource", "secret"], context);
-          builder.vec(&vec![resource_name.to_string(), secret.to_string()]);
+          builder.vec(&vec![resource_name.to_string(), secret.name.clone()]);
           builder.print_show();
         }
         AppCatalogAppResourcesValue::Topic(topic) => {
@@ -133,7 +134,7 @@ impl CommandExecutor for AppShowAll {
         }
         AppCatalogAppResourcesValue::Vhost(vhost) => {
           let mut builder = StringTableBuilder::new(&["resource", "vhost"], context);
-          builder.vec(&vec![resource_name.to_string(), vhost.to_string()]);
+          builder.vec(&vec![resource_name.to_string(), vhost.value.clone()]);
           builder.print_show();
         }
         AppCatalogAppResourcesValue::Volume(volume) => {
@@ -145,59 +146,16 @@ impl CommandExecutor for AppShowAll {
   }
 }
 
-/// Get application for this app
-///
-/// ## Returns
-/// * (resource_id, application)
-pub(crate) fn get_application_from_app(app: &AppCatalogApp) -> Option<(&String, &Application)> {
-  app.resources.iter().find_map(|(resource_id, resource)| match resource {
-    AppCatalogAppResourcesValue::Application(application) => Some((resource_id, application)),
-    _ => None,
-  })
-}
-
 pub(crate) fn _apps_that_use_env_value(value: &str, apps: &HashMap<String, AppCatalogApp>) -> Vec<(String, Vec<String>)> {
   let mut app_ids: Vec<String> = apps.keys().map(|p| p.to_string()).collect();
   app_ids.sort();
   let mut pairs: Vec<(String, Vec<String>)> = vec![];
   for app_id in app_ids {
     let app = apps.get(&app_id).unwrap();
-    if let Some((application_id, application)) = get_application_from_app(app) {
+    if let Some((application_id, application)) = DshApiClient::application_from_app(app) {
       if !application.env.is_empty() {
         let envs_that_contain_value: Vec<String> = application.env.clone().into_iter().filter(|(_, v)| v.contains(value)).map(|(k, _)| k).collect();
         pairs.push((application_id.clone(), envs_that_contain_value));
-      }
-    }
-  }
-  pairs
-}
-
-// Returns vector with pairs (application_id, instances, secret -> environment variables)
-pub(crate) fn apps_with_secret_injections(secrets: &[String], apps: &HashMap<String, AppCatalogApp>) -> Vec<(String, u64, HashMap<String, Vec<String>>)> {
-  let mut app_ids: Vec<String> = apps.keys().map(|p| p.to_string()).collect();
-  app_ids.sort();
-  let mut pairs: Vec<(String, u64, HashMap<String, Vec<String>>)> = vec![];
-  for app_id in app_ids {
-    let app = apps.get(&app_id).unwrap();
-    if let Some((application_id, application)) = get_application_from_app(app) {
-      if !application.secrets.is_empty() {
-        let mut injections = HashMap::<String, Vec<String>>::new();
-        for application_secret in &application.secrets {
-          if secrets.contains(&application_secret.name) {
-            let mut env_injections = vec![];
-            for application_secret_injection in &application_secret.injections {
-              if let Some(env_injection) = application_secret_injection.get("env") {
-                env_injections.push(env_injection.to_string());
-              }
-            }
-            if !env_injections.is_empty() {
-              injections.insert(application_secret.name.clone(), env_injections);
-            }
-          }
-        }
-        if !injections.is_empty() {
-          pairs.push((application_id.clone(), application.instances, injections));
-        }
       }
     }
   }
@@ -210,7 +168,7 @@ pub(crate) fn apps_that_use_volume(volume_id: &str, apps: &HashMap<String, AppCa
   let mut pairs: Vec<(String, u64, String)> = vec![];
   for app_id in app_ids {
     let app = apps.get(&app_id).unwrap();
-    if let Some((application_id, application)) = get_application_from_app(app) {
+    if let Some((application_id, application)) = DshApiClient::application_from_app(app) {
       for (path, volume) in application.volumes.clone() {
         if volume.name.contains(&format!("volume('{}')", volume_id)) {
           pairs.push((application_id.clone(), application.instances, path))

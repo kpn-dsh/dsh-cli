@@ -20,10 +20,11 @@ pub(crate) mod target;
 pub(crate) mod task;
 pub(crate) mod topic;
 pub(crate) mod usage;
+pub(crate) mod used_by;
 pub(crate) mod volume;
 
 pub(crate) fn notifications_to_string(notifications: &[Notification]) -> String {
-  notifications.iter().map(notification_to_string).collect::<Vec<String>>().join(", ")
+  notifications.iter().map(notification_to_string).collect::<Vec<_>>().join(", ")
 }
 
 pub(crate) fn notification_to_string(notification: &Notification) -> String {
@@ -35,7 +36,7 @@ pub(crate) fn notification_to_string(notification: &Notification) -> String {
       .args
       .iter()
       .map(|(key, value)| format!("{}:{}", key, value))
-      .collect::<Vec<String>>()
+      .collect::<Vec<_>>()
       .join(", "),
   )
 }

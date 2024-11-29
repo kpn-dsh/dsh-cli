@@ -87,15 +87,15 @@ impl SubjectFormatter<ApplicationLabel> for Application {
     match label {
       ApplicationLabel::Cpus => self.cpus.to_string(),
       ApplicationLabel::Env => {
-        let mut key = self.env.keys().map(|k| k.to_string()).collect::<Vec<String>>();
+        let mut key = self.env.keys().map(|k| k.to_string()).collect::<Vec<_>>();
         key.sort();
         key
           .iter()
           .map(|key| format!("{} -> {}", key, self.env.get(key).unwrap()))
-          .collect::<Vec<String>>()
+          .collect::<Vec<_>>()
           .join("\n")
       }
-      ApplicationLabel::ExposedPorts => self.exposed_ports.keys().map(|port| port.to_string()).collect::<Vec<String>>().join(","),
+      ApplicationLabel::ExposedPorts => self.exposed_ports.keys().map(|port| port.to_string()).collect::<Vec<_>>().join(","),
       ApplicationLabel::HealthCheck => match self.health_check {
         Some(ref health_check) => match health_check.protocol {
           Some(protocol) => format!("{}:{}/{}", protocol.to_string(), health_check.port, health_check.path),
@@ -120,22 +120,22 @@ impl SubjectFormatter<ApplicationLabel> for Application {
         .clone()
         .into_iter()
         .map(|readable_stream| readable_stream.to_string())
-        .collect::<Vec<String>>()
+        .collect::<Vec<_>>()
         .join(", "),
-      ApplicationLabel::Secrets => self.secrets.clone().into_iter().map(|secret| secret.name).collect::<Vec<String>>().join(", "),
+      ApplicationLabel::Secrets => self.secrets.clone().into_iter().map(|secret| secret.name).collect::<Vec<_>>().join(", "),
       ApplicationLabel::SingleInstance => self.single_instance.to_string(),
       ApplicationLabel::SpreadGroup => self.spread_group.clone().unwrap_or_default(),
       ApplicationLabel::Target => application_id.to_string(),
       ApplicationLabel::Tasks => "".to_string(),
-      ApplicationLabel::Topics => self.topics.clone().into_iter().map(|topic| topic.to_string()).collect::<Vec<String>>().join(", "),
+      ApplicationLabel::Topics => self.topics.clone().into_iter().map(|topic| topic.to_string()).collect::<Vec<_>>().join(", "),
       ApplicationLabel::User => self.user.clone(),
-      ApplicationLabel::Volumes => self.volumes.keys().map(|k| k.to_string()).collect::<Vec<String>>().join(","),
+      ApplicationLabel::Volumes => self.volumes.keys().map(|k| k.to_string()).collect::<Vec<_>>().join(","),
       ApplicationLabel::WritableStreams => self
         .writable_streams
         .clone()
         .into_iter()
         .map(|writable_stream| writable_stream.to_string())
-        .collect::<Vec<String>>()
+        .collect::<Vec<_>>()
         .join(", "),
     }
   }
