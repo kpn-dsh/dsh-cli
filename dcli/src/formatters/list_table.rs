@@ -87,12 +87,12 @@ where
     if let Ok((columns, _)) = terminal_size() {
       table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
     }
-    if self.context.border {
-      table.with(Padding::new(1, 1, 0, 0));
-      table.with(Style::sharp());
-    } else {
+    if self.context.hide_border {
       table.with(Padding::new(0, 2, 0, 0));
       table.with(Style::empty());
+    } else {
+      table.with(Padding::new(1, 1, 0, 0));
+      table.with(Style::sharp());
     }
     println!("{}", table);
   }

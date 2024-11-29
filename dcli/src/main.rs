@@ -11,8 +11,8 @@ use std::time::Instant;
 use crate::app::APP_SUBJECT;
 use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{
-  guid_argument, no_border_argument, password_argument, platform_argument, set_verbosity_argument, tenant_argument, PlatformArgument, Verbosity, GUID_ARGUMENT, NO_BORDER_ARGUMENT,
-  PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT, TENANT_ARGUMENT,
+  guid_argument, hide_border_argument, password_argument, platform_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, PlatformArgument, Verbosity,
+  GUID_ARGUMENT, HIDE_BORDER_ARGUMENT, PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT, TENANT_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::bucket::BUCKET_SUBJECT;
@@ -91,7 +91,8 @@ type DcliResult = Result<bool, String>;
 
 pub(crate) struct DcliContext<'a> {
   pub(crate) verbosity: Verbosity,
-  pub(crate) border: bool,
+  pub(crate) hide_border: bool,
+  pub(crate) show_execution_time: bool,
   pub(crate) dsh_api_client: Option<DshApiClient<'a>>,
 }
 
@@ -105,8 +106,8 @@ impl DcliContext<'_> {
 
   pub(crate) fn show_execution_time(&self) -> bool {
     match self.verbosity {
-      Verbosity::Low => false,
-      Verbosity::Medium | Verbosity::High => true,
+      Verbosity::Low | Verbosity::Medium => self.show_execution_time,
+      Verbosity::High => true,
     }
   }
 
@@ -209,7 +210,8 @@ async fn inner_main() -> DcliResult {
       guid_argument(),
       password_argument(),
       set_verbosity_argument(),
-      no_border_argument(),
+      hide_border_argument(),
+      show_execution_time_argument(),
       generate_autocomplete_file_argument(),
     ])
     .subcommand_value_name("SUBJECT/COMMAND")
@@ -232,7 +234,7 @@ async fn inner_main() -> DcliResult {
   let start_instant = Instant::now();
 
   match matches.subcommand() {
-    Some((command_name, sub_matches)) => match subject_registry.get(command_name) {
+    Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         if subject.requires_dsh_api_client() {
           let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
@@ -249,7 +251,7 @@ async fn inner_main() -> DcliResult {
           }
         };
       }
-      None => match subject_list_shortcut_registry.get(command_name) {
+      None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject) => {
           if subject.requires_dsh_api_client() {
             let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
@@ -282,19 +284,30 @@ async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings
 }
 
 fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<DcliContext<'a>, String> {
-  let border = !matches.get_flag(NO_BORDER_ARGUMENT);
-  let verbosity: Verbosity = matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT).unwrap_or(&Verbosity::Low).to_owned();
-  Ok(DcliContext { verbosity, border, dsh_api_client })
+  if let Some(settings) = read_settings(None)? {
+    let hide_border = if matches.get_flag(HIDE_BORDER_ARGUMENT) { true } else { settings.hide_border.unwrap_or(false) };
+    let verbosity: Verbosity = match matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT) {
+      Some(verbosity_argument) => verbosity_argument.to_owned(),
+      None => settings.verbosity.unwrap_or(Verbosity::Low).to_owned(),
+    };
+    let show_execution_time = if matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT) { true } else { settings.show_execution_time.unwrap_or(false) };
+    Ok(DcliContext { verbosity, hide_border, show_execution_time, dsh_api_client })
+  } else {
+    let hide_border = matches.get_flag(HIDE_BORDER_ARGUMENT);
+    let verbosity: Verbosity = matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT).unwrap_or(&Verbosity::Low).to_owned();
+    let show_execution_time = matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT);
+    Ok(DcliContext { verbosity, hide_border, show_execution_time, dsh_api_client })
+  }
 }
 
 /// # Get the target platform
 ///
 /// This method will get the target platform.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--platform`
-/// 1. Environment variable `DSH_API_PLATFORM`
-/// 1. Parameter `default-platform` from settings file, if available
-/// 1. Ask the user to enter the value
+/// 1. Command line argument `--platform`.
+/// 1. Environment variable `DSH_API_PLATFORM`.
+/// 1. Parameter `default-platform` from settings file, if available.
+/// 1. Ask the user to enter the value.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
@@ -322,10 +335,10 @@ fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Dsh
 ///
 /// This method will get the target tenant.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--tenant`
-/// 1. Environment variable `DSH_API_TENANT`
-/// 1. Parameter `default-tenant` from settings file, if available
-/// 1. Ask the user to enter the value
+/// 1. Command line argument `--tenant`.
+/// 1. Environment variable `DSH_API_TENANT`.
+/// 1. Parameter `default-tenant` from settings file, if available.
+/// 1. Ask the user to enter the value.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
@@ -353,10 +366,10 @@ fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<
 ///
 /// This method will get the target group and user id.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--guid`
-/// 1. Environment variable `DSH_API_GUID_[tenant_name]`
-/// 1. Parameter `group-user-id` from the target settings file, if available
-/// 1. Ask the user to enter the value
+/// 1. Command line argument `--guid`.
+/// 1. Environment variable `DSH_API_GUID_[tenant_name]`.
+/// 1. Parameter `group-user-id` from the target settings file, if available.
+/// 1. Ask the user to enter the value.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
@@ -383,11 +396,12 @@ fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> 
 /// This method will get the target password.
 /// This function will try the potential sources listed below, and returns at the first match.
 /// 1. If the command line argument `--password` is present, ask the user to enter the value
-///    and stop if the user doesn't provide the password
-/// 1. Environment variable `DSH_API_SECRET_[platform]_[tenant_name]`
-/// 1. Entry `dcli.[platform].[tenant_name]` from the keystore, if available
-/// 1. Parameter `password` from the target settings file, if available
-/// 1. Ask the user to enter the value
+///    and stop if the user doesn't provide the password.
+/// 1. Environment variable `DSH_API_SECRET_[platform]_[tenant_name]`.
+/// 1. Entry `dcli.[platform].[tenant_name]` from the keychain, if available.
+///    This can result in a pop-up where the user must authenticate for the keychain.
+/// 1. Parameter `password` from the target settings file, if available.
+/// 1. Ask the user to enter the value.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
@@ -491,4 +505,15 @@ pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
     (true, false) => (true, false),
     (true, true) => (true, true),
   }
+}
+
+pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
+  let mut environment_variables: Vec<(String, String)> = vec![];
+  for (env_var, value) in std::env::vars() {
+    if env_var.starts_with("DSH_API_") {
+      environment_variables.push((env_var, value));
+    }
+  }
+  environment_variables.sort_by(|(env_var_a, _), (env_var_b, _)| env_var_a.cmp(env_var_b));
+  environment_variables
 }

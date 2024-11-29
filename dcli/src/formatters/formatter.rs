@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
-
 use tabled::settings::peaker::{PriorityMax, PriorityMin};
 use tabled::settings::Reverse;
 use tabled::settings::Rotate;
@@ -117,12 +116,12 @@ where
       if let Ok((columns, _)) = terminal_size() {
         table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
       }
-      if self.context.border {
-        table.with(Padding::new(1, 1, 0, 0));
-        table.with(Style::sharp());
-      } else {
+      if self.context.hide_border {
         table.with(Padding::new(0, 2, 0, 0));
         table.with(Style::empty());
+      } else {
+        table.with(Padding::new(1, 1, 0, 0));
+        table.with(Style::sharp());
       }
       println!("{}", table);
     } else {
@@ -130,12 +129,12 @@ where
       if let Ok((columns, _)) = terminal_size() {
         table.with(Width::truncate(columns as usize).priority(PriorityMin).suffix("..."));
       }
-      if self.context.border {
-        table.with(Padding::new(1, 1, 0, 0));
-        table.with(Style::sharp());
-      } else {
+      if self.context.hide_border {
         table.with(Padding::new(0, 2, 0, 0));
         table.with(Style::empty());
+      } else {
+        table.with(Padding::new(1, 1, 0, 0));
+        table.with(Style::sharp());
       }
       table.with(Rotate::Left);
       table.with(Reverse::default());
@@ -187,12 +186,12 @@ impl<'a> StringTableBuilder<'a> {
     if let Ok((columns, _rows)) = terminal_size() {
       table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
     }
-    if self.context.border {
-      table.with(Padding::new(1, 1, 0, 0));
-      table.with(Style::sharp());
-    } else {
+    if self.context.hide_border {
       table.with(Padding::new(0, 2, 0, 0));
       table.with(Style::empty());
+    } else {
+      table.with(Padding::new(1, 1, 0, 0));
+      table.with(Style::sharp());
     }
     println!("{}", table);
   }
@@ -202,12 +201,12 @@ impl<'a> StringTableBuilder<'a> {
     if let Ok((columns, _rows)) = terminal_size() {
       table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
     }
-    if self.context.border {
-      table.with(Padding::new(1, 1, 0, 0));
-      table.with(Style::sharp());
-    } else {
+    if self.context.hide_border {
       table.with(Padding::new(0, 2, 0, 0));
       table.with(Style::empty());
+    } else {
+      table.with(Padding::new(1, 1, 0, 0));
+      table.with(Style::sharp());
     }
     table.with(Rotate::Left);
     table.with(Reverse::default());
@@ -225,12 +224,12 @@ pub fn print_vec(target_id: String, vec: Vec<String>, context: &DcliContext) {
   if let Ok((columns, _rows)) = terminal_size() {
     table.with(Width::truncate(columns as usize).priority(PriorityMax).suffix("..."));
   }
-  if context.border {
-    table.with(Padding::new(1, 1, 0, 0));
-    table.with(Style::sharp());
-  } else {
+  if context.hide_border {
     table.with(Padding::new(0, 2, 0, 0));
     table.with(Style::empty());
+  } else {
+    table.with(Padding::new(1, 1, 0, 0));
+    table.with(Style::sharp());
   }
   println!("{}", table);
 }

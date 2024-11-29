@@ -15,7 +15,7 @@ const TARGETS_SUBDIRECTORY: &str = "targets";
 const _DEFAULT_DCLI_SETTINGS_FILENAME: &str = "settings.toml";
 const TOML_FILENAME_EXTENSION: &str = "toml";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct Settings {
   #[serde(rename = "default-platform", skip_serializing_if = "Option::is_none")]
   pub(crate) default_platform: Option<String>,
@@ -23,8 +23,8 @@ pub(crate) struct Settings {
   pub(crate) default_tenant: Option<String>,
   #[serde(rename = "show-execution-time", skip_serializing_if = "Option::is_none")]
   pub(crate) show_execution_time: Option<bool>,
-  #[serde(rename = "no-border", skip_serializing_if = "Option::is_none")]
-  pub(crate) no_border: Option<bool>,
+  #[serde(rename = "hide-border", skip_serializing_if = "Option::is_none")]
+  pub(crate) hide_border: Option<bool>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) verbosity: Option<Verbosity>,
   #[serde(skip_serializing)]
@@ -72,7 +72,20 @@ pub(crate) fn read_settings(explicit_settings_filename: Option<&str>) -> Result<
       log::debug!("read settings from default file '{}'", default_settings_file.to_string_lossy());
       let settings = read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))?;
       Ok(settings.map(|settings| Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings }))
-      // read_and_deserialize_from_toml_file::<Settings>(default_settings_file)
+    }
+  }
+}
+
+pub(crate) fn write_settings(explicit_settings_filename: Option<&str>, settings: Settings) -> Result<(), String> {
+  match explicit_settings_filename {
+    Some(explicit_name) => {
+      log::debug!("write settings to explicit file '{}'", explicit_name);
+      serialize_and_write_to_toml_file::<Settings>(PathBuf::new().join(explicit_name), &settings)
+    }
+    None => {
+      let default_settings_file = dcli_directory()?.join(_DEFAULT_DCLI_SETTINGS_FILENAME);
+      log::debug!("write settings to default file '{}'", default_settings_file.to_string_lossy());
+      serialize_and_write_to_toml_file(default_settings_file, &settings)
     }
   }
 }
@@ -424,13 +437,13 @@ where
 //
 //   #[test]
 //   fn test_upsert_settings_default() {
-//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
+//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), hide_border: None };
 //     _upsert_settings(None, &settings).unwrap();
 //   }
 //
 //   #[test]
 //   fn test_upsert_settings_explicit_filename() {
-//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), no_border: None };
+//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), hide_border: None };
 //     _upsert_settings(Some(test_settings_filename().as_str()), &settings).unwrap();
 //   }
 //
@@ -460,14 +473,14 @@ where
 //   #[test]
 //   fn test_serialize_and_write_to_toml_file() {
 //     use crate::arguments::Verbosity::Medium;
-//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), no_border: None };
+//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), hide_border: None };
 //     serialize_and_write_to_toml_file(PathBuf::new().join(test_settings_filename()), &settings).unwrap();
 //   }
 //
 //   #[test]
 //   fn test_write_target() {
 //     use crate::arguments::Verbosity::Medium;
-//     let target = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), no_border: None };
+//     let target = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), hide_border: None };
 //     serialize_and_write_to_toml_file(dcli_directory().unwrap().join(_DEFAULT_DCLI_SETTINGS_FILENAME), &target).unwrap();
 //   }
 // }

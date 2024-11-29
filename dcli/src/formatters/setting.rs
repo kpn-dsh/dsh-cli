@@ -6,7 +6,7 @@ pub(crate) enum SettingLabel {
   DefaultPlatform,
   DefaultTenant,
   FileName,
-  NoBorder,
+  HideBorder,
   ShowExecutionTime,
   Target,
   Verbosity,
@@ -18,7 +18,7 @@ impl Label for SettingLabel {
       Self::DefaultPlatform => "default-platform",
       Self::DefaultTenant => "default-tenant",
       Self::FileName => "settings file name",
-      Self::NoBorder => "no-border",
+      Self::HideBorder => "hide-border",
       Self::ShowExecutionTime => "show-execution-time",
       Self::Target => "setting",
       Self::Verbosity => "verbosity",
@@ -26,10 +26,7 @@ impl Label for SettingLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    match self {
-      Self::Target => true,
-      _ => false,
-    }
+    *self == Self::Target
   }
 }
 
@@ -39,9 +36,9 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::DefaultPlatform => self.default_platform.clone().unwrap_or("not set".to_string()),
       SettingLabel::DefaultTenant => self.default_tenant.clone().unwrap_or("not set".to_string()),
       SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
-      SettingLabel::NoBorder => self
-        .no_border
-        .map(|no_border| no_border.to_string())
+      SettingLabel::HideBorder => self
+        .hide_border
+        .map(|hide_border| hide_border.to_string())
         .unwrap_or("not set (defaults to 'false')".to_string()),
       SettingLabel::ShowExecutionTime => self
         .show_execution_time
@@ -62,4 +59,4 @@ impl SubjectFormatter<SettingLabel> for Settings {
 }
 
 pub static SETTING_LABELS: [SettingLabel; 6] =
-  [SettingLabel::DefaultPlatform, SettingLabel::DefaultTenant, SettingLabel::ShowExecutionTime, SettingLabel::NoBorder, SettingLabel::Verbosity, SettingLabel::FileName];
+  [SettingLabel::DefaultPlatform, SettingLabel::DefaultTenant, SettingLabel::ShowExecutionTime, SettingLabel::HideBorder, SettingLabel::Verbosity, SettingLabel::FileName];
