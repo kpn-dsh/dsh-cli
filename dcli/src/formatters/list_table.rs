@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use crate::context::DcliContext;
+use crate::formatters::formatter::{Label, SubjectFormatter};
 use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style};
 use termion::terminal_size;
-
-use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::DcliContext;
 
 pub struct ListTable<'a, L: Label, V: SubjectFormatter<L>> {
   labels: &'a [L],

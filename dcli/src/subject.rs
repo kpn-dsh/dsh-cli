@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use clap::{ArgMatches, Command};
 
 use crate::capability::{Capability, CapabilityType, ALL_CAPABILITY_TYPES};
-use crate::{DcliContext, DcliResult};
+use crate::context::DcliContext;
+use crate::DcliResult;
 
 #[async_trait]
 pub trait Subject {

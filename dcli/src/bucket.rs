@@ -8,11 +8,12 @@ use lazy_static::lazy_static;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::flags::FlagType;
 use crate::formatters::bucket::BUCKET_STATUS_LABELS;
 use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::DcliResult;
 
 pub(crate) struct BucketSubject {}
 
@@ -72,9 +73,7 @@ struct BucketListAll {}
 #[async_trait]
 impl CommandExecutor for BucketListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all buckets with their parameters");
-    }
+    context.print_capability_explanation("list all buckets with their parameters");
     let bucket_ids = context.dsh_api_client.as_ref().unwrap().list_bucket_ids().await?;
     let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| context.dsh_api_client.as_ref().unwrap().get_bucket(id.as_str()))).await?;
     let mut builder = TableBuilder::list(&BUCKET_STATUS_LABELS, context);
@@ -91,9 +90,7 @@ struct BucketListIds {}
 #[async_trait]
 impl CommandExecutor for BucketListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all bucket ids");
-    }
+    context.print_capability_explanation("list all bucket ids");
     print_vec("bucket ids".to_string(), context.dsh_api_client.as_ref().unwrap().list_bucket_ids().await?, context);
     Ok(false)
   }
@@ -105,9 +102,7 @@ struct BucketShowAll {}
 impl CommandExecutor for BucketShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all parameters for bucket '{}'", bucket_id);
-    }
+    context.print_capability_explanation(format!("show all parameters for bucket '{}'", bucket_id));
     let bucket = context.dsh_api_client.as_ref().unwrap().get_bucket(bucket_id.as_str()).await?;
     let mut builder = TableBuilder::show(&BUCKET_STATUS_LABELS, context);
     builder.value(bucket_id, &bucket);

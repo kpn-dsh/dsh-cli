@@ -11,6 +11,7 @@ use lazy_static::lazy_static;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
@@ -19,7 +20,7 @@ use crate::formatters::list_table::ListTable;
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPLICATIONS_LABELS_SHOW, USAGE_IN_APPS_LABELS_LIST, USAGE_IN_APPS_LABELS_SHOW};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
-use crate::{confirmed, include_app_application, read_multi_line, read_single_line, DcliContext, DcliResult};
+use crate::{confirmed, include_app_application, read_multi_line, read_single_line, DcliResult};
 use dsh_api::types::{AppCatalogApp, Application, Secret};
 
 pub(crate) struct SecretSubject {}
@@ -105,9 +106,7 @@ impl CommandExecutor for SecretCreate {
   async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
     if matches.get_flag(ModifierFlagType::MultiLine.id()) {
       let secret_id = target.unwrap_or_else(|| unreachable!());
-      if context.show_capability_explanation() {
-        println!("create new multi-line secret '{}'", secret_id);
-      }
+      context.print_capability_explanation(format!("create new multi-line secret '{}'", secret_id));
       if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_ok() {
         return Err(format!("secret '{}' already exists", secret_id));
       }
@@ -119,9 +118,7 @@ impl CommandExecutor for SecretCreate {
       Ok(true)
     } else {
       let secret_id = target.unwrap_or_else(|| unreachable!());
-      if context.show_capability_explanation() {
-        println!("create new single line secret '{}'", secret_id);
-      }
+      context.print_capability_explanation(format!("create new single line secret '{}'", secret_id));
       if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_ok() {
         return Err(format!("secret '{}' already exists", secret_id));
       }
@@ -140,9 +137,7 @@ struct SecretDelete {}
 impl CommandExecutor for SecretDelete {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("delete secret '{}'", secret_id);
-    }
+    context.print_capability_explanation(format!("delete secret '{}'", secret_id));
     if context.dsh_api_client.as_ref().unwrap().get_secret_configuration(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exists", secret_id));
     }
@@ -161,9 +156,7 @@ struct SecretListAllocationStatus {}
 #[async_trait]
 impl CommandExecutor for SecretListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all secrets with their allocation status");
-    }
+    context.print_capability_explanation("list all secrets with their allocation status");
     let non_system_secret_ids = context
       .dsh_api_client
       .as_ref()
@@ -189,9 +182,7 @@ struct SecretListSystem {}
 #[async_trait]
 impl CommandExecutor for SecretListSystem {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all system secret ids");
-    }
+    context.print_capability_explanation("list all system secret ids");
     let system_secret_ids = context
       .dsh_api_client
       .as_ref()
@@ -217,9 +208,7 @@ struct SecretListIds {}
 #[async_trait]
 impl CommandExecutor for SecretListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all secret ids");
-    }
+    context.print_capability_explanation("list all secret ids");
     let non_system_secrets = context
       .dsh_api_client
       .as_ref()
@@ -241,9 +230,7 @@ impl CommandExecutor for SecretListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
     let (include_app, include_application) = include_app_application(matches);
     if include_app {
-      if context.show_capability_explanation() {
-        println!("list all secrets with their usage in apps");
-      }
+      context.print_capability_explanation("list all secrets with their usage in apps");
       let (secret_ids, apps) = try_join!(
         context.dsh_api_client.as_ref().unwrap().list_secret_ids(),
         context.dsh_api_client.as_ref().unwrap().get_app_configurations()
@@ -273,9 +260,7 @@ impl CommandExecutor for SecretListUsage {
       }
     }
     if include_application {
-      if context.show_capability_explanation() {
-        println!("list all secrets with their usage in applications");
-      }
+      context.print_capability_explanation("list all secrets with their usage in applications");
       let (secret_ids, applications) = try_join!(
         context.dsh_api_client.as_ref().unwrap().list_secret_ids(),
         context.dsh_api_client.as_ref().unwrap().get_applications()
@@ -319,9 +304,7 @@ struct SecretShowAllocationStatus {}
 impl CommandExecutor for SecretShowAllocationStatus {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show allocation status for secret '{}'", secret_id);
-    }
+    context.print_capability_explanation(format!("show allocation status for secret '{}'", secret_id));
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_secret_allocation_status(secret_id.as_str()).await?;
     print_allocation_status(secret_id, allocation_status, context);
     Ok(false)
@@ -334,9 +317,7 @@ struct SecretShowUsage {}
 impl CommandExecutor for SecretShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show applications that use secret '{}'", secret_id);
-    }
+    context.print_capability_explanation(format!("show applications that use secret '{}'", secret_id));
     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
     let application_injections: Vec<(String, &Application, HashMap<String, Vec<Injection>>)> =
       DshApiClient::applications_with_secrets_injections(&[secret_id.clone()], &applications);
@@ -380,9 +361,7 @@ struct SecretShowValue {}
 impl CommandExecutor for SecretShowValue {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the value of secret '{}'", secret_id);
-    }
+    context.print_capability_explanation(format!("show the value of secret '{}'", secret_id));
     let secret = context.dsh_api_client.as_ref().unwrap().get_secret(secret_id.as_str()).await?;
     println!("{}", secret);
     Ok(false)

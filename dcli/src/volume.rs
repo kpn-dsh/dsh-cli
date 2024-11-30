@@ -13,6 +13,7 @@ use crate::application::applications_that_use_volume;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
@@ -21,7 +22,7 @@ use crate::formatters::list_table::ListTable;
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_IN_APPLICATIONS_LABELS_LIST, USAGE_IN_APPS_LABELS_LIST, USAGE_LABELS_SHOW};
 use crate::formatters::volume::{VOLUME_LABELS, VOLUME_STATUS_LABELS};
 use crate::subject::Subject;
-use crate::{confirmed, include_app_application, read_single_line, DcliContext, DcliResult};
+use crate::{confirmed, include_app_application, read_single_line, DcliResult};
 
 pub(crate) struct VolumeSubject {}
 
@@ -105,9 +106,7 @@ struct VolumeCreate {}
 impl CommandExecutor for VolumeCreate {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("create new volume '{}'", volume_id);
-    }
+    context.print_capability_explanation(format!("create new volume '{}'", volume_id));
     if context.dsh_api_client.as_ref().unwrap().get_volume(&volume_id).await.is_ok() {
       return Err(format!("volume '{}' already exists", volume_id));
     }
@@ -126,9 +125,7 @@ struct VolumeDelete {}
 impl CommandExecutor for VolumeDelete {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("delete volume '{}'", volume_id);
-    }
+    context.print_capability_explanation(format!("delete volume '{}'", volume_id));
     if context.dsh_api_client.as_ref().unwrap().get_volume(&volume_id).await.is_err() {
       return Err(format!("volume '{}' does not exists", volume_id));
     }
@@ -147,9 +144,7 @@ struct VolumeListAll {}
 #[async_trait]
 impl CommandExecutor for VolumeListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all volumes with their parameters");
-    }
+    context.print_capability_explanation("list all volumes with their parameters");
     let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
     let volumes = try_join_all(
       volume_ids
@@ -171,9 +166,7 @@ struct VolumeListAllocationStatus {}
 #[async_trait]
 impl CommandExecutor for VolumeListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all volumes with their allocation status");
-    }
+    context.print_capability_explanation("list all volumes with their allocation status");
     let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
     let allocation_statuses = try_join_all(
       volume_ids
@@ -191,9 +184,7 @@ struct VolumeListConfiguration {}
 #[async_trait]
 impl CommandExecutor for VolumeListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all volumes with their configurations");
-    }
+    context.print_capability_explanation("list all volumes with their configurations");
     let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
     let configurations = try_join_all(
       volume_ids
@@ -215,9 +206,7 @@ struct VolumeListIds {}
 #[async_trait]
 impl CommandExecutor for VolumeListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list volume ids");
-    }
+    context.print_capability_explanation("list volume ids");
     print_vec("volume ids".to_string(), context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?, context);
     Ok(false)
   }
@@ -230,9 +219,7 @@ impl CommandExecutor for VolumeListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
     let (include_app, include_application) = include_app_application(matches);
     if include_app {
-      if context.show_capability_explanation() {
-        println!("list all volumes that are used in apps");
-      }
+      context.print_capability_explanation("list all volumes that are used in apps");
       let (volume_ids, apps) = try_join!(
         context.dsh_api_client.as_ref().unwrap().get_volume_ids(),
         context.dsh_api_client.as_ref().unwrap().get_app_configurations()
@@ -257,9 +244,7 @@ impl CommandExecutor for VolumeListUsage {
       }
     }
     if include_application {
-      if context.show_capability_explanation() {
-        println!("list all volumes that are used in applications");
-      }
+      context.print_capability_explanation("list all volumes that are used in applications");
       let (volume_ids, applications) = try_join!(
         context.dsh_api_client.as_ref().unwrap().get_volume_ids(),
         context.dsh_api_client.as_ref().unwrap().get_applications()
@@ -293,9 +278,7 @@ struct VolumeShowAll {}
 impl CommandExecutor for VolumeShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all parameters for volume '{}'", volume_id);
-    }
+    context.print_capability_explanation(format!("show all parameters for volume '{}'", volume_id));
     let mut builder = TableBuilder::show(&VOLUME_STATUS_LABELS, context);
     builder.value(volume_id.clone(), &context.dsh_api_client.as_ref().unwrap().get_volume(volume_id.as_str()).await?);
     builder.print();
@@ -309,9 +292,7 @@ struct VolumeShowAllocationStatus {}
 impl CommandExecutor for VolumeShowAllocationStatus {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the allocation status for volume '{}'", volume_id);
-    }
+    context.print_capability_explanation(format!("show the allocation status for volume '{}'", volume_id));
     print_allocation_status(
       volume_id.clone(),
       context.dsh_api_client.as_ref().unwrap().get_volume_allocation_status(volume_id.as_str()).await?,
@@ -327,9 +308,7 @@ struct VolumeShowUsage {}
 impl CommandExecutor for VolumeShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the applications that use volume '{}'", volume_id);
-    }
+    context.print_capability_explanation(format!("show the applications that use volume '{}'", volume_id));
     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
     let usages: Vec<(String, u64, String)> = applications_that_use_volume(volume_id.as_str(), &applications);
     if !usages.is_empty() {

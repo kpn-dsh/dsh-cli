@@ -1,11 +1,10 @@
+use crate::context::DcliContext;
 use tabled::settings::peaker::PriorityMax;
 use tabled::settings::Reverse;
 use tabled::settings::Rotate;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style};
 use termion::terminal_size;
-
-use crate::DcliContext;
 
 pub struct _StringTable<'a> {
   context: &'a DcliContext<'a>,

@@ -7,11 +7,12 @@ use std::collections::HashMap;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::formatters::list_table::ListTable;
 use crate::formatters::target::{TargetFormatter, TARGET_LABELS};
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
 use crate::subject::Subject;
-use crate::{confirmed, read_single_line, read_single_line_password, DcliContext, DcliResult};
+use crate::{confirmed, read_single_line, read_single_line_password, DcliResult};
 
 pub(crate) struct TargetSubject {}
 
@@ -98,9 +99,7 @@ struct TargetDefault {}
 #[async_trait]
 impl CommandExecutor for TargetDefault {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("set default target");
-    }
+    context.print_capability_explanation("set default target");
     let platform = read_single_line("enter platform: ")?;
     let platform = DshPlatform::try_from(platform.as_str())?;
     let tenant = read_single_line("enter tenant: ")?;
@@ -131,9 +130,7 @@ struct TargetDelete {}
 #[async_trait]
 impl CommandExecutor for TargetDelete {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("delete existing target");
-    }
+    context.print_capability_explanation("delete existing target");
     let platform = read_single_line("enter platform: ")?;
     let platform = DshPlatform::try_from(platform.as_str())?;
     let tenant = read_single_line("enter tenant: ")?;
@@ -169,9 +166,7 @@ struct TargetList {}
 #[async_trait]
 impl CommandExecutor for TargetList {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all target configurations");
-    }
+    context.print_capability_explanation("list all target configurations");
     let mut table = ListTable::new(&TARGET_LABELS, context);
     let settings = read_settings(None)?;
     let (default_platform, default_tenant) = match settings {
@@ -199,9 +194,7 @@ struct TargetNew {}
 #[async_trait]
 impl CommandExecutor for TargetNew {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("create new target configuration");
-    }
+    context.print_capability_explanation("create new target configuration");
     let platform = read_single_line("enter platform: ")?;
     let platform = DshPlatform::try_from(platform.as_str())?;
     let tenant = read_single_line("enter tenant: ")?;

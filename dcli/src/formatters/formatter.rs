@@ -1,3 +1,4 @@
+use crate::context::DcliContext;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -7,8 +8,6 @@ use tabled::settings::Rotate;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style};
 use termion::terminal_size;
-
-use crate::DcliContext;
 
 pub trait Label: Eq + Hash + PartialEq {
   fn label_for_list(&self) -> &str {
@@ -30,6 +29,15 @@ pub trait SubjectFormatter<L: Label> {
 
   #[allow(dead_code)]
   fn target_label(&self) -> Option<L>;
+}
+
+pub enum OutputFormat {
+  Csv,
+  Json,
+  None,
+  PlainText,
+  Table,
+  TableBordeless,
 }
 
 pub struct TableBuilder<'a, L: Label, V: SubjectFormatter<L>> {

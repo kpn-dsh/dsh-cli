@@ -10,6 +10,7 @@ use dsh_api::types::{AppCatalogApp, AppCatalogAppResourcesValue};
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::flags::FlagType;
 use crate::formatters::app::APP_CATALOG_APP_LABELS;
 use crate::formatters::application::APPLICATION_LABELS_SHOW;
@@ -20,7 +21,7 @@ use crate::formatters::show_table::ShowTable;
 use crate::formatters::topic::TOPIC_LABELS;
 use crate::formatters::volume::VOLUME_LABELS;
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::DcliResult;
 
 pub(crate) struct AppSubject {}
 
@@ -73,9 +74,7 @@ struct AppListConfiguration {}
 #[async_trait]
 impl CommandExecutor for AppListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all deployed apps and their configurations");
-    }
+    context.print_capability_explanation("list all deployed apps and their configurations");
     let apps = context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     app_ids.sort();
@@ -94,9 +93,7 @@ struct AppListIds {}
 #[async_trait]
 impl CommandExecutor for AppListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all deployed app ids");
-    }
+    context.print_capability_explanation("list all deployed app ids");
     print_vec("app ids".to_string(), context.dsh_api_client.as_ref().unwrap().list_app_ids().await?, context);
     Ok(false)
   }
@@ -108,9 +105,7 @@ struct AppShowAll {}
 impl CommandExecutor for AppShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let app_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all parameters for app '{}'", app_id);
-    }
+    context.print_capability_explanation(format!("show all parameters for app '{}'", app_id));
     let app = context.dsh_api_client.as_ref().unwrap().get_app_configuration(app_id.as_str()).await?;
     ShowTable::new(app_id.as_str(), &app, &APP_CATALOG_APP_LABELS, context).print();
     for (resource_name, resource) in &app.resources {

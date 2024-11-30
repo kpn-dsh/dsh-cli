@@ -4,11 +4,13 @@ All notable changes to the dcli tool project will be documented in this file.
 
 ## [Unreleased]
 
-### Security
+## [0.3.0]
 
-* Credentials are now stored in the keyring (only supported for OsX).
+### Changed
 
-## [0.2.0]
+* Output sent to stdout, rest to stderr.
+
+## [0.2.0] - 2024-11-29
 
 ### Added
 
@@ -19,6 +21,7 @@ All notable changes to the dcli tool project will be documented in this file.
 
 ### Changed
 
+* Credentials are now stored in the keyring (only supported for OsX).
 * Added prompts for user input.
 * System secrets no longer listed by default.
 

@@ -1,9 +1,10 @@
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::context::DcliContext;
 use crate::filter_flags::{create_filter_flag, FilterFlagType};
 use crate::flags::{create_flag, FlagType};
 use crate::modifier_flags::{create_modifier_flag, ModifierFlagType};
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::DcliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 

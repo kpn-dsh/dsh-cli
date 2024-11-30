@@ -10,13 +10,14 @@ use dsh_api::types::AppCatalogManifest;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::flags::FlagType;
 use crate::formatters::formatter::print_vec;
 use crate::formatters::list_table::ListTable;
 use crate::formatters::manifest::{Manifest, MANIFEST_LABELS_LIST, MANIFEST_LABELS_SHOW};
 use crate::formatters::show_table::ShowTable;
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::DcliResult;
 
 pub(crate) struct ManifestSubject {}
 
@@ -72,9 +73,7 @@ struct ManifestListAll {}
 #[async_trait]
 impl CommandExecutor for ManifestListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all app catalog manifests");
-    }
+    context.print_capability_explanation("list all app catalog manifests");
     let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifests().await?;
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
@@ -105,9 +104,7 @@ struct ManifestListIds {}
 #[async_trait]
 impl CommandExecutor for ManifestListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all app catalog manifest ids");
-    }
+    context.print_capability_explanation("list all app catalog manifest ids");
     print_vec(
       "manifest ids".to_string(),
       context
@@ -131,9 +128,7 @@ struct ManifestShowAll {}
 impl CommandExecutor for ManifestShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all parameters for app catalog manifest '{}'", manifest_id);
-    }
+    context.print_capability_explanation(format!("show all parameters for app catalog manifest '{}'", manifest_id));
     let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifests().await?;
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();

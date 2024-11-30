@@ -11,12 +11,13 @@ use dsh_api::types::AppCatalogApp;
 use crate::arguments::query_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::formatters::{wrap_vec_parts, TerminalStyle};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
-use crate::{include_app_application, DcliContext, DcliResult};
+use crate::{include_app_application, DcliResult};
 
 pub(crate) struct ImageSubject {}
 
@@ -80,9 +81,7 @@ impl CommandExecutor for ImageFind {
     };
     let (include_app, include_application) = include_app_application(matches);
     if include_app {
-      if context.show_capability_explanation() {
-        println!("find images in apps that {}", query_processor.describe());
-      }
+      context.print_capability_explanation(format!("find images in apps that {}", query_processor.describe()));
       let apps: &HashMap<String, AppCatalogApp> = &context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
       let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
       app_ids.sort();
@@ -108,9 +107,7 @@ impl CommandExecutor for ImageFind {
       }
     }
     if include_application {
-      if context.show_capability_explanation() {
-        println!("find environment variables in applications that {}", query_processor.describe());
-      }
+      context.print_capability_explanation(format!("find environment variables in applications that {}", query_processor.describe()));
       let applications = &context.dsh_api_client.as_ref().unwrap().get_applications().await?;
       let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<_>>();
       application_ids.sort();

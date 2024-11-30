@@ -9,10 +9,11 @@ use dsh_api::types::AppCatalogApp;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::subject::Subject;
-use crate::{include_app_application, include_started_stopped, DcliContext, DcliResult};
+use crate::{include_app_application, include_started_stopped, DcliResult};
 
 pub(crate) struct MetricSubject {}
 
@@ -73,9 +74,7 @@ impl CommandExecutor for MetricList {
     let (include_app, include_application) = include_app_application(matches);
     let (include_started, include_stopped) = include_started_stopped(matches);
     if include_app {
-      if context.show_capability_explanation() {
-        println!("find exported metrics in apps");
-      }
+      context.print_capability_explanation("find exported metrics in apps");
       let apps: &HashMap<String, AppCatalogApp> = &context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
       let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
       app_ids.sort();
@@ -105,9 +104,7 @@ impl CommandExecutor for MetricList {
       }
     }
     if include_application {
-      if context.show_capability_explanation() {
-        println!("find exported metrics in applications");
-      }
+      context.print_capability_explanation("find exported metrics in applications");
       let applications = &context.dsh_api_client.as_ref().unwrap().get_applications().await?;
       let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<_>>();
       application_ids.sort();

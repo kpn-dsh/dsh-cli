@@ -5,12 +5,13 @@ use std::collections::HashMap;
 
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::formatters::setting::SETTING_LABELS;
 use crate::formatters::show_table::ShowTable;
 use crate::settings::read_settings;
 use crate::subject::Subject;
-use crate::{get_environment_variables, DcliContext, DcliResult};
+use crate::{get_environment_variables, DcliResult};
 
 pub(crate) struct SettingSubject {}
 
@@ -54,18 +55,14 @@ struct SettingList {}
 #[async_trait]
 impl CommandExecutor for SettingList {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list default settings");
-    }
+    context.print_capability_explanation("list default settings");
     match read_settings(None)? {
       Some(settings) => ShowTable::new("current values", &settings, &SETTING_LABELS, context).print(),
       None => println!("no default settings found"),
     }
     let env_vars = get_environment_variables();
     if !env_vars.is_empty() {
-      if context.show_capability_explanation() {
-        println!("list environment variables");
-      }
+      context.print_capability_explanation("list environment variables");
       let mut builder = StringTableBuilder::new(&["environment variable", "value"], context);
       for (env_var, value) in env_vars {
         if env_var.contains("_SECRET_") {

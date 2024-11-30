@@ -8,9 +8,10 @@ use regex::Regex;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::formatters::formatter::StringTableBuilder;
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::DcliResult;
 
 pub(crate) struct VhostSubject {}
 
@@ -68,9 +69,7 @@ struct VhostListUsage {}
 #[async_trait]
 impl CommandExecutor for VhostListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list applications with a vhost configuration");
-    }
+    context.print_capability_explanation("list applications with a vhost configuration");
     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
     let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     application_ids.sort();
@@ -114,9 +113,7 @@ struct VhostShowUsage {}
 impl CommandExecutor for VhostShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let vhost_target = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the applications that use vhost '{}'", vhost_target);
-    }
+    context.print_capability_explanation(format!("show the applications that use vhost '{}'", vhost_target));
     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
     let mut builder = StringTableBuilder::new(&["application", "port", "a-zone"], context);
     for (application_id, application) in &applications {

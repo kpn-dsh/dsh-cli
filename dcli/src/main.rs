@@ -11,12 +11,13 @@ use std::time::Instant;
 use crate::app::APP_SUBJECT;
 use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{
-  guid_argument, hide_border_argument, password_argument, platform_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, PlatformArgument, Verbosity,
-  GUID_ARGUMENT, HIDE_BORDER_ARGUMENT, PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, SET_VERBOSITY_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT, TENANT_ARGUMENT,
+  guid_argument, hide_border_argument, password_argument, platform_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, PlatformArgument,
+  GUID_ARGUMENT, PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::bucket::BUCKET_SUBJECT;
 use crate::certificate::CERTIFICATE_SUBJECT;
+use crate::context::get_dcli_context;
 use crate::env::ENV_SUBJECT;
 use crate::filter_flags::FilterFlagType;
 use crate::image::IMAGE_SUBJECT;
@@ -35,7 +36,6 @@ use crate::vhost::VHOST_SUBJECT;
 use crate::volume::VOLUME_SUBJECT;
 use clap::builder::styling;
 use clap::{ArgMatches, Command};
-use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
 use dsh_api::platform::DshPlatform;
@@ -50,6 +50,7 @@ mod bucket;
 mod capability;
 mod capability_builder;
 mod certificate;
+mod context;
 mod env;
 mod filter_flags;
 mod flags;
@@ -89,35 +90,36 @@ static LONG_VERSION: &str = "version: 0.2.0\ndsh-api library version: 0.2.0\ndsh
 
 type DcliResult = Result<bool, String>;
 
-pub(crate) struct DcliContext<'a> {
-  pub(crate) verbosity: Verbosity,
-  pub(crate) hide_border: bool,
-  pub(crate) show_execution_time: bool,
-  pub(crate) dsh_api_client: Option<DshApiClient<'a>>,
-}
+// pub(crate) struct DcliContext<'a> {
+//   pub(crate) output_format: OutputFormat,
+//   pub(crate) verbosity: Verbosity,
+//   pub(crate) hide_border: bool,
+//   pub(crate) show_execution_time: bool,
+//   pub(crate) dsh_api_client: Option<DshApiClient<'a>>,
+// }
 
-impl DcliContext<'_> {
-  pub(crate) fn show_capability_explanation(&self) -> bool {
-    match self.verbosity {
-      Verbosity::Low => false,
-      Verbosity::Medium | Verbosity::High => true,
-    }
-  }
-
-  pub(crate) fn show_execution_time(&self) -> bool {
-    match self.verbosity {
-      Verbosity::Low | Verbosity::Medium => self.show_execution_time,
-      Verbosity::High => true,
-    }
-  }
-
-  pub(crate) fn _show_settings(&self) -> bool {
-    match self.verbosity {
-      Verbosity::Low => false,
-      Verbosity::Medium | Verbosity::High => true,
-    }
-  }
-}
+// impl DcliContext<'_> {
+//   pub(crate) fn show_capability_explanation(&self) -> bool {
+//     match self.verbosity {
+//       Verbosity::Low => false,
+//       Verbosity::Medium | Verbosity::High => true,
+//     }
+//   }
+//
+//   pub(crate) fn show_execution_time(&self) -> bool {
+//     match self.verbosity {
+//       Verbosity::Low | Verbosity::Medium => self.show_execution_time,
+//       Verbosity::High => true,
+//     }
+//   }
+//
+//   pub(crate) fn _show_settings(&self) -> bool {
+//     match self.verbosity {
+//       Verbosity::Low => false,
+//       Verbosity::Medium | Verbosity::High => true,
+//     }
+//   }
+// }
 
 #[derive(Debug)]
 enum DcliExit {
@@ -240,14 +242,14 @@ async fn inner_main() -> DcliResult {
           let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
           let context = get_dcli_context(&matches, Some(factory.client().await?))?;
           let suppress_show_execution_time = subject.execute_subject_command(sub_matches, &context).await?;
-          if !suppress_show_execution_time && context.show_execution_time() {
-            println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+          if !suppress_show_execution_time {
+            context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
           }
         } else {
           let context = get_dcli_context(&matches, None)?;
           let suppress_show_execution_time = subject.execute_subject_command(sub_matches, &context).await?;
-          if !suppress_show_execution_time && context.show_execution_time() {
-            println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+          if !suppress_show_execution_time {
+            context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
           }
         };
       }
@@ -257,14 +259,14 @@ async fn inner_main() -> DcliResult {
             let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
             let context = get_dcli_context(&matches, Some(factory.client().await?))?;
             let suppress_show_execution_time = subject.execute_subject_list_shortcut(sub_matches, &context).await?;
-            if !suppress_show_execution_time && context.show_execution_time() {
-              println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+            if !suppress_show_execution_time {
+              context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
             }
           } else {
             let context = get_dcli_context(&matches, None)?;
             let suppress_show_execution_time = subject.execute_subject_list_shortcut(sub_matches, &context).await?;
-            if !suppress_show_execution_time && context.show_execution_time() {
-              println!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+            if !suppress_show_execution_time {
+              context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
             }
           };
         }
@@ -283,22 +285,22 @@ async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings
   Ok(DshApiClientFactory::create(dsh_api_tenant, secret)?)
 }
 
-fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<DcliContext<'a>, String> {
-  if let Some(settings) = read_settings(None)? {
-    let hide_border = if matches.get_flag(HIDE_BORDER_ARGUMENT) { true } else { settings.hide_border.unwrap_or(false) };
-    let verbosity: Verbosity = match matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT) {
-      Some(verbosity_argument) => verbosity_argument.to_owned(),
-      None => settings.verbosity.unwrap_or(Verbosity::Low).to_owned(),
-    };
-    let show_execution_time = if matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT) { true } else { settings.show_execution_time.unwrap_or(false) };
-    Ok(DcliContext { verbosity, hide_border, show_execution_time, dsh_api_client })
-  } else {
-    let hide_border = matches.get_flag(HIDE_BORDER_ARGUMENT);
-    let verbosity: Verbosity = matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT).unwrap_or(&Verbosity::Low).to_owned();
-    let show_execution_time = matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT);
-    Ok(DcliContext { verbosity, hide_border, show_execution_time, dsh_api_client })
-  }
-}
+// fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<DcliContext<'a>, String> {
+//   if let Some(settings) = read_settings(None)? {
+//     let hide_border = if matches.get_flag(HIDE_BORDER_ARGUMENT) { true } else { settings.hide_border.unwrap_or(false) };
+//     let verbosity: Verbosity = match matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT) {
+//       Some(verbosity_argument) => verbosity_argument.to_owned(),
+//       None => settings.verbosity.unwrap_or(Verbosity::Low).to_owned(),
+//     };
+//     let show_execution_time = if matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT) { true } else { settings.show_execution_time.unwrap_or(false) };
+//     Ok(DcliContext { output_format: OutputFormat::Table, verbosity, hide_border, show_execution_time, dsh_api_client })
+//   } else {
+//     let hide_border = matches.get_flag(HIDE_BORDER_ARGUMENT);
+//     let verbosity: Verbosity = matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT).unwrap_or(&Verbosity::Low).to_owned();
+//     let show_execution_time = matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT);
+//     Ok(DcliContext { output_format: OutputFormat::Table, verbosity, hide_border, show_execution_time, dsh_api_client })
+//   }
+// }
 
 /// # Get the target platform
 ///

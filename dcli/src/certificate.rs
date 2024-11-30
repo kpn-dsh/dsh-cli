@@ -10,6 +10,7 @@ use lazy_static::lazy_static;
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
 use crate::formatters::certificate::{CertificateLabel, CERTIFICATE_CONFIGURATION_LABELS, CERTIFICATE_LABELS_LIST, CERTIFICATE_LABELS_SHOW};
@@ -18,7 +19,7 @@ use crate::formatters::show_table::ShowTable;
 use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST};
 use crate::formatters::used_by::{UsedByLabel, USED_BY_LABELS_LIST};
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::DcliResult;
 use dsh_api::types::Certificate;
 use dsh_api::UsedBy;
 
@@ -89,9 +90,7 @@ struct CertificateListAll {}
 #[async_trait]
 impl CommandExecutor for CertificateListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all certificates with their parameters");
-    }
+    context.print_capability_explanation("list all certificates with their parameters");
     let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     let certificate_statuses = futures::future::join_all(
       certificate_ids
@@ -116,9 +115,7 @@ struct CertificateListAllocationStatus {}
 #[async_trait]
 impl CommandExecutor for CertificateListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all certificates with their allocation status");
-    }
+    context.print_capability_explanation("list all certificates with their allocation status");
     let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     let allocation_statuses = try_join_all(
       certificate_ids
@@ -136,9 +133,7 @@ struct CertificateListConfiguration {}
 #[async_trait]
 impl CommandExecutor for CertificateListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all certificates with their configuration");
-    }
+    context.print_capability_explanation("list all certificates with their configuration");
     let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     let certificates = try_join_all(
       certificate_ids
@@ -159,9 +154,7 @@ struct CertificateListIds {}
 #[async_trait]
 impl CommandExecutor for CertificateListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all certificate ids");
-    }
+    context.print_capability_explanation("list all certificate ids");
     print_vec(
       "certificate ids".to_string(),
       context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?,
@@ -176,9 +169,7 @@ struct CertificateListUsage {}
 #[async_trait]
 impl CommandExecutor for CertificateListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all certificates with the applications where they are used");
-    }
+    context.print_capability_explanation("list all certificates with the applications where they are used");
     let (certificate_ids, applications, apps) = try_join!(
       context.dsh_api_client.as_ref().unwrap().get_certificate_ids(),
       context.dsh_api_client.as_ref().unwrap().get_applications(),
@@ -237,9 +228,7 @@ struct CertificateShowAll {}
 impl CommandExecutor for CertificateShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all parameters for certificate '{}'", certificate_id);
-    }
+    context.print_capability_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let certificate = context.dsh_api_client.as_ref().unwrap().get_certificate(certificate_id.as_str()).await?;
     if let Some(actual_certificate) = certificate.actual {
       let table = ShowTable::new(&certificate_id, &actual_certificate, &CERTIFICATE_LABELS_SHOW, context);
@@ -255,9 +244,7 @@ struct CertificateShowAllocationStatus {}
 impl CommandExecutor for CertificateShowAllocationStatus {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the allocation status for certificate '{}'", certificate_id);
-    }
+    context.print_capability_explanation(format!("show the allocation status for certificate '{}'", certificate_id));
     let allocation_status = context
       .dsh_api_client
       .as_ref()
@@ -275,9 +262,7 @@ struct CertificateShowUsage {}
 impl CommandExecutor for CertificateShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all applications and apps that use certificate '{}'", certificate_id);
-    }
+    context.print_capability_explanation(format!("show all applications and apps that use certificate '{}'", certificate_id));
     let (_, used_bys) = context.dsh_api_client.as_ref().unwrap().get_certificate_with_usage(certificate_id.as_str()).await?;
     let mut builder: TableBuilder<UsedByLabel, UsedBy> = TableBuilder::list(&USED_BY_LABELS_LIST, context);
     builder.rows(&used_bys);

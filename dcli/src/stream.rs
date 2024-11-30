@@ -110,9 +110,7 @@ lazy_static! {
 // impl CommandExecutor for StreamCreate {
 //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
 //     let stream_id = target.unwrap_or_else(|| unreachable!());
-//     if context.show_capability_explanation() {
-//       println!("create new internal stream '{}'", stream_id);
-//     }
+//     context.print_capability_explanation(format!("create new internal stream '{}'", stream_id));
 //     if dsh_api_client.get_internal_stream(&stream_id).await.is_ok() {
 //       return Err(format!("internal stream '{}' already exists", stream_id));
 //     }
@@ -132,9 +130,7 @@ struct StreamListConfiguration {}
 #[async_trait]
 impl CommandExecutor for StreamListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all internal and public streams");
-    }
+    context.print_capability_explanation("list all internal and public streams");
     let (stream_ids, internal_streams, public_streams) = try_join!(
       dsh_api_client.get_stream_ids(),
       dsh_api_client.get_internal_streams(),
@@ -159,9 +155,7 @@ struct StreamListIds {}
 #[async_trait]
 impl CommandExecutor for StreamListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all internal and public stream ids");
-    }
+    context.print_capability_explanation("list all internal and public stream ids");
     print_vec("stream ids".to_string(), dsh_api_client.get_stream_ids().await?, context);
     Ok(false)
   }
@@ -172,9 +166,7 @@ struct StreamListUsage {}
 #[async_trait]
 impl CommandExecutor for StreamListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all internal and public streams with the applications that use them");
-    }
+    context.print_capability_explanation("list all internal and public streams with the applications that use them");
     let (stream_ids, applications) = try_join!(dsh_api_client.get_stream_ids(), dsh_api_client.get_application_configurations())?;
     let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
     for stream_id in &stream_ids {
@@ -226,9 +218,7 @@ struct StreamShowConfiguration {}
 impl CommandExecutor for StreamShowConfiguration {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the configuration for topic '{}'", topic_id);
-    }
+    context.print_capability_explanation(format!("show the configuration for topic '{}'", topic_id));
     let topic = dsh_api_client.get_topic_configuration(topic_id.as_str()).await?;
     println!("{:#?}", topic);
     Ok(false)
@@ -241,9 +231,7 @@ struct StreamShowUsage {}
 impl CommandExecutor for StreamShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show the applications that use topic '{}'", topic_id);
-    }
+    context.print_capability_explanation(format!("show the applications that use topic '{}'", topic_id));
     let applications = dsh_api_client.get_application_configurations().await?;
     let usages: Vec<(String, Vec<String>)> = applications_that_use_topic(topic_id.as_str(), &applications);
     if !usages.is_empty() {

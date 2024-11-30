@@ -1,8 +1,7 @@
-use dsh_api::types::AllocationStatus;
-
+use crate::context::DcliContext;
 use crate::formatters::formatter::{Label, SubjectFormatter, TableBuilder};
 use crate::formatters::notifications_to_string;
-use crate::DcliContext;
+use dsh_api::types::AllocationStatus;
 
 #[derive(Eq, Hash, PartialEq)]
 pub enum AllocationStatusLabel {

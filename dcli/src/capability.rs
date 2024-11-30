@@ -3,8 +3,9 @@ use clap::{Arg, ArgMatches, Command};
 use std::fmt::{Display, Formatter};
 
 use crate::capability::CapabilityType::*;
+use crate::context::DcliContext;
 use crate::subject::Subject;
-use crate::{DcliContext, DcliResult};
+use crate::DcliResult;
 
 pub(crate) const CREATE: &str = "create";
 pub(crate) const DEFAULT: &str = "default";

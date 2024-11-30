@@ -10,6 +10,7 @@ use dsh_api::types::{Application, TaskStatus};
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
+use crate::context::DcliContext;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::allocation_status::{print_allocation_status, print_allocation_statuses};
@@ -18,7 +19,7 @@ use crate::formatters::formatter::{print_vec, TableBuilder};
 use crate::formatters::show_table::ShowTable;
 use crate::formatters::task::TASK_LABELS_LIST;
 use crate::subject::Subject;
-use crate::{to_command_error_with_id, DcliContext, DcliResult};
+use crate::{to_command_error_with_id, DcliResult};
 
 pub(crate) struct ApplicationSubject {}
 
@@ -91,9 +92,7 @@ struct ApplicationListAll {}
 #[async_trait]
 impl CommandExecutor for ApplicationListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all applications with their parameters");
-    }
+    context.print_capability_explanation("list all applications with their parameters");
     print_applications(&context.dsh_api_client.as_ref().unwrap().get_applications().await?, matches, context)
   }
 }
@@ -103,9 +102,7 @@ struct ApplicationListAllocationStatus {}
 #[async_trait]
 impl CommandExecutor for ApplicationListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all applications with their allocation status");
-    }
+    context.print_capability_explanation("list all applications with their allocation status");
     let application_ids = context.dsh_api_client.as_ref().unwrap().list_application_ids().await?;
     let allocation_statuses = try_join_all(
       application_ids
@@ -123,9 +120,7 @@ struct ApplicationListIds {}
 #[async_trait]
 impl CommandExecutor for ApplicationListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all application ids");
-    }
+    context.print_capability_explanation("list all application ids");
     print_vec(
       "application ids".to_string(),
       context.dsh_api_client.as_ref().unwrap().list_application_ids().await?,
@@ -140,9 +135,7 @@ struct ApplicationListTasks {}
 #[async_trait]
 impl CommandExecutor for ApplicationListTasks {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
-    if context.show_capability_explanation() {
-      println!("list all applications with their tasks");
-    }
+    context.print_capability_explanation("list all applications with their tasks");
     let application_ids = context.dsh_api_client.as_ref().unwrap().find_application_ids_with_derived_tasks().await?;
     let tasks: Vec<Vec<String>> = try_join_all(
       application_ids
@@ -182,9 +175,7 @@ struct ApplicationShowAll {}
 impl CommandExecutor for ApplicationShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let application_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all parameters for application '{}'", application_id);
-    }
+    context.print_capability_explanation(format!("show all parameters for application '{}'", application_id));
     match context.dsh_api_client.as_ref().unwrap().get_application(application_id.as_str()).await {
       Ok(application) => {
         let table = ShowTable::new(application_id.as_str(), &application, &APPLICATION_LABELS_SHOW, context);
@@ -202,9 +193,7 @@ struct ApplicationShowAllocationStatus {}
 impl CommandExecutor for ApplicationShowAllocationStatus {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let application_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show allocation status for application '{}'", application_id);
-    }
+    context.print_capability_explanation(format!("show allocation status for application '{}'", application_id));
     let allocation_status = context
       .dsh_api_client
       .as_ref()
@@ -222,9 +211,7 @@ struct ApplicationShowTasks {}
 impl CommandExecutor for ApplicationShowTasks {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext) -> DcliResult {
     let application_id = target.unwrap_or_else(|| unreachable!());
-    if context.show_capability_explanation() {
-      println!("show all tasks for application '{}'", application_id);
-    }
+    context.print_capability_explanation(format!("show all tasks for application '{}'", application_id));
     let task_ids = context
       .dsh_api_client
       .as_ref()
