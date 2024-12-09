@@ -1,6 +1,6 @@
 # Security Policy
 
-This document outlines security procedures and general policies for the `dsh-api` project.
+This document outlines security procedures and general policies for the `trifonius-engine` project.
 
 - [Security Policy](#security-policy)
     - [Supported Versions](#supported-versions)
@@ -13,19 +13,18 @@ This document outlines security procedures and general policies for the `dsh-api
 
 The following versions of this project are currently being supported with security updates.
 
-| Version | Supported          |
-|---------| ------------------ |
-| 0.1.x   | :white_check_mark: |
+| Version | Supported |
+|---------|-----------|
+| 0.0.7   | :x:       |
 
 ## Known dependency vulnerabilities
 
-[![dependency status](https://deps.rs/repo/github/kpn-dsh/dsh-api/status.svg)](https://deps.rs/repo/github/kpn-dsh/dsh-api).
-
-
+[![dependency status](https://deps.rs/repo/github/kpn-dsh/trifonius-engine/status.svg)](https://deps.rs/repo/github/kpn-dsh/trifonius-engine).
 
 ## Reporting a Vulnerability
 
-If you have found a vulnerability or bug, you can report it to unibox@kpn.com.
+If you have found a vulnerability or bug, you can report it to wilbertschelvis@kpn.com or
+unibox@kpn.com.
 
 ### Reporting Process
 
@@ -45,7 +44,9 @@ When a vulnerability is reported, the following process will be followed:
 - The maintainers will determine the severity of the vulnerability and the impact on the project
 - The maintainers will update the issue with the above information
 - The maintainers will create a fix for the vulnerability
-- The maintainers will release a new version with the fix and post a security advisory on the [ GitHub repo ]( https://github.com/kpn-dsh/dsh-api ) with the following information:
+- The maintainers will release a new version with the fix and post a security advisory on
+  the [ GitHub repo ]( https://github.com/kpn-dsh/trifonius-engine ) with the following
+  information:
     - Description of the vulnerability
     - Affected versions
     - Fixed versions
@@ -53,5 +54,5 @@ When a vulnerability is reported, the following process will be followed:
     - Potential impact of the vulnerability
     - Any additional information of context
 
-
-We appreciate contributions to our security and, where appropriate, will offer credit in release notes. 
+We appreciate contributions to our security and, where appropriate, will offer credit in release
+notes. 
