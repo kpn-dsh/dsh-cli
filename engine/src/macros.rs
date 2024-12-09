@@ -60,7 +60,15 @@
 
 #[macro_export]
 macro_rules! identifier {
-  ($crate_name:literal, $name:ident, $label:literal, $regex:literal, $valid_id:literal, $invalid_id:literal, $(#[$doc:meta])*) => {
+  (
+    $crate_name:literal,
+    $name:ident,
+    $label:literal,
+    $regex:literal,
+    $valid_id:literal,
+    $invalid_id:literal,
+    $(#[$doc:meta])*
+  ) => {
     #[doc = concat!("# `", stringify!($name), "`")]
     #[doc = ""]
     $(#[$doc])*
