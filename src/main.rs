@@ -3,78 +3,64 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::{stdin, stdout, Write};
+use std::io::{stdin, stdout, IsTerminal, Write};
+use std::path::{Path, PathBuf};
 use std::process;
 use std::process::{ExitCode, Termination};
-use std::time::Instant;
 
-use crate::app::APP_SUBJECT;
-use crate::application::APPLICATION_SUBJECT;
 use crate::arguments::{
-  guid_argument, hide_border_argument, password_argument, platform_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, PlatformArgument,
-  GUID_ARGUMENT, PASSWORD_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT,
+  dry_run_argument, force_argument, guid_argument, matching_style_argument, no_escape_argument, output_format_argument, password_file_argument, platform_argument, quiet_argument,
+  set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, PlatformArgument, GUID_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT,
+  TENANT_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
-use crate::bucket::BUCKET_SUBJECT;
-use crate::certificate::CERTIFICATE_SUBJECT;
-use crate::context::get_dcli_context;
-use crate::env::ENV_SUBJECT;
+use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::image::IMAGE_SUBJECT;
-use crate::manifest::MANIFEST_SUBJECT;
-use crate::metric::METRIC_SUBJECT;
-use crate::proxy::PROXY_SUBJECT;
-use crate::secret::SECRET_SUBJECT;
-use crate::setting::SETTING_SUBJECT;
 use crate::settings::{get_password_from_keyring, read_settings, read_target, Settings};
-#[cfg(feature = "stream")]
-use crate::stream::STREAM_SUBJECT;
 use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
-use crate::target::TARGET_SUBJECT;
-use crate::topic::TOPIC_SUBJECT;
-use crate::vhost::VHOST_SUBJECT;
-use crate::volume::VOLUME_SUBJECT;
+use crate::subjects::api::API_SUBJECT;
+use crate::subjects::application::APPLICATION_SUBJECT;
 use clap::builder::styling;
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
 use dsh_api::platform::DshPlatform;
-use dsh_api::{guid_environment_variable, secret_environment_variable, DshApiError, PLATFORM_ENVIRONMENT_VARIABLE, TENANT_ENVIRONMENT_VARIABLE};
+use subjects::app::APP_SUBJECT;
+use subjects::bucket::BUCKET_SUBJECT;
+use subjects::certificate::CERTIFICATE_SUBJECT;
+use subjects::env::ENV_SUBJECT;
+use subjects::image::IMAGE_SUBJECT;
+use subjects::manifest::MANIFEST_SUBJECT;
+use subjects::metric::METRIC_SUBJECT;
+use subjects::proxy::PROXY_SUBJECT;
+use subjects::secret::SECRET_SUBJECT;
+use subjects::setting::SETTING_SUBJECT;
+// #[cfg(feature = "stream")]
+// use subjects::stream::STREAM_SUBJECT;
+use subjects::target::TARGET_SUBJECT;
+use subjects::topic::TOPIC_SUBJECT;
+use subjects::vhost::VHOST_SUBJECT;
+use subjects::volume::VOLUME_SUBJECT;
 use termion::input::TermRead;
 
-mod app;
-mod application;
 mod arguments;
 mod autocomplete;
-mod bucket;
 mod capability;
 mod capability_builder;
-mod certificate;
 mod context;
-mod env;
 mod filter_flags;
 mod flags;
 mod formatters;
-mod image;
-mod manifest;
-mod metric;
 mod modifier_flags;
-mod proxy;
-mod secret;
-mod setting;
 mod settings;
-#[cfg(feature = "stream")]
-mod stream;
 mod subject;
-mod target;
-mod topic;
-mod vhost;
-mod volume;
+mod subjects;
 
-pub(crate) static APPLICATION_NAME: &str = "dcli";
+pub(crate) static APPLICATION_NAME: &str = "dsh";
 
 /// Short help text, shown when `-h` was provided
 static ABOUT: &str = "DSH resource management api command line interface.";
+static AUTHOR: &str = "KPN DSH Team, unibox@kpn.com";
 /// Long help text, shown when `--help` was provided
 static LONG_ABOUT: &str = "DSH resource management api command line interface\n\n\
    The DSH api command line tool enables the user to call a subset of the functions \
@@ -84,55 +70,30 @@ static LONG_ABOUT: &str = "DSH resource management api command line interface\n\
    list of all resources of a certain type (e.g. list all volumes).";
 /// Will be shown after normal help text, when `-h` was provided
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
-   as using the 'list' subcommand, e.g. using 'dcli apps' will be the same \
-   as using 'dcli app list'.";
+   as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
+   as using 'dsh app list'.";
 static LONG_VERSION: &str = "version: 0.2.0\ndsh-api library version: 0.2.0\ndsh rest api version: 1.8.0";
 
-type DcliResult = Result<bool, String>;
+static ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
+static ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
+static ENV_VAR_GUID: &str = "DSH_CLI_GUID";
+static ENV_VAR_PASSWORD: &str = "DSH_CLI_PASSWORD";
+static ENV_VAR_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
 
-// pub(crate) struct DcliContext<'a> {
-//   pub(crate) output_format: OutputFormat,
-//   pub(crate) verbosity: Verbosity,
-//   pub(crate) hide_border: bool,
-//   pub(crate) show_execution_time: bool,
-//   pub(crate) dsh_api_client: Option<DshApiClient<'a>>,
-// }
-
-// impl DcliContext<'_> {
-//   pub(crate) fn show_capability_explanation(&self) -> bool {
-//     match self.verbosity {
-//       Verbosity::Low => false,
-//       Verbosity::Medium | Verbosity::High => true,
-//     }
-//   }
-//
-//   pub(crate) fn show_execution_time(&self) -> bool {
-//     match self.verbosity {
-//       Verbosity::Low | Verbosity::Medium => self.show_execution_time,
-//       Verbosity::High => true,
-//     }
-//   }
-//
-//   pub(crate) fn _show_settings(&self) -> bool {
-//     match self.verbosity {
-//       Verbosity::Low => false,
-//       Verbosity::Medium | Verbosity::High => true,
-//     }
-//   }
-// }
+type DshCliResult = Result<(), String>;
 
 #[derive(Debug)]
-enum DcliExit {
+enum DshCliExit {
   Success,
   Error(String),
 }
 
-impl Termination for DcliExit {
+impl Termination for DshCliExit {
   fn report(self) -> ExitCode {
     match self {
-      DcliExit::Success => ExitCode::SUCCESS,
-      DcliExit::Error(msg) => {
-        println!("{}", msg);
+      DshCliExit::Success => ExitCode::SUCCESS,
+      DshCliExit::Error(msg) => {
+        eprintln!("{}", msg);
         ExitCode::FAILURE
       }
     }
@@ -140,17 +101,17 @@ impl Termination for DcliExit {
 }
 
 #[tokio::main]
-async fn main() -> DcliExit {
+async fn main() -> DshCliExit {
   match inner_main().await {
-    Ok(_) => DcliExit::Success,
-    Err(msg) => DcliExit::Error(msg),
+    Ok(_) => DshCliExit::Success,
+    Err(msg) => DshCliExit::Error(msg),
   }
 }
 
-async fn inner_main() -> DcliResult {
+async fn inner_main() -> DshCliResult {
   env_logger::init();
   let _ = ctrlc::set_handler(move || {
-    println!("interrupted");
+    eprintln!("interrupted");
     process::exit(0);
   });
 
@@ -163,6 +124,7 @@ async fn inner_main() -> DcliResult {
     .placeholder(styling::AnsiColor::Cyan.on_default());
 
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
+    API_SUBJECT.as_ref(),
     APP_SUBJECT.as_ref(),
     APPLICATION_SUBJECT.as_ref(),
     BUCKET_SUBJECT.as_ref(),
@@ -173,8 +135,8 @@ async fn inner_main() -> DcliResult {
     METRIC_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
-    #[cfg(feature = "stream")]
-    STREAM_SUBJECT.as_ref(),
+    // #[cfg(feature = "stream")]
+    // STREAM_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
     VOLUME_SUBJECT.as_ref(),
@@ -199,21 +161,23 @@ async fn inner_main() -> DcliResult {
 
   let mut command = Command::new(APPLICATION_NAME)
     .about(ABOUT)
-    // .author(AUTHOR)
-    // .display_name(APPLICATION_NAME)
+    .author(AUTHOR)
     .long_about(LONG_ABOUT)
     .after_help(AFTER_HELP)
-    // .after_long_help(AFTER_LONG_HELP)
-    // .before_help("BEFORE_HELP")
-    // .before_long_help("BEFORE_LONG_HELP")
     .args(vec![
       platform_argument(),
       tenant_argument(),
       guid_argument(),
-      password_argument(),
+      password_file_argument(),
+      output_format_argument(),
       set_verbosity_argument(),
-      hide_border_argument(),
+      dry_run_argument(),
+      force_argument(),
+      matching_style_argument(),
+      no_escape_argument(),
+      quiet_argument(),
       show_execution_time_argument(),
+      terminal_width_argument(),
       generate_autocomplete_file_argument(),
     ])
     .subcommand_value_name("SUBJECT/COMMAND")
@@ -230,44 +194,30 @@ async fn inner_main() -> DcliResult {
 
   if let Some(shell) = matches.get_one::<AutocompleteShell>(AUTOCOMPLETE_ARGUMENT) {
     generate_autocomplete_file(&mut command, shell);
-    return Ok(false);
+    return Ok(());
   }
-
-  let start_instant = Instant::now();
 
   match matches.subcommand() {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         if subject.requires_dsh_api_client() {
           let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
-          let context = get_dcli_context(&matches, Some(factory.client().await?))?;
-          let suppress_show_execution_time = subject.execute_subject_command(sub_matches, &context).await?;
-          if !suppress_show_execution_time {
-            context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
-          }
+          let context = Context::create(&matches, Some(factory.client().await?))?;
+          subject.execute_subject_command(sub_matches, &context).await?;
         } else {
-          let context = get_dcli_context(&matches, None)?;
-          let suppress_show_execution_time = subject.execute_subject_command(sub_matches, &context).await?;
-          if !suppress_show_execution_time {
-            context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
-          }
+          let context = Context::create(&matches, None)?;
+          subject.execute_subject_command(sub_matches, &context).await?;
         };
       }
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject) => {
           if subject.requires_dsh_api_client() {
             let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
-            let context = get_dcli_context(&matches, Some(factory.client().await?))?;
-            let suppress_show_execution_time = subject.execute_subject_list_shortcut(sub_matches, &context).await?;
-            if !suppress_show_execution_time {
-              context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
-            }
+            let context = Context::create(&matches, Some(factory.client().await?))?;
+            subject.execute_subject_list_shortcut(sub_matches, &context).await?;
           } else {
-            let context = get_dcli_context(&matches, None)?;
-            let suppress_show_execution_time = subject.execute_subject_list_shortcut(sub_matches, &context).await?;
-            if !suppress_show_execution_time {
-              context.print_execution_time(Instant::now().duration_since(start_instant).as_millis());
-            }
+            let context = Context::create(&matches, None)?;
+            subject.execute_subject_list_shortcut(sub_matches, &context).await?;
           };
         }
         None => return Err("unexpected error, list shortcut not found".to_string()),
@@ -275,41 +225,31 @@ async fn inner_main() -> DcliResult {
     },
     None => return Err("unexpected error, no subcommand".to_string()),
   };
-
-  Ok(false)
+  Ok(())
 }
 
 async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiClientFactory, String> {
   let dsh_api_tenant: DshApiTenant = get_dsh_api_tenant(matches, settings)?;
-  let secret = get_password(matches, &dsh_api_tenant)?;
-  Ok(DshApiClientFactory::create(dsh_api_tenant, secret)?)
+  let password = get_password(matches, &dsh_api_tenant)?;
+  Ok(DshApiClientFactory::create(dsh_api_tenant, password)?)
 }
 
-// fn get_dcli_context<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<DcliContext<'a>, String> {
-//   if let Some(settings) = read_settings(None)? {
-//     let hide_border = if matches.get_flag(HIDE_BORDER_ARGUMENT) { true } else { settings.hide_border.unwrap_or(false) };
-//     let verbosity: Verbosity = match matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT) {
-//       Some(verbosity_argument) => verbosity_argument.to_owned(),
-//       None => settings.verbosity.unwrap_or(Verbosity::Low).to_owned(),
-//     };
-//     let show_execution_time = if matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT) { true } else { settings.show_execution_time.unwrap_or(false) };
-//     Ok(DcliContext { output_format: OutputFormat::Table, verbosity, hide_border, show_execution_time, dsh_api_client })
-//   } else {
-//     let hide_border = matches.get_flag(HIDE_BORDER_ARGUMENT);
-//     let verbosity: Verbosity = matches.get_one::<Verbosity>(SET_VERBOSITY_ARGUMENT).unwrap_or(&Verbosity::Low).to_owned();
-//     let show_execution_time = matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT);
-//     Ok(DcliContext { output_format: OutputFormat::Table, verbosity, hide_border, show_execution_time, dsh_api_client })
-//   }
-// }
+fn get_dsh_api_tenant(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiTenant, String> {
+  let platform = get_platform(matches, settings)?;
+  let tenant_name = get_tenant_name(matches, settings)?;
+  let guid = get_guid(matches, &platform, &tenant_name)?;
+  Ok(DshApiTenant::new(tenant_name, guid, platform))
+}
 
 /// # Get the target platform
 ///
 /// This method will get the target platform.
 /// This function will try the potential sources listed below, and returns at the first match.
 /// 1. Command line argument `--platform`.
-/// 1. Environment variable `DSH_API_PLATFORM`.
+/// 1. Environment variable `DSH_CLI_PLATFORM`.
 /// 1. Parameter `default-platform` from settings file, if available.
-/// 1. Ask the user to enter the value.
+/// 1. If stdin is a terminal, ask the user to enter the value.
+/// 1. Else return with an error.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
@@ -319,15 +259,18 @@ async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings
 /// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
 fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshPlatform, String> {
   match matches.get_one::<PlatformArgument>(PLATFORM_ARGUMENT) {
-    Some(name_from_argument) => DshPlatform::try_from(name_from_argument.to_string().as_str()),
-    None => match std::env::var(PLATFORM_ENVIRONMENT_VARIABLE) {
-      Ok(name_from_env_var) => DshPlatform::try_from(name_from_env_var.as_str()),
-      Err(_) => match settings {
-        Some(settings) => match settings.default_platform.clone() {
-          Some(name_from_settings) => DshPlatform::try_from(name_from_settings.as_str()),
-          None => DshPlatform::try_from(read_single_line("platform name: ")?.as_str()),
-        },
-        None => DshPlatform::try_from(read_single_line("platform name: ")?.as_str()),
+    Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.to_string().as_str()),
+    None => match std::env::var(ENV_VAR_PLATFORM) {
+      Ok(platform_name_from_env_var) => DshPlatform::try_from(platform_name_from_env_var.as_str()),
+      Err(_) => match settings.and_then(|settings| settings.default_platform.clone()) {
+        Some(platform_name_from_settings) => DshPlatform::try_from(platform_name_from_settings.as_str()),
+        None => {
+          if stdin().is_terminal() {
+            DshPlatform::try_from(read_single_line("platform name: ")?.as_str())
+          } else {
+            Err("could not determine platform, please check configuration".to_string())
+          }
+        }
       },
     },
   }
@@ -338,9 +281,10 @@ fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Dsh
 /// This method will get the target tenant.
 /// This function will try the potential sources listed below, and returns at the first match.
 /// 1. Command line argument `--tenant`.
-/// 1. Environment variable `DSH_API_TENANT`.
+/// 1. Environment variable `DSH_CLI_TENANT`.
 /// 1. Parameter `default-tenant` from settings file, if available.
-/// 1. Ask the user to enter the value.
+/// 1. If stdin is a terminal, ask the user to enter the value.
+/// 1. Else return with an error.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
@@ -350,15 +294,18 @@ fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Dsh
 /// An `Ok<String>` containing the tenant name, or an `Err<String>`.
 fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<String, String> {
   match matches.get_one::<String>(TENANT_ARGUMENT) {
-    Some(name_from_argument) => Ok(name_from_argument.to_string()),
-    None => match std::env::var(TENANT_ENVIRONMENT_VARIABLE) {
-      Ok(name_from_env_var) => Ok(name_from_env_var),
-      Err(_) => match settings {
-        Some(settings) => match settings.default_tenant.clone() {
-          Some(name_from_settings) => Ok(name_from_settings),
-          None => read_single_line("tenant: "),
-        },
-        None => read_single_line("tenant: "),
+    Some(tenant_name_from_argument) => Ok(tenant_name_from_argument.to_string()),
+    None => match std::env::var(ENV_VAR_TENANT) {
+      Ok(tenant_name_from_env_var) => Ok(tenant_name_from_env_var),
+      Err(_) => match settings.and_then(|settings| settings.default_tenant.clone()) {
+        Some(tenant_name_from_settings) => Ok(tenant_name_from_settings),
+        None => {
+          if stdin().is_terminal() {
+            read_single_line("tenant: ")
+          } else {
+            Err("could not determine tenant, please check configuration".to_string())
+          }
+        }
       },
     },
   }
@@ -369,9 +316,10 @@ fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<
 /// This method will get the target group and user id.
 /// This function will try the potential sources listed below, and returns at the first match.
 /// 1. Command line argument `--guid`.
-/// 1. Environment variable `DSH_API_GUID_[tenant_name]`.
+/// 1. Environment variable `DSH_CLI_GUID`.
 /// 1. Parameter `group-user-id` from the target settings file, if available.
-/// 1. Ask the user to enter the value.
+/// 1. If stdin is a terminal, ask the user to enter the value.
+/// 1. Else return with an error.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
@@ -383,11 +331,17 @@ fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<
 fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> Result<u16, String> {
   match matches.get_one::<String>(GUID_ARGUMENT) {
     Some(guid_from_argument) => Ok(parse_and_validate_guid(guid_from_argument.clone())?),
-    None => match std::env::var(guid_environment_variable(tenant_name)) {
+    None => match std::env::var(ENV_VAR_GUID) {
       Ok(guid_from_env_var) => Ok(parse_and_validate_guid(guid_from_env_var)?),
       Err(_) => match read_target(platform, tenant_name)? {
         Some(target) => Ok(target.group_user_id),
-        None => read_single_line(format!("group and user id for tenant {}: ", tenant_name).as_str()).and_then(|guid| parse_and_validate_guid(guid).map_err(|e| e.to_string())),
+        None => {
+          if stdin().is_terminal() {
+            read_single_line(format!("group and user id for tenant {}: ", tenant_name).as_str()).and_then(|guid| parse_and_validate_guid(guid).map_err(|e| e.to_string()))
+          } else {
+            Err("could not determine group and user id and unable to prompt user, please check configuration".to_string())
+          }
+        }
       },
     },
   }
@@ -397,54 +351,58 @@ fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> 
 ///
 /// This method will get the target password.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. If the command line argument `--password` is present, ask the user to enter the value
-///    and stop if the user doesn't provide the password.
-/// 1. Environment variable `DSH_API_SECRET_[platform]_[tenant_name]`.
-/// 1. Entry `dcli.[platform].[tenant_name]` from the keychain, if available.
+/// 1. Command line argument `--password-file`, which should reference a file that
+///    contains the password.
+/// 1. Environment variable `DSH_CLI_PASSWORD_FILE`.
+/// 1. Environment variable `DSH_CLI_PASSWORD`.
+/// 1. Entry `dsh.[platform].[tenant_name]` from the keychain, if available.
 ///    This can result in a pop-up where the user must authenticate for the keychain.
 /// 1. Parameter `password` from the target settings file, if available.
-/// 1. Ask the user to enter the value.
+/// 1. If stdin is a terminal, ask the user to enter the password.
+/// 1. Else return with an error.
 ///
 /// ## Parameters
 /// * `matches` - parsed clap command line arguments
-/// * `platform` - used to determine the target settings file
-/// * `tenant_name` - used to determine the environment variable or the target settings file
+/// * `dsh_api_tenant` - used to determine the target settings file
 ///
 /// ## Returns
-/// An `Ok<u16>` containing the group and user id, or an `Err<String>`.
+/// An `Ok<String>` containing the password, or an `Err<String>`.
 fn get_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
-  if matches.get_flag(PASSWORD_ARGUMENT) {
-    read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
-  } else {
-    match std::env::var(secret_environment_variable(dsh_api_tenant.platform().to_string().as_str(), dsh_api_tenant.name())) {
-      Ok(password_from_env_var) => Ok(password_from_env_var),
-      Err(_) => match get_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
-        Some(password_from_keyring) => Ok(password_from_keyring),
-        None => match read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
-          Some(target) => match target.password {
+  match matches.get_one::<PathBuf>(PASSWORD_FILE_ARGUMENT) {
+    Some(password_file) => read_password_file(password_file),
+    None => match std::env::var(ENV_VAR_PASSWORD_FILE) {
+      Ok(password_file) => read_password_file(password_file),
+      Err(_) => match std::env::var(ENV_VAR_PASSWORD) {
+        Ok(password_from_env_var) => Ok(password_from_env_var),
+        Err(_) => match get_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
+          Some(password_from_keyring) => Ok(password_from_keyring),
+          None => match read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())?.and_then(|target| target.password) {
             Some(password_from_target) => Ok(password_from_target),
-            None => read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str()),
+            None => {
+              if stdin().is_terminal() {
+                read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
+              } else {
+                Err("could not determine password and unable to to prompt user, please check configuration".to_string())
+              }
+            }
           },
-          None => read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str()),
         },
       },
-    }
+    },
   }
 }
 
-fn get_dsh_api_tenant(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiTenant, String> {
-  let platform = get_platform(matches, settings)?;
-  let tenant_name = get_tenant_name(matches, settings)?;
-  let guid = get_guid(matches, &platform, &tenant_name)?;
-  Ok(DshApiTenant::new(tenant_name, guid, platform))
-}
-
-pub(crate) fn to_command_error_with_id(error: DshApiError, subject: &str, which: &str) -> DcliResult {
-  match error {
-    DshApiError::Configuration(message) => Err(message),
-    DshApiError::NotAuthorized => Err("not authorized".to_string()),
-    DshApiError::NotFound => Err(format!("{} {} not found", subject, which)),
-    DshApiError::Unexpected(error, _) => Err(format!("unexpected error, {}", error)),
+fn read_password_file<T: AsRef<Path>>(password_file: T) -> Result<String, String> {
+  match std::fs::read_to_string(&password_file) {
+    Ok(password_string) => {
+      let trimmed_password = password_string.trim();
+      if trimmed_password.is_empty() {
+        Err(format!("password file '{}' is empty", password_file.as_ref().to_string_lossy()))
+      } else {
+        Ok(trimmed_password.to_string())
+      }
+    }
+    Err(_) => Err(format!("password file '{}' could not be read", password_file.as_ref().to_string_lossy())),
   }
 }
 
@@ -483,22 +441,14 @@ pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<Strin
   }
 }
 
-pub(crate) fn confirmed(prompt: impl AsRef<str>) -> Result<bool, String> {
-  print!("{}", prompt.as_ref());
-  let _ = stdout().lock().flush();
-  let mut line = String::new();
-  stdin().read_line(&mut line).expect("could not read line");
-  Ok(line == *"yes\n")
-}
-
-pub(crate) fn include_app_application(matches: &ArgMatches) -> (bool, bool) {
-  match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
-    (false, false) => (true, true),
-    (false, true) => (false, true),
-    (true, false) => (true, false),
-    (true, true) => (true, true),
-  }
-}
+// pub(crate) fn include_app_application(matches: &ArgMatches) -> (bool, bool) {
+//   match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
+//     (false, false) => (true, true),
+//     (false, true) => (false, true),
+//     (true, false) => (true, false),
+//     (true, true) => (true, true),
+//   }
+// }
 
 pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
   match (matches.get_flag(FilterFlagType::Started.id()), matches.get_flag(FilterFlagType::Stopped.id())) {
@@ -512,7 +462,7 @@ pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
 pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
   let mut environment_variables: Vec<(String, String)> = vec![];
   for (env_var, value) in std::env::vars() {
-    if env_var.starts_with("DSH_API_") {
+    if env_var.starts_with("DSH_CLI_") {
       environment_variables.push((env_var, value));
     }
   }

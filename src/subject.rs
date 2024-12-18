@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use clap::{ArgMatches, Command};
 
 use crate::capability::{Capability, CapabilityType, ALL_CAPABILITY_TYPES};
-use crate::context::DcliContext;
-use crate::DcliResult;
+use crate::context::Context;
+use crate::DshCliResult;
 
 #[async_trait]
 pub trait Subject {
@@ -26,7 +26,7 @@ pub trait Subject {
   // Map of capabilities that are supported for this Subject
   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)>;
 
-  async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, context: &DcliContext) -> DcliResult {
+  async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult {
     match matches.subcommand() {
       Some((capability_command_id, matches)) => match CapabilityType::try_from(capability_command_id) {
         Ok(ref capability_type) => match self.capabilities().get(capability_type) {
@@ -44,7 +44,7 @@ pub trait Subject {
     }
   }
 
-  async fn execute_subject_list_shortcut<'a>(&self, matches: &'a ArgMatches, context: &DcliContext) -> DcliResult {
+  async fn execute_subject_list_shortcut<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult {
     match self.capabilities().get(&CapabilityType::List) {
       Some(capability) => capability.execute_capability(None, None, matches, context).await,
       None => unreachable!(),

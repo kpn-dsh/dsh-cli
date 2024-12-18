@@ -47,6 +47,7 @@ pub(crate) fn generate_autocomplete_file_argument() -> Arg {
           See the documentation for your shell on how to install the autocomplete file. \
           When this option is used, all other provided commands or options will be ignored.",
     )
+    .exclusive(true)
 }
 
 pub(crate) fn generate_autocomplete_file(command: &mut Command, shell: &AutocompleteShell) {

@@ -3,9 +3,9 @@ use clap::{Arg, ArgMatches, Command};
 use std::fmt::{Display, Formatter};
 
 use crate::capability::CapabilityType::*;
-use crate::context::DcliContext;
+use crate::context::Context;
 use crate::subject::Subject;
-use crate::DcliResult;
+use crate::DshCliResult;
 
 pub(crate) const CREATE: &str = "create";
 pub(crate) const DEFAULT: &str = "default";
@@ -103,10 +103,10 @@ pub trait Capability {
 
   fn command_target_argument_ids(&self) -> Vec<String>;
 
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult;
+  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult;
 }
 
 #[async_trait]
 pub(crate) trait CommandExecutor {
-  async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult;
+  async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult;
 }

@@ -1,4 +1,6 @@
 use crate::arguments::Verbosity;
+use crate::context::MatchingStyle;
+use crate::formatters::OutputFormat;
 use crate::APPLICATION_NAME;
 use dsh_api::platform::DshPlatform;
 use homedir::my_home;
@@ -9,29 +11,43 @@ use std::fs;
 use std::io::ErrorKind::NotFound;
 use std::path::{Path, PathBuf};
 
-const DCLI_DIRECTORY_ENV_VAR: &str = "DCLI_HOME";
-const DEFAULT_USER_DCLI_DIRECTORY: &str = ".dcli";
+const DSH_CLI_DIRECTORY_ENV_VAR: &str = "DSH_CLI_HOME";
+const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const TARGETS_SUBDIRECTORY: &str = "targets";
-const _DEFAULT_DCLI_SETTINGS_FILENAME: &str = "settings.toml";
+const DEFAULT_DSH_CLI_SETTINGS_FILENAME: &str = "settings.toml";
 const TOML_FILENAME_EXTENSION: &str = "toml";
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct Settings {
+  #[serde(rename = "csv-quote", skip_serializing_if = "Option::is_none")]
+  pub(crate) csv_quote: Option<char>,
+  #[serde(rename = "csv-separator", skip_serializing_if = "Option::is_none")]
+  pub(crate) csv_separator: Option<String>,
   #[serde(rename = "default-platform", skip_serializing_if = "Option::is_none")]
   pub(crate) default_platform: Option<String>,
+  #[serde(rename = "dry-run", skip_serializing_if = "Option::is_none")]
+  pub(crate) dry_run: Option<bool>,
   #[serde(rename = "default-tenant", skip_serializing_if = "Option::is_none")]
   pub(crate) default_tenant: Option<String>,
+  #[serde(rename = "matching-style", skip_serializing_if = "Option::is_none")]
+  pub(crate) matching_style: Option<MatchingStyle>,
+  #[serde(rename = "no-escape", skip_serializing_if = "Option::is_none")]
+  pub(crate) no_escape: Option<bool>,
+  #[serde(rename = "output-format", skip_serializing_if = "Option::is_none")]
+  pub(crate) output_format: Option<OutputFormat>,
+  #[serde(rename = "quiet", skip_serializing_if = "Option::is_none")]
+  pub(crate) quiet: Option<bool>,
   #[serde(rename = "show-execution-time", skip_serializing_if = "Option::is_none")]
   pub(crate) show_execution_time: Option<bool>,
-  #[serde(rename = "hide-border", skip_serializing_if = "Option::is_none")]
-  pub(crate) hide_border: Option<bool>,
+  #[serde(rename = "terminal-width", skip_serializing_if = "Option::is_none")]
+  pub(crate) terminal_width: Option<usize>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) verbosity: Option<Verbosity>,
   #[serde(skip_serializing)]
   pub(crate) file_name: Option<String>,
 }
 
-/// Identifies the application's target
+/// # Identifies the application's target
 ///
 /// * `platform` target's platform
 /// * `tenant` target's tenant name
@@ -68,7 +84,7 @@ pub(crate) fn read_settings(explicit_settings_filename: Option<&str>) -> Result<
       Ok(settings.map(|settings| Settings { file_name: Some(explicit_name.to_string()), ..settings }))
     }
     None => {
-      let default_settings_file = dcli_directory()?.join(_DEFAULT_DCLI_SETTINGS_FILENAME);
+      let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
       log::debug!("read settings from default file '{}'", default_settings_file.to_string_lossy());
       let settings = read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))?;
       Ok(settings.map(|settings| Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings }))
@@ -83,7 +99,7 @@ pub(crate) fn write_settings(explicit_settings_filename: Option<&str>, settings:
       serialize_and_write_to_toml_file::<Settings>(PathBuf::new().join(explicit_name), &settings)
     }
     None => {
-      let default_settings_file = dcli_directory()?.join(_DEFAULT_DCLI_SETTINGS_FILENAME);
+      let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
       log::debug!("write settings to default file '{}'", default_settings_file.to_string_lossy());
       serialize_and_write_to_toml_file(default_settings_file, &settings)
     }
@@ -97,7 +113,7 @@ pub(crate) fn _upsert_settings(explicit_settings_filename: Option<&str>, setting
       serialize_and_write_to_toml_file::<Settings>(PathBuf::new().join(explicit_name), settings)
     }
     None => {
-      let default_settings_file = dcli_directory()?.join(_DEFAULT_DCLI_SETTINGS_FILENAME);
+      let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
       log::debug!("upsert default settings file '{}'", default_settings_file.to_string_lossy());
       serialize_and_write_to_toml_file::<Settings>(default_settings_file, settings)
     }
@@ -245,33 +261,36 @@ pub(crate) fn upsert_target(target: &Target) -> Result<(), String> {
   }
 }
 
-/// Returns the dcli application directory
+/// # Returns the dsh application directory
 ///
 /// This function returns the application directory.
 /// If it doesn't already exist the directory (and possibly its parent directories)
 /// will be created.
 ///
-/// To determine the directory, first the environment variable DCLI_HOME will be checked.
-/// If this variable is not defined, `${HOME}/.dcli` will be used as the application directory.
-fn dcli_directory() -> Result<PathBuf, String> {
-  let dcli_directory = match env::var(DCLI_DIRECTORY_ENV_VAR) {
-    Ok(dcli_directory) => PathBuf::new().join(dcli_directory),
+/// To determine the directory, first the environment variable DSH_CLI_HOME will be checked.
+/// If this variable is not defined, `${HOME}/.dsh` will be used as the application directory.
+fn dsh_directory() -> Result<PathBuf, String> {
+  let dsh_directory = match env::var(DSH_CLI_DIRECTORY_ENV_VAR) {
+    Ok(dsh_directory) => PathBuf::new().join(dsh_directory),
     Err(_) => match my_home() {
-      Ok(Some(user_home_directory)) => user_home_directory.join(DEFAULT_USER_DCLI_DIRECTORY),
+      Ok(Some(user_home_directory)) => user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY),
       _ => {
-        let message = format!("could not determine dcli directory name (check environment variable {})", DCLI_DIRECTORY_ENV_VAR);
+        let message = format!(
+          "could not determine dsh cli directory name (check environment variable {})",
+          DSH_CLI_DIRECTORY_ENV_VAR
+        );
         log::error!("{}", &message);
         return Err(message);
       }
     },
   };
-  match fs::create_dir_all(&dcli_directory) {
-    Ok(_) => match fs::create_dir_all(dcli_directory.join(TARGETS_SUBDIRECTORY)) {
-      Ok(_) => Ok(dcli_directory),
+  match fs::create_dir_all(&dsh_directory) {
+    Ok(_) => match fs::create_dir_all(dsh_directory.join(TARGETS_SUBDIRECTORY)) {
+      Ok(_) => Ok(dsh_directory),
       Err(io_error) => {
         let message = format!(
-          "could not create dcli targets directory '{}' ({})",
-          dcli_directory.join(TARGETS_SUBDIRECTORY).to_string_lossy(),
+          "could not create dsh targets directory '{}' ({})",
+          dsh_directory.join(TARGETS_SUBDIRECTORY).to_string_lossy(),
           io_error
         );
         log::error!("{}", &message);
@@ -279,7 +298,7 @@ fn dcli_directory() -> Result<PathBuf, String> {
       }
     },
     Err(io_error) => {
-      let message = format!("could not create dcli directory '{}' ({})", dcli_directory.to_string_lossy(), io_error);
+      let message = format!("could not create dsh directory '{}' ({})", dsh_directory.to_string_lossy(), io_error);
       log::error!("{}", &message);
       Err(message)
     }
@@ -287,7 +306,7 @@ fn dcli_directory() -> Result<PathBuf, String> {
 }
 
 fn targets_directory() -> Result<PathBuf, String> {
-  Ok(dcli_directory()?.join(TARGETS_SUBDIRECTORY))
+  Ok(dsh_directory()?.join(TARGETS_SUBDIRECTORY))
 }
 
 fn target_file(platform: &DshPlatform, tenant: &str) -> Result<PathBuf, String> {
@@ -411,76 +430,3 @@ where
     }
   }
 }
-
-// #[cfg(test)]
-// mod tests {
-//   use super::*;
-//
-//   fn test_settings_filename() -> String {
-//     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), "../test_dcli_home/settings.toml")
-//   }
-//
-//   #[test]
-//   fn test_dcli_directory() {
-//     println!("{}", dcli_directory().unwrap().to_string_lossy());
-//   }
-//
-//   #[test]
-//   fn test_read_settings_default() {
-//     println!("settings default: {:?}", read_settings(None));
-//   }
-//
-//   #[test]
-//   fn test_read_settings_explicit_filename() {
-//     println!("settings explicit filename: {:?}", read_settings(Some(test_settings_filename().as_str())));
-//   }
-//
-//   #[test]
-//   fn test_upsert_settings_default() {
-//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), hide_border: None };
-//     _upsert_settings(None, &settings).unwrap();
-//   }
-//
-//   #[test]
-//   fn test_upsert_settings_explicit_filename() {
-//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Off), hide_border: None };
-//     _upsert_settings(Some(test_settings_filename().as_str()), &settings).unwrap();
-//   }
-//
-//   #[test]
-//   fn test_all_targets() {
-//     for target in all_targets().unwrap() {
-//       println!("{}", target);
-//     }
-//   }
-//
-//   #[test]
-//   fn test_delete_target() {
-//     delete_target(&DshPlatform::NpLz, "greenbox-dev").unwrap()
-//   }
-//
-//   #[test]
-//   fn test_upsert_target() {
-//     let target = Target { platform: DshPlatform::NpLz, tenant: "greenbox".to_string(), group_user_id: 2067, password: Some("abcdefghijklmnopqrstuvwxyz".to_string()) };
-//     upsert_target(&target).unwrap();
-//   }
-//
-//   #[test]
-//   fn test_read_target() {
-//     println!("{:?}", read_target(&DshPlatform::NpLz, "greenbox-dev").unwrap());
-//   }
-//
-//   #[test]
-//   fn test_serialize_and_write_to_toml_file() {
-//     use crate::arguments::Verbosity::Medium;
-//     let settings = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), hide_border: None };
-//     serialize_and_write_to_toml_file(PathBuf::new().join(test_settings_filename()), &settings).unwrap();
-//   }
-//
-//   #[test]
-//   fn test_write_target() {
-//     use crate::arguments::Verbosity::Medium;
-//     let target = Settings { default_platform: None, default_tenant: None, show_execution_time: Some(true), verbosity: Some(Medium), hide_border: None };
-//     serialize_and_write_to_toml_file(dcli_directory().unwrap().join(_DEFAULT_DCLI_SETTINGS_FILENAME), &target).unwrap();
-//   }
-// }

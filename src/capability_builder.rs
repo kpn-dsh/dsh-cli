@@ -1,10 +1,10 @@
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
-use crate::context::DcliContext;
+use crate::context::Context;
 use crate::filter_flags::{create_filter_flag, FilterFlagType};
 use crate::flags::{create_flag, FlagType};
 use crate::modifier_flags::{create_modifier_flag, ModifierFlagType};
 use crate::subject::Subject;
-use crate::DcliResult;
+use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 
@@ -167,37 +167,37 @@ impl<'a> Capability for CapabilityBuilder<'a> {
     self.target_arguments.clone().iter().map(|arg| arg.get_id().to_string()).collect::<Vec<_>>()
   }
 
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &DcliContext) -> DcliResult {
-    let mut last_dcli_result: Option<DcliResult> = None;
+  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let mut last_dsh_result: Option<DshCliResult> = None;
     let mut number_of_executed_capabilities = 0;
     if self.run_all_executors {
       for (flag_type, executor, _) in &self.executors {
         if matches.get_flag(flag_type.id()) {
-          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
+          last_dsh_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
           number_of_executed_capabilities += 1;
         }
       }
     } else {
       for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) && last_dcli_result.is_none() {
-          last_dcli_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
+        if matches.get_flag(flag_type.id()) && last_dsh_result.is_none() {
+          last_dsh_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
           number_of_executed_capabilities += 1;
         }
       }
     }
-    match last_dcli_result {
-      Some(dcli_result) => {
+    match last_dsh_result {
+      Some(dsh_result) => {
         if number_of_executed_capabilities > 1 {
-          Ok(true)
+          Ok(())
         } else {
-          dcli_result
+          dsh_result
         }
       }
       None => {
         if let Some(default_executor) = self.default_executor {
           default_executor.execute(argument.clone(), sub_argument.clone(), matches, context).await
         } else {
-          Ok(true)
+          Ok(())
         }
       }
     }
