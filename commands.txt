@@ -40,17 +40,9 @@ certificate show $CERTIFICATE_UNDER_TEST --status
 certificate show $CERTIFICATE_UNDER_TEST --usage
 
 env find $ENV_VALUE_UNDER_TEST
-env find $ENV_VALUE_UNDER_TEST --app
-env find $ENV_VALUE_UNDER_TEST --application
-env find $ENV_VALUE_UNDER_TEST_REGEX --app --regex
-env find $ENV_VALUE_UNDER_TEST_REGEX --application --regex
 env find $ENV_VALUE_UNDER_TEST_REGEX --regex
 
 image find $IMAGE_UNDER_TEST
-image find $IMAGE_UNDER_TEST --app
-image find $IMAGE_UNDER_TEST --application
-image find $IMAGE_UNDER_TEST_REGEX --app --regex
-image find $IMAGE_UNDER_TEST_REGEX --application --regex
 image find $IMAGE_UNDER_TEST_REGEX --regex
 
 manifest list
@@ -60,8 +52,6 @@ manifest show $MANIFEST_UNDER_TEST
 metric list
 m list
 metrics
-metric list --app
-metric list --application
 metric list --started
 metric list --stopped
 
@@ -107,8 +97,6 @@ volume list --configuration
 volume list --ids
 volume list --status
 volume list --usage
-volume list --usage --app
-volume list --usage --application
 volume show $VOLUME_UNDER_TEST
 volume show $VOLUME_UNDER_TEST --status
 volume show $VOLUME_UNDER_TEST --usage
