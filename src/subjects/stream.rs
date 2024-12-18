@@ -15,7 +15,7 @@
 // use crate::formatters::usage::{Usage, UsageLabel, USAGE_LABELS_LIST, USAGE_LABELS_SHOW};
 // use crate::subject::Subject;
 // use crate::subjects::topic::applications_that_use_topic;
-// use crate::{DcliContext, DcliResult};
+// use crate::{Context, DshCliResult};
 //
 // pub(crate) struct StreamSubject {}
 //
@@ -108,7 +108,7 @@
 //
 // // #[async_trait]
 // // impl CommandExecutor for StreamCreate {
-// //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+// //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 // //     let stream_id = target.unwrap_or_else(|| unreachable!());
 // //     context.print_capability_explanation(format!("create new internal stream '{}'", stream_id));
 // //     if dsh_api_client.get_internal_stream(&stream_id).await.is_ok() {
@@ -129,7 +129,7 @@
 //
 // #[async_trait]
 // impl CommandExecutor for StreamListConfiguration {
-//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 //     context.print_explanation("list all internal and public streams");
 //     let (stream_ids, internal_streams, public_streams) = try_join!(
 //       dsh_api_client.get_stream_ids(),
@@ -154,7 +154,7 @@
 //
 // #[async_trait]
 // impl CommandExecutor for StreamListIds {
-//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 //     context.print_explanation("list all internal and public stream ids");
 //     print_vec("stream ids".to_string(), dsh_api_client.get_stream_ids().await?, context);
 //     Ok(false)
@@ -165,7 +165,7 @@
 //
 // #[async_trait]
 // impl CommandExecutor for StreamListUsage {
-//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 //     context.print_explanation("list all internal and public streams with the applications that use them");
 //     let (stream_ids, applications) = try_join!(dsh_api_client.get_stream_ids(), dsh_api_client.get_application_configurations())?;
 //     let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
@@ -192,7 +192,7 @@
 //
 // #[async_trait]
 // impl CommandExecutor for StreamShowAll {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 //     let stream_id = target.unwrap_or_else(|| unreachable!());
 //     let (internal_stream, public_stream) = join!(
 //       dsh_api_client.get_internal_stream(stream_id.as_str()),
@@ -216,7 +216,7 @@
 //
 // #[async_trait]
 // impl CommandExecutor for StreamShowConfiguration {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 //     let topic_id = target.unwrap_or_else(|| unreachable!());
 //     context.print_explanation(format!("show the configuration for topic '{}'", topic_id));
 //     let topic = dsh_api_client.get_topic_configuration(topic_id.as_str()).await?;
@@ -229,7 +229,7 @@
 //
 // #[async_trait]
 // impl CommandExecutor for StreamShowUsage {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &DcliContext, dsh_api_client: &DshApiClient<'_>) -> DcliResult {
+//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 //     let topic_id = target.unwrap_or_else(|| unreachable!());
 //     context.print_explanation(format!("show the applications that use topic '{}'", topic_id));
 //     let applications = dsh_api_client.get_application_configurations().await?;
