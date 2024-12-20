@@ -21,6 +21,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 * Renamed the binary/executable from `dcli` to `dsh`.
 * Changed environment variables.
+* Changed dsp_api dependency from `git` to `crates.io`.
 
 ## [0.2.0] - 2024-11-29
 
