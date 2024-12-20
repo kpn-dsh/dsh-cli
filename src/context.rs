@@ -378,7 +378,7 @@ impl Context<'_> {
   /// If `quiet` is `true`, nothing will be printed.
   /// The standard error device is almost always a tty, but can in special cases also be
   /// a pipe or an output file.
-  pub(crate) fn _print_error<T: AsRef<str>>(&self, error: T) {
+  pub(crate) fn print_error<T: AsRef<str>>(&self, error: T) {
     if !self.quiet {
       eprintln!("{}", error.as_ref());
     }

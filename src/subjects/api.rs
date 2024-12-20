@@ -5,7 +5,7 @@ use crate::subject::Subject;
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
-use dsh_api::OPENAPI_SPEC;
+use dsh_api::dsh_api_client::DshApiClient;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
@@ -55,7 +55,7 @@ struct ApiShow {}
 impl CommandExecutor for ApiShow {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("print the open api specification");
-    context.print(OPENAPI_SPEC);
+    context.print(DshApiClient::openapi_spec());
     Ok(())
   }
 }

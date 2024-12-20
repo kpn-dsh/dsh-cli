@@ -85,12 +85,12 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn _add_extra_argument(mut self, argument: Arg) -> Self {
+  pub fn add_extra_argument(mut self, argument: Arg) -> Self {
     self.extra_arguments.push(argument);
     self
   }
 
-  pub fn _add_extra_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
+  pub fn add_extra_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
     self.extra_arguments.append(&mut arguments);
     self
   }
