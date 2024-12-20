@@ -1,14 +1,29 @@
 # Changelog
 
-All notable changes to the dcli tool project will be documented in this file.
+All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-### Security
+## [0.3.0]
 
-* Credentials are now stored in the keyring (only supported for OsX).
+### Added
 
-## [0.2.0]
+* User can specify the format of the output (csv, json, table, toml, yaml).
+* Output will now be printed to stdout, while logging, error messages and metadata
+  will be printed to stderr.
+* More control over the generated output.
+* Capability to do a dry-run, without actually changing anything on the DSH.
+* Flag to enforce changes.
+* Capability to print the open-api specification.
+* Capability to list and use platform parameters.
+
+### Changed
+
+* Renamed the binary/executable from `dcli` to `dsh`.
+* Changed environment variables.
+* Changed dsp_api dependency from `git` to `crates.io`.
+
+## [0.2.0] - 2024-11-29
 
 ### Added
 
@@ -19,6 +34,7 @@ All notable changes to the dcli tool project will be documented in this file.
 
 ### Changed
 
+* Credentials are now stored in the keyring (only supported for OsX).
 * Added prompts for user input.
 * System secrets no longer listed by default.
 

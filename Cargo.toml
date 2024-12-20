@@ -1,13 +1,46 @@
-[workspace]
-resolver = "2"
-members = [
-    "dcli"
-]
-
-[workspace.package]
-authors = ["Wilbert Schelvis <wilbert.schelvis@kpn.com"]
-description = "Command line tool for DSH Resource Management API"
+[package]
+name = "dsh"
+authors = ["Wilbert Schelvis, <wilbert.schelvis@kpn.com>", "KPN DSH Team, <unibox@kpn.com>"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
+description = "Command line tool for DSH resource management API"
 edition = "2021"
-rust-version = "1.77"
-version = "0.2.0"
-publish = ["artifactory"]
+homepage = "https://www.kpn.com/dsh"
+keywords = ["kpn", "dsh", "rest", "api", "cli"]
+license = "Apache-2.0"
+repository = "https://github.com/kpn-dsh/dsh-api"
+rust-version = "1.79"
+version = "0.3.0"
+
+[profile.release]
+opt-level = "s"
+
+[features]
+stream = []
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "0.4" }
+clap = { version = "4.5", features = ["derive", "string", "wrap_help"] }
+clap_complete = "4.5"
+ctrlc = "3.4"
+env_logger = "0.11"
+futures = "0.3"
+homedir = "0.3"
+itertools = "0.13.0"
+keyring = { version = "3.6", features = ["apple-native", "windows-native"] }
+lazy_static = "1.5"
+log = "0.4"
+open = "5.3.1"
+regex = "1.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9.33"
+tabled = { version = "0.17", features = ["ansi"] }
+termion = "4.0"
+tokio = { version = "1.41", features = ["rt", "rt-multi-thread", "macros"] }
+toml = { version = "0.8", features = ["display"] }
+
+# When publishing, alway use the crates.io dependency.
+dsh_api = "0.3.1"
+# While developing use the relative path dependency to dsh_api.
+#dsh_api = { path = "../dsh-api/dsh-api" }
