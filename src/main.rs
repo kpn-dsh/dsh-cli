@@ -37,6 +37,7 @@ use subjects::secret::SECRET_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
 // #[cfg(feature = "stream")]
 // use subjects::stream::STREAM_SUBJECT;
+use crate::subjects::platform::PLATFORM_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
@@ -133,6 +134,7 @@ async fn inner_main() -> DshCliResult {
     IMAGE_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
     METRIC_SUBJECT.as_ref(),
+    PLATFORM_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     // #[cfg(feature = "stream")]
@@ -441,14 +443,14 @@ pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<Strin
   }
 }
 
-// pub(crate) fn include_app_application(matches: &ArgMatches) -> (bool, bool) {
-//   match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
-//     (false, false) => (true, true),
-//     (false, true) => (false, true),
-//     (true, false) => (true, false),
-//     (true, true) => (true, true),
-//   }
-// }
+pub(crate) fn _include_app_application(matches: &ArgMatches) -> (bool, bool) {
+  match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
+    (false, false) => (true, true),
+    (false, true) => (false, true),
+    (true, false) => (true, false),
+    (true, true) => (true, true),
+  }
+}
 
 pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
   match (matches.get_flag(FilterFlagType::Started.id()), matches.get_flag(FilterFlagType::Stopped.id())) {

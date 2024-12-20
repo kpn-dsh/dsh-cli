@@ -7,6 +7,7 @@ pub(crate) mod env;
 pub(crate) mod image;
 pub(crate) mod manifest;
 pub(crate) mod metric;
+pub(crate) mod platform;
 pub(crate) mod proxy;
 pub(crate) mod secret;
 pub(crate) mod setting;
