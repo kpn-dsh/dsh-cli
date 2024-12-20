@@ -14,6 +14,7 @@ pub(crate) const FIND: &str = "find";
 pub(crate) const DIFF: &str = "diff";
 pub(crate) const LIST: &str = "list";
 pub(crate) const NEW: &str = "new";
+pub(crate) const OPEN: &str = "open";
 pub(crate) const SHOW: &str = "show";
 pub(crate) const START: &str = "start";
 pub(crate) const STOP: &str = "stop";
@@ -28,13 +29,14 @@ pub(crate) enum CapabilityType {
   Find,
   List,
   New,
+  Open,
   Show,
   Start,
   Stop,
   Update,
 }
 
-pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 11] = [Create, Default, Delete, Diff, Find, List, New, Show, Start, Stop, Update];
+pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 12] = [Create, Default, Delete, Diff, Find, List, New, Open, Show, Start, Stop, Update];
 
 impl TryFrom<&str> for CapabilityType {
   type Error = String;
@@ -48,6 +50,7 @@ impl TryFrom<&str> for CapabilityType {
       FIND => Ok(Find),
       LIST => Ok(List),
       NEW => Ok(New),
+      OPEN => Ok(Open),
       SHOW => Ok(Show),
       START => Ok(Start),
       STOP => Ok(Stop),
@@ -67,6 +70,7 @@ impl CapabilityType {
       Find => Some("f"),
       List => Some("l"),
       New => None,
+      Open => Some("o"),
       Show => Some("s"),
       Start => None,
       Stop => None,
@@ -85,6 +89,7 @@ impl Display for CapabilityType {
       Find => write!(f, "{}", FIND),
       List => write!(f, "{}", LIST),
       New => write!(f, "{}", NEW),
+      Open => write!(f, "{}", OPEN),
       Show => write!(f, "{}", SHOW),
       Start => write!(f, "{}", START),
       Stop => write!(f, "{}", STOP),
