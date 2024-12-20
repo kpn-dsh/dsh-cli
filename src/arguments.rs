@@ -1,14 +1,18 @@
 use crate::context::MatchingStyle;
 use crate::formatters::OutputFormat;
+use crate::read_single_line;
 use builder::EnumValueParser;
 use clap::builder::ValueParser;
-use clap::{builder, Arg, ArgAction};
+use clap::{builder, Arg, ArgAction, ArgMatches};
+use dsh_api::dsh_api_tenant::parse_and_validate_guid;
+use dsh_api::platform::DshPlatform;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 pub(crate) const GUID_ARGUMENT: &str = "guid-argument";
 pub(crate) const PASSWORD_FILE_ARGUMENT: &str = "password-file-argument";
 pub(crate) const PLATFORM_ARGUMENT: &str = "platform-argument";
+pub(crate) const SERVICE_ARGUMENT: &str = "service-argument";
 pub(crate) const TENANT_ARGUMENT: &str = "tenant-argument";
 
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
@@ -42,21 +46,30 @@ pub(crate) enum Verbosity {
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum PlatformArgument {
-  /// Non-production landing zone
-  #[serde(rename = "nplz")]
-  Nplz,
-  /// Proof of concept
-  #[serde(rename = "poc")]
-  Poc,
-  /// Production landing zone
-  #[serde(rename = "prod")]
-  Prod,
-  /// Production AZ
-  #[serde(rename = "prodaz")]
-  Prodaz,
-  /// Production LZ
-  #[serde(rename = "prodlz")]
-  Prodlz,
+  /// Staging platform for KPN internal tenants
+  #[serde(rename = "np-aws-lz-dsh", alias = "nplz")]
+  #[clap(alias = "nplz")]
+  NpAwsLzDsh,
+  /// Staging platform for non KPN tenants
+  #[serde(rename = "poc-aws-dsh", alias = "poc")]
+  #[clap(alias = "poc")]
+  PocAwsDsh,
+  /// Production platform for non KPN tenants
+  #[serde(rename = "prod-aws-dsh", alias = "prod")]
+  #[clap(alias = "prod")]
+  ProdAwsDsh,
+  /// Production platform for KPN internal tenants
+  #[serde(rename = "prod-aws-lz-dsh", alias = "prodlz")]
+  #[clap(alias = "prodlz")]
+  ProdAwsLzDsh,
+  /// Production platform for logstash as a service
+  #[serde(rename = "prod-aws-lz-laas", alias = "prodls")]
+  #[clap(alias = "prodls")]
+  ProdAwsLzLaas,
+  /// Production platform for non KPN tenants
+  #[serde(rename = "prod-azure-dsh", alias = "prodaz")]
+  #[clap(alias = "prodaz")]
+  ProdAzureDsh,
 }
 
 pub(crate) fn dry_run_argument() -> Arg {
@@ -100,6 +113,13 @@ pub(crate) fn guid_argument() -> Arg {
           Note that if the tenant is already provided, the target settings file will also be \
           checked for the guid value.",
     )
+}
+
+pub(crate) fn get_guid_argument_or_prompt(matches: &ArgMatches) -> Result<u16, String> {
+  match matches.get_one::<String>(GUID_ARGUMENT) {
+    Some(tenant_argument) => Ok(parse_and_validate_guid(tenant_argument.to_string())?),
+    None => Ok(parse_and_validate_guid(read_single_line("enter group/user id: ")?)?),
+  }
 }
 
 pub(crate) fn matching_style_argument() -> Arg {
@@ -178,8 +198,17 @@ pub(crate) fn platform_argument() -> Arg {
       "This option specifies the name of the target platform. \
           If this argument is not provided, \
           the platform must be specified via the environment variable DSH_CLI_PLATFORM, \
-          as a default setting in the settings file, or else the user will be prompted.",
+          as a default setting in the settings file, or else the user will be prompted. \
+          The target platform names have the following shortcuts, \
+          respectively: nplz, poc, prod, prodlz, prodls and prodaz.",
     )
+}
+
+pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
+  match matches.get_one::<PlatformArgument>(PLATFORM_ARGUMENT) {
+    Some(platform_argument) => Ok(DshPlatform::try_from(platform_argument.to_string().as_str())?),
+    None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
+  }
 }
 
 pub(crate) fn quiet_argument() -> Arg {
@@ -220,6 +249,29 @@ pub(crate) fn show_execution_time_argument() -> Arg {
     )
 }
 
+pub(crate) fn service_argument() -> Arg {
+  Arg::new(SERVICE_ARGUMENT)
+    .long("service")
+    .short('s')
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("SERVICE")
+    .help("Provide service.")
+    .long_help(
+      "This option specifies the name of a service running on the DSH platform. \
+          If this argument is not provided, \
+          the service could be specified via the environment variable DSH_CLI_SERVICE \
+          or else the user will be prompted.",
+    )
+}
+
+pub(crate) fn _get_service_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+  match matches.get_one::<String>(SERVICE_ARGUMENT) {
+    Some(service_argument) => Ok(service_argument.to_string()),
+    None => Ok(read_single_line("enter service: ")?),
+  }
+}
+
 pub(crate) fn tenant_argument() -> Arg {
   Arg::new(TENANT_ARGUMENT)
     .long("tenant")
@@ -234,6 +286,13 @@ pub(crate) fn tenant_argument() -> Arg {
           the tenant should be specified via the environment variable DSH_CLI_TENANT,\
           as a default setting in the settings file, or else the user will be prompted.",
     )
+}
+
+pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+  match matches.get_one::<String>(TENANT_ARGUMENT) {
+    Some(tenant_argument) => Ok(tenant_argument.to_string()),
+    None => Ok(read_single_line("enter tenant: ")?),
+  }
 }
 
 pub(crate) fn terminal_width_argument() -> Arg {
@@ -311,11 +370,12 @@ impl Display for Verbosity {
 impl Display for PlatformArgument {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      PlatformArgument::Nplz => write!(f, "nplz"),
-      PlatformArgument::Poc => write!(f, "poc"),
-      PlatformArgument::Prod => write!(f, "prod"),
-      PlatformArgument::Prodaz => write!(f, "prodaz"),
-      PlatformArgument::Prodlz => write!(f, "prodlz"),
+      Self::NpAwsLzDsh => write!(f, "np-aws-lz-dsh"),
+      Self::PocAwsDsh => write!(f, "poc-aws-dsh"),
+      Self::ProdAwsDsh => write!(f, "prod-aws-dsh"),
+      Self::ProdAwsLzDsh => write!(f, "prod-aws-lz-dsh"),
+      Self::ProdAwsLzLaas => write!(f, "prod-aws-lz-laas"),
+      Self::ProdAzureDsh => write!(f, "prod-azure-dsh"),
     }
   }
 }

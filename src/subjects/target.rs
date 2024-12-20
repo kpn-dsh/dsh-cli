@@ -1,19 +1,18 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
-use dsh_api::dsh_api_tenant::parse_and_validate_guid;
-use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 
+use crate::arguments::{get_guid_argument_or_prompt, get_platform_argument_or_prompt, get_tenant_argument_or_prompt, guid_argument, platform_argument, tenant_argument};
 use crate::capability::{Capability, CapabilityType, CommandExecutor};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
 use crate::subject::Subject;
-use crate::{read_single_line, read_single_line_password, DshCliResult};
+use crate::{read_single_line_password, DshCliResult};
 
 pub(crate) struct TargetSubject {}
 
@@ -68,6 +67,7 @@ lazy_static! {
         you won't be prompted for the platform and tenant name."
       )
       .set_default_command_executor(&TargetDefault {})
+      .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
   pub static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::Delete, "Delete target configuration.")
@@ -77,6 +77,7 @@ lazy_static! {
         and you need to explicitly confirm the action.",
       )
       .set_default_command_executor(&TargetDelete {})
+      .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
   pub static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CapabilityType::List, "List all target configurations.")
@@ -92,6 +93,7 @@ lazy_static! {
         The password will be stored in your computers keyring application, which is more secure.",
       )
       .set_default_command_executor(&TargetNew {})
+      .add_extra_arguments(vec![guid_argument(), platform_argument(), tenant_argument()])
   );
 }
 
@@ -99,11 +101,10 @@ struct TargetDefault {}
 
 #[async_trait]
 impl CommandExecutor for TargetDefault {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("set default target");
-    let platform = read_single_line("enter platform: ")?;
-    let platform = DshPlatform::try_from(platform.as_str())?;
-    let tenant = read_single_line("enter tenant: ")?;
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
     match read_target(&platform, &tenant)? {
       Some(ref target) => {
         match read_settings(None)? {
@@ -130,11 +131,10 @@ struct TargetDelete {}
 
 #[async_trait]
 impl CommandExecutor for TargetDelete {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("delete existing target");
-    let platform = read_single_line("enter platform: ")?;
-    let platform = DshPlatform::try_from(platform.as_str())?;
-    let tenant = read_single_line("enter tenant: ")?;
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
     match read_target(&platform, &tenant)? {
       Some(target) => {
         let prompt = if target.password.is_some() {
@@ -206,18 +206,17 @@ struct TargetNew {}
 
 #[async_trait]
 impl CommandExecutor for TargetNew {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("create new target configuration");
-    let platform = read_single_line("enter platform: ")?;
-    let platform = DshPlatform::try_from(platform.as_str())?;
-    let tenant = read_single_line("enter tenant: ")?;
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
     if let Some(existing_target) = read_target(&platform, &tenant)? {
       return Err(format!(
         "target configuration {} already exists (first delete the existing target configuration)",
         existing_target
       ));
-    }
-    let guid = parse_and_validate_guid(read_single_line("enter group/user id: ")?)?;
+    };
+    let guid = get_guid_argument_or_prompt(matches)?;
     let password = read_single_line_password("enter password: ")?;
     let target = Target::new(platform, tenant, guid, Some(password))?;
     if context.dry_run {
