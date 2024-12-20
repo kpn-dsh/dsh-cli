@@ -1,3 +1,5 @@
+api show
+
 app l
 app list
 apps
@@ -54,6 +56,10 @@ m list
 metrics
 metric list --started
 metric list --stopped
+
+platform list
+platform show nplz
+platform show nplz --tenant greenbox
 
 proxy l
 proxy list

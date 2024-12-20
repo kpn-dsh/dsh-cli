@@ -1,3 +1,5 @@
+api show
+
 app list
 app list --ids
 app show $APP_UNDER_TEST
@@ -49,6 +51,10 @@ manifest show $MANIFEST_UNDER_TEST
 metric list
 metric list --started
 metric list --stopped
+
+platform list
+platform show nplz
+platform show nplz --tenant greenbox
 
 proxy list
 proxy list --ids
