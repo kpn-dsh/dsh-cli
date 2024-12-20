@@ -466,23 +466,23 @@ Commands also have their own help text.
 
 ### Dependencies
 
-The `dsh` tool has a strong dependency on the [`dsh-api`](dsh_api) library,
+The `dsh` tool has a strong dependency on the [`dsh_api`](dsh_api) library,
 that provides the client for the DSH resource management API.
-This library is still being worked on, and it is not (yet) published to `crates.io`.
-Hence, at this time `dsh` depends on the [github](https://github.com/kpn-dsh/dsh-api)
+This library is continuously being worked on, and is published to `crates.io`.
+Hence, at this time `dsh` depends on the [crates.io](https://crates.io/crates/dsh_api)
 version of the library.
 
 ```toml
 # Cargo.toml
-dsh-api = { git = "ssh://git@github.com/kpn-dsh/dsh-api.git", branch = "0.2.0" }
+dsh_api = "0.3.1"
 ```
 
-When developing simultaneously on `dsh` and `dsh-api` consider changing the library dependency
+When developing simultaneously on `dsh` and `dsh_api` consider changing the library dependency
 to your local copy.
 
 ```toml
 # Cargo.toml
-dsh-api = { path = "../dsh-api/dsh-api" }
+dsh_api = { path = "../dsh-api/dsh-api" }
 ```
 
 ### Coding guidelines
