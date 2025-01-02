@@ -11,9 +11,9 @@ use dsh_api::query_processor::Part::{Matching, NonMatching};
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
-use std::io::{stdin, stdout, IsTerminal, Write};
+use std::io::{stderr, stdin, stdout, IsTerminal, Write};
 use std::time::Instant;
-use termion::terminal_size;
+use terminal_size::{terminal_size, Height, Width};
 
 static ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
 static ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
@@ -59,15 +59,8 @@ impl Context<'_> {
     }
     let dry_run = Self::dry_run(matches, settings.as_ref());
     let no_escape = Self::no_escape(matches, settings.as_ref());
-    let (matching_style, stderr_escape, stdout_escape) = if no_escape {
-      (None, false, false)
-    } else {
-      (
-        Self::matching_style(matches, settings.as_ref())?,
-        std::io::stderr().is_terminal(),
-        std::io::stdout().is_terminal(),
-      )
-    };
+    let (matching_style, stderr_escape, stdout_escape) =
+      if no_escape { (None, false, false) } else { (Self::matching_style(matches, settings.as_ref())?, stderr().is_terminal(), stdout().is_terminal()) };
     let quiet = Self::quiet(matches, settings.as_ref());
     let force = Self::force(matches, settings.as_ref());
     let (output_format, show_execution_time, verbosity) = if quiet {
@@ -223,7 +216,7 @@ impl Context<'_> {
         Ok(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str()).map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_OUTPUT_FORMAT)),
         Err(_) => match settings.and_then(|settings| settings.output_format.clone()) {
           Some(output_format_from_settings) => Ok(output_format_from_settings),
-          None => Ok(if std::io::stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
+          None => Ok(if stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
         },
       },
     }
@@ -280,8 +273,11 @@ impl Context<'_> {
         Err(_) => match settings.and_then(|settings| settings.terminal_width) {
           Some(terminal_width_from_settings) => Ok(Some(terminal_width_from_settings)),
           None => {
-            if std::io::stdout().is_terminal() {
-              Ok(terminal_size().ok().map(|(width, _)| width as usize))
+            if stdout().is_terminal() {
+              match terminal_size() {
+                Some((Width(width), Height(_))) => Ok(Some(width as usize)),
+                None => Ok(None),
+              }
             } else {
               Ok(None)
             }
@@ -330,7 +326,7 @@ impl Context<'_> {
   /// The prompt is only printed when stderr is a tty,
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: AsRef<str>>(&self, prompt: T) {
-    if !self.quiet && std::io::stderr().is_terminal() {
+    if !self.quiet && stderr().is_terminal() {
       eprintln!("{}", prompt.as_ref());
     }
   }

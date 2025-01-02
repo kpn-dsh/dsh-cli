@@ -20,11 +20,13 @@ use crate::settings::{get_password_from_keyring, read_settings, read_target, Set
 use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::application::APPLICATION_SUBJECT;
+use crate::subjects::platform::PLATFORM_SUBJECT;
 use clap::builder::styling;
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
 use dsh_api::platform::DshPlatform;
+use rpassword::prompt_password;
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
@@ -37,12 +39,10 @@ use subjects::secret::SECRET_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
 // #[cfg(feature = "stream")]
 // use subjects::stream::STREAM_SUBJECT;
-use crate::subjects::platform::PLATFORM_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
 use subjects::volume::VOLUME_SUBJECT;
-use termion::input::TermRead;
 
 mod arguments;
 mod autocomplete;
@@ -73,7 +73,7 @@ static LONG_ABOUT: &str = "DSH resource management api command line interface\n\
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
-static LONG_VERSION: &str = "version: 0.2.0\ndsh-api library version: 0.2.0\ndsh rest api version: 1.8.0";
+static LONG_VERSION: &str = "version: 0.3.1\ndsh-api library version: 0.3.1\ndsh rest api version: 1.8.0";
 
 static ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
 static ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
@@ -189,7 +189,7 @@ async fn inner_main() -> DshCliResult {
     .hide_possible_values(false)
     .styles(styles)
     .subcommands(clap_commands)
-    .version("0.2.0")
+    .version("0.3.1")
     .long_version(LONG_VERSION);
 
   let matches = command.clone().get_matches();
@@ -430,16 +430,9 @@ pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String
 }
 
 pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<String, String> {
-  print!("{}", prompt.as_ref());
-  let mut stdout = stdout();
-  let _ = stdout.flush();
-  let mut stdin = stdin();
-  match stdin.read_passwd(&mut stdout).map_err(|error| error.to_string())? {
-    Some(line) => {
-      let _ = stdout.write("\n".as_bytes());
-      Ok(line.trim().to_string())
-    }
-    None => Err("empty input".to_string()),
+  match prompt_password(prompt.as_ref()) {
+    Ok(line) => Ok(line.trim().to_string()),
+    Err(_) => Err("empty input".to_string()),
   }
 }
 

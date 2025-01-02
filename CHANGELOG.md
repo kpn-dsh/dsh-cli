@@ -4,7 +4,17 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.3.0]
+## [0.3.1]
+
+### Added
+
+* Support for Windows.
+
+### Changed
+
+* Re-organized documentation.
+
+## [0.3.0] - 2024-12-20
 
 ### Added
 
