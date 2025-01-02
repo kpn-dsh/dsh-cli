@@ -105,7 +105,8 @@ impl Context<'_> {
       let _ = stdout().lock().flush();
       let mut line = String::new();
       stdin().read_line(&mut line).expect("could not read line");
-      Ok(line == *"yes\n")
+      line = line.trim().to_string();
+      Ok(line == *"yes")
     }
   }
 
