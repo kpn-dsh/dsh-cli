@@ -26,6 +26,7 @@ use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
 use dsh_api::platform::DshPlatform;
+use dsh_api::{api_version, crate_version};
 use rpassword::prompt_password;
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
@@ -73,7 +74,8 @@ static LONG_ABOUT: &str = "DSH resource management api command line interface\n\
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
-static LONG_VERSION: &str = "version: 0.3.1\ndsh-api library version: 0.3.1\ndsh rest api version: 1.8.0";
+
+static VERSION: &str = "0.3.1";
 
 static ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
 static ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
@@ -189,8 +191,13 @@ async fn inner_main() -> DshCliResult {
     .hide_possible_values(false)
     .styles(styles)
     .subcommands(clap_commands)
-    .version("0.3.1")
-    .long_version(LONG_VERSION);
+    .version(VERSION)
+    .long_version(format!(
+      "version: {}\ndsh-api library version: {}\ndsh rest api version: {}",
+      VERSION,
+      crate_version(),
+      api_version()
+    ));
 
   let matches = command.clone().get_matches();
 
@@ -463,4 +470,14 @@ pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
   }
   environment_variables.sort_by(|(env_var_a, _), (env_var_b, _)| env_var_a.cmp(env_var_b));
   environment_variables
+}
+
+#[test]
+fn test_api_version() {
+  assert_eq!(api_version(), "1.9.0");
+}
+
+#[test]
+fn test_crate_version() {
+  assert_eq!(crate_version(), "0.3.2");
 }
