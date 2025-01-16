@@ -1,5 +1,7 @@
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -17,7 +19,6 @@ use dsh_api::types::Secret;
 use dsh_api::{secret, UsedBy};
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
-use std::collections::HashMap;
 use std::time::Instant;
 
 pub(crate) struct SecretSubject {}
@@ -50,32 +51,37 @@ impl Subject for SecretSubject {
     true
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Create, SECRET_CREATE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Delete, SECRET_DELETE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::List, SECRET_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, SECRET_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      CREATE_COMMAND => Some(SECRET_CREATE_CAPABILITY.as_ref()),
+      DELETE_COMMAND => Some(SECRET_DELETE_CAPABILITY.as_ref()),
+      LIST_COMMAND => Some(SECRET_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(SECRET_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &SECRET_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref SECRET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Create, "Create secret")
+  static ref SECRET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CREATE_COMMAND_PAIR, "Create secret")
       .set_long_about("Create a secret.")
       .set_default_command_executor(&SecretCreate {})
       .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );
-  pub static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Delete, "Delete secret")
+  static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete secret")
       .set_long_about("Delete a secret.")
       .set_default_command_executor(&SecretDelete {})
       .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
   );
-  pub static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List secrets")
+  static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List secrets")
       .set_long_about("Lists all secrets used by the applications/services and apps on the DSH.")
       .set_default_command_executor(&SecretListIds {})
       .add_command_executors(vec![
@@ -88,12 +94,14 @@ lazy_static! {
         (FilterFlagType::Application, Some("List all applications that use the secret.".to_string())),
       ])
   );
-  pub static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show secret configuration or value")
+  static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show secret configuration or value")
       .set_default_command_executor(&SecretShowAllocationStatus {})
       .add_command_executors(vec![(FlagType::Usage, &SecretShowUsage {}, None), (FlagType::Value, &SecretShowValue {}, None),])
       .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
   );
+  static ref SECRET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![SECRET_CREATE_CAPABILITY.as_ref(), SECRET_DELETE_CAPABILITY.as_ref(), SECRET_LIST_CAPABILITY.as_ref(), SECRET_SHOW_CAPABILITY.as_ref()];
 }
 
 struct SecretCreate {}

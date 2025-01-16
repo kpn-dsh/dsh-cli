@@ -1,5 +1,5 @@
 use crate::arguments::query_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -46,17 +46,21 @@ impl Subject for EnvSubject {
   fn requires_dsh_api_client(&self) -> bool {
     true
   }
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      FIND_COMMAND => Some(ENV_FIND_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Find, ENV_FIND_CAPABILITY.as_ref());
-    capabilities
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &ENV_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Find, "Find environment variable values")
+  static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(FIND_COMMAND_PAIR, "Find environment variable values")
       .set_long_about("Find values in environment variables in the configurations of applications and apps deployed on the DSH.")
       .set_default_command_executor(&EnvFind {})
       .add_filter_flags(vec![
@@ -66,6 +70,7 @@ lazy_static! {
       .add_target_argument(query_argument(None))
       .add_modifier_flag(ModifierFlagType::Regex, None)
   );
+  static ref ENV_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![ENV_FIND_CAPABILITY.as_ref()];
 }
 
 struct EnvFind {}

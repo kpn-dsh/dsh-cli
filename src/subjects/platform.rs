@@ -1,5 +1,5 @@
 use crate::arguments::{get_platform_argument_or_prompt, platform_argument, service_argument, target_argument, tenant_argument, TENANT_ARGUMENT};
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, OPEN_COMMAND, OPEN_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
@@ -12,7 +12,6 @@ use clap::ArgMatches;
 use dsh_api::platform::{DshPlatform, DSH_PLATFORMS};
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 
 pub(crate) struct PlatformSubject {}
 
@@ -36,34 +35,41 @@ impl Subject for PlatformSubject {
     false
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::List, PLATFORM_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Open, PLATFORM_OPEN_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, PLATFORM_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(PLATFORM_LIST_CAPABILITY.as_ref()),
+      OPEN_COMMAND => Some(PLATFORM_OPEN_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(PLATFORM_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &PLATFORM__CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List platforms")
+  static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List platforms")
       .set_long_about("Lists all dsh platforms.")
       .set_default_command_executor(&PLatformList {}),
   );
-  pub static ref PLATFORM_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Open, "Open console or web application")
+  static ref PLATFORM_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(OPEN_COMMAND_PAIR, "Open console or web application")
       .set_long_about("Open the DSH console, monitoring page or the web application for the tenant or a service.")
       .set_default_command_executor(&PlatformOpen {})
       .add_extra_arguments(vec![platform_argument(), service_argument(), tenant_argument()])
   );
-  pub static ref PLATFORM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show platform data")
+  static ref PLATFORM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show platform data")
       .set_long_about("Show platform data.")
       .set_default_command_executor(&PlatformShow {})
       .add_target_argument(target_argument(PLATFORM_SUBJECT_TARGET, None))
       .add_extra_argument(tenant_argument())
   );
+  static ref PLATFORM__CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![PLATFORM_LIST_CAPABILITY.as_ref(), PLATFORM_OPEN_CAPABILITY.as_ref(), PLATFORM_SHOW_CAPABILITY.as_ref()];
 }
 
 struct PLatformList {}

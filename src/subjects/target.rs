@@ -3,10 +3,11 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 
 use crate::arguments::{get_guid_argument_or_prompt, get_platform_argument_or_prompt, get_tenant_argument_or_prompt, guid_argument, platform_argument, tenant_argument};
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{
+  Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
@@ -49,19 +50,24 @@ impl Subject for TargetSubject {
     false
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Default, TARGET_DEFAULT_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Delete, TARGET_DELETE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::List, TARGET_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::New, TARGET_NEW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      DEFAULT_COMMAND => Some(TARGET_DEFAULT_CAPABILITY.as_ref()),
+      DELETE_COMMAND => Some(TARGET_DELETE_CAPABILITY.as_ref()),
+      LIST_COMMAND => Some(TARGET_LIST_CAPABILITY.as_ref()),
+      NEW_COMMAND => Some(TARGET_NEW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &TARGET_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref TARGET_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Default, "Set default target.")
+  static ref TARGET_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DEFAULT_COMMAND_PAIR, "Set default target.")
       .set_long_about(
         "Set the default target. If you set a default target, \
         you won't be prompted for the platform and tenant name."
@@ -69,8 +75,8 @@ lazy_static! {
       .set_default_command_executor(&TargetDefault {})
       .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
-  pub static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Delete, "Delete target configuration.")
+  static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete target configuration.")
       .set_long_about(
         "Delete a target configuration. \
         You will be prompted for the target's platform and tenant, \
@@ -79,13 +85,13 @@ lazy_static! {
       .set_default_command_executor(&TargetDelete {})
       .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
-  pub static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List all target configurations.")
+  static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List all target configurations.")
       .set_long_about("Lists all target configurations.")
       .set_default_command_executor(&TargetList {})
   );
-  pub static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::New, "Create a new target configuration.")
+  static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create a new target configuration.")
       .set_long_about(
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant, group/user id and password. \
@@ -95,6 +101,8 @@ lazy_static! {
       .set_default_command_executor(&TargetNew {})
       .add_extra_arguments(vec![guid_argument(), platform_argument(), tenant_argument()])
   );
+  static ref TARGET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![TARGET_DEFAULT_CAPABILITY.as_ref(), TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref(), TARGET_NEW_CAPABILITY.as_ref()];
 }
 
 struct TargetDefault {}

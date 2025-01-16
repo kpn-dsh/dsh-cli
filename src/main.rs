@@ -17,7 +17,7 @@ use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::settings::{get_password_from_keyring, read_settings, read_target, Settings};
-use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
+use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::application::APPLICATION_SUBJECT;
 use crate::subjects::platform::PLATFORM_SUBJECT;
@@ -154,10 +154,10 @@ async fn inner_main() -> DshCliResult {
   let mut clap_commands: Vec<Command> = Vec::new();
 
   for subject in subjects {
-    let (command_name, clap_command) = clap_subject_command(subject);
+    let (command_name, clap_command) = subject.clap_subject_command();
     subject_registry.insert(command_name.to_string(), subject);
     clap_commands.push(clap_command);
-    if let Some((list_shortcut_name, clap_list_command_shortcut)) = clap_list_shortcut_command(subject) {
+    if let Some((list_shortcut_name, clap_list_command_shortcut)) = subject.clap_list_shortcut_command() {
       subject_list_shortcut_registry.insert(list_shortcut_name.to_string(), subject);
       clap_commands.push(clap_list_command_shortcut);
     }

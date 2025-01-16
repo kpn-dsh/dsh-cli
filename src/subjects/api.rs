@@ -1,4 +1,4 @@
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::subject::Subject;
@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use lazy_static::lazy_static;
-use std::collections::HashMap;
 
 pub(crate) struct ApiSubject {}
 
@@ -37,16 +36,22 @@ impl Subject for ApiSubject {
     true
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Show, API_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      SHOW_COMMAND => Some(API_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &API_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(CapabilityType::Show, "Print the open api specification.").set_default_command_executor(&ApiShow {}));
+  static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Print the open api specification.").set_default_command_executor(&ApiShow {}));
+  static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![API_SHOW_CAPABILITY.as_ref()];
 }
 
 struct ApiShow {}

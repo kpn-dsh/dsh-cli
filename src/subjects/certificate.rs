@@ -1,5 +1,5 @@
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -18,7 +18,6 @@ use dsh_api::UsedBy;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::time::Instant;
 
 pub(crate) struct CertificateSubject {}
@@ -51,17 +50,22 @@ impl Subject for CertificateSubject {
     true
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::List, CERTIFICATE_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, CERTIFICATE_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(CERTIFICATE_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(CERTIFICATE_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &CERTIFICATE_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List certificates")
+  static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List certificates")
       .set_long_about("Lists all available certificates.")
       .set_default_command_executor(&CertificateListAll {})
       .add_command_executors(vec![
@@ -72,8 +76,8 @@ lazy_static! {
       ])
       .set_run_all_executors(true)
   );
-  pub static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show certificate configuration")
+  static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show certificate configuration")
       .set_default_command_executor(&CertificateShowAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
@@ -81,6 +85,7 @@ lazy_static! {
       ])
       .add_target_argument(target_argument(CERTIFICATE_SUBJECT_TARGET, None))
   );
+  static ref CERTIFICATE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()];
 }
 
 struct CertificateListAll {}

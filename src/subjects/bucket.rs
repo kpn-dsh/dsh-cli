@@ -6,11 +6,10 @@ use dsh_api::types::{Bucket, BucketStatus};
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -50,27 +49,33 @@ impl Subject for BucketSubject {
     true
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::List, BUCKET_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, BUCKET_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(BUCKET_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(BUCKET_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &BUCKET_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List buckets")
+  static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List buckets")
       .set_long_about("Lists all available buckets.")
       .set_default_command_executor(&BucketListAll {})
       .add_command_executor(FlagType::Ids, &BucketListIds {}, None)
       .set_run_all_executors(true)
   );
-  pub static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show bucket configuration")
+  static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show bucket configuration")
       .set_default_command_executor(&BucketShowAll {})
       .add_target_argument(target_argument(BUCKET_SUBJECT_TARGET, None))
   );
+  static ref BUCKET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![BUCKET_LIST_CAPABILITY.as_ref(), BUCKET_SHOW_CAPABILITY.as_ref()];
 }
 
 struct BucketListAll {}
