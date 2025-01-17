@@ -4,9 +4,12 @@ use crate::context::Context;
 use crate::subject::Subject;
 use crate::DshCliResult;
 use async_trait::async_trait;
-use clap::ArgMatches;
+use clap::{Arg, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, HEAD_METHODS, PATCH_METHODS, POST_METHODS, PUT_METHODS};
+use itertools::Itertools;
 use lazy_static::lazy_static;
+use std::time::Instant;
 
 pub(crate) struct ApiSubject {}
 
@@ -38,6 +41,12 @@ impl Subject for ApiSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      DELETE_COMMAND => Some(API_DELETE_CAPABILITY.as_ref()),
+      GET_COMMAND => Some(API_GET_CAPABILITY.as_ref()),
+      HEAD_COMMAND => Some(API_HEAD_CAPABILITY.as_ref()),
+      PATCH_COMMAND => Some(API_PATCH_CAPABILITY.as_ref()),
+      POST_COMMAND => Some(API_POST_CAPABILITY.as_ref()),
+      PUT_COMMAND => Some(API_PUT_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(API_SHOW_CAPABILITY.as_ref()),
       _ => None,
     }
@@ -49,9 +58,115 @@ impl Subject for ApiSubject {
 }
 
 lazy_static! {
+  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, &ApiGet {});
+  static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, &ApiGet {});
+  static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, &ApiGet {});
+  static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, &ApiGet {});
+  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiGet {});
+  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiGet {});
   static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
     Box::new(CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Print the open api specification.").set_default_command_executor(&ApiShow {}));
-  static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![API_SHOW_CAPABILITY.as_ref()];
+  static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
+    API_DELETE_CAPABILITY.as_ref(),
+    API_GET_CAPABILITY.as_ref(),
+    API_HEAD_CAPABILITY.as_ref(),
+    API_PATCH_CAPABILITY.as_ref(),
+    API_POST_CAPABILITY.as_ref(),
+    API_PUT_CAPABILITY.as_ref(),
+    API_SHOW_CAPABILITY.as_ref(),
+  ];
+}
+
+const DELETE_COMMAND: &str = "delete";
+const GET_COMMAND: &str = "get";
+const HEAD_COMMAND: &str = "head";
+const PATCH_COMMAND: &str = "patch";
+const POST_COMMAND: &str = "post";
+const PUT_COMMAND: &str = "put";
+
+fn get_method_descriptors(method: &str) -> Option<&'static [(&str, MethodDescriptor)]> {
+  match method {
+    DELETE_COMMAND => Some(&DELETE_METHODS),
+    GET_COMMAND => Some(&GET_METHODS),
+    HEAD_COMMAND => Some(&HEAD_METHODS),
+    PATCH_COMMAND => Some(&PATCH_METHODS),
+    POST_COMMAND => Some(&POST_METHODS),
+    PUT_COMMAND => Some(&PUT_METHODS),
+    _ => None,
+  }
+}
+
+fn get_method_descriptor(method: &'static str, query_selector: &str) -> Option<&'static MethodDescriptor> {
+  match get_method_descriptors(method) {
+    Some(method_descriptors) => method_descriptors
+      .iter()
+      .find_or_first(|(selector, _)| selector == &query_selector)
+      .map(|(_, method_descriptor)| method_descriptor),
+    None => None,
+  }
+}
+
+fn create_generic_capability<'a>(method: &'static str, command_executor: &'a ApiGet) -> Box<(dyn Capability + Send + Sync + 'a)> {
+  let subcommands = match get_method_descriptors(method) {
+    Some(method_descriptors) => method_descriptors
+      .iter()
+      .map(|(selector, method_descriptor)| create_generic_capability_command(method, selector, method_descriptor))
+      .collect::<Vec<_>>(),
+    None => unreachable!(),
+  };
+  Box::new(
+    CapabilityBuilder::new((method, ""), format!("{} methods ", method))
+      .add_subcommands(subcommands)
+      .set_default_command_executor(command_executor),
+  )
+}
+
+fn create_generic_capability_command(method_command: &str, selector: &str, method_descriptor: &MethodDescriptor) -> Command {
+  let mut command = Command::new(selector.to_string());
+  if let Some(description) = method_descriptor.description {
+    command = command
+      .about(description)
+      .long_about(format!("{}\n{} {}", description, method_command.to_ascii_uppercase(), method_descriptor.path));
+  }
+  if !method_descriptor.parameters.is_empty() {
+    command = command.args(
+      method_descriptor
+        .parameters
+        .iter()
+        .map(|(parameter_name, _, description)| {
+          let mut arg = Arg::new(parameter_name).value_name(parameter_name.to_ascii_uppercase().to_string());
+          if let Some(description) = description {
+            arg = arg.help(description);
+          }
+          arg
+        })
+        .collect::<Vec<_>>(),
+    )
+  }
+  command
+}
+
+struct ApiGet {}
+
+#[async_trait]
+impl CommandExecutor for ApiGet {
+  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    match matches.subcommand() {
+      Some((selector, matches)) => match get_method_descriptor("get", selector) {
+        Some(method_descriptor) => {
+          context.print_explanation(format!("GET {}", method_descriptor.path));
+          let parameters = matches.ids().map(|id| matches.get_one::<String>(id.as_str()).unwrap().as_str()).collect::<Vec<_>>();
+          let start_instant = Instant::now();
+          let response = context.dsh_api_client.as_ref().unwrap().get(selector, &parameters).await?;
+          context.print_execution_time(start_instant);
+          context.print_serializable(response);
+        }
+        None => unreachable!(),
+      },
+      None => unreachable!(),
+    }
+    Ok(())
+  }
 }
 
 struct ApiShow {}

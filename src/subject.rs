@@ -69,14 +69,14 @@ pub trait Subject {
     }
   }
 
-  async fn execute_subject_command<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult {
-    match matches.subcommand() {
-      Some((capability_command_id, matches)) => match self.capability(capability_command_id) {
+  async fn execute_subject_command<'a>(&self, subject_matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+    match subject_matches.subcommand() {
+      Some((capability_command_id, capability_matches)) => match self.capability(capability_command_id) {
         Some(capability) => {
           let arguments = capability.command_target_argument_ids();
-          let argument = arguments.first().and_then(|argument| matches.get_one::<String>(argument)).cloned();
-          let sub_argument = arguments.get(1).and_then(|argument| matches.get_one::<String>(argument)).cloned();
-          capability.execute_capability(argument, sub_argument, matches, context).await
+          let argument = arguments.first().and_then(|argument| capability_matches.get_one::<String>(argument)).cloned();
+          let sub_argument = arguments.get(1).and_then(|argument| capability_matches.get_one::<String>(argument)).cloned();
+          capability.execute_capability(argument, sub_argument, capability_matches, context).await
         }
         None => unreachable!(),
       },

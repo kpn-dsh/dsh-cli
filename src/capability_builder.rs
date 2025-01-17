@@ -12,6 +12,7 @@ pub struct CapabilityBuilder<'a> {
   capability_command_alias: Option<String>,
   about: String,
   long_about: Option<String>,
+  subcommands: Vec<Command>,
   executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<String>)>,
   default_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
   run_all_executors: bool,
@@ -33,6 +34,7 @@ impl<'a> CapabilityBuilder<'a> {
       capability_command_alias: if command_pair.1.is_empty() { None } else { Some(command_pair.1.to_string()) },
       about: about.into(),
       long_about: None,
+      subcommands: vec![],
       executors: vec![],
       default_executor: None,
       run_all_executors: false,
@@ -51,6 +53,18 @@ impl<'a> CapabilityBuilder<'a> {
   /// * `long_about` - long help text
   pub fn set_long_about(mut self, long_about: impl Into<String>) -> Self {
     self.long_about = Some(long_about.into());
+    self
+  }
+
+  pub fn _add_subcommand(mut self, subcommand: Command) -> Self {
+    self.subcommands.push(subcommand);
+    self
+  }
+
+  pub fn add_subcommands(mut self, subcommands: Vec<Command>) -> Self {
+    for subcommand in subcommands {
+      self.subcommands.push(subcommand);
+    }
     self
   }
 
@@ -127,6 +141,7 @@ impl<'a> Capability for CapabilityBuilder<'a> {
     let mut capability_command = Command::new(self.capability_command_name.clone())
       .name(self.capability_command_name.clone())
       .about(&self.about)
+      .subcommands(&self.subcommands)
       .args(&self.target_arguments)
       .args(self.clap_flags(subject_command))
       .args(&self.extra_arguments);

@@ -319,6 +319,44 @@ impl Context<'_> {
     }
   }
 
+  /// # Prints serializable output to stdout
+  ///
+  /// This method is used to print a serialized version of the output of the tool
+  /// to the standard output device.
+  /// If `quiet` is `true`, nothing will be printed.
+  /// This standard output device can either be a tty, a pipe or an output file,
+  /// depending on how the tool was run from a shell or script.
+  pub(crate) fn print_serializable<T: Serialize>(&self, output: T) {
+    if !self.quiet {
+      match self.output_format {
+        OutputFormat::Json => match serde_json::to_string_pretty(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to json failed"),
+        },
+        OutputFormat::JsonCompact => match serde_json::to_string(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to json failed"),
+        },
+        OutputFormat::Toml => match toml::to_string_pretty(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to toml failed"),
+        },
+        OutputFormat::TomlCompact => match toml::to_string(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to toml failed"),
+        },
+        OutputFormat::Yaml => match serde_yaml::to_string(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to yaml failed"),
+        },
+        OutputFormat::Csv => self.print_warning("csv output is not supported here, use flag --output-format json|toml|yaml"),
+        OutputFormat::Plain => self.print_warning("plain output is not supported here, use flag --output-format json|toml|yaml"),
+        OutputFormat::Quiet => (),
+        OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use flag --output-format json|toml|yaml"),
+      }
+    }
+  }
+
   /// # Prints a prompt to stderr
   ///
   /// This method is used to print a prompt to the standard error device.
