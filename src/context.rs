@@ -43,7 +43,7 @@ pub(crate) struct Context<'a> {
   pub(crate) show_execution_time: bool,
   pub(crate) show_labels: bool,
   pub(crate) _stderr_escape: bool,
-  pub(crate) _stdin_terminal: bool,
+  pub(crate) stdin_is_terminal: bool,
   pub(crate) _stdout_escape: bool,
   pub(crate) verbosity: Verbosity,
 }
@@ -92,7 +92,7 @@ impl Context<'_> {
       show_labels,
       terminal_width,
       _stderr_escape: stderr_escape,
-      _stdin_terminal: stdin().is_terminal(),
+      stdin_is_terminal: stdin().is_terminal(),
       _stdout_escape: stdout_escape,
       verbosity,
     })
@@ -461,40 +461,27 @@ impl Context<'_> {
   pub(crate) fn read_multi_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
     if stdin().is_terminal() {
       self.print_prompt(prompt.as_ref());
-      let mut multi_line = String::new();
-      let stdin = stdin();
-      loop {
-        match stdin.read_line(&mut multi_line) {
-          Ok(0) => break,
-          Ok(_) => continue,
-          Err(_) => return Err("error reading line".to_string()),
-        }
-      }
-      Ok(multi_line)
-    } else {
-      let mut multi_line = String::new();
-      let stdin = stdin();
-      loop {
-        match stdin.read_line(&mut multi_line) {
-          Ok(0) => break,
-          Ok(_) => continue,
-          Err(_) => return Err("error reading line".to_string()),
-        }
-      }
-      Ok(multi_line)
     }
+    let mut multi_line = String::new();
+    let stdin = stdin();
+    loop {
+      match stdin.read_line(&mut multi_line) {
+        Ok(0) => break,
+        Ok(_) => continue,
+        Err(_) => return Err("error reading line".to_string()),
+      }
+    }
+    Ok(multi_line)
   }
 
   pub(crate) fn read_single_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
     if stdin().is_terminal() {
-      print!("{}", prompt.as_ref());
-      let _ = stdout().lock().flush();
-      let mut line = String::new();
-      stdin().read_line(&mut line).expect("could not read line");
-      Ok(line.trim().to_string())
-    } else {
-      todo!()
+      self.print_prompt(prompt.as_ref());
     }
+    let _ = stdout().lock().flush();
+    let mut line = String::new();
+    stdin().read_line(&mut line).expect("could not read line");
+    Ok(line.trim().to_string())
   }
 
   pub(crate) fn read_single_line_password(&self, prompt: impl AsRef<str>) -> Result<String, String> {
@@ -504,7 +491,7 @@ impl Context<'_> {
         Err(_) => Err("empty input".to_string()),
       }
     } else {
-      todo!()
+      self.read_single_line(prompt)
     }
   }
 
