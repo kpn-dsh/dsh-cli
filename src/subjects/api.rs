@@ -58,12 +58,12 @@ impl Subject for ApiSubject {
 }
 
 lazy_static! {
-  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, &ApiGet {});
+  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, &ApiDelete {});
   static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, &ApiGet {});
   static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, &ApiGet {});
   static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, &ApiGet {});
   static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiGet {});
-  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiGet {});
+  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiPut {});
   static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
     Box::new(CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Print the open api specification.").set_default_command_executor(&ApiShow {}));
   static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
@@ -106,7 +106,7 @@ fn method_descriptor(method: &'static str, query_selector: &str) -> Option<&'sta
   }
 }
 
-fn create_generic_capability<'a>(method: &'static str, command_executor: &'a ApiGet) -> Box<(dyn Capability + Send + Sync + 'a)> {
+fn create_generic_capability<'a>(method: &'static str, command_executor: &'a (dyn CommandExecutor + Send + Sync)) -> Box<(dyn Capability + Send + Sync + 'a)> {
   let subcommands = match method_descriptors(method) {
     Some(method_descriptors) => method_descriptors
       .iter()
@@ -124,9 +124,7 @@ fn create_generic_capability<'a>(method: &'static str, command_executor: &'a Api
 fn create_generic_capability_command(method_command: &str, selector: &str, method_descriptor: &MethodDescriptor) -> Command {
   let mut command = Command::new(selector.to_string());
   if let Some(description) = method_descriptor.description {
-    command = command
-      .about(description)
-      .long_about(format!("{}\n{} {}", description, method_command.to_ascii_uppercase(), method_descriptor.path));
+    command = command.about(create_about(method_command, method_descriptor, description));
   }
   if !method_descriptor.parameters.is_empty() {
     command = command.args(
@@ -144,6 +142,63 @@ fn create_generic_capability_command(method_command: &str, selector: &str, metho
     )
   }
   command
+}
+
+fn create_about(method_command: &str, method_descriptor: &MethodDescriptor, description: &str) -> String {
+  [
+    Some(description.to_string()),
+    Some(format!("{} {}", method_command.to_ascii_uppercase(), method_descriptor.path)),
+    if method_descriptor.parameters.is_empty() {
+      None
+    } else {
+      Some(
+        method_descriptor
+          .parameters
+          .iter()
+          .map(|(parameter_name, parameter_type, parameter_description)| {
+            format!(
+              "- {}: {}{}",
+              parameter_name,
+              parameter_description.unwrap_or_default(),
+              if parameter_type == &"str" { "".to_string() } else { format!(" ({})", parameter_type) }
+            )
+          })
+          .collect::<Vec<_>>()
+          .join("\n"),
+      )
+    },
+    method_descriptor.body_type.map(|body_type| format!("body type: {}", body_type)),
+  ]
+  .iter()
+  .flatten()
+  .join("\n")
+}
+
+struct ApiDelete {}
+
+#[async_trait]
+impl CommandExecutor for ApiDelete {
+  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    match matches.subcommand() {
+      Some((selector, matches)) => match method_descriptor("delete", selector) {
+        Some(method_descriptor) => {
+          context.print_explanation(format!("DELETE {}", method_descriptor.path));
+          let parameters = method_descriptor
+            .parameters
+            .iter()
+            .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
+            .collect::<Vec<_>>();
+          let start_instant = Instant::now();
+          let response = context.dsh_api_client.as_ref().unwrap().delete(selector, &parameters).await?;
+          context.print_execution_time(start_instant);
+          context.print_serializable(response);
+        }
+        None => unreachable!(),
+      },
+      None => unreachable!(),
+    }
+    Ok(())
+  }
 }
 
 struct ApiGet {}
@@ -181,5 +236,39 @@ impl CommandExecutor for ApiShow {
     context.print_explanation("print the open api specification");
     context.print(DshApiClient::openapi_spec());
     Ok(())
+  }
+}
+
+struct ApiPut {}
+
+#[async_trait]
+impl CommandExecutor for ApiPut {
+  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    match matches.subcommand() {
+      Some((selector, matches)) => match method_descriptor("put", selector) {
+        Some(method_descriptor) => {
+          context.print_explanation(format!("PUT {}", method_descriptor.path));
+          let parameters = method_descriptor
+            .parameters
+            .iter()
+            .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
+            .collect::<Vec<_>>();
+          let body =
+            if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
+          if context.dry_run {
+            context.print_warning("dry-run mode, nothing updated");
+            Ok(())
+          } else {
+            let start_instant = Instant::now();
+            context.dsh_api_client.as_ref().unwrap().put(selector, &parameters, body).await?;
+            context.print_execution_time(start_instant);
+            context.print_outcome("updated");
+            Ok(())
+          }
+        }
+        None => unreachable!(),
+      },
+      None => unreachable!(),
+    }
   }
 }
