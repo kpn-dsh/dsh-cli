@@ -43,20 +43,6 @@ impl FlagType {
       Value => "value",
     }
   }
-
-  pub(crate) fn shortcut(&self) -> Option<char> {
-    match &self {
-      All => Some('a'),
-      AllocationStatus => Some('s'),
-      Configuration => Some('c'),
-      Ids => Some('i'),
-      Properties => Some('p'),
-      System => None,
-      Tasks => None,
-      Usage => Some('u'),
-      Value => Some('v'),
-    }
-  }
 }
 
 pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option<&str>) -> Arg {
@@ -111,9 +97,6 @@ fn value_flag(subject: &str, long_help: Option<&str>) -> Arg {
 
 fn create_clap_flag(flag_type: FlagType, help: String, long_help: Option<&str>) -> Arg {
   let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help);
-  if let Some(shortcut) = flag_type.shortcut() {
-    flag_arg = flag_arg.short(shortcut)
-  }
   if let Some(long_help) = long_help {
     flag_arg = flag_arg.long_help(long_help.to_string());
   }
