@@ -10,9 +10,11 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 * Support for Windows.
 * Support DSH open api specification version 1.9.0.
+* Added logging.
 
 ### Changed
 
+* Improved user interface.
 * Re-organized documentation.
 
 ## [0.3.0] - 2024-12-20
