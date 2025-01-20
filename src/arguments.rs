@@ -84,6 +84,7 @@ pub(crate) fn dry_run_argument() -> Arg {
           environment variable DSH_CLI_DRY_RUN or in the settings file.",
     )
     .conflicts_with(FORCE_ARGUMENT)
+    .global(true)
 }
 
 pub(crate) fn force_argument() -> Arg {
@@ -95,6 +96,7 @@ pub(crate) fn force_argument() -> Arg {
       "When this option is provided any change, update and delete actions \
           will be executed without asking for confirmation.",
     )
+    .global(true)
 }
 
 pub(crate) fn guid_argument() -> Arg {
@@ -113,6 +115,7 @@ pub(crate) fn guid_argument() -> Arg {
           Note that if the tenant is already provided, the target settings file will also be \
           checked for the guid value.",
     )
+    .global(true)
 }
 
 pub(crate) fn get_guid_argument_or_prompt(matches: &ArgMatches) -> Result<u16, String> {
@@ -202,6 +205,7 @@ pub(crate) fn platform_argument() -> Arg {
           The target platform names have the following shortcuts, \
           respectively: nplz, poc, prod, prodlz, prodls and prodaz.",
     )
+    .global(true)
 }
 
 pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
@@ -221,6 +225,7 @@ pub(crate) fn quiet_argument() -> Arg {
       "When this option is provided the tool will run in quiet mode, \
           meaning that no output will be produced to the terminal (stdout and stderr).",
     )
+    .global(true)
 }
 
 pub(crate) fn set_verbosity_argument() -> Arg {
@@ -236,6 +241,7 @@ pub(crate) fn set_verbosity_argument() -> Arg {
     it will set the verbosity level. \
     The default verbosity setting is 'low'.",
     )
+    .global(true)
 }
 
 pub(crate) fn show_execution_time_argument() -> Arg {
@@ -286,6 +292,7 @@ pub(crate) fn tenant_argument() -> Arg {
           the tenant should be specified via the environment variable DSH_CLI_TENANT,\
           as a default setting in the settings file, or else the user will be prompted.",
     )
+    .global(true)
 }
 
 pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
