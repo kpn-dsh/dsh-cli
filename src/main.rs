@@ -16,12 +16,12 @@ use crate::arguments::{
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::settings::{get_password_from_keyring, read_settings, read_target, Settings};
+use crate::settings::{get_password_from_keyring, read_settings, read_target, read_target_and_password, Settings};
 use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::application::APPLICATION_SUBJECT;
 use crate::subjects::platform::PLATFORM_SUBJECT;
-use clap::builder::styling;
+use clap::builder::{styling, Styles};
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
@@ -120,12 +120,6 @@ async fn inner_main() -> DshCliResult {
 
   let settings = read_settings(None)?;
 
-  let styles = styling::Styles::styled()
-    .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
-    .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
-    .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
-    .placeholder(styling::AnsiColor::Cyan.on_default());
-
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
     API_SUBJECT.as_ref(),
     APP_SUBJECT.as_ref(),
@@ -163,41 +157,7 @@ async fn inner_main() -> DshCliResult {
     }
   }
 
-  let mut command = Command::new(APPLICATION_NAME)
-    .about(ABOUT)
-    .author(AUTHOR)
-    .long_about(LONG_ABOUT)
-    .after_help(AFTER_HELP)
-    .args(vec![
-      platform_argument(),
-      tenant_argument(),
-      guid_argument(),
-      password_file_argument(),
-      output_format_argument(),
-      set_verbosity_argument(),
-      dry_run_argument(),
-      force_argument(),
-      matching_style_argument(),
-      no_escape_argument(),
-      quiet_argument(),
-      show_execution_time_argument(),
-      terminal_width_argument(),
-      generate_autocomplete_file_argument(),
-    ])
-    .subcommand_value_name("SUBJECT/COMMAND")
-    .subcommand_help_heading("Subjects/commands")
-    .arg_required_else_help(true)
-    .max_term_width(120)
-    .hide_possible_values(false)
-    .styles(styles)
-    .subcommands(clap_commands)
-    .version(VERSION)
-    .long_version(format!(
-      "version: {}\ndsh-api library version: {}\ndsh rest api version: {}",
-      VERSION,
-      crate_version(),
-      api_version()
-    ));
+  let mut command = create_command(&clap_commands);
 
   let matches = command.clone().get_matches();
 
@@ -235,6 +195,49 @@ async fn inner_main() -> DshCliResult {
     None => return Err("unexpected error, no subcommand".to_string()),
   };
   Ok(())
+}
+
+fn create_command(clap_commands: &Vec<Command>) -> Command {
+  let styles = Styles::styled()
+    .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
+    .placeholder(styling::AnsiColor::Cyan.on_default());
+  Command::new(APPLICATION_NAME)
+    .about(ABOUT)
+    .author(AUTHOR)
+    .long_about(LONG_ABOUT)
+    .after_help(AFTER_HELP)
+    .args(vec![
+      platform_argument(),
+      tenant_argument(),
+      guid_argument(),
+      password_file_argument(),
+      output_format_argument(), // TODO Should this one be at this level?
+      set_verbosity_argument(),
+      dry_run_argument(),
+      force_argument(),
+      matching_style_argument(), // TODO Should this one be at this level?
+      no_escape_argument(),      // TODO Should this one be at this level?
+      quiet_argument(),
+      show_execution_time_argument(), // TODO Should this one be at this level?
+      terminal_width_argument(),      // TODO Should this one be at this level?
+      generate_autocomplete_file_argument(),
+    ])
+    .subcommand_value_name("SUBJECT/COMMAND")
+    .subcommand_help_heading("Subjects/commands")
+    .arg_required_else_help(true)
+    .max_term_width(120)
+    .hide_possible_values(false)
+    .styles(styles)
+    .subcommands(clap_commands)
+    .version(VERSION)
+    .long_version(format!(
+      "version: {}\ndsh-api library version: {}\ndsh rest api version: {}",
+      VERSION,
+      crate_version(),
+      api_version()
+    ))
 }
 
 async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiClientFactory, String> {
@@ -378,14 +381,14 @@ fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> 
 /// An `Ok<String>` containing the password, or an `Err<String>`.
 fn get_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
   match matches.get_one::<PathBuf>(PASSWORD_FILE_ARGUMENT) {
-    Some(password_file) => read_password_file(password_file),
+    Some(password_file_from_arg) => read_password_file(password_file_from_arg),
     None => match std::env::var(ENV_VAR_PASSWORD_FILE) {
-      Ok(password_file) => read_password_file(password_file),
+      Ok(password_file_from_env) => read_password_file(password_file_from_env),
       Err(_) => match std::env::var(ENV_VAR_PASSWORD) {
         Ok(password_from_env_var) => Ok(password_from_env_var),
         Err(_) => match get_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
           Some(password_from_keyring) => Ok(password_from_keyring),
-          None => match read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())?.and_then(|target| target.password) {
+          None => match read_target_and_password(dsh_api_tenant.platform(), dsh_api_tenant.name())?.and_then(|target| target.password) {
             Some(password_from_target) => Ok(password_from_target),
             None => {
               if stdin().is_terminal() {
@@ -413,19 +416,6 @@ fn read_password_file<T: AsRef<Path>>(password_file: T) -> Result<String, String
     }
     Err(_) => Err(format!("password file '{}' could not be read", password_file.as_ref().to_string_lossy())),
   }
-}
-
-pub(crate) fn read_multi_line() -> Result<String, String> {
-  let mut multi_line = String::new();
-  let stdin = stdin();
-  loop {
-    match stdin.read_line(&mut multi_line) {
-      Ok(0) => break,
-      Ok(_) => continue,
-      Err(_) => return Err("error reading line".to_string()),
-    }
-  }
-  Ok(multi_line)
 }
 
 pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String> {
