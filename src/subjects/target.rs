@@ -13,7 +13,7 @@ use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
 use crate::subject::Subject;
-use crate::{read_single_line_password, DshCliResult};
+use crate::DshCliResult;
 
 pub(crate) struct TargetSubject {}
 
@@ -225,7 +225,7 @@ impl CommandExecutor for TargetNew {
       ));
     };
     let guid = get_guid_argument_or_prompt(matches)?;
-    let password = read_single_line_password("enter password: ")?;
+    let password = context.read_single_line_password("enter password: ")?;
     let target = Target::new(platform, tenant, guid, Some(password))?;
     if context.dry_run {
       context.print_warning(format!("dry-run mode, target {} not created", target));

@@ -1,6 +1,6 @@
 use crate::arguments::{
-  Verbosity, DRY_RUN_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT, TERMINAL_WIDTH_ARGUMENT,
-  VERBOSITY_ARGUMENT,
+  Verbosity, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT,
+  TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::formatters::OutputFormat;
 use crate::settings::{read_settings, Settings};
@@ -8,6 +8,7 @@ use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
+use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
@@ -170,7 +171,7 @@ impl Context<'_> {
   /// 1. Try flag `--force`
   /// 1. Default to `false`
   fn force(matches: &ArgMatches, _settings: Option<&Settings>) -> bool {
-    matches.get_flag(DRY_RUN_ARGUMENT)
+    matches.get_flag(FORCE_ARGUMENT)
   }
 
   /// Gets matching_style context value
@@ -453,6 +454,57 @@ impl Context<'_> {
   pub(crate) fn print_execution_time(&self, start_instant: Instant) {
     if !self.quiet && (self.show_execution_time || self.verbosity == Verbosity::High) {
       eprintln!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+    }
+  }
+
+  // TODO Needs better testing
+  pub(crate) fn read_multi_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
+    if stdin().is_terminal() {
+      self.print_prompt(prompt.as_ref());
+      let mut multi_line = String::new();
+      let stdin = stdin();
+      loop {
+        match stdin.read_line(&mut multi_line) {
+          Ok(0) => break,
+          Ok(_) => continue,
+          Err(_) => return Err("error reading line".to_string()),
+        }
+      }
+      Ok(multi_line)
+    } else {
+      let mut multi_line = String::new();
+      let stdin = stdin();
+      loop {
+        match stdin.read_line(&mut multi_line) {
+          Ok(0) => break,
+          Ok(_) => continue,
+          Err(_) => return Err("error reading line".to_string()),
+        }
+      }
+      Ok(multi_line)
+    }
+  }
+
+  pub(crate) fn read_single_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
+    if stdin().is_terminal() {
+      print!("{}", prompt.as_ref());
+      let _ = stdout().lock().flush();
+      let mut line = String::new();
+      stdin().read_line(&mut line).expect("could not read line");
+      Ok(line.trim().to_string())
+    } else {
+      todo!()
+    }
+  }
+
+  pub(crate) fn read_single_line_password(&self, prompt: impl AsRef<str>) -> Result<String, String> {
+    if stdin().is_terminal() {
+      match prompt_password(prompt.as_ref()) {
+        Ok(line) => Ok(line.trim().to_string()),
+        Err(_) => Err("empty input".to_string()),
+      }
+    } else {
+      todo!()
     }
   }
 

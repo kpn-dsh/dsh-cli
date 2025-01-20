@@ -12,7 +12,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::Subject;
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
-use crate::{read_multi_line, read_single_line_password, DshCliResult};
+use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::types::Secret;
@@ -106,6 +106,8 @@ lazy_static! {
 
 struct SecretCreate {}
 
+// TODO When too many secrets: 400 status with message: limit_exceeded: secretcount the quota of 40 secrets is full
+
 #[async_trait]
 impl CommandExecutor for SecretCreate {
   async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
@@ -115,8 +117,7 @@ impl CommandExecutor for SecretCreate {
       if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_ok() {
         return Err(format!("secret '{}' already exists", secret_id));
       }
-      context.print_prompt("enter multi-line secret (terminate input with ctrl-d after last line)");
-      let value = read_multi_line()?;
+      let value = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
       let secret = Secret { name: secret_id.clone(), value };
       if context.dry_run {
         context.print_warning("dry-run mode, secret not created");
@@ -131,7 +132,7 @@ impl CommandExecutor for SecretCreate {
       if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_ok() {
         return Err(format!("secret '{}' already exists", secret_id));
       }
-      let value = read_single_line_password("enter secret: ")?;
+      let value = context.read_single_line_password("enter secret: ")?;
       let secret = Secret { name: secret_id.clone(), value };
       if context.dry_run {
         context.print_warning("dry-run mode, secret not created");

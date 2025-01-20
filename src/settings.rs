@@ -188,7 +188,7 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
   }
 }
 
-/// # Read target
+/// # Read target and password
 ///
 /// This function will read the target parameters from the target settings file (if it exists)
 /// and the target password from the keyring.
@@ -204,12 +204,39 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
 ///   but the `password` field can be empty if there was no matching keyring entry
 /// * `Ok(None)` - if the target setting was not available
 /// * `Err(message)` - if an error occurred
-pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
+pub(crate) fn read_target_and_password(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
   let target_file = target_file(platform, tenant)?;
   match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
     Some(target) => {
       log::debug!("read target file '{}'", target_file.to_string_lossy());
       Ok(Some(Target { password: get_password_from_keyring(platform, tenant)?, ..target }))
+    }
+    None => {
+      log::debug!("could not read target file '{}'", target_file.to_string_lossy());
+      Ok(None)
+    }
+  }
+}
+
+/// # Read target
+///
+/// This function will read the target parameters from the target settings file (if it exists).
+/// The `password` field of the returned `Target` will always be `None`.
+///
+/// ## Parameters
+/// * `platform` - target platform
+/// * `tenant` - target tenant name
+///
+/// ## Returns
+/// * `Ok(Some(target))` - if the target setting was available a `Target` will be returned.
+/// * `Ok(None)` - if the target setting was not available
+/// * `Err(message)` - if an error occurred
+pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
+  let target_file = target_file(platform, tenant)?;
+  match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
+    Some(target) => {
+      log::debug!("read target file '{}'", target_file.to_string_lossy());
+      Ok(Some(Target { password: None, ..target }))
     }
     None => {
       log::debug!("could not read target file '{}'", target_file.to_string_lossy());

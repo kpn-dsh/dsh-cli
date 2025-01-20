@@ -21,7 +21,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::Subject;
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
-use crate::{read_single_line, DshCliResult};
+use crate::DshCliResult;
 
 pub(crate) struct VolumeSubject {}
 
@@ -116,7 +116,7 @@ impl CommandExecutor for VolumeCreate {
     if context.dsh_api_client.as_ref().unwrap().get_volume(&volume_id).await.is_ok() {
       return Err(format!("volume '{}' already exists", volume_id));
     }
-    let line = read_single_line("enter size in gigabytes: ")?;
+    let line = context.read_single_line("enter size in gigabytes: ")?;
     let size_gi_b = line.parse::<i64>().map_err(|_| format!("could not parse '{}' as a valid integer", line))?;
     let volume = Volume { size_gi_b };
     if context.dry_run {
