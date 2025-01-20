@@ -84,7 +84,7 @@ const PATCH_COMMAND: &str = "patch";
 const POST_COMMAND: &str = "post";
 const PUT_COMMAND: &str = "put";
 
-fn get_method_descriptors(method: &str) -> Option<&'static [(&str, MethodDescriptor)]> {
+fn method_descriptors(method: &str) -> Option<&'static [(&str, MethodDescriptor)]> {
   match method {
     DELETE_COMMAND => Some(&DELETE_METHODS),
     GET_COMMAND => Some(&GET_METHODS),
@@ -96,8 +96,8 @@ fn get_method_descriptors(method: &str) -> Option<&'static [(&str, MethodDescrip
   }
 }
 
-fn get_method_descriptor(method: &'static str, query_selector: &str) -> Option<&'static MethodDescriptor> {
-  match get_method_descriptors(method) {
+fn method_descriptor(method: &'static str, query_selector: &str) -> Option<&'static MethodDescriptor> {
+  match method_descriptors(method) {
     Some(method_descriptors) => method_descriptors
       .iter()
       .find_or_first(|(selector, _)| selector == &query_selector)
@@ -107,7 +107,7 @@ fn get_method_descriptor(method: &'static str, query_selector: &str) -> Option<&
 }
 
 fn create_generic_capability<'a>(method: &'static str, command_executor: &'a ApiGet) -> Box<(dyn Capability + Send + Sync + 'a)> {
-  let subcommands = match get_method_descriptors(method) {
+  let subcommands = match method_descriptors(method) {
     Some(method_descriptors) => method_descriptors
       .iter()
       .map(|(selector, method_descriptor)| create_generic_capability_command(method, selector, method_descriptor))
@@ -134,7 +134,7 @@ fn create_generic_capability_command(method_command: &str, selector: &str, metho
         .parameters
         .iter()
         .map(|(parameter_name, _, description)| {
-          let mut arg = Arg::new(parameter_name).value_name(parameter_name.to_ascii_uppercase().to_string());
+          let mut arg = Arg::new(parameter_name).value_name(parameter_name.to_ascii_uppercase().to_string()).required(true);
           if let Some(description) = description {
             arg = arg.help(description);
           }
@@ -152,10 +152,14 @@ struct ApiGet {}
 impl CommandExecutor for ApiGet {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     match matches.subcommand() {
-      Some((selector, matches)) => match get_method_descriptor("get", selector) {
+      Some((selector, matches)) => match method_descriptor("get", selector) {
         Some(method_descriptor) => {
           context.print_explanation(format!("GET {}", method_descriptor.path));
-          let parameters = matches.ids().map(|id| matches.get_one::<String>(id.as_str()).unwrap().as_str()).collect::<Vec<_>>();
+          let parameters = method_descriptor
+            .parameters
+            .iter()
+            .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
+            .collect::<Vec<_>>();
           let start_instant = Instant::now();
           let response = context.dsh_api_client.as_ref().unwrap().get(selector, &parameters).await?;
           context.print_execution_time(start_instant);
