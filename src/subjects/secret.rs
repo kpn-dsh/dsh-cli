@@ -1,6 +1,7 @@
 use crate::arguments::target_argument;
 use crate::capability::{
   Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
+  UPDATE_COMMAND, UPDATE_COMMAND_PAIR,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -57,6 +58,7 @@ impl Subject for SecretSubject {
       DELETE_COMMAND => Some(SECRET_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SECRET_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(SECRET_SHOW_CAPABILITY.as_ref()),
+      UPDATE_COMMAND => Some(SECRET_UPDATE_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -100,48 +102,61 @@ lazy_static! {
       .add_command_executors(vec![(FlagType::Usage, &SecretShowUsage {}, None), (FlagType::Value, &SecretShowValue {}, None),])
       .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
   );
+  static ref SECRET_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(UPDATE_COMMAND_PAIR, "Update secret")
+      .set_long_about("Update a secret.")
+      .set_default_command_executor(&SecretUpdate {})
+      .add_target_argument(target_argument(SECRET_SUBJECT_TARGET, None))
+      .add_modifier_flag(ModifierFlagType::MultiLine, None),
+  );
   static ref SECRET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![SECRET_CREATE_CAPABILITY.as_ref(), SECRET_DELETE_CAPABILITY.as_ref(), SECRET_LIST_CAPABILITY.as_ref(), SECRET_SHOW_CAPABILITY.as_ref()];
+    vec![SECRET_CREATE_CAPABILITY.as_ref(), SECRET_DELETE_CAPABILITY.as_ref(), SECRET_LIST_CAPABILITY.as_ref(), SECRET_SHOW_CAPABILITY.as_ref(), SECRET_UPDATE_CAPABILITY.as_ref()];
 }
 
-struct SecretCreate {}
-
 // TODO When too many secrets: 400 status with message: limit_exceeded: secretcount the quota of 40 secrets is full
+
+struct SecretCreate {}
 
 #[async_trait]
 impl CommandExecutor for SecretCreate {
   async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    if matches.get_flag(ModifierFlagType::MultiLine.id()) {
-      let secret_id = target.unwrap_or_else(|| unreachable!());
-      context.print_explanation(format!("create new multi-line secret '{}'", secret_id));
-      if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_ok() {
-        return Err(format!("secret '{}' already exists", secret_id));
-      }
-      let value = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
-      let secret = Secret { name: secret_id.clone(), value };
-      if context.dry_run {
-        context.print_warning("dry-run mode, secret not created");
-      } else {
-        context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
-        context.print_outcome(format!("secret {} created", secret_id));
-      }
-      Ok(())
-    } else {
-      let secret_id = target.unwrap_or_else(|| unreachable!());
-      context.print_explanation(format!("create new single line secret '{}'", secret_id));
-      if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_ok() {
-        return Err(format!("secret '{}' already exists", secret_id));
-      }
-      let value = context.read_single_line_password("enter secret: ")?;
-      let secret = Secret { name: secret_id.clone(), value };
-      if context.dry_run {
-        context.print_warning("dry-run mode, secret not created");
-      } else {
-        context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
-        context.print_outcome(format!("secret {} created", secret_id));
-      }
-      Ok(())
+    let secret_id = target.unwrap_or_else(|| unreachable!());
+    if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_ok() {
+      return Err(format!("secret '{}' already exists", secret_id));
     }
+    if context.stdin_is_terminal {
+      if matches.get_flag(ModifierFlagType::MultiLine.id()) {
+        context.print_explanation(format!("create new multi-line secret '{}'", secret_id));
+        let secret = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
+        let secret = Secret { name: secret_id.clone(), value: secret };
+        if context.dry_run {
+          context.print_warning("dry-run mode, secret not created");
+        } else {
+          context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
+          context.print_outcome(format!("secret {} created", secret_id));
+        }
+      } else {
+        context.print_explanation(format!("create new single line secret '{}'", secret_id));
+        let secret = context.read_single_line_password("enter secret: ")?;
+        let secret = Secret { name: secret_id.clone(), value: secret };
+        if context.dry_run {
+          context.print_warning("dry-run mode, secret not created");
+        } else {
+          context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
+          context.print_outcome(format!("secret {} created", secret_id));
+        }
+      }
+    } else {
+      let secret = context.read_multi_line("")?;
+      let secret = Secret { name: secret_id.clone(), value: secret };
+      if context.dry_run {
+        context.print_warning("dry-run mode, secret not created");
+      } else {
+        context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
+        context.print_outcome(format!("secret {} created", secret_id));
+      }
+    }
+    Ok(())
   }
 }
 
@@ -246,7 +261,8 @@ impl CommandExecutor for SecretListIds {
       .filter(|id| !secret::is_system_secret(id))
       .collect::<Vec<_>>();
     context.print_execution_time(start_instant);
-    let mut formatter = IdsFormatter::new("secret id", context);
+    let header = format!("secret ids ({})", non_system_secrets.len());
+    let mut formatter = IdsFormatter::new(&header, context);
     formatter.push_target_ids(non_system_secrets.as_slice());
     formatter.print()?;
     Ok(())
@@ -330,6 +346,48 @@ impl CommandExecutor for SecretShowValue {
     let secret = context.dsh_api_client.as_ref().unwrap().get_secret(secret_id.as_str()).await?;
     context.print_execution_time(start_instant);
     context.print(secret);
+    Ok(())
+  }
+}
+
+struct SecretUpdate {}
+
+#[async_trait]
+impl CommandExecutor for SecretUpdate {
+  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let secret_id = target.unwrap_or_else(|| unreachable!());
+    if context.dsh_api_client.as_ref().unwrap().get_secret(&secret_id).await.is_err() {
+      return Err(format!("secret '{}' does not exist", secret_id));
+    }
+    if context.stdin_is_terminal {
+      if matches.get_flag(ModifierFlagType::MultiLine.id()) {
+        context.print_explanation(format!("update multi-line secret '{}'", secret_id));
+        let secret = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
+        if context.dry_run {
+          context.print_warning("dry-run mode, secret not updated");
+        } else {
+          context.dsh_api_client.as_ref().unwrap().update_secret(secret_id.as_str(), secret).await?;
+          context.print_outcome(format!("secret {} updated", secret_id));
+        }
+      } else {
+        context.print_explanation(format!("update single line secret '{}'", secret_id));
+        let secret = context.read_single_line_password("enter secret: ")?;
+        if context.dry_run {
+          context.print_warning("dry-run mode, secret not updated");
+        } else {
+          context.dsh_api_client.as_ref().unwrap().update_secret(secret_id.as_str(), secret).await?;
+          context.print_outcome(format!("secret {} updated", secret_id));
+        }
+      }
+    } else {
+      let secret = context.read_multi_line("")?;
+      if context.dry_run {
+        context.print_warning("dry-run mode, secret not updated");
+      } else {
+        context.dsh_api_client.as_ref().unwrap().update_secret(secret_id.as_str(), secret).await?;
+        context.print_outcome(format!("secret {} updated", secret_id));
+      }
+    }
     Ok(())
   }
 }
