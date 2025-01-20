@@ -44,6 +44,6 @@ tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "macros"] }
 toml = { version = "0.8", features = ["display"] }
 
 # When publishing, alway use the crates.io dependency.
-dsh_api = "0.3.1"
+#dsh_api = { version = "0.3.2", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api.
-#dsh_api = { path = "../dsh-api/dsh-api" }
+dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
