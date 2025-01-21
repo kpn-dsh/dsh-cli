@@ -10,8 +10,12 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 * Support for Windows.
 * Support DSH open api specification version 1.9.0.
+* Added generic api calls.
+* Added capabilities for piping and redirecting.
 * Added logging.
 * Secret update capability.
+* Token capabilities.
+* Capability to open platform web applications.
 
 ### Changed
 
