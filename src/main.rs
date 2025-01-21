@@ -1,5 +1,6 @@
 #![doc(html_favicon_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
 #![doc(html_logo_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+extern crate core;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -40,6 +41,7 @@ use subjects::secret::SECRET_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
 // #[cfg(feature = "stream")]
 // use subjects::stream::STREAM_SUBJECT;
+use crate::subjects::token::TOKEN_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
@@ -135,6 +137,7 @@ async fn inner_main() -> DshCliResult {
     SECRET_SUBJECT.as_ref(),
     // #[cfg(feature = "stream")]
     // STREAM_SUBJECT.as_ref(),
+    TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
     VOLUME_SUBJECT.as_ref(),
@@ -275,7 +278,7 @@ fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Dsh
     None => match std::env::var(ENV_VAR_PLATFORM) {
       Ok(platform_name_from_env_var) => DshPlatform::try_from(platform_name_from_env_var.as_str()),
       Err(_) => match settings.and_then(|settings| settings.default_platform.clone()) {
-        Some(platform_name_from_settings) => DshPlatform::try_from(platform_name_from_settings.as_str()),
+        Some(default_platform_name_from_settings) => DshPlatform::try_from(default_platform_name_from_settings.as_str()),
         None => {
           if stdin().is_terminal() {
             DshPlatform::try_from(read_single_line("platform name: ")?.as_str())
