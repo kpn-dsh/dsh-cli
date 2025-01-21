@@ -61,8 +61,8 @@ lazy_static! {
   static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, &ApiDelete {});
   static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, &ApiGet {});
   static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, &ApiGet {});
-  static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, &ApiGet {});
-  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiGet {});
+  static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, &ApiPatch {});
+  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiPost {});
   static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiPut {});
   static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
     Box::new(CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Print the open api specification.").set_default_command_executor(&ApiShow {}));
@@ -122,7 +122,7 @@ fn create_generic_capability<'a>(method: &'static str, command_executor: &'a (dy
 }
 
 fn create_generic_capability_command(method_command: &str, selector: &str, method_descriptor: &MethodDescriptor) -> Command {
-  let mut command = Command::new(selector.to_string());
+  let mut command = Command::new(selector.to_string()).alias(method_descriptor.path);
   if let Some(description) = method_descriptor.description {
     command = command.about(create_about(method_command, method_descriptor, description));
   }
@@ -183,15 +183,24 @@ impl CommandExecutor for ApiDelete {
       Some((selector, matches)) => match method_descriptor("delete", selector) {
         Some(method_descriptor) => {
           context.print_explanation(format!("DELETE {}", method_descriptor.path));
-          let parameters = method_descriptor
-            .parameters
-            .iter()
-            .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-            .collect::<Vec<_>>();
-          let start_instant = Instant::now();
-          let response = context.dsh_api_client.as_ref().unwrap().delete(selector, &parameters).await?;
-          context.print_execution_time(start_instant);
-          context.print_serializable(response);
+          if context.confirmed("type 'yes' to delete: ")? {
+            if context.dry_run {
+              context.print_warning("dry-run mode, nothing deleted");
+            } else {
+              let parameters = method_descriptor
+                .parameters
+                .iter()
+                .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
+                .collect::<Vec<_>>();
+              let start_instant = Instant::now();
+              let response = context.dsh_api_client.as_ref().unwrap().delete(selector, &parameters).await?;
+              context.print_execution_time(start_instant);
+              context.print_serializable(response);
+              context.print_outcome("deleted");
+            }
+          } else {
+            context.print_outcome("cancelled, nothing deleted");
+          }
         }
         None => unreachable!(),
       },
@@ -228,14 +237,71 @@ impl CommandExecutor for ApiGet {
   }
 }
 
-struct ApiShow {}
+struct ApiPatch {}
 
 #[async_trait]
-impl CommandExecutor for ApiShow {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("print the open api specification");
-    context.print(DshApiClient::openapi_spec());
-    Ok(())
+impl CommandExecutor for ApiPatch {
+  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    match matches.subcommand() {
+      Some((selector, matches)) => match method_descriptor("patch", selector) {
+        Some(method_descriptor) => {
+          context.print_explanation(format!("PATCH {}", method_descriptor.path));
+          let parameters = method_descriptor
+            .parameters
+            .iter()
+            .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
+            .collect::<Vec<_>>();
+          let body =
+            if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
+          if context.dry_run {
+            context.print_warning("dry-run mode, nothing patched");
+            Ok(())
+          } else {
+            let start_instant = Instant::now();
+            context.dsh_api_client.as_ref().unwrap().patch(selector, &parameters, body).await?;
+            context.print_execution_time(start_instant);
+            context.print_outcome("patched");
+            Ok(())
+          }
+        }
+        None => unreachable!(),
+      },
+      None => unreachable!(),
+    }
+  }
+}
+
+struct ApiPost {}
+
+#[async_trait]
+impl CommandExecutor for ApiPost {
+  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    match matches.subcommand() {
+      Some((selector, matches)) => match method_descriptor("post", selector) {
+        Some(method_descriptor) => {
+          context.print_explanation(format!("POST {}", method_descriptor.path));
+          let parameters = method_descriptor
+            .parameters
+            .iter()
+            .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
+            .collect::<Vec<_>>();
+          let body =
+            if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
+          if context.dry_run {
+            context.print_warning("dry-run mode, nothing posted");
+            Ok(())
+          } else {
+            let start_instant = Instant::now();
+            context.dsh_api_client.as_ref().unwrap().post(selector, &parameters, body).await?;
+            context.print_execution_time(start_instant);
+            context.print_outcome("posted");
+            Ok(())
+          }
+        }
+        None => unreachable!(),
+      },
+      None => unreachable!(),
+    }
   }
 }
 
@@ -256,13 +322,13 @@ impl CommandExecutor for ApiPut {
           let body =
             if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
           if context.dry_run {
-            context.print_warning("dry-run mode, nothing updated");
+            context.print_warning("dry-run mode, nothing put");
             Ok(())
           } else {
             let start_instant = Instant::now();
             context.dsh_api_client.as_ref().unwrap().put(selector, &parameters, body).await?;
             context.print_execution_time(start_instant);
-            context.print_outcome("updated");
+            context.print_outcome("put");
             Ok(())
           }
         }
@@ -270,5 +336,16 @@ impl CommandExecutor for ApiPut {
       },
       None => unreachable!(),
     }
+  }
+}
+
+struct ApiShow {}
+
+#[async_trait]
+impl CommandExecutor for ApiShow {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+    context.print_explanation("print the open api specification");
+    context.print(DshApiClient::openapi_spec());
+    Ok(())
   }
 }
