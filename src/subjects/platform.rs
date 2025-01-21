@@ -1,4 +1,4 @@
-use crate::arguments::{get_platform_argument_or_prompt, platform_argument, service_argument, target_argument, tenant_argument, TENANT_ARGUMENT};
+use crate::arguments::{service_argument, target_argument, tenant_argument, SERVICE_ARGUMENT, TENANT_ARGUMENT};
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, OPEN_COMMAND, OPEN_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -6,9 +6,10 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::Subject;
-use crate::DshCliResult;
+use crate::{read_single_line, DshCliResult};
+use arboard::Clipboard;
 use async_trait::async_trait;
-use clap::ArgMatches;
+use clap::{Arg, ArgMatches, Command};
 use dsh_api::platform::{DshPlatform, DSH_PLATFORMS};
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -32,7 +33,7 @@ impl Subject for PlatformSubject {
   }
 
   fn requires_dsh_api_client(&self) -> bool {
-    false
+    true
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -49,6 +50,13 @@ impl Subject for PlatformSubject {
   }
 }
 
+const OPEN_TARGET_CONSOLE: &str = "console";
+const OPEN_TARGET_MONITORING: &str = "monitoring";
+const OPEN_TARGET_SERVICE: &str = "service";
+const OPEN_TARGET_SWAGGER: &str = "swagger";
+
+struct PLatformList {}
+
 lazy_static! {
   static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND_PAIR, "List platforms")
@@ -59,7 +67,15 @@ lazy_static! {
     CapabilityBuilder::new(OPEN_COMMAND_PAIR, "Open console or web application")
       .set_long_about("Open the DSH console, monitoring page or the web application for the tenant or a service.")
       .set_default_command_executor(&PlatformOpen {})
-      .add_extra_arguments(vec![platform_argument(), service_argument(), tenant_argument()])
+      .add_subcommands(vec![
+        Command::new(OPEN_TARGET_CONSOLE).about("Open the console for the platform and tenant"),
+        Command::new(OPEN_TARGET_MONITORING).about("Open the monitoring web application for the platform and tenant"),
+        Command::new(OPEN_TARGET_SERVICE)
+          .about("Open the console for the platform, tenant and service")
+          .arg(Arg::new(SERVICE_ARGUMENT)),
+        Command::new(OPEN_TARGET_SWAGGER).about("Open the swagger web application for the platform and tenant"),
+      ])
+      .add_extra_arguments(vec![service_argument()])
   );
   static ref PLATFORM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show platform data")
@@ -71,8 +87,6 @@ lazy_static! {
   static ref PLATFORM__CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![PLATFORM_LIST_CAPABILITY.as_ref(), PLATFORM_OPEN_CAPABILITY.as_ref(), PLATFORM_SHOW_CAPABILITY.as_ref()];
 }
-
-struct PLatformList {}
 
 #[async_trait]
 impl CommandExecutor for PLatformList {
@@ -90,23 +104,86 @@ struct PlatformOpen {}
 
 #[async_trait]
 impl CommandExecutor for PlatformOpen {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = get_platform_argument_or_prompt(matches)?;
-    match matches.get_one::<String>(TENANT_ARGUMENT) {
-      Some(tenant) => {
-        let url = platform.console_url_for_tenant(tenant);
-        context.print_explanation(format!("open console for tenant {}@{} at url {}", tenant, platform, url));
-        if let Err(error) = open::that(url) {
-          context.print_error(format!("could not run browser ({})", error));
+  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    match matches.subcommand() {
+      Some((target, arg_matches)) => {
+        let platform = context.platform.clone().ok_or("platform undefined")?;
+        match target {
+          OPEN_TARGET_CONSOLE => match &context.tenant_name {
+            Some(tenant_name) => {
+              let url = platform.console_url_for_tenant(tenant_name.clone());
+              context.print_explanation(format!("open console for tenant {}@{} at url {}", tenant_name, platform, url));
+              if let Err(error) = open::that(url) {
+                context.print_error(format!("could not open browser ({})", error));
+              }
+            }
+            None => {
+              let url = platform.console_url();
+              context.print_explanation(format!("open console for platform '{}' at url {}", platform, url));
+              if let Err(error) = open::that(url) {
+                context.print_error(format!("could not open browser ({})", error));
+              }
+            }
+          },
+          OPEN_TARGET_MONITORING => match &context.tenant_name {
+            Some(tenant_name) => {
+              let url = format!("https://{}/dashboards", platform.monitoring_domain_for_tenant(tenant_name.clone()));
+              context.print_explanation(format!("open monitoring application for tenant {}@{} at url {}", tenant_name, platform, url));
+              if let Err(error) = open::that(url) {
+                context.print_error(format!("could not open browser ({})", error));
+              }
+            }
+            None => context.print_error("unable to open monitoring application because tenant is not known"),
+          },
+          OPEN_TARGET_SERVICE => match &context.tenant_name {
+            Some(tenant_name) => match get_service_argument_or_prompt(arg_matches) {
+              Ok(service) => {
+                let url = platform.console_url_for_tenant_service(tenant_name.clone(), service.clone());
+                context.print_explanation(format!(
+                  "open console for service {} at tenant {}@{} at url {}",
+                  service, tenant_name, platform, url
+                ));
+                if let Err(error) = open::that(url) {
+                  context.print_error(format!("could not open browser ({})", error));
+                }
+              }
+              Err(error) => context.print_error(error),
+            },
+            None => {
+              let url = platform.console_url();
+              context.print_explanation(format!("open console for platform '{}' at url {}", platform, url));
+              if let Err(error) = open::that(url) {
+                context.print_error(format!("could not open browser ({})", error));
+              }
+            }
+          },
+          OPEN_TARGET_SWAGGER => {
+            let token = match context.dsh_api_client.as_ref() {
+              Some(client) => match client.token().await {
+                Ok(token) => Some(token),
+                Err(_) => None,
+              },
+              None => None,
+            };
+            if let Some(token) = token {
+              context.print_explanation(format!("open swagger application for platform {} and copy token to clipboard", platform));
+              if let Some(token) = token.strip_prefix("Bearer ") {
+                if Clipboard::new().and_then(|mut clipboard| clipboard.set_text(token)).is_err() {
+                  context.print_error("could not copy token to clipboard");
+                }
+              }
+            } else {
+              context.print_explanation(format!("open swagger application for platform {}", platform));
+            }
+            let url = platform.swagger_url();
+            if let Err(error) = open::that(url) {
+              context.print_error(format!("could not open browser ({})", error));
+            }
+          }
+          _ => (),
         }
       }
-      None => {
-        let url = platform.console_url();
-        context.print_explanation(format!("open console for platform '{}' at url {}", platform, url));
-        if let Err(error) = open::that(url) {
-          context.print_error(format!("could not run browser ({})", error));
-        }
-      }
+      None => context.print_error("missing target argument"),
     }
     Ok(())
   }
@@ -137,6 +214,13 @@ impl CommandExecutor for PlatformShow {
       }
     }
     Ok(())
+  }
+}
+
+fn get_service_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+  match matches.get_one::<String>(SERVICE_ARGUMENT) {
+    Some(service_argument) => Ok(service_argument.to_string()),
+    None => Ok(read_single_line("enter service: ")?),
   }
 }
 

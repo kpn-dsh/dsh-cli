@@ -20,6 +20,7 @@ stream = []
 
 [dependencies]
 
+arboard = "3.4"
 async-trait = "0.1"
 chrono = { version = "0.4" }
 clap = { version = "4.5", features = ["derive", "string", "wrap_help"] }
@@ -44,6 +45,6 @@ tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "macros"] }
 toml = { version = "0.8", features = ["display"] }
 
 # When publishing, alway use the crates.io dependency.
-#dsh_api = { version = "0.3.2", features = ["generic"] }
+# dsh_api = { version = "0.3.2", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api.
 dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
