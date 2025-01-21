@@ -1,10 +1,12 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_tenant::parse_and_validate_guid;
+use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-use crate::arguments::{get_guid_argument_or_prompt, get_platform_argument_or_prompt, get_tenant_argument_or_prompt, guid_argument, platform_argument, tenant_argument};
+use crate::arguments::{guid_argument, platform_argument, tenant_argument, PlatformArgument, GUID_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
 use crate::capability::{
   Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR,
 };
@@ -13,7 +15,7 @@ use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
 use crate::subject::Subject;
-use crate::DshCliResult;
+use crate::{read_single_line, DshCliResult};
 
 pub(crate) struct TargetSubject {}
 
@@ -234,6 +236,27 @@ impl CommandExecutor for TargetNew {
       context.print_outcome(format!("target {} created", target));
     }
     Ok(())
+  }
+}
+
+fn get_guid_argument_or_prompt(matches: &ArgMatches) -> Result<u16, String> {
+  match matches.get_one::<String>(GUID_ARGUMENT) {
+    Some(tenant_argument) => Ok(parse_and_validate_guid(tenant_argument.to_string())?),
+    None => Ok(parse_and_validate_guid(read_single_line("enter group/user id: ")?)?),
+  }
+}
+
+fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
+  match matches.get_one::<PlatformArgument>(PLATFORM_ARGUMENT) {
+    Some(platform_argument) => Ok(DshPlatform::try_from(platform_argument.to_string().as_str())?),
+    None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
+  }
+}
+
+fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+  match matches.get_one::<String>(TENANT_ARGUMENT) {
+    Some(tenant_argument) => Ok(tenant_argument.to_string()),
+    None => Ok(read_single_line("enter tenant: ")?),
   }
 }
 

@@ -1,11 +1,8 @@
 use crate::context::MatchingStyle;
 use crate::formatters::OutputFormat;
-use crate::read_single_line;
 use builder::EnumValueParser;
 use clap::builder::ValueParser;
-use clap::{builder, Arg, ArgAction, ArgMatches};
-use dsh_api::dsh_api_tenant::parse_and_validate_guid;
-use dsh_api::platform::DshPlatform;
+use clap::{builder, Arg, ArgAction};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -118,13 +115,6 @@ pub(crate) fn guid_argument() -> Arg {
     .global(true)
 }
 
-pub(crate) fn get_guid_argument_or_prompt(matches: &ArgMatches) -> Result<u16, String> {
-  match matches.get_one::<String>(GUID_ARGUMENT) {
-    Some(tenant_argument) => Ok(parse_and_validate_guid(tenant_argument.to_string())?),
-    None => Ok(parse_and_validate_guid(read_single_line("enter group/user id: ")?)?),
-  }
-}
-
 pub(crate) fn matching_style_argument() -> Arg {
   Arg::new(MATCHING_STYLE_ARGUMENT)
     .long("matching-style")
@@ -208,13 +198,6 @@ pub(crate) fn platform_argument() -> Arg {
     .global(true)
 }
 
-pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
-  match matches.get_one::<PlatformArgument>(PLATFORM_ARGUMENT) {
-    Some(platform_argument) => Ok(DshPlatform::try_from(platform_argument.to_string().as_str())?),
-    None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
-  }
-}
-
 pub(crate) fn quiet_argument() -> Arg {
   Arg::new(QUIET_ARGUMENT)
     .long("quiet")
@@ -271,13 +254,6 @@ pub(crate) fn service_argument() -> Arg {
     )
 }
 
-pub(crate) fn _get_service_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
-  match matches.get_one::<String>(SERVICE_ARGUMENT) {
-    Some(service_argument) => Ok(service_argument.to_string()),
-    None => Ok(read_single_line("enter service: ")?),
-  }
-}
-
 pub(crate) fn tenant_argument() -> Arg {
   Arg::new(TENANT_ARGUMENT)
     .long("tenant")
@@ -293,13 +269,6 @@ pub(crate) fn tenant_argument() -> Arg {
           as a default setting in the settings file, or else the user will be prompted.",
     )
     .global(true)
-}
-
-pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
-  match matches.get_one::<String>(TENANT_ARGUMENT) {
-    Some(tenant_argument) => Ok(tenant_argument.to_string()),
-    None => Ok(read_single_line("enter tenant: ")?),
-  }
 }
 
 pub(crate) fn terminal_width_argument() -> Arg {
