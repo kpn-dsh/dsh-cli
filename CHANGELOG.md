@@ -4,7 +4,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.3.1]
+## [0.4.0] - 2025-01-30
 
 ### Added
 
@@ -21,6 +21,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 * Improved user interface.
 * Re-organized documentation.
+* Embedded logo and favicon in generated docs.
 
 ## [0.3.0] - 2024-12-20
 
