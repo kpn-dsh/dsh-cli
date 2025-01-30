@@ -43,9 +43,10 @@ impl Subject for EnvSubject {
     Some("e")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
+
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       FIND_COMMAND => Some(ENV_FIND_CAPABILITY.as_ref()),

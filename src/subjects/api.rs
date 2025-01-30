@@ -35,8 +35,11 @@ impl Subject for ApiSubject {
     "List and call DSH resource management api.".to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requires_dsh_api_client(&self, sub_matches: &ArgMatches) -> bool {
+    match sub_matches.subcommand() {
+      Some((capability_command_id, _)) => !matches!(capability_command_id, SHOW_COMMAND),
+      None => unreachable!(),
+    }
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -229,6 +232,8 @@ impl CommandExecutor for ApiGet {
           context.print_execution_time(start_instant);
           context.print_serializable(response);
         }
+
+        // TODO        HIER!!! Gaat mis als er geen argumenten worden gegeven
         None => unreachable!(),
       },
       None => unreachable!(),

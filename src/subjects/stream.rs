@@ -1,3 +1,5 @@
+use clap::ArgMatches;
+
 // use std::collections::HashMap;
 //
 // use async_trait::async_trait;
@@ -47,7 +49,7 @@
 //     self.subject()
 //   }
 //
-//   fn requires_dsh_api_client(&self) -> bool {
+//   fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
 //     true
 //   }
 //

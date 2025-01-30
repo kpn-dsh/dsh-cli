@@ -42,7 +42,7 @@ impl Subject for ProxySubject {
     "Show, manage and list Kafka proxies used by the applications/services and apps on the DSH.".to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
 

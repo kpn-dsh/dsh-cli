@@ -44,7 +44,7 @@ impl Subject for ImageSubject {
     Some("i")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
 
@@ -225,6 +225,7 @@ lazy_static! {
 /// When the provided string is valid, the method returns a 2-tuple containing:
 /// * registry of the image
 /// * image id
+// TODO Move to dsh-api
 pub(crate) fn parse_image_string(image_string: &str) -> Result<(String, String), String> {
   match APP_CATALOG_IMAGE_REGEX.captures(image_string) {
     Some(app_catalog_captures) => Ok((

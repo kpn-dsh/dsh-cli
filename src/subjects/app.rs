@@ -46,7 +46,7 @@ impl Subject for AppSubject {
     "Show, manage and list apps deployed from the DSH app catalog.".to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
 

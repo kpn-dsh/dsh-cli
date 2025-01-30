@@ -46,7 +46,7 @@ impl Subject for ManifestSubject {
     "Show the manifest files for the apps in the DSH App Catalog.".to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
 

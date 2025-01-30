@@ -40,7 +40,7 @@ impl Subject for VhostSubject {
     Some("v")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
 

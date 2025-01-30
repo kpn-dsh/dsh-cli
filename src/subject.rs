@@ -22,7 +22,7 @@ pub trait Subject {
     None
   }
 
-  fn requires_dsh_api_client(&self) -> bool;
+  fn requires_dsh_api_client(&self, sub_matches: &ArgMatches) -> bool;
 
   // Is called at most once and only if capability command is used
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)>;

@@ -6,7 +6,7 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-use crate::arguments::{guid_argument, platform_argument, tenant_argument, PlatformArgument, GUID_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
+use crate::arguments::{guid_argument, platform_argument, tenant_argument, GUID_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
 use crate::capability::{
   Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR,
 };
@@ -48,8 +48,8 @@ impl Subject for TargetSubject {
       .to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    false
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
+    true
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -247,8 +247,8 @@ fn get_guid_argument_or_prompt(matches: &ArgMatches) -> Result<u16, String> {
 }
 
 fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
-  match matches.get_one::<PlatformArgument>(PLATFORM_ARGUMENT) {
-    Some(platform_argument) => Ok(DshPlatform::try_from(platform_argument.to_string().as_str())?),
+  match matches.get_one::<DshPlatform>(PLATFORM_ARGUMENT) {
+    Some(dsh_platform) => Ok(dsh_platform.clone()),
     None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
   }
 }

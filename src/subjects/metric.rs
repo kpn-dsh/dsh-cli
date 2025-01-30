@@ -40,7 +40,7 @@ impl Subject for MetricSubject {
     Some("m")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
 

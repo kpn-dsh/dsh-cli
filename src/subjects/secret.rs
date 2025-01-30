@@ -48,7 +48,7 @@ impl Subject for SecretSubject {
     Some("s")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
+  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
     true
   }
 
