@@ -1,17 +1,23 @@
 use crate::context::MatchingStyle;
 use crate::formatters::OutputFormat;
 use builder::EnumValueParser;
-use clap::builder::ValueParser;
+use clap::builder::{PossibleValue, ValueParser};
 use clap::{builder, Arg, ArgAction};
+use dsh_api::platform::DshPlatform;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
+pub(crate) const APP_ARGUMENT: &str = "app-argument";
 pub(crate) const GUID_ARGUMENT: &str = "guid-argument";
 pub(crate) const PASSWORD_FILE_ARGUMENT: &str = "password-file-argument";
 pub(crate) const PLATFORM_ARGUMENT: &str = "platform-argument";
 pub(crate) const SERVICE_ARGUMENT: &str = "service-argument";
 pub(crate) const TENANT_ARGUMENT: &str = "tenant-argument";
+pub(crate) const VENDOR_ARGUMENT: &str = "vendor-argument";
+pub(crate) const VHOST_ARGUMENT: &str = "vhost-argument";
 
+// pub(crate) const TO_CLIPBOARD_ARGUMENT: &str = "to-clipboard-argument";
+// pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
 pub(crate) const MATCHING_STYLE_ARGUMENT: &str = "matching-style-argument";
@@ -20,8 +26,8 @@ pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
 pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
 pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
-pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 pub(crate) const _SUBTARGET_ARGUMENT: &str = "subtarget-argument";
+pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 pub(crate) const TARGET_ARGUMENT: &str = "target-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 
@@ -41,32 +47,15 @@ pub(crate) enum Verbosity {
   High = 4,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
-pub(crate) enum PlatformArgument {
-  /// Staging platform for KPN internal tenants
-  #[serde(rename = "np-aws-lz-dsh", alias = "nplz")]
-  #[clap(alias = "nplz")]
-  NpAwsLzDsh,
-  /// Staging platform for non KPN tenants
-  #[serde(rename = "poc-aws-dsh", alias = "poc")]
-  #[clap(alias = "poc")]
-  PocAwsDsh,
-  /// Production platform for non KPN tenants
-  #[serde(rename = "prod-aws-dsh", alias = "prod")]
-  #[clap(alias = "prod")]
-  ProdAwsDsh,
-  /// Production platform for KPN internal tenants
-  #[serde(rename = "prod-aws-lz-dsh", alias = "prodlz")]
-  #[clap(alias = "prodlz")]
-  ProdAwsLzDsh,
-  /// Production platform for logstash as a service
-  #[serde(rename = "prod-aws-lz-laas", alias = "prodls")]
-  #[clap(alias = "prodls")]
-  ProdAwsLzLaas,
-  /// Production platform for non KPN tenants
-  #[serde(rename = "prod-azure-dsh", alias = "prodaz")]
-  #[clap(alias = "prodaz")]
-  ProdAzureDsh,
+pub(crate) fn app_argument() -> Arg {
+  Arg::new(APP_ARGUMENT)
+    .long("app")
+    .short('a')
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("APP")
+    .help("Provide app.")
+    .long_help("This option specifies the name of an app running on the DSH platform.")
 }
 
 pub(crate) fn dry_run_argument() -> Arg {
@@ -96,6 +85,19 @@ pub(crate) fn force_argument() -> Arg {
     .global(true)
 }
 
+// pub(crate) fn from_clipboard_argument() -> Arg {
+//   Arg::new(FROM_CLIPBOARD_ARGUMENT)
+//     .long("from-clipboard")
+//     .action(ArgAction::SetTrue)
+//     .help("Read input from clipboard.")
+//     .long_help(
+//       "When this option is provided the input for methods that require it \
+//           will be read from the clipboard, \
+//           instead of being read from the terminal, pipes or redirects.",
+//     )
+//     .global(true)
+// }
+
 pub(crate) fn guid_argument() -> Arg {
   Arg::new(GUID_ARGUMENT)
     .long("guid")
@@ -112,7 +114,6 @@ pub(crate) fn guid_argument() -> Arg {
           Note that if the tenant is already provided, the target settings file will also be \
           checked for the guid value.",
     )
-    .global(true)
 }
 
 pub(crate) fn matching_style_argument() -> Arg {
@@ -139,7 +140,7 @@ pub(crate) fn no_escape_argument() -> Arg {
     .help("No color.")
     .long_help(
       "When this option is provided the output will not contain \
-          any color or other ansi escape sequences.
+          any color or other ansi escape sequences. \
           If this argument is not provided, the environment variable \
           DSH_CLI_NO_ESCAPE or the value from the settings file will be used. \
           The default behavior is to use ansi escape styling where applicable.",
@@ -180,11 +181,19 @@ pub(crate) fn password_file_argument() -> Arg {
 }
 
 pub(crate) fn platform_argument() -> Arg {
+  let possible_values = DshPlatform::all()
+    .iter()
+    .map(|platform| {
+      PossibleValue::new(platform.name())
+        .alias(platform.alias())
+        .help(format!("{} ({})", platform.description(), platform.alias()))
+    })
+    .collect::<Vec<_>>();
   Arg::new(PLATFORM_ARGUMENT)
     .long("platform")
     .short('p')
     .action(ArgAction::Set)
-    .value_parser(EnumValueParser::<PlatformArgument>::new())
+    .value_parser(possible_values)
     .value_name("PLATFORM")
     .help("Provide target platform.")
     .long_help(
@@ -192,8 +201,7 @@ pub(crate) fn platform_argument() -> Arg {
           If this argument is not provided, \
           the platform must be specified via the environment variable DSH_CLI_PLATFORM, \
           as a default setting in the settings file, or else the user will be prompted. \
-          The target platform names have the following shortcuts, \
-          respectively: nplz, poc, prod, prodlz, prodls and prodaz.",
+          The value between parentheses can be used as an alias for the platform name.",
     )
     .global(true)
 }
@@ -294,6 +302,18 @@ pub(crate) fn target_argument(subject: &str, long_help: Option<&str>) -> Arg {
   target_argument
 }
 
+// pub(crate) fn to_clipboard_argument() -> Arg {
+//   Arg::new(TO_CLIPBOARD_ARGUMENT)
+//     .long("to-clipboard")
+//     .action(ArgAction::SetTrue)
+//     .help("Copy output to clipboard.")
+//     .long_help(
+//       "When this option is provided the output will be copied to the clipboard, \
+//           instead of being printed to the terminal.",
+//     )
+//     .global(true)
+// }
+
 pub(crate) fn _subtarget_argument(subtarget: &str, long_help: Option<&str>) -> Arg {
   let mut subtarget_argument = Arg::new(_SUBTARGET_ARGUMENT)
     .action(ArgAction::Set)
@@ -318,6 +338,26 @@ pub(crate) fn query_argument(long_help: Option<&str>) -> Arg {
   query_argument
 }
 
+pub(crate) fn vendor_argument() -> Arg {
+  Arg::new(VENDOR_ARGUMENT)
+    .long("vendor")
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("VENDOR")
+    .help("Provide app vendor.")
+    .long_help("This option specifies the name of an app vendor. Allowed values are \"kpn\".")
+}
+
+pub(crate) fn vhost_argument() -> Arg {
+  Arg::new(VHOST_ARGUMENT)
+    .long("vhost")
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("VHOST")
+    .help("Provide vhost.")
+    .long_help("This option specifies the name of a vhost.")
+}
+
 impl TryFrom<&str> for Verbosity {
   type Error = String;
 
@@ -339,19 +379,6 @@ impl Display for Verbosity {
       Verbosity::Low => write!(f, "low"),
       Verbosity::Medium => write!(f, "medium"),
       Verbosity::High => write!(f, "high"),
-    }
-  }
-}
-
-impl Display for PlatformArgument {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Self::NpAwsLzDsh => write!(f, "np-aws-lz-dsh"),
-      Self::PocAwsDsh => write!(f, "poc-aws-dsh"),
-      Self::ProdAwsDsh => write!(f, "prod-aws-dsh"),
-      Self::ProdAwsLzDsh => write!(f, "prod-aws-lz-dsh"),
-      Self::ProdAwsLzLaas => write!(f, "prod-aws-lz-laas"),
-      Self::ProdAzureDsh => write!(f, "prod-azure-dsh"),
     }
   }
 }
