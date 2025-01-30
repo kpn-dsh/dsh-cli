@@ -6,8 +6,8 @@
 > Please include the exact command, the erroneous output and an explanation of the expected output.
 > You can also send requests for new features to this e-mail address.
 
-* [Set up autocompletion](autocompletion.md)
 * [Environment variables](environment_variables.md)
+* [Set up autocompletion](autocompletion.md)
 * [Developers](developers.md)
 
 This project provides a tool to call functions on the DSH resource management API from the
@@ -30,11 +30,10 @@ listed, queried, searched, created and deleted.
 * vhost
 * volume
 
-## Local installation
+## Installation
 
-The DSH Api Command Line Tool (`dsh`) can be installed on your local machine
-(assuming you have the `rust` tool chain installed),
-by executing the following command.
+If you have the `rust` tool chain installed, the DSH Api Command Line Tool (`dsh`) can be
+installed on your local machine directly from `crates.io` by executing the following command.
 
 ```bash
 > cargo install dsh
@@ -65,6 +64,7 @@ Subjects/commands:
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
   secret       Show, manage and list DSH secrets.
+  token        Request DSH tokens.
   topic        Show, manage and list DSH topics.
   vhost        Show vhost usage.
   volume       Show, manage and list DSH volumes.
@@ -73,29 +73,43 @@ Subjects/commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-  -p, --platform <PLATFORM>                 Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh,
-                                            prod-aws-dsh, prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
-  -t, --tenant <TENANT>                     Provide target tenant.
-  -g, --guid <GUID>                         Provide target group and user id.
-      --password-file <FILE>                Provide password file name.
-  -o, --output-format <FORMAT>              Set output format. [possible values: csv, json, json-compact, plain, quiet,
-                                            table, table-no-border, toml, toml-compact, yaml]
-  -v, --verbosity <VERBOSITY>               Set verbosity level. [possible values: off, low, medium, high]
-      --dry-run                             Execute in dry-run mode.
-      --force                               Force changes without confirmation.
-      --matching-style <STYLE>              Set styling for matches. [possible values: normal, bold, dim, italic,
-                                            underlined, reverse]
-      --no-color                            No color.
-  -q, --quiet                               Run in quiet mode.
-      --show-execution-time                 Show execution time.
-      --terminal-width <WIDTH>              Set terminal width.
-      --generate-autocomplete-file <SHELL>  Generate autocomplete file [possible values: bash, elvish, fish, powershell,
-                                            zsh]
-  -h, --help                                Print help (see more with '--help')
-  -V, --version                             Print version
+  -p, --platform <PLATFORM>
+          Provide target platform. [possible values: np-aws-lz-dsh, prod-aws-lz-dsh]
+  -t, --tenant <TENANT>
+          Provide target tenant.
+  -g, --guid <GUID>
+          Provide target group and user id.
+      --password-file <FILE>
+          Provide password file name.
+  -o, --output-format <FORMAT>
+          Set output format. [possible values: csv, json, json-compact, plain, quiet, table,
+          table-no-border, toml, toml-compact, yaml]
+  -v, --verbosity <VERBOSITY>
+          Set verbosity level. [possible values: off, low, medium, high]
+      --dry-run
+          Execute in dry-run mode.
+      --force
+          Force changes without confirmation.
+      --matching-style <STYLE>
+          Set styling for matches. [possible values: normal, bold, dim, italic, underlined,
+          reverse]
+      --no-color
+          No color.
+  -q, --quiet
+          Run in quiet mode.
+      --show-execution-time
+          Show execution time.
+      --terminal-width <WIDTH>
+          Set terminal width.
+      --generate-autocomplete-file <SHELL>
+          Generate autocomplete file [possible values: bash, elvish, fish, powershell, zsh]
+  -h, --help
+          Print help (see more with '--help')
+  -V, --version
+          Print version
 
-For most commands adding an 's' as a postfix will yield the same result as using the 'list' subcommand, e.g. using 'dsh
-apps' will be the same as using 'dsh app list'.
+For most commands adding an 's' as a postfix will yield the same result as using the 'list'
+subcommand, e.g. using 'dsh apps' will be the same as using 'dsh app list'.
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.
@@ -107,11 +121,19 @@ Commands also have their own help text.
 > dsh secret list --help
 ```
 
-## Environment variables
+## Configuration
 
-In order to run `dsh`, either make sure that the environment variables described below
-are properly set. These values can also be set via the settings file
-or be provided as command line arguments.
+The `dsh` tool can be run entirely from the command line and
+all configurations and parameters can be specified via command line arguments.
+However, especially when using `dsh` interactively,
+it is much more convenient to make some settings persistent.
+
+### Environment variables
+
+Almost all configuration and parameters can be configured via environment variables.
+The table below describes some variables to get you started.
+Detailed information about all environments variables can be found in
+[`environment_variables.md`](environment_variables.md).
 
 <table>
     <tr valign="top">
@@ -122,87 +144,78 @@ or be provided as command line arguments.
         <td><code>DSH_CLI_OUTPUT_FORMAT</code></td>
         <td>
             This option specifies the format used when printing the output. 
-            If this argument is not provided, the value from the settings file will be used. 
-            Else, when stdout is a terminal the default 'table' will be used, if
-            stdout is not a terminal the value 'json' will be used.
-            <ul>
-                <li><code>csv</code> - Output will be formatted as comma separated values</li>
-                <li><code>json</code> - Output will be in json format</li>
-                <li><code>json-compact</code> - Output will be in compact json format</li>
-                <li><code>plain</code> - Output will be formatted as plain text</li>
-                <li><code>quiet</code> - No output will be generated</li>
-                <li><code>table</code> - Output will be formatted as a table with borders</li>
-                <li>
-                    <code>table-no-border</code> - Output will be formatted as a table 
-                    without borders
-                </li>
-                <li><code>toml</code> - Output will be in toml format</li>
-                <li><code>toml-compact</code> - Output will be in compact toml format</li>
-                <li><code>yaml</code> - Output will be in yaml format</li>
-            </ul>
-            This environment variable can be overridden via the 
+            Some possible values are
+            <code>csv</code>, <code>json</code>, <code>plain</code>, <code>table</code>, 
+            <code>toml</code> or <code>yaml</code>.
+            Note that not all output formats can be used with all subjects and capabilities.
+            The output format can also be set via the 
             <code>--output-format</code> command line argument.
         </td>
     </tr>
     <tr valign="top">
         <td><code>DSH_CLI_PASSWORD</code></td>
         <td>
-            This environment variable specifies the secret api token/password for the target tenant. 
-            Note that when the environment variable <code>DSH_CLI_PASSWORD_FILE</code> 
-            or the argument <code>--password-file</code> command line argument is provided,
-            this environment variable will not be used. 
-            For better security, consider using one of these two options instead of 
-            defining <code>DSH_CLI_PASSWORD</code>
+            This environment variable specifies the secret api token/password for the target tenant.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_PASSWORD_FILE</code></td>
+        <td>
+            This environment variable specifies a file containing the secret api 
+            token/password for the target tenant. 
+            Note that when the <code>--password-file</code> command line argument is provided,
+            this will override the environment variable. 
         </td>
     </tr>
     <tr valign="top">
         <td><code>DSH_CLI_PLATFORM</code></td>
         <td>
-            Target platform on which the tenant's environment lives.
-            <ul>
-                <li><code>np-aws-lz-dsh / nplz</code> - Staging platform for KPN internal tenants</li>
-                <li><code>poc-aws-dsh / poc</code> - Staging platform for non KPN tenants</li>
-                <li><code>prod-aws-dsh / prod</code> - Production platform for non KPN tenants</li>
-                <li><code>prod-aws-lz-dsh / prodlz</code> - Production platform for KPN internal tenants</li>
-                <li><code>prod-aws-lz-laas / prodls</code> - Production platform for logstash as a service</li>
-                <li><code>prod-azure-dsh / prodaz</code> - Production platform for non KPN tenants</li>
-            </ul>
-            This environment variable can be overridden via the 
+            Target platform on which the tenant's environment lives. 
+            The platform can be specified by its full name (e.g. <code>np-aws-lz-dsh</code>) 
+            or by its alias (e.g. <code>nplz</code>).
+            The platform can also be specified via the 
             <code>--platform</code> command line argument.
         </td>
     </tr>
     <tr valign="top">
         <td><code>DSH_CLI_TENANT</code></td>
-        <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
+        <td>
+            Tenant id for the target tenant. The target tenant is the tenant whose resources 
             will be managed via the api.
-            This environment variable can be overridden via the 
+            The tenant can also be set via the 
             <code>--tenant</code> command line argument.
         </td>
     </tr>
 </table>
 
-### Autocompletion
+### Settings
 
-#### zsh
+The `dsh` tool is also able to store settings and configuration in settings files.
+The settings files can be created and managed via the tool itself, which is the preferred way.
+The settings are typically stored in a subdirectory of the user's home directory
+(`$HOME/.dsh_cli`).
+This location can be changed by setting the environment variable `DSH_CLI_HOME`.
 
-Run `dsh` with the `--generate-autocomplete-file zsh` flag and pipe the result
-to an autocomplete file name `_dsh`.
+The settings are stored in the file `$HOME/.dsh_cli/settings.toml`:
 
-```bash
-> dsh --generate-autocomplete-file zsh > _dsh
+```toml
+default-platform = "np-aws-lz-dsh"
+default-tenant = "greenbox-dev"
+matching-style = "bold"
+show-execution-time = false
+verbosity = "medium"
 ```
 
-Then copy the autocomplete file to our `zsh` autocomplete directory.
-Note that this might require `sudo`.
+The target data is stored in files in the directory `$HOME/.dsh_cli/targets`.
+For each combination of a platform and a tenant there is a separate file.
+E.g., for the platform `np-aws-lz-dsh` and the tenant `greenbox-dev` the target data is stored in
+the file `$HOME/.dsh_cli/targets/np-aws-lz-dsh.greenbox-dev.toml`:
 
-```bash
-> mv _dsh /usr/local/share/zsh/site-functions/_dsh
+```toml
+platform = "np-aws-lz-dsh"
+tenant = "greenbox-dev"
+group-user-id = 1903
 ```
 
-Finally, add the following two lines to your `~/.zshrc` file.
-
-```
-# enable autocomplete
-autoload -Uz compinit
-compinit
-```
+The target's password is not stored in these files.
+For security reasins.passwords are stored in your computers keychain (for Mac Osx and Windows). 

@@ -1,14 +1,21 @@
 # Developers
 
+This page is targeted a developers who wish to work on the `dsh` tool.
+
 ## Local installation and run
 
-The DSH Api Command Line Tool (`dsh`) can be installed on your local machine
-(assuming you have the `rust` tool chain installed),
-by executing the following command.
+First clone the repository to your local machine:
 
 ```bash
-> cargo install dsh
+> git clone git@github.com:kpn-dsh/dsh-cli.git
 ...
+> cd dsh-cli
+```
+
+Then you can for example install the tool on your local machine using:
+
+```bash
+> cargo install --path .
 ```
 
 ## Development
@@ -23,7 +30,7 @@ version of the library.
 
 ```toml
 # Cargo.toml
-dsh_api = "0.3.1"
+dsh_api = "0.4.0"
 ```
 
 When developing simultaneously on `dsh` and `dsh_api` consider changing the library dependency
@@ -48,4 +55,4 @@ return without any remarks:
 > cargo clippy
 ```
 
-Consider configuring your IDE to automatically apply the formatting rules when saving a file. 
+Consider configuring your IDE to automatically apply the formatting rules when saving a file.

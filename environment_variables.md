@@ -1,24 +1,24 @@
-# DSH resource management API command line tool
-
-This method will get the target tenant.
-This function will try the potential sources listed below, and returns at the first match.
-
-1. Command line argument `--tenant`.
-1. Environment variable `DSH_CLI_TENANT`.
-1. Parameter `default-tenant` from settings file, if available.
-1. If stdin is a terminal, ask the user to enter the value.
-1. Else return with an error.
-
-### Environment variables
-
-In order to run `dsh`, either make sure that the environment variables described below
-are properly set. These values can also be set via the settings file
-or be provided as command line arguments.
+# Environment variables
 
 <table>
     <tr valign="top">
         <th align="left">variable</th>
         <th align="left">description</th>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_API_PLATFORMS_FILE</code></td>
+        <td>
+            Set this environment variable to override the default list of available platforms.
+            The value of the environment variable must be the name 
+            of the alternative platforms file. It can either be an absolute file name, 
+            or a relative file name from the working directory of your application. 
+            When this environment variable is set, the normal list of default platforms 
+            will <em>not</em> be included. If you need these too, make sure that you also 
+            include the default platforms in your platforms file.
+            The default platforms file is defined in the <code>dsh-api</code> library crate and
+            can be printed using the command: 
+            <pre>> dsh platform default</pre>
+        </td>
     </tr>
     <tr valign="top">
         <td><code>DSH_CLI_CSV_QUOTE</code></td>
@@ -56,6 +56,14 @@ or be provided as command line arguments.
             This value must be provided as a single integer, e.g. <code>1903</code>.
             This environment variable can be overridden via the <code>--guid</code>
             command line argument.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_HOME</code></td>
+        <td> 
+            Use this environment variable to change the location where <code>dsh</code> 
+            stores its settings and targets information. 
+            The default location is <code>$HOME/.dsh_cli</code>.
         </td>
     </tr>
     <tr valign="top">
@@ -207,5 +215,3 @@ or be provided as command line arguments.
         </td>
     </tr>
 </table>
-
-### Settings file
