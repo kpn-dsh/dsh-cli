@@ -12,7 +12,7 @@ use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::settings::read_settings;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::{get_environment_variables, DshCliResult, ENV_VAR_PASSWORD};
 
 pub(crate) struct SettingSubject {}
@@ -33,8 +33,8 @@ impl Subject for SettingSubject {
     "Show, manage and list dsh settings.".to_string()
   }
 
-  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
-    false
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(false, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {

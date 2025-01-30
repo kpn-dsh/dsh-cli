@@ -11,7 +11,7 @@ use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::modifier_flags::ModifierFlagType;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
 use crate::DshCliResult;
 use async_trait::async_trait;
@@ -48,8 +48,8 @@ impl Subject for SecretSubject {
     Some("s")
   }
 
-  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {

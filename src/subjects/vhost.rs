@@ -3,7 +3,7 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::subjects::USED_BY_LABELS_LIST;
 use crate::DshCliResult;
 use async_trait::async_trait;
@@ -40,8 +40,8 @@ impl Subject for VhostSubject {
     Some("v")
   }
 
-  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {

@@ -4,6 +4,7 @@ use crate::arguments::{
 };
 use crate::formatters::OutputFormat;
 use crate::settings::{read_settings, Settings};
+use crate::subject::Requirements;
 use crate::{get_guid, get_platform, get_tenant_name};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -55,8 +56,10 @@ pub(crate) struct Context<'a> {
 }
 
 impl Context<'_> {
-  pub(crate) fn create<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<Context<'a>, String> {
+  pub(crate) fn create<'a>(matches: &'a ArgMatches, requirements: &Requirements, dsh_api_client: Option<DshApiClient<'a>>) -> Result<Context<'a>, String> {
     let settings: Option<Settings> = read_settings(None)?;
+    let stdin_is_terminal = stdin().is_terminal();
+
     let csv_quote = Self::csv_quote(settings.as_ref())?;
     let csv_separator = Self::csv_separator(settings.as_ref())?;
     if let Some(quote) = csv_quote {
@@ -74,7 +77,7 @@ impl Context<'_> {
       (OutputFormat::Quiet, false, Verbosity::Off)
     } else {
       (
-        Self::output_format(matches, settings.as_ref())?,
+        Self::output_format(matches, settings.as_ref(), requirements.default_output_format.clone())?,
         Self::show_execution_time(matches, settings.as_ref()),
         Self::verbosity(matches, settings.as_ref())?,
       )
@@ -107,7 +110,7 @@ impl Context<'_> {
       tenant_name,
       terminal_width,
       _stderr_escape: stderr_escape,
-      stdin_is_terminal: stdin().is_terminal(),
+      stdin_is_terminal,
       _stdout_escape: stdout_escape,
       verbosity,
     })
@@ -224,16 +227,20 @@ impl Context<'_> {
   /// 1. Try flag `--output-format`
   /// 1. Try environment variable `DSH_CLI_OUTPUT_FORMAT`
   /// 1. Try settings file
+  /// 1. Try default_output_format parameter
   /// 1. If stdout is a terminal default to `OutputFormat::Table`,
   ///    else default to `OutputFormat::Json`
-  fn output_format(matches: &ArgMatches, settings: Option<&Settings>) -> Result<OutputFormat, String> {
+  fn output_format(matches: &ArgMatches, settings: Option<&Settings>, default_output_format: Option<OutputFormat>) -> Result<OutputFormat, String> {
     match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
       Some(output_format_argument) => Ok(output_format_argument.to_owned()),
       None => match std::env::var(ENV_VAR_OUTPUT_FORMAT) {
         Ok(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str()).map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_OUTPUT_FORMAT)),
         Err(_) => match settings.and_then(|settings| settings.output_format.clone()) {
           Some(output_format_from_settings) => Ok(output_format_from_settings),
-          None => Ok(if stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
+          None => match default_output_format {
+            Some(output_format_from_default) => Ok(output_format_from_default),
+            None => Ok(if stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
+          },
         },
       },
     }

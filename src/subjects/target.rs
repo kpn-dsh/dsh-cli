@@ -14,7 +14,7 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::{read_single_line, DshCliResult};
 
 pub(crate) struct TargetSubject {}
@@ -48,8 +48,9 @@ impl Subject for TargetSubject {
       .to_string()
   }
 
-  fn requires_dsh_api_client(&self, _sub_matches: &ArgMatches) -> bool {
-    true
+  // TODO Check this
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
