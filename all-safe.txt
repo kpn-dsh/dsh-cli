@@ -1,3 +1,4 @@
+api get secret-ids
 api show
 
 app list
@@ -53,7 +54,8 @@ metric list --started
 metric list --stopped
 
 platform list
-platform show nplz
+platform show np-aws-lz-dsh
+platform show nplz --service cmd
 platform show nplz --tenant greenbox
 
 proxy list

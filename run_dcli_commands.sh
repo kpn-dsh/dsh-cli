@@ -29,7 +29,7 @@ export RUST_LOG=dsh=info,dsh_api=info
 export SEPARATOR="-------------------------------"
 
 #export MATCHING_STYLE="--matching-style bold"
-export OUTPUT_FORMAT="--output-format table"
+export OUTPUT_FORMAT="--output-format json"
 #export SHOW_EXECUTION_TIME="--show-execution-time"
 #export VERBOSITY="-v high"
 
@@ -41,7 +41,7 @@ export VERBOSITY=""
 IFS=$'\n'
 set -f
 for i in $(cat < "$1"); do
-  CMD=`echo "dsh $MATCHING_STYLE $OUTPUT_FORMAT $SHOW_EXECUTION_TIME $VERBOSITY $i" | envsubst`
+  CMD=`echo "dsh --dry-run $MATCHING_STYLE $OUTPUT_FORMAT $SHOW_EXECUTION_TIME $VERBOSITY $i" | envsubst`
   echo "$SEPARATOR"
   echo "$CMD"
   echo "$SEPARATOR"
