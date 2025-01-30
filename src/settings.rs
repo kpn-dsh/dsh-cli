@@ -4,7 +4,8 @@ use crate::formatters::OutputFormat;
 use crate::APPLICATION_NAME;
 use dsh_api::platform::DshPlatform;
 use homedir::my_home;
-use serde::{Deserialize, Serialize};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::env;
 use std::fmt::{Debug, Display, Formatter};
 use std::fs;
@@ -56,6 +57,7 @@ pub(crate) struct Settings {
 ///   but instead in the keyring
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub(crate) struct Target {
+  #[serde(deserialize_with = "dsh_platform_from_name")]
   pub(crate) platform: DshPlatform,
   pub(crate) tenant: String,
   #[serde(rename = "group-user-id")]
@@ -456,4 +458,11 @@ where
       Err(message)
     }
   }
+}
+
+fn dsh_platform_from_name<'de, D>(deserializer: D) -> Result<DshPlatform, D::Error>
+where
+  D: Deserializer<'de>,
+{
+  DshPlatform::try_from(String::deserialize(deserializer)?.as_str()).map_err(Error::custom)
 }
