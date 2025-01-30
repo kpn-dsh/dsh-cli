@@ -100,7 +100,7 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn add_extra_argument(mut self, argument: Arg) -> Self {
+  pub fn _add_extra_argument(mut self, argument: Arg) -> Self {
     self.extra_arguments.push(argument);
     self
   }
@@ -136,12 +136,13 @@ impl<'a> CapabilityBuilder<'a> {
 }
 
 #[async_trait]
-impl<'a> Capability for CapabilityBuilder<'a> {
+impl Capability for CapabilityBuilder<'_> {
   fn clap_capability_command(&self, subject_command: &str) -> Command {
     let mut capability_command = Command::new(self.capability_command_name.clone())
       .name(self.capability_command_name.clone())
       .about(&self.about)
       .subcommands(&self.subcommands)
+      .subcommand_required(!self.subcommands.is_empty())
       .args(&self.target_arguments)
       .args(self.clap_flags(subject_command))
       .args(&self.extra_arguments);
