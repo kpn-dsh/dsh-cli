@@ -4,7 +4,26 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.3.0]
+## [0.4.0] - 2025-01-31
+
+### Added
+
+* Support for Windows.
+* Support DSH open api specification version 1.9.0.
+* Added generic api calls.
+* Added capabilities for piping and redirecting.
+* Added logging.
+* Secret update capability.
+* Token capabilities.
+* Capability to open platform web applications.
+
+### Changed
+
+* Improved user interface.
+* Re-organized documentation.
+* Embedded logo and favicon in generated docs.
+
+## [0.3.0] - 2024-12-20
 
 ### Added
 

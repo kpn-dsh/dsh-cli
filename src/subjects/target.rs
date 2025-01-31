@@ -1,18 +1,21 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_tenant::parse_and_validate_guid;
+use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 
-use crate::arguments::{get_guid_argument_or_prompt, get_platform_argument_or_prompt, get_tenant_argument_or_prompt, guid_argument, platform_argument, tenant_argument};
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::arguments::{guid_argument, platform_argument, tenant_argument, GUID_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
+use crate::capability::{
+  Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
-use crate::subject::Subject;
-use crate::{read_single_line_password, DshCliResult};
+use crate::subject::{Requirements, Subject};
+use crate::{read_single_line, DshCliResult};
 
 pub(crate) struct TargetSubject {}
 
@@ -45,23 +48,29 @@ impl Subject for TargetSubject {
       .to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    false
+  // TODO Check this
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Default, TARGET_DEFAULT_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Delete, TARGET_DELETE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::List, TARGET_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::New, TARGET_NEW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      DEFAULT_COMMAND => Some(TARGET_DEFAULT_CAPABILITY.as_ref()),
+      DELETE_COMMAND => Some(TARGET_DELETE_CAPABILITY.as_ref()),
+      LIST_COMMAND => Some(TARGET_LIST_CAPABILITY.as_ref()),
+      NEW_COMMAND => Some(TARGET_NEW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &TARGET_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref TARGET_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Default, "Set default target.")
+  static ref TARGET_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DEFAULT_COMMAND_PAIR, "Set default target.")
       .set_long_about(
         "Set the default target. If you set a default target, \
         you won't be prompted for the platform and tenant name."
@@ -69,8 +78,8 @@ lazy_static! {
       .set_default_command_executor(&TargetDefault {})
       .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
-  pub static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Delete, "Delete target configuration.")
+  static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete target configuration.")
       .set_long_about(
         "Delete a target configuration. \
         You will be prompted for the target's platform and tenant, \
@@ -79,13 +88,13 @@ lazy_static! {
       .set_default_command_executor(&TargetDelete {})
       .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
-  pub static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List all target configurations.")
+  static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List all target configurations.")
       .set_long_about("Lists all target configurations.")
       .set_default_command_executor(&TargetList {})
   );
-  pub static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::New, "Create a new target configuration.")
+  static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create a new target configuration.")
       .set_long_about(
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant, group/user id and password. \
@@ -95,6 +104,8 @@ lazy_static! {
       .set_default_command_executor(&TargetNew {})
       .add_extra_arguments(vec![guid_argument(), platform_argument(), tenant_argument()])
   );
+  static ref TARGET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![TARGET_DEFAULT_CAPABILITY.as_ref(), TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref(), TARGET_NEW_CAPABILITY.as_ref()];
 }
 
 struct TargetDefault {}
@@ -217,7 +228,7 @@ impl CommandExecutor for TargetNew {
       ));
     };
     let guid = get_guid_argument_or_prompt(matches)?;
-    let password = read_single_line_password("enter password: ")?;
+    let password = context.read_single_line_password("enter password: ")?;
     let target = Target::new(platform, tenant, guid, Some(password))?;
     if context.dry_run {
       context.print_warning(format!("dry-run mode, target {} not created", target));
@@ -226,6 +237,27 @@ impl CommandExecutor for TargetNew {
       context.print_outcome(format!("target {} created", target));
     }
     Ok(())
+  }
+}
+
+fn get_guid_argument_or_prompt(matches: &ArgMatches) -> Result<u16, String> {
+  match matches.get_one::<String>(GUID_ARGUMENT) {
+    Some(tenant_argument) => Ok(parse_and_validate_guid(tenant_argument.to_string())?),
+    None => Ok(parse_and_validate_guid(read_single_line("enter group/user id: ")?)?),
+  }
+}
+
+fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
+  match matches.get_one::<DshPlatform>(PLATFORM_ARGUMENT) {
+    Some(dsh_platform) => Ok(dsh_platform.clone()),
+    None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
+  }
+}
+
+fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+  match matches.get_one::<String>(TENANT_ARGUMENT) {
+    Some(tenant_argument) => Ok(tenant_argument.to_string()),
+    None => Ok(read_single_line("enter tenant: ")?),
   }
 }
 

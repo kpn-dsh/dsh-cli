@@ -1,9 +1,9 @@
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::subjects::USED_BY_LABELS_LIST;
 use crate::DshCliResult;
 use async_trait::async_trait;
@@ -12,7 +12,6 @@ use dsh_api::types::Vhost;
 use dsh_api::UsedBy;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::time::Instant;
 
 pub(crate) struct VhostSubject {}
@@ -41,21 +40,25 @@ impl Subject for VhostSubject {
     Some("v")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::List, VHOST_LIST_CAPABILITY.as_ref());
-    // capabilities.insert(CapabilityType::Show, VHOST_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &VHOST_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref VHOST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List configured vhosts")
+  static ref VHOST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List configured vhosts")
       .set_long_about("List applications that have vhosts configured. Vhosts that are provisioned but are not configured in any applications will not be shown.")
       .set_default_command_executor(&VhostListUsage {})
   );
@@ -64,6 +67,7 @@ lazy_static! {
   //     .set_default_command_executor(&VhostShowUsage {})
   //     .add_target_argument(target_argument(VHOST_SUBJECT_TARGET, None))
   // );
+  static ref VHOST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![VHOST_LIST_CAPABILITY.as_ref()];
 }
 
 struct VhostListUsage {}

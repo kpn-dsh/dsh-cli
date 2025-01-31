@@ -1,10 +1,10 @@
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -40,24 +40,30 @@ impl Subject for MetricSubject {
     Some("m")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::List, METRIC_LIST_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(METRIC_LIST_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &METRIC_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List exported metrics")
+  static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List exported metrics")
       .set_long_about("List all applications/apps that have metrics export configured.")
       .set_default_command_executor(&MetricList {})
       .add_filter_flags(vec![(FilterFlagType::Started, None), (FilterFlagType::Stopped, None)])
   );
+  static ref METRIC_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![METRIC_LIST_CAPABILITY.as_ref()];
 }
 
 struct MetricList {}

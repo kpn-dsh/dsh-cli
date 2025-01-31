@@ -6,11 +6,12 @@ use dsh_api::UsedBy;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -18,9 +19,9 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
-use crate::{read_single_line, DshCliResult};
+use crate::DshCliResult;
 
 pub(crate) struct VolumeSubject {}
 
@@ -44,35 +45,40 @@ impl Subject for VolumeSubject {
     "Show, manage and list volumes deployed on the DSH.".to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Create, VOLUME_CREATE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Delete, VOLUME_DELETE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::List, VOLUME_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, VOLUME_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      CREATE_COMMAND => Some(VOLUME_CREATE_CAPABILITY.as_ref()),
+      DELETE_COMMAND => Some(VOLUME_DELETE_CAPABILITY.as_ref()),
+      LIST_COMMAND => Some(VOLUME_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(VOLUME_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &VOLUME_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref VOLUME_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Create, "Create volume")
+  static ref VOLUME_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CREATE_COMMAND_PAIR, "Create volume")
       .set_long_about("Create a volume.")
       .set_default_command_executor(&VolumeCreate {})
       .add_target_argument(target_argument(VOLUME_SUBJECT_TARGET, None))
   );
-  pub static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Delete, "Delete volume")
+  static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete volume")
       .set_long_about("Delete a volume.")
       .set_default_command_executor(&VolumeDelete {})
       .add_target_argument(target_argument(VOLUME_SUBJECT_TARGET, None))
   );
-  pub static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List volumes")
+  static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List volumes")
       .set_long_about("Lists all available volumes.")
       .set_default_command_executor(&VolumeListAll {})
       .add_command_executors(vec![
@@ -87,8 +93,8 @@ lazy_static! {
         (FilterFlagType::Application, Some("List all applications that use the volume.".to_string()))
       ])
   );
-  pub static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show secret configuration")
+  static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show secret configuration")
       .set_default_command_executor(&VolumeShowAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
@@ -96,6 +102,8 @@ lazy_static! {
       ])
       .add_target_argument(target_argument(VOLUME_SUBJECT_TARGET, None))
   );
+  static ref VOLUME_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![VOLUME_CREATE_CAPABILITY.as_ref(), VOLUME_DELETE_CAPABILITY.as_ref(), VOLUME_LIST_CAPABILITY.as_ref(), VOLUME_SHOW_CAPABILITY.as_ref()];
 }
 
 struct VolumeCreate {}
@@ -108,7 +116,7 @@ impl CommandExecutor for VolumeCreate {
     if context.dsh_api_client.as_ref().unwrap().get_volume(&volume_id).await.is_ok() {
       return Err(format!("volume '{}' already exists", volume_id));
     }
-    let line = read_single_line("enter size in gigabytes: ")?;
+    let line = context.read_single_line("enter size in gigabytes: ")?;
     let size_gi_b = line.parse::<i64>().map_err(|_| format!("could not parse '{}' as a valid integer", line))?;
     let volume = Volume { size_gi_b };
     if context.dry_run {

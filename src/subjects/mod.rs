@@ -12,6 +12,7 @@ pub(crate) mod proxy;
 pub(crate) mod secret;
 pub(crate) mod setting;
 pub(crate) mod target;
+pub(crate) mod token;
 pub(crate) mod topic;
 pub(crate) mod vhost;
 pub(crate) mod volume;

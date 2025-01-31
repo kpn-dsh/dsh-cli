@@ -1,106 +1,39 @@
+use crate::context::Context;
+use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
-use std::fmt::{Display, Formatter};
 
-use crate::capability::CapabilityType::*;
-use crate::context::Context;
-use crate::subject::Subject;
-use crate::DshCliResult;
+pub(crate) const CREATE_COMMAND: &str = "create";
+pub(crate) const DEFAULT_COMMAND: &str = "default";
+pub(crate) const DELETE_COMMAND: &str = "delete";
+// pub(crate) const DIFF_COMMAND: &str = "diff";
+pub(crate) const FIND_COMMAND: &str = "find";
+pub(crate) const LIST_COMMAND: &str = "list";
+pub(crate) const NEW_COMMAND: &str = "new";
+pub(crate) const OPEN_COMMAND: &str = "open";
+pub(crate) const REQUEST_COMMAND: &str = "request";
+pub(crate) const SHOW_COMMAND: &str = "show";
+// pub(crate) const START_COMMAND: &str = "start";
+// pub(crate) const STOP_COMMAND: &str = "stop";
+pub(crate) const UPDATE_COMMAND: &str = "update";
 
-pub(crate) const CREATE: &str = "create";
-pub(crate) const DEFAULT: &str = "default";
-pub(crate) const DELETE: &str = "delete";
-pub(crate) const FIND: &str = "find";
-pub(crate) const DIFF: &str = "diff";
-pub(crate) const LIST: &str = "list";
-pub(crate) const NEW: &str = "new";
-pub(crate) const OPEN: &str = "open";
-pub(crate) const SHOW: &str = "show";
-pub(crate) const START: &str = "start";
-pub(crate) const STOP: &str = "stop";
-pub(crate) const UPDATE: &str = "update";
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum CapabilityType {
-  Create,
-  Default,
-  Delete,
-  Diff,
-  Find,
-  List,
-  New,
-  Open,
-  Show,
-  Start,
-  Stop,
-  Update,
-}
-
-pub(crate) static ALL_CAPABILITY_TYPES: [CapabilityType; 12] = [Create, Default, Delete, Diff, Find, List, New, Open, Show, Start, Stop, Update];
-
-impl TryFrom<&str> for CapabilityType {
-  type Error = String;
-
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
-    match value {
-      CREATE => Ok(Create),
-      DEFAULT => Ok(Default),
-      DELETE => Ok(Delete),
-      DIFF => Ok(Diff),
-      FIND => Ok(Find),
-      LIST => Ok(List),
-      NEW => Ok(New),
-      OPEN => Ok(Open),
-      SHOW => Ok(Show),
-      START => Ok(Start),
-      STOP => Ok(Stop),
-      UPDATE => Ok(Update),
-      _ => Err(format!("unrecognized capability type {}", value)),
-    }
-  }
-}
-
-impl CapabilityType {
-  pub(crate) fn command_alias(&self) -> Option<&'static str> {
-    match self {
-      Create => None,
-      Default => None,
-      Delete => None,
-      Diff => None,
-      Find => Some("f"),
-      List => Some("l"),
-      New => None,
-      Open => Some("o"),
-      Show => Some("s"),
-      Start => None,
-      Stop => None,
-      Update => None,
-    }
-  }
-}
-
-impl Display for CapabilityType {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Create => write!(f, "{}", CREATE),
-      Default => write!(f, "{}", DEFAULT),
-      Delete => write!(f, "{}", DELETE),
-      Diff => write!(f, "{}", DIFF),
-      Find => write!(f, "{}", FIND),
-      List => write!(f, "{}", LIST),
-      New => write!(f, "{}", NEW),
-      Open => write!(f, "{}", OPEN),
-      Show => write!(f, "{}", SHOW),
-      Start => write!(f, "{}", START),
-      Stop => write!(f, "{}", STOP),
-      Update => write!(f, "{}", UPDATE),
-    }
-  }
-}
+pub(crate) const CREATE_COMMAND_PAIR: (&str, &str) = (CREATE_COMMAND, "");
+pub(crate) const DEFAULT_COMMAND_PAIR: (&str, &str) = (DEFAULT_COMMAND, "");
+pub(crate) const DELETE_COMMAND_PAIR: (&str, &str) = (DELETE_COMMAND, "");
+// pub(crate) const DIFF_COMMAND_PAIR: (&str, &str) = (DIFF_COMMAND, "");
+pub(crate) const FIND_COMMAND_PAIR: (&str, &str) = (FIND_COMMAND, "f");
+pub(crate) const LIST_COMMAND_PAIR: (&str, &str) = (LIST_COMMAND, "l");
+pub(crate) const NEW_COMMAND_PAIR: (&str, &str) = (NEW_COMMAND, "");
+pub(crate) const OPEN_COMMAND_PAIR: (&str, &str) = (OPEN_COMMAND, "o");
+pub(crate) const REQUEST_COMMAND_PAIR: (&str, &str) = (REQUEST_COMMAND, "");
+pub(crate) const SHOW_COMMAND_PAIR: (&str, &str) = (SHOW_COMMAND, "s");
+// pub(crate) const START_COMMAND_PAIR: (&str, &str) = (START_COMMAND, "");
+// pub(crate) const STOP_COMMAND_PAIR: (&str, &str) = (STOP_COMMAND, "");
+pub(crate) const UPDATE_COMMAND_PAIR: (&str, &str) = (UPDATE_COMMAND, "");
 
 #[async_trait]
 pub trait Capability {
-  fn clap_capability_command(&self, subject: &dyn Subject) -> Command;
+  fn clap_capability_command(&self, subject_command: &str) -> Command;
 
   fn clap_flags(&self, subject: &str) -> Vec<Arg>;
 

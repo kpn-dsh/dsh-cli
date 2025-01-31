@@ -1,5 +1,10 @@
-#![doc(html_favicon_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
-#![doc(html_logo_url = "https://teamkpn.kpnnet.org/static/images/favicon.svg")]
+#![doc(
+  html_favicon_url = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPHN2ZyB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeD0iMHB4IiB5PSIwcHgiCiAgICAgdmlld0JveD0iMCAwIDE3MS4zIDE4Mi45IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAxNzEuMyAxODIuOTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgogICAgPHN0eWxlPgoJCSNrcG5fbG9nbyB7CgkJCWZpbGw6IGJsYWNrOwoJCX0KCgkJQG1lZGlhIChwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyaykgewoJCQkja3BuX2xvZ28gewoJCQkJZmlsbDogd2hpdGU7CgkJCX0KCQl9Cgk8L3N0eWxlPgogICAgPGcgaWQ9Imtwbl9sb2dvIj4KCQk8cGF0aCBkPSJNMTYxLjcsNzIuMWMtNS40LTUuNC0xNS4zLTExLjgtMzIuMi0xMS44Yy0zLjEsMC02LjIsMC4yLTkuMSwwLjZsLTAuOSwwLjFsMC4zLDAuOWMwLjgsMi42LDEuNCw1LjUsMS44LDguNGwwLjEsMC44CgkJCWwwLjgtMC4xYzIuNC0wLjMsNC43LTAuNCw3LTAuNGMxMy40LDAsMjEsNC44LDI1LDguOGM0LjIsNC4yLDYuNSw5LjYsNi41LDE1YzAsNi45LTMuNiwxNS42LTcuMiwyNC4xYy0xLjcsNC4yLTQuOSwxMi4zLTYuNywxOS4yCgkJCWMtMy4zLDEzLjEtOC44LDM1LTIxLjksMzVjLTQuMywwLTkuNC0yLjQtMTUuNS03LjJjLTMuMywxLjktNi44LDMuNC0xMC41LDQuNmM5LjgsOC43LDE4LjEsMTIuOCwyNiwxMi44CgkJCWMyMS4yLDAsMjguMS0yNy44LDMxLjgtNDIuN2MxLjEtNC42LDMuMy0xMC44LDYuMi0xNy43YzMuOS05LjQsOC0xOS4xLDgtMjhDMTcxLjMsODYuMywxNjcuOCw3OC4yLDE2MS43LDcyLjF6Ii8+CgkJPHBhdGggZD0iTTExNiw1Mi4ybDAuOS0wLjJjMi45LTAuNSw1LjktMC44LDkuMS0xYzAuMywwLDAuNiwwLDAuOSwwQzExMi45LDE3LjcsNzcuMiwwLDU2LjcsMEMyOS42LDAsMjAsMjcuNiwyMCw1My40CgkJCWMwLDEyLDQuMSwyNC42LDcuNSwzM2wwLjMsMC44bDAuOC0wLjNjMi40LTEuMSw1LTIuMSw4LTMuMmwwLjgtMC4zTDM3LDgyLjZjLTQuMy0xMC42LTYuOC0yMS4zLTYuOC0yOS4yYzAtMTYuNSw0LTMwLDExLjEtMzcKCQkJYzQuMS00LjEsOS4xLTYuMSwxNS40LTYuMUM3Mi44LDEwLjMsMTAzLDI1LjIsMTE2LDUyLjJ6Ii8+CgkJPHBhdGggZD0iTTk0LjksMTUxLjNsLTAuNC0wLjRsLTAuNSwwLjJjLTUuNSwyLTExLjEsMi45LTE3LjIsMi45Yy0yMCwwLTQxLjgtOC45LTU1LjYtMjIuOGMtNi45LTYuOS0xMC45LTE0LjMtMTAuOS0yMC4yCgkJCWMwLTguMSwzLTE0LjEsOS40LTE5Yy0xLjItMi45LTIuNi02LjMtMy44LTkuOUM1LjIsODkuMiwwLDk4LjcsMCwxMTFjMCw4LjcsNC45LDE4LjUsMTMuOSwyNy41YzEyLjQsMTIuNSwzNS41LDI1LjgsNjIuOSwyNS44CgkJCWM4LjYsMCwxNi44LTEuNywyNC40LTVsMS4xLTAuNWwtMC44LTAuOEM5OS4xLDE1NS43LDk2LjksMTUzLjQsOTQuOSwxNTEuM3oiLz4KCQk8cGF0aCBkPSJNODMuMiw3OS45di05QzgxLDcwLjMsNzguNSw3MCw3NS45LDcwYy0xMC41LDAtMTUuNiw3LjEtMTUuNiwxNC4yYzAsNi44LDIuNSwxMy4zLDExLjksMjcuOWMzLjgtMC41LDcuNi0wLjgsMTEuNC0wLjkKCQkJYy04LjItMTUuMi0xMC4yLTIwLjYtMTAuMi0yNC41YzAtNC41LDIuNi02LjgsNy45LTYuOEM4Miw3OS44LDgyLjYsNzkuOSw4My4yLDc5Ljl6Ii8+CgkJPHBhdGggZD0iTTU0LjcsOTMuMWMtMC44LTItMS4zLTUuMy0xLjYtNy43Yy04LjMtMC4zLTE0LjYsNC41LTE0LjYsMTEuMmMwLDUuNCwyLjgsMTAuMiwxNC4yLDE5LjljMi45LTEsNi44LTIuMSwxMC4xLTIuOAoJCQljLTExLjItMTAuNS0xMy0xMy4zLTEzLTE2LjRDNTAsOTUuMSw1MS42LDkzLjYsNTQuNyw5My4xeiIvPgoJCTxwYXRoIGQ9Ik05MC45LDc5Ljl2LTljMi4xLTAuNiw0LjctMC45LDcuMy0wLjljMTAuNCwwLDE1LjYsNy4xLDE1LjYsMTQuMmMwLDYuOC0yLjUsMTMuMy0xMS45LDI3LjljLTMuOC0wLjUtNy42LTAuOC0xMS40LTAuOQoJCQljOC4yLTE1LjIsMTAuMi0yMC42LDEwLjItMjQuNWMwLTQuNS0yLjYtNi44LTcuOS02LjhDOTIsNzkuOCw5MS40LDc5LjksOTAuOSw3OS45eiIvPgoJCTxwYXRoIGQ9Ik0xMTkuMyw5My4xYzAuOC0yLDEuMy01LjMsMS42LTcuN2M4LjMtMC4zLDE0LjYsNC41LDE0LjYsMTEuMmMwLDUuNC0yLjgsMTAuMi0xNC4yLDE5LjljLTIuOS0xLTYuOC0yLjEtMTAuMS0yLjgKCQkJYzExLjItMTAuNSwxMy0xMy4zLDEzLTE2LjRDMTI0LjEsOTUuMSwxMjIuNSw5My42LDExOS4zLDkzLjF6Ii8+CgkJPHBhdGggZD0iTTg3LDEzMC4yYzguNCwwLDE3LDEuMSwyNS45LDMuOGwzLTEwYy0xMC0zLTE5LjgtNC4yLTI5LTQuMmMtOS4yLDAtMTguOSwxLjItMjksNC4ybDMsMTBDNzAsMTMxLjMsNzguNiwxMzAuMiw4NywxMzAuMnoiCgkJLz4KCQk8cmVjdCB4PSI4MC41IiB5PSI0OS4zIiB0cmFuc2Zvcm09Im1hdHJpeCgwLjcwNzIgLTAuNzA3MSAwLjcwNzEgMC43MDcyIC0xMy45OTkyIDc3Ljg3NDQpIiB3aWR0aD0iMTMuMSIKCQkJICBoZWlnaHQ9IjEzLjEiLz4KCTwvZz4KPC9zdmc+Cg=="
+)]
+#![doc(
+  html_logo_url = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPHN2ZyB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeD0iMHB4IiB5PSIwcHgiCiAgICAgdmlld0JveD0iMCAwIDE3MS4zIDE4Mi45IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAxNzEuMyAxODIuOTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgogICAgPHN0eWxlPgoJCSNrcG5fbG9nbyB7CgkJCWZpbGw6IGJsYWNrOwoJCX0KCgkJQG1lZGlhIChwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyaykgewoJCQkja3BuX2xvZ28gewoJCQkJZmlsbDogd2hpdGU7CgkJCX0KCQl9Cgk8L3N0eWxlPgogICAgPGcgaWQ9Imtwbl9sb2dvIj4KCQk8cGF0aCBkPSJNMTYxLjcsNzIuMWMtNS40LTUuNC0xNS4zLTExLjgtMzIuMi0xMS44Yy0zLjEsMC02LjIsMC4yLTkuMSwwLjZsLTAuOSwwLjFsMC4zLDAuOWMwLjgsMi42LDEuNCw1LjUsMS44LDguNGwwLjEsMC44CgkJCWwwLjgtMC4xYzIuNC0wLjMsNC43LTAuNCw3LTAuNGMxMy40LDAsMjEsNC44LDI1LDguOGM0LjIsNC4yLDYuNSw5LjYsNi41LDE1YzAsNi45LTMuNiwxNS42LTcuMiwyNC4xYy0xLjcsNC4yLTQuOSwxMi4zLTYuNywxOS4yCgkJCWMtMy4zLDEzLjEtOC44LDM1LTIxLjksMzVjLTQuMywwLTkuNC0yLjQtMTUuNS03LjJjLTMuMywxLjktNi44LDMuNC0xMC41LDQuNmM5LjgsOC43LDE4LjEsMTIuOCwyNiwxMi44CgkJCWMyMS4yLDAsMjguMS0yNy44LDMxLjgtNDIuN2MxLjEtNC42LDMuMy0xMC44LDYuMi0xNy43YzMuOS05LjQsOC0xOS4xLDgtMjhDMTcxLjMsODYuMywxNjcuOCw3OC4yLDE2MS43LDcyLjF6Ii8+CgkJPHBhdGggZD0iTTExNiw1Mi4ybDAuOS0wLjJjMi45LTAuNSw1LjktMC44LDkuMS0xYzAuMywwLDAuNiwwLDAuOSwwQzExMi45LDE3LjcsNzcuMiwwLDU2LjcsMEMyOS42LDAsMjAsMjcuNiwyMCw1My40CgkJCWMwLDEyLDQuMSwyNC42LDcuNSwzM2wwLjMsMC44bDAuOC0wLjNjMi40LTEuMSw1LTIuMSw4LTMuMmwwLjgtMC4zTDM3LDgyLjZjLTQuMy0xMC42LTYuOC0yMS4zLTYuOC0yOS4yYzAtMTYuNSw0LTMwLDExLjEtMzcKCQkJYzQuMS00LjEsOS4xLTYuMSwxNS40LTYuMUM3Mi44LDEwLjMsMTAzLDI1LjIsMTE2LDUyLjJ6Ii8+CgkJPHBhdGggZD0iTTk0LjksMTUxLjNsLTAuNC0wLjRsLTAuNSwwLjJjLTUuNSwyLTExLjEsMi45LTE3LjIsMi45Yy0yMCwwLTQxLjgtOC45LTU1LjYtMjIuOGMtNi45LTYuOS0xMC45LTE0LjMtMTAuOS0yMC4yCgkJCWMwLTguMSwzLTE0LjEsOS40LTE5Yy0xLjItMi45LTIuNi02LjMtMy44LTkuOUM1LjIsODkuMiwwLDk4LjcsMCwxMTFjMCw4LjcsNC45LDE4LjUsMTMuOSwyNy41YzEyLjQsMTIuNSwzNS41LDI1LjgsNjIuOSwyNS44CgkJCWM4LjYsMCwxNi44LTEuNywyNC40LTVsMS4xLTAuNWwtMC44LTAuOEM5OS4xLDE1NS43LDk2LjksMTUzLjQsOTQuOSwxNTEuM3oiLz4KCQk8cGF0aCBkPSJNODMuMiw3OS45di05QzgxLDcwLjMsNzguNSw3MCw3NS45LDcwYy0xMC41LDAtMTUuNiw3LjEtMTUuNiwxNC4yYzAsNi44LDIuNSwxMy4zLDExLjksMjcuOWMzLjgtMC41LDcuNi0wLjgsMTEuNC0wLjkKCQkJYy04LjItMTUuMi0xMC4yLTIwLjYtMTAuMi0yNC41YzAtNC41LDIuNi02LjgsNy45LTYuOEM4Miw3OS44LDgyLjYsNzkuOSw4My4yLDc5Ljl6Ii8+CgkJPHBhdGggZD0iTTU0LjcsOTMuMWMtMC44LTItMS4zLTUuMy0xLjYtNy43Yy04LjMtMC4zLTE0LjYsNC41LTE0LjYsMTEuMmMwLDUuNCwyLjgsMTAuMiwxNC4yLDE5LjljMi45LTEsNi44LTIuMSwxMC4xLTIuOAoJCQljLTExLjItMTAuNS0xMy0xMy4zLTEzLTE2LjRDNTAsOTUuMSw1MS42LDkzLjYsNTQuNyw5My4xeiIvPgoJCTxwYXRoIGQ9Ik05MC45LDc5Ljl2LTljMi4xLTAuNiw0LjctMC45LDcuMy0wLjljMTAuNCwwLDE1LjYsNy4xLDE1LjYsMTQuMmMwLDYuOC0yLjUsMTMuMy0xMS45LDI3LjljLTMuOC0wLjUtNy42LTAuOC0xMS40LTAuOQoJCQljOC4yLTE1LjIsMTAuMi0yMC42LDEwLjItMjQuNWMwLTQuNS0yLjYtNi44LTcuOS02LjhDOTIsNzkuOCw5MS40LDc5LjksOTAuOSw3OS45eiIvPgoJCTxwYXRoIGQ9Ik0xMTkuMyw5My4xYzAuOC0yLDEuMy01LjMsMS42LTcuN2M4LjMtMC4zLDE0LjYsNC41LDE0LjYsMTEuMmMwLDUuNC0yLjgsMTAuMi0xNC4yLDE5LjljLTIuOS0xLTYuOC0yLjEtMTAuMS0yLjgKCQkJYzExLjItMTAuNSwxMy0xMy4zLDEzLTE2LjRDMTI0LjEsOTUuMSwxMjIuNSw5My42LDExOS4zLDkzLjF6Ii8+CgkJPHBhdGggZD0iTTg3LDEzMC4yYzguNCwwLDE3LDEuMSwyNS45LDMuOGwzLTEwYy0xMC0zLTE5LjgtNC4yLTI5LTQuMmMtOS4yLDAtMTguOSwxLjItMjksNC4ybDMsMTBDNzAsMTMxLjMsNzguNiwxMzAuMiw4NywxMzAuMnoiCgkJLz4KCQk8cmVjdCB4PSI4MC41IiB5PSI0OS4zIiB0cmFuc2Zvcm09Im1hdHJpeCgwLjcwNzIgLTAuNzA3MSAwLjcwNzEgMC43MDcyIC0xMy45OTkyIDc3Ljg3NDQpIiB3aWR0aD0iMTMuMSIKCQkJICBoZWlnaHQ9IjEzLjEiLz4KCTwvZz4KPC9zdmc+Cg=="
+)]
+extern crate core;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -10,21 +15,24 @@ use std::process::{ExitCode, Termination};
 
 use crate::arguments::{
   dry_run_argument, force_argument, guid_argument, matching_style_argument, no_escape_argument, output_format_argument, password_file_argument, platform_argument, quiet_argument,
-  set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, PlatformArgument, GUID_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT,
-  TENANT_ARGUMENT,
+  set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, GUID_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::settings::{get_password_from_keyring, read_settings, read_target, Settings};
-use crate::subject::{clap_list_shortcut_command, clap_subject_command, Subject};
+use crate::settings::{get_password_from_keyring, read_settings, read_target, read_target_and_password, Settings};
+use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::application::APPLICATION_SUBJECT;
-use clap::builder::styling;
+use crate::subjects::platform::PLATFORM_SUBJECT;
+use clap::builder::{styling, Styles};
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
 use dsh_api::platform::DshPlatform;
+use dsh_api::{api_version, crate_version, ENV_VAR_PLATFORMS_FILE_NAME};
+use lazy_static::lazy_static;
+use rpassword::prompt_password;
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
@@ -37,12 +45,11 @@ use subjects::secret::SECRET_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
 // #[cfg(feature = "stream")]
 // use subjects::stream::STREAM_SUBJECT;
-use crate::subjects::platform::PLATFORM_SUBJECT;
+use crate::subjects::token::TOKEN_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
 use subjects::volume::VOLUME_SUBJECT;
-use termion::input::TermRead;
 
 mod arguments;
 mod autocomplete;
@@ -56,6 +63,14 @@ mod modifier_flags;
 mod settings;
 mod subject;
 mod subjects;
+
+lazy_static! {
+  static ref STYLES: Styles = Styles::styled()
+    .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
+    .placeholder(styling::AnsiColor::Cyan.on_default());
+}
 
 pub(crate) static APPLICATION_NAME: &str = "dsh";
 
@@ -73,7 +88,8 @@ static LONG_ABOUT: &str = "DSH resource management api command line interface\n\
 static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
-static LONG_VERSION: &str = "version: 0.2.0\ndsh-api library version: 0.2.0\ndsh rest api version: 1.8.0";
+
+static VERSION: &str = "0.4.0";
 
 static ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
 static ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
@@ -118,12 +134,6 @@ async fn inner_main() -> DshCliResult {
 
   let settings = read_settings(None)?;
 
-  let styles = styling::Styles::styled()
-    .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
-    .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
-    .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
-    .placeholder(styling::AnsiColor::Cyan.on_default());
-
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
     API_SUBJECT.as_ref(),
     APP_SUBJECT.as_ref(),
@@ -139,6 +149,7 @@ async fn inner_main() -> DshCliResult {
     SECRET_SUBJECT.as_ref(),
     // #[cfg(feature = "stream")]
     // STREAM_SUBJECT.as_ref(),
+    TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
     VOLUME_SUBJECT.as_ref(),
@@ -152,45 +163,16 @@ async fn inner_main() -> DshCliResult {
   let mut clap_commands: Vec<Command> = Vec::new();
 
   for subject in subjects {
-    let (command_name, clap_command) = clap_subject_command(subject);
+    let (command_name, clap_command) = subject.clap_subject_command();
     subject_registry.insert(command_name.to_string(), subject);
     clap_commands.push(clap_command);
-    if let Some((list_shortcut_name, clap_list_command_shortcut)) = clap_list_shortcut_command(subject) {
+    if let Some((list_shortcut_name, clap_list_command_shortcut)) = subject.clap_list_shortcut_command() {
       subject_list_shortcut_registry.insert(list_shortcut_name.to_string(), subject);
       clap_commands.push(clap_list_command_shortcut);
     }
   }
 
-  let mut command = Command::new(APPLICATION_NAME)
-    .about(ABOUT)
-    .author(AUTHOR)
-    .long_about(LONG_ABOUT)
-    .after_help(AFTER_HELP)
-    .args(vec![
-      platform_argument(),
-      tenant_argument(),
-      guid_argument(),
-      password_file_argument(),
-      output_format_argument(),
-      set_verbosity_argument(),
-      dry_run_argument(),
-      force_argument(),
-      matching_style_argument(),
-      no_escape_argument(),
-      quiet_argument(),
-      show_execution_time_argument(),
-      terminal_width_argument(),
-      generate_autocomplete_file_argument(),
-    ])
-    .subcommand_value_name("SUBJECT/COMMAND")
-    .subcommand_help_heading("Subjects/commands")
-    .arg_required_else_help(true)
-    .max_term_width(120)
-    .hide_possible_values(false)
-    .styles(styles)
-    .subcommands(clap_commands)
-    .version("0.2.0")
-    .long_version(LONG_VERSION);
+  let mut command = create_command(&clap_commands);
 
   let matches = command.clone().get_matches();
 
@@ -202,23 +184,25 @@ async fn inner_main() -> DshCliResult {
   match matches.subcommand() {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
-        if subject.requires_dsh_api_client() {
+        let requirements = subject.requirements(sub_matches);
+        if requirements.needs_dsh_api_client {
           let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
-          let context = Context::create(&matches, Some(factory.client().await?))?;
+          let context = Context::create(&matches, &requirements, Some(factory.client().await?))?;
           subject.execute_subject_command(sub_matches, &context).await?;
         } else {
-          let context = Context::create(&matches, None)?;
+          let context = Context::create(&matches, &requirements, None)?;
           subject.execute_subject_command(sub_matches, &context).await?;
         };
       }
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject) => {
-          if subject.requires_dsh_api_client() {
+          let requirements = subject.requirements(sub_matches);
+          if requirements.needs_dsh_api_client {
             let factory = get_api_client_factory(&matches, settings.as_ref()).await?;
-            let context = Context::create(&matches, Some(factory.client().await?))?;
+            let context = Context::create(&matches, &requirements, Some(factory.client().await?))?;
             subject.execute_subject_list_shortcut(sub_matches, &context).await?;
           } else {
-            let context = Context::create(&matches, None)?;
+            let context = Context::create(&matches, &requirements, None)?;
             subject.execute_subject_list_shortcut(sub_matches, &context).await?;
           };
         }
@@ -228,6 +212,44 @@ async fn inner_main() -> DshCliResult {
     None => return Err("unexpected error, no subcommand".to_string()),
   };
   Ok(())
+}
+
+fn create_command(clap_commands: &Vec<Command>) -> Command {
+  Command::new(APPLICATION_NAME)
+    .about(ABOUT)
+    .author(AUTHOR)
+    .long_about(LONG_ABOUT)
+    .after_help(AFTER_HELP)
+    .args(vec![
+      platform_argument(),
+      tenant_argument(),
+      guid_argument(),
+      password_file_argument(),
+      output_format_argument(), // TODO Should this one be at this level?
+      set_verbosity_argument(),
+      dry_run_argument(),
+      force_argument(),
+      matching_style_argument(), // TODO Should this one be at this level?
+      no_escape_argument(),      // TODO Should this one be at this level?
+      quiet_argument(),
+      show_execution_time_argument(), // TODO Should this one be at this level?
+      terminal_width_argument(),      // TODO Should this one be at this level?
+      generate_autocomplete_file_argument(),
+    ])
+    .subcommand_value_name("SUBJECT/COMMAND")
+    .subcommand_help_heading("Subjects/commands")
+    .arg_required_else_help(true)
+    .max_term_width(120)
+    .hide_possible_values(false)
+    .styles(STYLES.clone())
+    .subcommands(clap_commands)
+    .version(VERSION)
+    .long_version(format!(
+      "version: {}\ndsh-api library version: {}\ndsh rest api version: {}",
+      VERSION,
+      crate_version(),
+      api_version()
+    ))
 }
 
 async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiClientFactory, String> {
@@ -260,12 +282,12 @@ fn get_dsh_api_tenant(matches: &ArgMatches, settings: Option<&Settings>) -> Resu
 /// ## Returns
 /// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
 fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshPlatform, String> {
-  match matches.get_one::<PlatformArgument>(PLATFORM_ARGUMENT) {
-    Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.to_string().as_str()),
+  match matches.get_one::<String>(PLATFORM_ARGUMENT) {
+    Some(platform_from_argument) => Ok(DshPlatform::try_from(platform_from_argument.as_str()).unwrap()),
     None => match std::env::var(ENV_VAR_PLATFORM) {
       Ok(platform_name_from_env_var) => DshPlatform::try_from(platform_name_from_env_var.as_str()),
       Err(_) => match settings.and_then(|settings| settings.default_platform.clone()) {
-        Some(platform_name_from_settings) => DshPlatform::try_from(platform_name_from_settings.as_str()),
+        Some(default_platform_name_from_settings) => DshPlatform::try_from(default_platform_name_from_settings.as_str()),
         None => {
           if stdin().is_terminal() {
             DshPlatform::try_from(read_single_line("platform name: ")?.as_str())
@@ -371,14 +393,14 @@ fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> 
 /// An `Ok<String>` containing the password, or an `Err<String>`.
 fn get_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
   match matches.get_one::<PathBuf>(PASSWORD_FILE_ARGUMENT) {
-    Some(password_file) => read_password_file(password_file),
+    Some(password_file_from_arg) => read_password_file(password_file_from_arg),
     None => match std::env::var(ENV_VAR_PASSWORD_FILE) {
-      Ok(password_file) => read_password_file(password_file),
+      Ok(password_file_from_env) => read_password_file(password_file_from_env),
       Err(_) => match std::env::var(ENV_VAR_PASSWORD) {
         Ok(password_from_env_var) => Ok(password_from_env_var),
         Err(_) => match get_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
           Some(password_from_keyring) => Ok(password_from_keyring),
-          None => match read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())?.and_then(|target| target.password) {
+          None => match read_target_and_password(dsh_api_tenant.platform(), dsh_api_tenant.name())?.and_then(|target| target.password) {
             Some(password_from_target) => Ok(password_from_target),
             None => {
               if stdin().is_terminal() {
@@ -408,19 +430,6 @@ fn read_password_file<T: AsRef<Path>>(password_file: T) -> Result<String, String
   }
 }
 
-pub(crate) fn read_multi_line() -> Result<String, String> {
-  let mut multi_line = String::new();
-  let stdin = stdin();
-  loop {
-    match stdin.read_line(&mut multi_line) {
-      Ok(0) => break,
-      Ok(_) => continue,
-      Err(_) => return Err("error reading line".to_string()),
-    }
-  }
-  Ok(multi_line)
-}
-
 pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String> {
   print!("{}", prompt.as_ref());
   let _ = stdout().lock().flush();
@@ -430,16 +439,9 @@ pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String
 }
 
 pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<String, String> {
-  print!("{}", prompt.as_ref());
-  let mut stdout = stdout();
-  let _ = stdout.flush();
-  let mut stdin = stdin();
-  match stdin.read_passwd(&mut stdout).map_err(|error| error.to_string())? {
-    Some(line) => {
-      let _ = stdout.write("\n".as_bytes());
-      Ok(line.trim().to_string())
-    }
-    None => Err("empty input".to_string()),
+  match prompt_password(prompt.as_ref()) {
+    Ok(line) => Ok(line.trim().to_string()),
+    Err(_) => Err("empty input".to_string()),
   }
 }
 
@@ -468,6 +470,19 @@ pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
       environment_variables.push((env_var, value));
     }
   }
+  if let Ok(platforms_file) = std::env::var(ENV_VAR_PLATFORMS_FILE_NAME) {
+    environment_variables.push((ENV_VAR_PLATFORMS_FILE_NAME.to_string(), platforms_file));
+  }
   environment_variables.sort_by(|(env_var_a, _), (env_var_b, _)| env_var_a.cmp(env_var_b));
   environment_variables
+}
+
+#[test]
+fn test_open_api_version() {
+  assert_eq!(api_version(), "1.9.0");
+}
+
+#[test]
+fn test_dsh_api_version() {
+  assert_eq!(crate_version(), "0.4.0");
 }

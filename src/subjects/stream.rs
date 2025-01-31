@@ -1,3 +1,6 @@
+use crate::subject::Requirements;
+use clap::ArgMatches;
+
 // use std::collections::HashMap;
 //
 // use async_trait::async_trait;
@@ -47,8 +50,8 @@
 //     self.subject()
 //   }
 //
-//   fn requires_dsh_api_client(&self) -> bool {
-//     true
+//   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
+//     Requirements::new(true, None)
 //   }
 //
 //   fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {

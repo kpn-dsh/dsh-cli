@@ -7,13 +7,12 @@ use dsh_api::types::Application;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::time::Instant;
 
 use dsh_api::types::{Task, TaskStatus};
 
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -21,7 +20,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{include_started_stopped, DshCliResult};
 
@@ -47,21 +46,26 @@ impl Subject for ApplicationSubject {
     Some("a")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities = HashMap::new();
-    capabilities.insert(CapabilityType::List, APPLICATION_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, APPLICATION_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(APPLICATION_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(APPLICATION_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &APPLICATION_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List applications")
+  static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List applications")
       .set_long_about(
         "Lists all deployed DSH applications. \
         This will also include applications that are stopped \
@@ -79,8 +83,8 @@ lazy_static! {
         (FilterFlagType::Stopped, Some("List all stopped applications.".to_string()))
       ])
   );
-  pub static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show application configuration")
+  static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show application configuration")
       .set_long_about("Show the configuration of an application deployed on the DSH.")
       .set_default_command_executor(&ApplicationShowAll {})
       .add_command_executors(vec![
@@ -89,6 +93,7 @@ lazy_static! {
       ])
       .add_target_argument(target_argument(APPLICATION_SUBJECT_TARGET, None))
   );
+  static ref APPLICATION_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APPLICATION_LIST_CAPABILITY.as_ref(), APPLICATION_SHOW_CAPABILITY.as_ref()];
 }
 
 struct ApplicationListAll {}

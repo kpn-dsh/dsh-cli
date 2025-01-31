@@ -7,7 +7,6 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use serde_json::de::from_str;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::formatters::formatter::{Label, SubjectFormatter};
@@ -15,14 +14,14 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use dsh_api::types::AppCatalogManifest;
 
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 
 pub(crate) struct ManifestSubject {}
@@ -47,31 +46,37 @@ impl Subject for ManifestSubject {
     "Show the manifest files for the apps in the DSH App Catalog.".to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::List, MANIFEST_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, MANIFEST_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(MANIFEST_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(MANIFEST_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &MANIFEST_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List manifests")
+  static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List manifests")
       .set_long_about("Lists all manifest files from the App Catalog.")
       .set_default_command_executor(&ManifestListAll {})
       .add_command_executor(FlagType::Ids, &ManifestListIds {}, None)
       .set_run_all_executors(true)
   );
-  pub static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show manifest configuration")
+  static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show manifest configuration")
       .set_default_command_executor(&ManifestShowAll {})
       .add_target_argument(target_argument(MANIFEST_SUBJECT_TARGET, None))
   );
+  static ref MANIFEST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];
 }
 
 struct ManifestListAll {}

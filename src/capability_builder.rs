@@ -1,17 +1,18 @@
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor};
 use crate::context::Context;
 use crate::filter_flags::{create_filter_flag, FilterFlagType};
 use crate::flags::{create_flag, FlagType};
 use crate::modifier_flags::{create_modifier_flag, ModifierFlagType};
-use crate::subject::Subject;
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 
 pub struct CapabilityBuilder<'a> {
-  capability_type: CapabilityType,
+  capability_command_name: String,
+  capability_command_alias: Option<String>,
   about: String,
   long_about: Option<String>,
+  subcommands: Vec<Command>,
   executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<String>)>,
   default_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
   run_all_executors: bool,
@@ -27,11 +28,13 @@ impl<'a> CapabilityBuilder<'a> {
   /// ## Parameters
   /// * `capability_type` -
   /// * `about` - help text printed when -h flag is provided
-  pub fn new(capability_type: CapabilityType, about: impl Into<String>) -> Self {
+  pub fn new(command_pair: (&str, &str), about: impl Into<String>) -> Self {
     Self {
-      capability_type,
+      capability_command_name: command_pair.0.to_string(),
+      capability_command_alias: if command_pair.1.is_empty() { None } else { Some(command_pair.1.to_string()) },
       about: about.into(),
       long_about: None,
+      subcommands: vec![],
       executors: vec![],
       default_executor: None,
       run_all_executors: false,
@@ -50,6 +53,18 @@ impl<'a> CapabilityBuilder<'a> {
   /// * `long_about` - long help text
   pub fn set_long_about(mut self, long_about: impl Into<String>) -> Self {
     self.long_about = Some(long_about.into());
+    self
+  }
+
+  pub fn _add_subcommand(mut self, subcommand: Command) -> Self {
+    self.subcommands.push(subcommand);
+    self
+  }
+
+  pub fn add_subcommands(mut self, subcommands: Vec<Command>) -> Self {
+    for subcommand in subcommands {
+      self.subcommands.push(subcommand);
+    }
     self
   }
 
@@ -85,7 +100,7 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn add_extra_argument(mut self, argument: Arg) -> Self {
+  pub fn _add_extra_argument(mut self, argument: Arg) -> Self {
     self.extra_arguments.push(argument);
     self
   }
@@ -121,15 +136,17 @@ impl<'a> CapabilityBuilder<'a> {
 }
 
 #[async_trait]
-impl<'a> Capability for CapabilityBuilder<'a> {
-  fn clap_capability_command(&self, subject: &dyn Subject) -> Command {
-    let mut capability_command = Command::new(self.capability_type.to_string())
-      .name(self.capability_type.to_string())
+impl Capability for CapabilityBuilder<'_> {
+  fn clap_capability_command(&self, subject_command: &str) -> Command {
+    let mut capability_command = Command::new(self.capability_command_name.clone())
+      .name(self.capability_command_name.clone())
       .about(&self.about)
+      .subcommands(&self.subcommands)
+      .subcommand_required(!self.subcommands.is_empty())
       .args(&self.target_arguments)
-      .args(self.clap_flags(subject.subject()))
+      .args(self.clap_flags(subject_command))
       .args(&self.extra_arguments);
-    if let Some(alias) = self.capability_type.command_alias() {
+    if let Some(ref alias) = self.capability_command_alias {
       capability_command = capability_command.alias(alias)
     }
     if let Some(ref long_about) = self.long_about {

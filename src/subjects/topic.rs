@@ -10,11 +10,10 @@ use futures::future::try_join_all;
 use futures::try_join;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -22,7 +21,7 @@ use crate::formatters::formatter::PROPERTY_LABELS;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS_LIST};
 use crate::DshCliResult;
 
@@ -52,28 +51,33 @@ impl Subject for TopicSubject {
     Some("t")
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::Delete, TOPIC_DELETE_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::List, TOPIC_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, TOPIC_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      DELETE_COMMAND => Some(TOPIC_DELETE_CAPABILITY.as_ref()),
+      LIST_COMMAND => Some(TOPIC_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(TOPIC_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &TOPIC_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Delete, "Delete scratch topic")
+  static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete scratch topic")
       .set_long_about("Delete a scratch topic.")
       .set_default_command_executor(&TopicDelete {})
       .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
   );
-  pub static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List topics")
+  static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List topics")
       .set_long_about("Lists all available scratch topics.")
       .set_default_command_executor(&TopicListConfiguration {})
       .add_command_executors(vec![
@@ -83,8 +87,8 @@ lazy_static! {
       ])
       .set_run_all_executors(true)
   );
-  pub static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show topic configuration")
+  static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show topic configuration")
       .set_default_command_executor(&TopicShow {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
@@ -93,6 +97,8 @@ lazy_static! {
       ])
       .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
   );
+  static ref TOPIC_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![TOPIC_DELETE_CAPABILITY.as_ref(), TOPIC_LIST_CAPABILITY.as_ref(), TOPIC_SHOW_CAPABILITY.as_ref()];
 }
 
 struct TopicDelete {}

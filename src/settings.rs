@@ -4,7 +4,8 @@ use crate::formatters::OutputFormat;
 use crate::APPLICATION_NAME;
 use dsh_api::platform::DshPlatform;
 use homedir::my_home;
-use serde::{Deserialize, Serialize};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::env;
 use std::fmt::{Debug, Display, Formatter};
 use std::fs;
@@ -56,6 +57,7 @@ pub(crate) struct Settings {
 ///   but instead in the keyring
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub(crate) struct Target {
+  #[serde(deserialize_with = "dsh_platform_from_name")]
   pub(crate) platform: DshPlatform,
   pub(crate) tenant: String,
   #[serde(rename = "group-user-id")]
@@ -188,7 +190,7 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
   }
 }
 
-/// # Read target
+/// # Read target and password
 ///
 /// This function will read the target parameters from the target settings file (if it exists)
 /// and the target password from the keyring.
@@ -204,12 +206,39 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
 ///   but the `password` field can be empty if there was no matching keyring entry
 /// * `Ok(None)` - if the target setting was not available
 /// * `Err(message)` - if an error occurred
-pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
+pub(crate) fn read_target_and_password(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
   let target_file = target_file(platform, tenant)?;
   match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
     Some(target) => {
       log::debug!("read target file '{}'", target_file.to_string_lossy());
       Ok(Some(Target { password: get_password_from_keyring(platform, tenant)?, ..target }))
+    }
+    None => {
+      log::debug!("could not read target file '{}'", target_file.to_string_lossy());
+      Ok(None)
+    }
+  }
+}
+
+/// # Read target
+///
+/// This function will read the target parameters from the target settings file (if it exists).
+/// The `password` field of the returned `Target` will always be `None`.
+///
+/// ## Parameters
+/// * `platform` - target platform
+/// * `tenant` - target tenant name
+///
+/// ## Returns
+/// * `Ok(Some(target))` - if the target setting was available a `Target` will be returned.
+/// * `Ok(None)` - if the target setting was not available
+/// * `Err(message)` - if an error occurred
+pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
+  let target_file = target_file(platform, tenant)?;
+  match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
+    Some(target) => {
+      log::debug!("read target file '{}'", target_file.to_string_lossy());
+      Ok(Some(Target { password: None, ..target }))
     }
     None => {
       log::debug!("could not read target file '{}'", target_file.to_string_lossy());
@@ -429,4 +458,11 @@ where
       Err(message)
     }
   }
+}
+
+fn dsh_platform_from_name<'de, D>(deserializer: D) -> Result<DshPlatform, D::Error>
+where
+  D: Deserializer<'de>,
+{
+  DshPlatform::try_from(String::deserialize(deserializer)?.as_str()).map_err(Error::custom)
 }

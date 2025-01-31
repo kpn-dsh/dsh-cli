@@ -1,19 +1,23 @@
 use crate::arguments::{
-  Verbosity, DRY_RUN_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT, TERMINAL_WIDTH_ARGUMENT,
-  VERBOSITY_ARGUMENT,
+  Verbosity, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT,
+  TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::formatters::OutputFormat;
 use crate::settings::{read_settings, Settings};
+use crate::subject::Requirements;
+use crate::{get_guid, get_platform, get_tenant_name};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::platform::DshPlatform;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
+use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
-use std::io::{stdin, stdout, IsTerminal, Write};
+use std::io::{stderr, stdin, stdout, IsTerminal, Write};
 use std::time::Instant;
-use termion::terminal_size;
+use terminal_size::{terminal_size, Height, Width};
 
 static ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
 static ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
@@ -37,19 +41,25 @@ pub(crate) struct Context<'a> {
   pub(crate) matching_style: Option<MatchingStyle>,
   pub(crate) no_escape: bool,
   pub(crate) output_format: OutputFormat,
+  pub(crate) platform: Option<DshPlatform>,
   pub(crate) quiet: bool,
+  #[allow(unused)]
+  pub(crate) tenant_guid: Option<u16>,
+  pub(crate) tenant_name: Option<String>,
   pub(crate) terminal_width: Option<usize>,
   pub(crate) show_execution_time: bool,
   pub(crate) show_labels: bool,
   pub(crate) _stderr_escape: bool,
-  pub(crate) _stdin_terminal: bool,
+  pub(crate) stdin_is_terminal: bool,
   pub(crate) _stdout_escape: bool,
   pub(crate) verbosity: Verbosity,
 }
 
 impl Context<'_> {
-  pub(crate) fn create<'a>(matches: &'a ArgMatches, dsh_api_client: Option<DshApiClient<'a>>) -> Result<Context<'a>, String> {
+  pub(crate) fn create<'a>(matches: &'a ArgMatches, requirements: &Requirements, dsh_api_client: Option<DshApiClient<'a>>) -> Result<Context<'a>, String> {
     let settings: Option<Settings> = read_settings(None)?;
+    let stdin_is_terminal = stdin().is_terminal();
+
     let csv_quote = Self::csv_quote(settings.as_ref())?;
     let csv_separator = Self::csv_separator(settings.as_ref())?;
     if let Some(quote) = csv_quote {
@@ -59,27 +69,26 @@ impl Context<'_> {
     }
     let dry_run = Self::dry_run(matches, settings.as_ref());
     let no_escape = Self::no_escape(matches, settings.as_ref());
-    let (matching_style, stderr_escape, stdout_escape) = if no_escape {
-      (None, false, false)
-    } else {
-      (
-        Self::matching_style(matches, settings.as_ref())?,
-        std::io::stderr().is_terminal(),
-        std::io::stdout().is_terminal(),
-      )
-    };
+    let (matching_style, stderr_escape, stdout_escape) =
+      if no_escape { (None, false, false) } else { (Self::matching_style(matches, settings.as_ref())?, stderr().is_terminal(), stdout().is_terminal()) };
     let quiet = Self::quiet(matches, settings.as_ref());
     let force = Self::force(matches, settings.as_ref());
     let (output_format, show_execution_time, verbosity) = if quiet {
       (OutputFormat::Quiet, false, Verbosity::Off)
     } else {
       (
-        Self::output_format(matches, settings.as_ref())?,
+        Self::output_format(matches, settings.as_ref(), requirements.default_output_format.clone())?,
         Self::show_execution_time(matches, settings.as_ref()),
         Self::verbosity(matches, settings.as_ref())?,
       )
     };
+    let platform = get_platform(matches, settings.as_ref()).ok();
     let show_labels = true;
+    let tenant_name = get_tenant_name(matches, settings.as_ref()).ok();
+    let tenant_guid = match (&platform, &tenant_name) {
+      (Some(platform), Some(tenant)) => get_guid(matches, platform, tenant).ok(),
+      _ => None,
+    };
     let terminal_width = Self::terminal_width(matches, settings.as_ref())?;
     if dry_run && verbosity >= Verbosity::Medium {
       eprintln!("dry-run mode enabled");
@@ -93,12 +102,15 @@ impl Context<'_> {
       matching_style,
       no_escape,
       output_format,
+      platform,
       quiet,
       show_execution_time,
       show_labels,
+      tenant_guid,
+      tenant_name,
       terminal_width,
       _stderr_escape: stderr_escape,
-      _stdin_terminal: stdin().is_terminal(),
+      stdin_is_terminal,
       _stdout_escape: stdout_escape,
       verbosity,
     })
@@ -112,7 +124,8 @@ impl Context<'_> {
       let _ = stdout().lock().flush();
       let mut line = String::new();
       stdin().read_line(&mut line).expect("could not read line");
-      Ok(line == *"yes\n")
+      line = line.trim().to_string();
+      Ok(line == *"yes")
     }
   }
 
@@ -176,7 +189,7 @@ impl Context<'_> {
   /// 1. Try flag `--force`
   /// 1. Default to `false`
   fn force(matches: &ArgMatches, _settings: Option<&Settings>) -> bool {
-    matches.get_flag(DRY_RUN_ARGUMENT)
+    matches.get_flag(FORCE_ARGUMENT)
   }
 
   /// Gets matching_style context value
@@ -214,16 +227,20 @@ impl Context<'_> {
   /// 1. Try flag `--output-format`
   /// 1. Try environment variable `DSH_CLI_OUTPUT_FORMAT`
   /// 1. Try settings file
+  /// 1. Try default_output_format parameter
   /// 1. If stdout is a terminal default to `OutputFormat::Table`,
   ///    else default to `OutputFormat::Json`
-  fn output_format(matches: &ArgMatches, settings: Option<&Settings>) -> Result<OutputFormat, String> {
+  fn output_format(matches: &ArgMatches, settings: Option<&Settings>, default_output_format: Option<OutputFormat>) -> Result<OutputFormat, String> {
     match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
       Some(output_format_argument) => Ok(output_format_argument.to_owned()),
       None => match std::env::var(ENV_VAR_OUTPUT_FORMAT) {
         Ok(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str()).map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_OUTPUT_FORMAT)),
         Err(_) => match settings.and_then(|settings| settings.output_format.clone()) {
           Some(output_format_from_settings) => Ok(output_format_from_settings),
-          None => Ok(if std::io::stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
+          None => match default_output_format {
+            Some(output_format_from_default) => Ok(output_format_from_default),
+            None => Ok(if stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
+          },
         },
       },
     }
@@ -280,8 +297,11 @@ impl Context<'_> {
         Err(_) => match settings.and_then(|settings| settings.terminal_width) {
           Some(terminal_width_from_settings) => Ok(Some(terminal_width_from_settings)),
           None => {
-            if std::io::stdout().is_terminal() {
-              Ok(terminal_size().ok().map(|(width, _)| width as usize))
+            if stdout().is_terminal() {
+              match terminal_size() {
+                Some((Width(width), Height(_))) => Ok(Some(width as usize)),
+                None => Ok(None),
+              }
             } else {
               Ok(None)
             }
@@ -322,6 +342,44 @@ impl Context<'_> {
     }
   }
 
+  /// # Prints serializable output to stdout
+  ///
+  /// This method is used to print a serialized version of the output of the tool
+  /// to the standard output device.
+  /// If `quiet` is `true`, nothing will be printed.
+  /// This standard output device can either be a tty, a pipe or an output file,
+  /// depending on how the tool was run from a shell or script.
+  pub(crate) fn print_serializable<T: Serialize>(&self, output: T) {
+    if !self.quiet {
+      match self.output_format {
+        OutputFormat::Json => match serde_json::to_string_pretty(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to json failed"),
+        },
+        OutputFormat::JsonCompact => match serde_json::to_string(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to json failed"),
+        },
+        OutputFormat::Toml => match toml::to_string_pretty(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to toml failed"),
+        },
+        OutputFormat::TomlCompact => match toml::to_string(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to toml failed"),
+        },
+        OutputFormat::Yaml => match serde_yaml::to_string(&output) {
+          Ok(json) => println!("{}", json),
+          Err(_) => self.print_error("serializing to yaml failed"),
+        },
+        OutputFormat::Csv => self.print_warning("csv output is not supported here, use flag --output-format json|toml|yaml"),
+        OutputFormat::Plain => self.print_warning("plain output is not supported here, use flag --output-format json|toml|yaml"),
+        OutputFormat::Quiet => (),
+        OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use flag --output-format json|toml|yaml"),
+      }
+    }
+  }
+
   /// # Prints a prompt to stderr
   ///
   /// This method is used to print a prompt to the standard error device.
@@ -330,7 +388,7 @@ impl Context<'_> {
   /// The prompt is only printed when stderr is a tty,
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: AsRef<str>>(&self, prompt: T) {
-    if !self.quiet && std::io::stderr().is_terminal() {
+    if !self.quiet && stderr().is_terminal() {
       eprintln!("{}", prompt.as_ref());
     }
   }
@@ -418,6 +476,44 @@ impl Context<'_> {
   pub(crate) fn print_execution_time(&self, start_instant: Instant) {
     if !self.quiet && (self.show_execution_time || self.verbosity == Verbosity::High) {
       eprintln!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+    }
+  }
+
+  // TODO Needs better testing
+  pub(crate) fn read_multi_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
+    if stdin().is_terminal() {
+      self.print_prompt(prompt.as_ref());
+    }
+    let mut multi_line = String::new();
+    let stdin = stdin();
+    loop {
+      match stdin.read_line(&mut multi_line) {
+        Ok(0) => break,
+        Ok(_) => continue,
+        Err(_) => return Err("error reading line".to_string()),
+      }
+    }
+    Ok(multi_line)
+  }
+
+  pub(crate) fn read_single_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
+    if stdin().is_terminal() {
+      self.print_prompt(prompt.as_ref());
+    }
+    let _ = stdout().lock().flush();
+    let mut line = String::new();
+    stdin().read_line(&mut line).expect("could not read line");
+    Ok(line.trim().to_string())
+  }
+
+  pub(crate) fn read_single_line_password(&self, prompt: impl AsRef<str>) -> Result<String, String> {
+    if stdin().is_terminal() {
+      match prompt_password(prompt.as_ref()) {
+        Ok(line) => Ok(line.trim().to_string()),
+        Err(_) => Err("empty input".to_string()),
+      }
+    } else {
+      self.read_single_line(prompt)
     }
   }
 

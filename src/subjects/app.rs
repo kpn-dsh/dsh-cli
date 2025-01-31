@@ -12,14 +12,14 @@ use serde::Serialize;
 use dsh_api::types::AppCatalogAppResourcesValue;
 
 use crate::arguments::target_argument;
-use crate::capability::{Capability, CapabilityType, CommandExecutor};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::subject::Subject;
+use crate::subject::{Requirements, Subject};
 use crate::subjects::application::APPLICATION_LABELS_SHOW;
 use crate::subjects::bucket::BUCKET_LABELS;
 use crate::subjects::certificate::CERTIFICATE_LABELS_SHOW;
@@ -46,32 +46,38 @@ impl Subject for AppSubject {
     "Show, manage and list apps deployed from the DSH app catalog.".to_string()
   }
 
-  fn requires_dsh_api_client(&self) -> bool {
-    true
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(true, None)
   }
 
-  fn capabilities(&self) -> HashMap<CapabilityType, &(dyn Capability + Send + Sync)> {
-    let mut capabilities: HashMap<CapabilityType, &(dyn Capability + Send + Sync)> = HashMap::new();
-    capabilities.insert(CapabilityType::List, APP_LIST_CAPABILITY.as_ref());
-    capabilities.insert(CapabilityType::Show, APP_SHOW_CAPABILITY.as_ref());
-    capabilities
+  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
+    match capability_command {
+      LIST_COMMAND => Some(APP_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(APP_SHOW_CAPABILITY.as_ref()),
+      _ => None,
+    }
+  }
+
+  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
+    &APP_CAPABILITIES
   }
 }
 
 lazy_static! {
-  pub static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::List, "List deployed apps")
+  static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List deployed apps")
       .set_long_about("Lists all apps deployed from the DSH app catalog.")
       .set_default_command_executor(&AppListConfiguration {})
       .add_command_executor(FlagType::Ids, &AppListIds {}, None)
       .set_run_all_executors(true)
   );
-  pub static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CapabilityType::Show, "Show app configuration")
+  static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .set_default_command_executor(&AppShowAll {})
       .add_target_argument(target_argument(APP_SUBJECT_TARGET, None))
   );
+  static ref APP_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APP_LIST_CAPABILITY.as_ref(), APP_SHOW_CAPABILITY.as_ref()];
 }
 
 struct AppListConfiguration {}
