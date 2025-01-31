@@ -73,44 +73,29 @@ Subjects/commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-  -p, --platform <PLATFORM>
-          Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,
-          prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
-  -t, --tenant <TENANT>
-          Provide target tenant.
-  -g, --guid <GUID>
-          Provide target group and user id.
-      --password-file <FILE>
-          Provide password file name.
-  -o, --output-format <FORMAT>
-          Set output format. [possible values: csv, json, json-compact, plain, quiet, table,
-          table-no-border, toml, toml-compact, yaml]
-  -v, --verbosity <VERBOSITY>
-          Set verbosity level. [possible values: off, low, medium, high]
-      --dry-run
-          Execute in dry-run mode.
-      --force
-          Force changes without confirmation.
-      --matching-style <STYLE>
-          Set styling for matches. [possible values: normal, bold, dim, italic, underlined,
-          reverse]
-      --no-color
-          No color.
-  -q, --quiet
-          Run in quiet mode.
-      --show-execution-time
-          Show execution time.
-      --terminal-width <WIDTH>
-          Set terminal width.
-      --generate-autocomplete-file <SHELL>
-          Generate autocomplete file [possible values: bash, elvish, fish, powershell, zsh]
-  -h, --help
-          Print help (see more with '--help')
-  -V, --version
-          Print version
+  -p, --platform <PLATFORM>                 Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh,
+                                            prod-aws-dsh, prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
+  -t, --tenant <TENANT>                     Provide target tenant.
+  -g, --guid <GUID>                         Provide target group and user id.
+      --password-file <FILE>                Provide password file name.
+  -o, --output-format <FORMAT>              Set output format. [possible values: csv, json, json-compact, plain, quiet,
+                                            table, table-no-border, toml, toml-compact, yaml]
+  -v, --verbosity <VERBOSITY>               Set verbosity level. [possible values: off, low, medium, high]
+      --dry-run                             Execute in dry-run mode.
+      --force                               Force changes without confirmation.
+      --matching-style <STYLE>              Set styling for matches. [possible values: normal, bold, dim, italic,
+                                            underlined, reverse]
+      --no-color                            No color.
+  -q, --quiet                               Run in quiet mode.
+      --show-execution-time                 Show execution time.
+      --terminal-width <WIDTH>              Set terminal width.
+      --generate-autocomplete-file <SHELL>  Generate autocomplete file [possible values: bash, elvish, fish, powershell,
+                                            zsh]
+  -h, --help                                Print help (see more with '--help')
+  -V, --version                             Print version
 
-For most commands adding an 's' as a postfix will yield the same result as using the 'list'
-subcommand, e.g. using 'dsh apps' will be the same as using 'dsh app list'.
+For most commands adding an 's' as a postfix will yield the same result as using the 'list' subcommand, e.g. using 'dsh
+apps' will be the same as using 'dsh app list'.
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.
