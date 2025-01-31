@@ -26,7 +26,6 @@ chrono = { version = "0.4" }
 clap = { version = "4.5", features = ["color", "derive", "string", "wrap_help"] }
 clap_complete = "4.5"
 ctrlc = "3.4"
-dsh_sdk = "0.5.0-rc.2"
 env_logger = "0.11"
 futures = "0.3"
 homedir = "0.3"
@@ -46,6 +45,6 @@ tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "macros"] }
 toml = { version = "0.8", features = ["display"] }
 
 # When publishing, alway use the crates.io dependency.
-# dsh_api = { version = "0.4.0", features = ["generic"] }
+dsh_api = { version = "0.4.0", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api.
-dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
+# dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
