@@ -74,7 +74,8 @@ Subjects/commands:
 
 Options:
   -p, --platform <PLATFORM>
-          Provide target platform. [possible values: np-aws-lz-dsh, prod-aws-lz-dsh]
+          Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,
+          prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
   -t, --tenant <TENANT>
           Provide target tenant.
   -g, --guid <GUID>
