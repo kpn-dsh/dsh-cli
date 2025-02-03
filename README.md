@@ -204,4 +204,4 @@ group-user-id = 1903
 ```
 
 The target's password is not stored in these files.
-For security reasins.passwords are stored in your computers keychain (for Mac Osx and Windows). 
+For security reasons, passwords are stored in your computers keychain (for Mac Osx and Windows). 
