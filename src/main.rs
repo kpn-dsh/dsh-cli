@@ -14,8 +14,9 @@ use std::process;
 use std::process::{ExitCode, Termination};
 
 use crate::arguments::{
-  dry_run_argument, force_argument, guid_argument, matching_style_argument, no_escape_argument, output_format_argument, password_file_argument, platform_argument, quiet_argument,
-  set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, GUID_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT,
+  dry_run_argument, force_argument, guid_argument, log_level_api_argument, log_level_argument, matching_style_argument, no_escape_argument, output_format_argument,
+  password_file_argument, platform_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, LogLevel,
+  GUID_ARGUMENT, LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::context::Context;
@@ -32,6 +33,7 @@ use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
 use dsh_api::platform::DshPlatform;
 use dsh_api::{api_version, crate_version, ENV_VAR_PLATFORMS_FILE_NAME};
 use lazy_static::lazy_static;
+use log::{debug, LevelFilter};
 use rpassword::prompt_password;
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
@@ -89,13 +91,16 @@ static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yie
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-static VERSION: &str = "0.4.0";
+static VERSION: &str = "0.4.1";
 
 static ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
 static ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
 static ENV_VAR_GUID: &str = "DSH_CLI_GUID";
 static ENV_VAR_PASSWORD: &str = "DSH_CLI_PASSWORD";
 static ENV_VAR_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
+
+static ENV_VAR_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
+static ENV_VAR_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
 
 type DshCliResult = Result<(), String>;
 
@@ -126,13 +131,10 @@ async fn main() -> DshCliExit {
 }
 
 async fn inner_main() -> DshCliResult {
-  env_logger::init();
   let _ = ctrlc::set_handler(move || {
     eprintln!("interrupted");
     process::exit(0);
   });
-
-  let settings = read_settings(None)?;
 
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
     API_SUBJECT.as_ref(),
@@ -181,6 +183,12 @@ async fn inner_main() -> DshCliResult {
     return Ok(());
   }
 
+  let settings = read_settings(None)?;
+
+  initialize_logger(&matches, settings.as_ref())?;
+
+  debug!("{:#?}", settings);
+
   match matches.subcommand() {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
@@ -214,6 +222,28 @@ async fn inner_main() -> DshCliResult {
   Ok(())
 }
 
+fn initialize_logger(matches: &ArgMatches, settings: Option<&Settings>) -> Result<(), String> {
+  let log_level_dsh: LogLevel = match matches.get_one::<LogLevel>(LOG_LEVEL_ARGUMENT) {
+    Some(log_level_from_argument) => log_level_from_argument.clone(),
+    None => match std::env::var(ENV_VAR_LOG_LEVEL) {
+      Ok(log_level_from_env_var) => LogLevel::try_from(log_level_from_env_var.as_str())?,
+      Err(_) => settings.and_then(|settings| settings.log_level.clone()).unwrap_or_else(|| LogLevel::Error),
+    },
+  };
+  let log_level_dsh_api: LogLevel = match matches.get_one::<LogLevel>(LOG_LEVEL_API_ARGUMENT) {
+    Some(log_level_api_from_argument) => log_level_api_from_argument.clone(),
+    None => match std::env::var(ENV_VAR_LOG_LEVEL_API) {
+      Ok(log_level_api_from_env_var) => LogLevel::try_from(log_level_api_from_env_var.as_str())?,
+      Err(_) => settings.and_then(|settings| settings.log_level_api.clone()).unwrap_or_else(|| LogLevel::Error),
+    },
+  };
+  env_logger::builder()
+    .filter_module("dsh", LevelFilter::from(log_level_dsh))
+    .filter_module("dsh_api", LevelFilter::from(log_level_dsh_api))
+    .init();
+  Ok(())
+}
+
 fn create_command(clap_commands: &Vec<Command>) -> Command {
   Command::new(APPLICATION_NAME)
     .about(ABOUT)
@@ -232,6 +262,8 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
       matching_style_argument(), // TODO Should this one be at this level?
       no_escape_argument(),      // TODO Should this one be at this level?
       quiet_argument(),
+      log_level_argument(),
+      log_level_api_argument(),
       show_execution_time_argument(), // TODO Should this one be at this level?
       terminal_width_argument(),      // TODO Should this one be at this level?
       generate_autocomplete_file_argument(),
@@ -484,5 +516,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.4.0");
+  assert_eq!(crate_version(), "0.4.1");
 }

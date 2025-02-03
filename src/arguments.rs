@@ -4,6 +4,7 @@ use builder::EnumValueParser;
 use clap::builder::{PossibleValue, ValueParser};
 use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
+use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -20,16 +21,40 @@ pub(crate) const VHOST_ARGUMENT: &str = "vhost-argument";
 // pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
+pub(crate) const LOG_LEVEL_API_ARGUMENT: &str = "log-level-api-argument";
+pub(crate) const LOG_LEVEL_ARGUMENT: &str = "log-level-argument";
 pub(crate) const MATCHING_STYLE_ARGUMENT: &str = "matching-style-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
 pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
-pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
-pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
-pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
-pub(crate) const _SUBTARGET_ARGUMENT: &str = "subtarget-argument";
-pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
-pub(crate) const TARGET_ARGUMENT: &str = "target-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
+pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
+pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
+pub(crate) const TARGET_ARGUMENT: &str = "target-argument";
+pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
+pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
+pub(crate) const _SUBTARGET_ARGUMENT: &str = "subtarget-argument";
+
+#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+pub(crate) enum LogLevel {
+  /// No logging will be printed
+  #[serde(rename = "off")]
+  Off,
+  /// Only errors will be logged
+  #[serde(rename = "error")]
+  Error,
+  /// Warnings and errors will be logged
+  #[serde(rename = "warn")]
+  Warn,
+  /// High level info, warnings and errors will be logged
+  #[serde(rename = "info")]
+  Info,
+  /// Debug info, high level info, warnings and errors will be logged
+  #[serde(rename = "debug")]
+  Debug,
+  /// Tracing info, debug info, high level info, warnings and errors will be logged
+  #[serde(rename = "trace")]
+  Trace,
+}
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum Verbosity {
@@ -116,6 +141,35 @@ pub(crate) fn guid_argument() -> Arg {
     )
 }
 
+pub(crate) fn log_level_argument() -> Arg {
+  Arg::new(LOG_LEVEL_ARGUMENT)
+    .long("log-level")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<LogLevel>::new())
+    .value_name("LEVEL")
+    .help("Set log level.")
+    .long_help(
+      "If this option is provided, it will set the tool's log level. \
+      The default log level is 'error'.",
+    )
+    .global(true)
+}
+
+pub(crate) fn log_level_api_argument() -> Arg {
+  Arg::new(LOG_LEVEL_API_ARGUMENT)
+    .long("log-level-api")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<LogLevel>::new())
+    .value_name("LEVEL")
+    .help("Set log level for the dsh api crate.")
+    .long_help(
+      "If this option is provided, it will set the log level for the 'dsh_api' crate. \
+      The default log level is 'error'. See option --log-level for the possible values.",
+    )
+    .hide_possible_values(true)
+    .global(true)
+}
+
 pub(crate) fn matching_style_argument() -> Arg {
   Arg::new(MATCHING_STYLE_ARGUMENT)
     .long("matching-style")
@@ -174,8 +228,8 @@ pub(crate) fn password_file_argument() -> Arg {
     .long_help(
       "This option specifies the name of a file that contains the api password. \
           If this flag is not provided, the environment variable \
-          DSH_CLI_PASSWORD will be tried. Else, if the platform and tenant are known, \
-          the target settings file will be checked.\
+          DSH_CLI_PASSWORD_FILE will be tried. Else, if the platform and tenant are known, \
+          the target settings file will be checked. \
           Finally, the user will be prompted for the password.",
     )
 }
@@ -235,17 +289,6 @@ pub(crate) fn set_verbosity_argument() -> Arg {
     .global(true)
 }
 
-pub(crate) fn show_execution_time_argument() -> Arg {
-  Arg::new(SHOW_EXECUTION_TIME_ARGUMENT)
-    .long("show-execution-time")
-    .action(ArgAction::SetTrue)
-    .help("Show execution time.")
-    .long_help(
-      "When this option is provided the execution time of the executed function \
-          will be shown, in milliseconds.",
-    )
-}
-
 pub(crate) fn service_argument() -> Arg {
   Arg::new(SERVICE_ARGUMENT)
     .long("service")
@@ -260,6 +303,30 @@ pub(crate) fn service_argument() -> Arg {
           the service could be specified via the environment variable DSH_CLI_SERVICE \
           or else the user will be prompted.",
     )
+}
+
+pub(crate) fn show_execution_time_argument() -> Arg {
+  Arg::new(SHOW_EXECUTION_TIME_ARGUMENT)
+    .long("show-execution-time")
+    .action(ArgAction::SetTrue)
+    .help("Show execution time.")
+    .long_help(
+      "When this option is provided the execution time of the executed function \
+          will be shown, in milliseconds.",
+    )
+}
+
+pub(crate) fn target_argument(subject: &str, long_help: Option<&str>) -> Arg {
+  let mut target_argument = Arg::new(TARGET_ARGUMENT)
+    .action(ArgAction::Set)
+    .required(true)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .help(format!("{} name", subject))
+    .value_name(subject.to_uppercase());
+  if let Some(long_help) = long_help {
+    target_argument = target_argument.long_help(long_help.to_string())
+  }
+  target_argument
 }
 
 pub(crate) fn tenant_argument() -> Arg {
@@ -287,19 +354,6 @@ pub(crate) fn terminal_width_argument() -> Arg {
     .value_name("WIDTH")
     .help("Set terminal width.")
     .long_help("With this option the maximum terminal width can be set. If not set, the environment variable  By default")
-}
-
-pub(crate) fn target_argument(subject: &str, long_help: Option<&str>) -> Arg {
-  let mut target_argument = Arg::new(TARGET_ARGUMENT)
-    .action(ArgAction::Set)
-    .required(true)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .help(format!("{} name", subject))
-    .value_name(subject.to_uppercase());
-  if let Some(long_help) = long_help {
-    target_argument = target_argument.long_help(long_help.to_string())
-  }
-  target_argument
 }
 
 // pub(crate) fn to_clipboard_argument() -> Arg {
@@ -356,6 +410,48 @@ pub(crate) fn vhost_argument() -> Arg {
     .value_name("VHOST")
     .help("Provide vhost.")
     .long_help("This option specifies the name of a vhost.")
+}
+
+impl TryFrom<&str> for LogLevel {
+  type Error = String;
+
+  fn try_from(value: &str) -> Result<Self, String> {
+    match value {
+      "off" => Ok(Self::Off),
+      "error" => Ok(Self::Error),
+      "warn" => Ok(Self::Warn),
+      "info" => Ok(Self::Info),
+      "debug" => Ok(Self::Debug),
+      "trace" => Ok(Self::Trace),
+      _ => Err(format!("invalid log level value '{}'", value)),
+    }
+  }
+}
+
+impl From<LogLevel> for LevelFilter {
+  fn from(value: LogLevel) -> Self {
+    match value {
+      LogLevel::Off => LevelFilter::Off,
+      LogLevel::Error => LevelFilter::Error,
+      LogLevel::Warn => LevelFilter::Warn,
+      LogLevel::Info => LevelFilter::Info,
+      LogLevel::Debug => LevelFilter::Debug,
+      LogLevel::Trace => LevelFilter::Trace,
+    }
+  }
+}
+
+impl Display for LogLevel {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Off => write!(f, "off"),
+      Self::Error => write!(f, "error"),
+      Self::Warn => write!(f, "warn"),
+      Self::Info => write!(f, "info"),
+      Self::Debug => write!(f, "debug"),
+      Self::Trace => write!(f, "trace"),
+    }
+  }
 }
 
 impl TryFrom<&str> for Verbosity {

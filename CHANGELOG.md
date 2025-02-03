@@ -4,6 +4,16 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.1] - yyy-mm-dd
+
+### Added
+
+* Configurable logging.
+* 
+### Changed
+
+* Autocomplete flag now hidden.
+
 ## [0.4.0] - 2025-01-31
 
 ### Added

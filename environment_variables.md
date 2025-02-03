@@ -43,8 +43,9 @@
     <tr valign="top">
         <td><code>DSH_CLI_DRY_RUN</code></td>
         <td>
-            If this environment variable is set (to any value) the tool will run in quiet mode, 
-            meaning that no output will be produced to the terminal (stdout and stderr).
+            If this environment variable is set (to any value) the tool will not call 
+            any api operations that could potentially make changes, like delete, create or change.
+            The input parameters will be validated and checked.
             The same effect can be accomplished via the <code>--dry-run</code>
             command line argument.
         </td>
@@ -67,12 +68,46 @@
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_LOG_LEVEL</code></td>
+        <td> 
+            Use this environment variable to set the log level of the tool.
+            The available log levels are:
+            <ul>
+              <li><code>off</code> - Logging is off</li>
+              <li><code>error</code> - Only errors will be logged</li>
+              <li><code>warn</code> - Warnings and errors will be logged</li>
+              <li><code>info</code> - High level info, warnings and errors will be logged</li>
+              <li><code>debug</code> - Debug info, high level info, warnings and errors 
+                will be logged</li>
+              <li><code>trace</code> - Tracing info, debug info, high level info, warnings 
+                and errors will be logged</li>
+            </ul>
+            If this argument is not provided, the settings file will be checked. 
+            When the <code>--log-level</code> command line argument is provided this will override
+            this environment variable or the value in the settings file.
+            The default log level is <code>error</code>.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_LOG_LEVEL_API</code></td>
+        <td> 
+            Use this environment variable to set the log level for the funcions 
+            in the library crate <code>dsh_api</code>, that supports the <code>dsh</code> tool.
+            For the available log levels see the description of the 
+            <code>DSH_CLI_LOG_LEVEL</code> environment variable.<br/>
+            If this argument is not provided, the settings file will be checked. 
+            When the <code>--log-level-api</code> command line argument is provided this will 
+            override this environment variable or the value in the settings file.
+            The default log level is <code>error</code>.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_MATCHING_STYLE</code></td>
         <td>
             This environment variable specifies the styling to be used when printing matching 
             results for the find functions, e.q. when matching regular expressions. 
             If this argument is not provided, the value from the settings file will be used.
-            Else the default 'bold' will be used.
+            Else the default <code>bold</code> will be used.
             <ul>
               <li><code>normal</code> - Matches will be displayed in normal font</li>
               <li><code>bold</code> - Matches will be displayed bold</li>
@@ -99,8 +134,9 @@
         <td>
             This option specifies the format used when printing the output. 
             If this argument is not provided, the value from the settings file will be used. 
-            Else, when stdout is a terminal the default 'table' will be used, if
-            stdout is not a terminal the value 'json' will be used.
+            Else, when <code>stdout</code> is a terminal the default 
+            <code>table</code> will be used, is <code>stdout</code> is not a terminal 
+            the value <code>json</code> will be used.
             <ul>
                 <li><code>csv</code> - Output will be formatted as comma separated values</li>
                 <li><code>json</code> - Output will be in json format</li>
@@ -126,7 +162,7 @@
             This environment variable specifies the secret api token/password for the target tenant. 
             Note that when the environment variable <code>DSH_CLI_PASSWORD_FILE</code> 
             or the argument <code>--password-file</code> command line argument is provided,
-            this environment variable will not be used. 
+            this environment variable will never be used. 
             For better security, consider using one of these two options instead of 
             defining <code>DSH_CLI_PASSWORD</code>
         </td>
@@ -160,7 +196,8 @@
         <td><code>DSH_CLI_QUIET</code></td>
         <td>
             When this environment variable is set (to any value) the tool will run in quiet mode, 
-            meaning that no output will be produced to the terminal (stdout and stderr).
+            meaning that no output will be produced to the terminal 
+            (<code>stdout</code> and <code>stderr</code>).
             This environment variable can be overridden via the 
             <code>--quit</code> command line argument.
         </td>
@@ -214,4 +251,5 @@
             or the command line argument <code>--quiet</code> is provided, nothing will be printed.
         </td>
     </tr>
+
 </table>
