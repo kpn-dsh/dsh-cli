@@ -9,7 +9,8 @@ All notable changes to the `dsh` tool project will be documented in this file.
 ### Added
 
 * Configurable logging.
-* 
+*
+
 ### Changed
 
 * Autocomplete flag now hidden.

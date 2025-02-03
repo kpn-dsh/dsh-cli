@@ -1,8 +1,7 @@
 # Autocompletion
 
-The `dsh` tool supports a basic implementation for autocompletion.
-
-The `dsh` tool can generate autocompletion files for the following shells:
+The `dsh` tool has a hidden argument `--generate-autocomplete-file`, which can be used
+to generate an autocompletion file for the following shells:
 
 * `bash` - Bourne-again shell
 * `elvish` - Elvish shell
@@ -10,7 +9,7 @@ The `dsh` tool can generate autocompletion files for the following shells:
 * `powershell` - Microsoft Powershell
 * `zsh` - Z shell
 
-For `zsh` see below. For the other shell types, please consult your shell's documentation
+For the `zsh` shell see below. For the other shell types, please consult your shell's documentation
 how to install the autocompletion file.
 
 ## Bourne-again shell
