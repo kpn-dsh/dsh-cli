@@ -29,9 +29,9 @@ use crate::subjects::platform::PLATFORM_SUBJECT;
 use clap::builder::{styling, Styles};
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
-use dsh_api::dsh_api_tenant::{parse_and_validate_guid, DshApiTenant};
+use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
-use dsh_api::{api_version, crate_version, ENV_VAR_PLATFORMS_FILE_NAME};
+use dsh_api::{crate_version, openapi_version, DshApiError};
 use lazy_static::lazy_static;
 use log::{debug, LevelFilter};
 use rpassword::prompt_password;
@@ -92,6 +92,9 @@ static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yie
    as using 'dsh app list'.";
 
 static VERSION: &str = "0.4.1";
+
+// Duplicate from dsh_api crate
+static ENV_VAR_PLATFORMS_FILE_NAME: &str = "DSH_API_PLATFORMS_FILE";
 
 static ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
 static ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
@@ -277,10 +280,10 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .subcommands(clap_commands)
     .version(VERSION)
     .long_version(format!(
-      "version: {}\ndsh-api library version: {}\ndsh rest api version: {}",
+      "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
       VERSION,
       crate_version(),
-      api_version()
+      openapi_version()
     ))
 }
 
@@ -509,9 +512,40 @@ pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
   environment_variables
 }
 
+/// # Parse and validate guid string
+///
+/// # Parameters
+/// * `guid` - Guid string
+///
+/// # Returns
+/// `OK(guid)` - when the guid is valid
+/// `Err(message)` - when the guid is invalid
+///
+/// # Examples
+/// ```rust
+/// use dsh_api::DshApiError;
+/// # fn main() -> Result<(), DshApiError> {
+/// # use dsh_api::dsh_api_tenant::parse_and_validate_guid;
+/// let guid = parse_and_validate_guid("1234".to_string())?;
+/// assert_eq!(1234, guid);
+/// # Ok(())
+/// # }
+pub fn parse_and_validate_guid(guid: String) -> Result<u16, DshApiError> {
+  match guid.parse::<u16>() {
+    Ok(guid) => {
+      if guid > 0 && guid < 60000 {
+        Ok(guid)
+      } else {
+        Err(DshApiError::Configuration(format!("guid {} not in range (1 <= guid < 60000)", guid)))
+      }
+    }
+    Err(_) => Err(DshApiError::Configuration(format!("could not parse guid '{}'", guid))),
+  }
+}
+
 #[test]
 fn test_open_api_version() {
-  assert_eq!(api_version(), "1.9.0");
+  assert_eq!(openapi_version(), "1.9.0");
 }
 
 #[test]

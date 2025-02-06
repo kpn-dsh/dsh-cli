@@ -1,7 +1,6 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
-use dsh_api::dsh_api_tenant::parse_and_validate_guid;
 use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -15,7 +14,7 @@ use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
 use crate::subject::{Requirements, Subject};
-use crate::{read_single_line, DshCliResult};
+use crate::{parse_and_validate_guid, read_single_line, DshCliResult};
 
 pub(crate) struct TargetSubject {}
 
