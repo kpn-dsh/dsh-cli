@@ -8,11 +8,19 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Added
 
-* Configurable logging.
-*
+* Improved error handling for bad requests.
+* Features:
+    * `appcatalog` - Controls availability of app catalog operations.
+    * `manage` - Controls availability of manage operations.
+    * `robot` - Controls availability of robot operation.
+
+### Removed
+
+* Feature `actual` is removed. Its capabilities are now all enabled.
 
 ### Changed
 
+* Upgraded `dsh_api` dependency to 0.5.0.
 * Autocomplete flag now hidden.
 
 ## [0.4.0] - 2025-01-31
