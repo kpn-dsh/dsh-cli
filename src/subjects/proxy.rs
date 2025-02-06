@@ -97,14 +97,14 @@ impl CommandExecutor for ProxyDelete {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("delete proxy '{}'", proxy_id));
-    if context.dsh_api_client.as_ref().unwrap().get_proxy(&proxy_id).await.is_err() {
+    if context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_configuration(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
     if context.confirmed(format!("type 'yes' to delete proxy '{}': ", proxy_id).as_str())? {
       if context.dry_run {
         context.print_warning("dry-run mode, proxy not deleted");
       } else {
-        context.dsh_api_client.as_ref().unwrap().delete_proxy(&proxy_id).await?;
+        context.dsh_api_client.as_ref().unwrap().delete_kafkaproxy_configuration(&proxy_id).await?;
         context.print_outcome(format!("proxy {} deleted", proxy_id));
       }
     } else {
@@ -121,11 +121,11 @@ impl CommandExecutor for ProxyListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all proxies with parameters");
     let start_instant = Instant::now();
-    let proxy_ids = context.dsh_api_client.as_ref().unwrap().get_proxy_ids().await?;
+    let proxy_ids = context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_ids().await?;
     let proxys = try_join_all(
       proxy_ids
         .iter()
-        .map(|proxy_id| context.dsh_api_client.as_ref().unwrap().get_proxy(proxy_id.as_str())),
+        .map(|proxy_id| context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_configuration(proxy_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -143,7 +143,7 @@ impl CommandExecutor for ProxyListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all proxy ids");
     let start_instant = Instant::now();
-    let proxy_ids = context.dsh_api_client.as_ref().unwrap().get_proxy_ids().await?;
+    let proxy_ids = context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("proxy id", context);
     formatter.push_target_ids(&proxy_ids);
@@ -160,7 +160,7 @@ impl CommandExecutor for ProxyShowConfiguration {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
     let start_instant = Instant::now();
-    let proxy = context.dsh_api_client.as_ref().unwrap().get_proxy(proxy_id.as_str()).await?;
+    let proxy = context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_configuration(proxy_id.as_str()).await?;
     context.print_execution_time(start_instant);
     let formatter = UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, &proxy, context);
     formatter.print()?;
@@ -175,7 +175,7 @@ impl CommandExecutor for ProxyUpdateConfiguration {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("update configuration for proxy '{}'", proxy_id));
-    if context.dsh_api_client.as_ref().unwrap().get_proxy(&proxy_id).await.is_err() {
+    if context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_configuration(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
     // TODO

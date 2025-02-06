@@ -87,7 +87,7 @@ impl CommandExecutor for AppListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed apps and their configurations");
     let start_instant = Instant::now();
-    let apps = context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
+    let apps = context.dsh_api_client.as_ref().unwrap().get_appcatalogapp_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     app_ids.sort();
@@ -125,7 +125,12 @@ impl CommandExecutor for AppShowAll {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
     let start_instant = Instant::now();
-    let app = context.dsh_api_client.as_ref().unwrap().get_app_configuration(app_id.as_str()).await?;
+    let app = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .get_appcatalogapp_appcatalogappid_configuration(app_id.as_str())
+      .await?;
     context.print_execution_time(start_instant);
     for (resource_name, resource) in &app.resources {
       match resource {

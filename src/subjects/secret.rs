@@ -132,7 +132,7 @@ impl CommandExecutor for SecretCreate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not created");
         } else {
-          context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
+          context.dsh_api_client.as_ref().unwrap().post_secret(&secret).await?;
           context.print_outcome(format!("secret {} created", secret_id));
         }
       } else {
@@ -142,7 +142,7 @@ impl CommandExecutor for SecretCreate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not created");
         } else {
-          context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
+          context.dsh_api_client.as_ref().unwrap().post_secret(&secret).await?;
           context.print_outcome(format!("secret {} created", secret_id));
         }
       }
@@ -152,7 +152,7 @@ impl CommandExecutor for SecretCreate {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not created");
       } else {
-        context.dsh_api_client.as_ref().unwrap().create_secret(&secret).await?;
+        context.dsh_api_client.as_ref().unwrap().post_secret(&secret).await?;
         context.print_outcome(format!("secret {} created", secret_id));
       }
     }
@@ -174,7 +174,7 @@ impl CommandExecutor for SecretDelete {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not deleted");
       } else {
-        context.dsh_api_client.as_ref().unwrap().delete_secret(&secret_id).await?;
+        context.dsh_api_client.as_ref().unwrap().delete_secret_configuration(&secret_id).await?;
         context.print_outcome(format!("secret {} deleted", secret_id));
       }
     } else {
@@ -195,7 +195,7 @@ impl CommandExecutor for SecretListAllocationStatus {
       .dsh_api_client
       .as_ref()
       .unwrap()
-      .list_secret_ids()
+      .get_secret_ids()
       .await?
       .into_iter()
       .filter(|id| !secret::is_system_secret(id))
@@ -203,7 +203,7 @@ impl CommandExecutor for SecretListAllocationStatus {
     let allocation_statuses = try_join_all(
       non_system_secret_ids
         .iter()
-        .map(|id| context.dsh_api_client.as_ref().unwrap().get_secret_allocation_status(id.as_str())),
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_secret_status(id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -225,7 +225,7 @@ impl CommandExecutor for SecretListSystem {
       .dsh_api_client
       .as_ref()
       .unwrap()
-      .list_secret_ids()
+      .get_secret_ids()
       .await?
       .into_iter()
       .filter(|id| secret::is_system_secret(id))
@@ -233,7 +233,7 @@ impl CommandExecutor for SecretListSystem {
     let allocation_statuses = try_join_all(
       system_secret_ids
         .iter()
-        .map(|id| context.dsh_api_client.as_ref().unwrap().get_secret_allocation_status(id.as_str())),
+        .map(|id| context.dsh_api_client.as_ref().unwrap().get_secret_status(id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -255,7 +255,7 @@ impl CommandExecutor for SecretListIds {
       .dsh_api_client
       .as_ref()
       .unwrap()
-      .list_secret_ids()
+      .get_secret_ids()
       .await?
       .into_iter()
       .filter(|id| !secret::is_system_secret(id))
@@ -307,7 +307,7 @@ impl CommandExecutor for SecretShowAllocationStatus {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show allocation status for secret '{}'", secret_id));
     let start_instant = Instant::now();
-    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_secret_allocation_status(secret_id.as_str()).await?;
+    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_secret_status(secret_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), &allocation_status, context).print()?;
     Ok(())
@@ -366,7 +366,7 @@ impl CommandExecutor for SecretUpdate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          context.dsh_api_client.as_ref().unwrap().update_secret(secret_id.as_str(), secret).await?;
+          context.dsh_api_client.as_ref().unwrap().put_secret(secret_id.as_str(), secret).await?;
           context.print_outcome(format!("secret {} updated", secret_id));
         }
       } else {
@@ -375,7 +375,7 @@ impl CommandExecutor for SecretUpdate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          context.dsh_api_client.as_ref().unwrap().update_secret(secret_id.as_str(), secret).await?;
+          context.dsh_api_client.as_ref().unwrap().put_secret(secret_id.as_str(), secret).await?;
           context.print_outcome(format!("secret {} updated", secret_id));
         }
       }
@@ -384,7 +384,7 @@ impl CommandExecutor for SecretUpdate {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not updated");
       } else {
-        context.dsh_api_client.as_ref().unwrap().update_secret(secret_id.as_str(), secret).await?;
+        context.dsh_api_client.as_ref().unwrap().put_secret(secret_id.as_str(), secret).await?;
         context.print_outcome(format!("secret {} updated", secret_id));
       }
     }

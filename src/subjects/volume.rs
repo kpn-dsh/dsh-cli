@@ -122,7 +122,7 @@ impl CommandExecutor for VolumeCreate {
     if context.dry_run {
       context.print_warning("dry-run mode, volume not created");
     } else {
-      context.dsh_api_client.as_ref().unwrap().create_volume(&volume_id, &volume).await?;
+      context.dsh_api_client.as_ref().unwrap().put_volume_configuration(&volume_id, &volume).await?;
       context.print_outcome("volume created");
     }
     Ok(())
@@ -143,7 +143,7 @@ impl CommandExecutor for VolumeDelete {
       if context.dry_run {
         context.print_warning("dry-run mode, volume not deleted");
       } else {
-        context.dsh_api_client.as_ref().unwrap().delete_volume(&volume_id).await?;
+        context.dsh_api_client.as_ref().unwrap().delete_volume_configuration(&volume_id).await?;
         context.print_outcome("volume deleted");
       }
     } else {
@@ -160,11 +160,11 @@ impl CommandExecutor for VolumeListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all volumes with their parameters");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().list_volume_ids().await?;
+    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
     let volumes = try_join_all(
       volume_ids
         .iter()
-        .map(|volume_id| context.dsh_api_client.as_ref().unwrap().get_volume(volume_id.as_str())),
+        .map(|volume_id| context.dsh_api_client.as_ref().unwrap().get_volume_configuration(volume_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -182,11 +182,11 @@ impl CommandExecutor for VolumeListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all volumes with their allocation status");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().list_volume_ids().await?;
+    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
     let allocation_statuses = try_join_all(
       volume_ids
         .iter()
-        .map(|volume_id| context.dsh_api_client.as_ref().unwrap().get_volume_allocation_status(volume_id.as_str())),
+        .map(|volume_id| context.dsh_api_client.as_ref().unwrap().get_volume_status(volume_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -204,7 +204,7 @@ impl CommandExecutor for VolumeListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all volumes with their configurations");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().list_volume_ids().await?;
+    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
     let configurations = try_join_all(
       volume_ids
         .iter()
@@ -226,7 +226,7 @@ impl CommandExecutor for VolumeListIds {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list volume ids");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().list_volume_ids().await?;
+    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("volume id", context);
     formatter.push_target_ids(volume_ids.as_slice());
@@ -289,7 +289,7 @@ impl CommandExecutor for VolumeShowAllocationStatus {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for volume '{}'", volume_id));
     let start_instant = Instant::now();
-    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_volume_allocation_status(volume_id.as_str()).await?;
+    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_volume_status(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);
     let formatter = UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), &allocation_status, context);
     formatter.print()?;

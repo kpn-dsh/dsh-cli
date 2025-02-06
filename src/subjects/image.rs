@@ -100,7 +100,7 @@ impl CommandExecutor for ImageFind {
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(image_query.as_str())? } else { &ExactMatchQueryProcessor::create(image_query.as_str())? };
     context.print_explanation(format!("find images that {}", query_processor.describe()));
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(applications, query_processor, matches, context)?;
     Ok(())
@@ -114,7 +114,7 @@ impl CommandExecutor for ImageListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all images used in applications");
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(applications, &DummyQueryProcessor::create()?, matches, context)?;
     Ok(())

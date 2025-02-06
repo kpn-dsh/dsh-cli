@@ -85,7 +85,7 @@ impl CommandExecutor for EnvFind {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation(format!("find environment variables in applications that {}", query_processor.describe()));
     let start_instant = Instant::now();
-    let applications = &context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = &context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
 
     let mut application_pairs = applications.iter().collect::<Vec<_>>();

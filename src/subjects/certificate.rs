@@ -95,7 +95,7 @@ impl CommandExecutor for CertificateListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their parameters");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().list_certificate_ids().await?;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     let certificate_statuses = futures::future::join_all(
       certificate_ids
         .iter()
@@ -121,11 +121,11 @@ impl CommandExecutor for CertificateListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their allocation status");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().list_certificate_ids().await?;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     let allocation_statuses = try_join_all(
       certificate_ids
         .iter()
-        .map(|certificate_id| context.dsh_api_client.as_ref().unwrap().get_certificate_allocation_status(certificate_id)),
+        .map(|certificate_id| context.dsh_api_client.as_ref().unwrap().get_certificate_status(certificate_id)),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -143,7 +143,7 @@ impl CommandExecutor for CertificateListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their configuration");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().list_certificate_ids().await?;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     let certificates = try_join_all(
       certificate_ids
         .iter()
@@ -165,7 +165,7 @@ impl CommandExecutor for CertificateListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificate ids");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().list_certificate_ids().await?;
+    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("certificate id", context);
     formatter.push_target_ids(&certificate_ids);
@@ -230,12 +230,7 @@ impl CommandExecutor for CertificateShowAllocationStatus {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let allocation_status = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
-      .get_certificate_allocation_status(certificate_id.as_str())
-      .await?;
+    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_certificate_status(certificate_id.as_str()).await?;
     context.print_execution_time(start_instant);
     let formatter = UnitFormatter::new(
       certificate_id,
