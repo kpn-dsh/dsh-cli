@@ -17,9 +17,6 @@ pub(crate) mod topic;
 pub(crate) mod vhost;
 pub(crate) mod volume;
 
-#[cfg(feature = "stream")]
-pub(crate) mod stream;
-
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::notifications_to_string;
 use dsh_api::types::AllocationStatus;
