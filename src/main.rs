@@ -40,6 +40,7 @@ use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
 use subjects::env::ENV_SUBJECT;
 use subjects::image::IMAGE_SUBJECT;
+#[cfg(feature = "appcatalog")]
 use subjects::manifest::MANIFEST_SUBJECT;
 use subjects::metric::METRIC_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
@@ -147,6 +148,7 @@ async fn inner_main() -> DshCliResult {
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),
+    #[cfg(feature = "appcatalog")]
     MANIFEST_SUBJECT.as_ref(),
     METRIC_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),
