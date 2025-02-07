@@ -26,6 +26,7 @@ use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::application::APPLICATION_SUBJECT;
 use crate::subjects::platform::PLATFORM_SUBJECT;
+use crate::subjects::token::TOKEN_SUBJECT;
 use clap::builder::{styling, Styles};
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
@@ -46,9 +47,6 @@ use subjects::metric::METRIC_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
-// #[cfg(feature = "stream")]
-// use subjects::stream::STREAM_SUBJECT;
-use crate::subjects::token::TOKEN_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
@@ -92,7 +90,7 @@ static AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yie
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-static VERSION: &str = "0.4.1";
+static VERSION: &str = "0.5.0";
 
 // Duplicate from dsh_api crate
 static ENV_VAR_PLATFORMS_FILE_NAME: &str = "DSH_API_PLATFORMS_FILE";
@@ -154,8 +152,6 @@ async fn inner_main() -> DshCliResult {
     PLATFORM_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
-    // #[cfg(feature = "stream")]
-    // STREAM_SUBJECT.as_ref(),
     TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
@@ -250,10 +246,14 @@ fn initialize_logger(matches: &ArgMatches, settings: Option<&Settings>) -> Resul
 }
 
 fn create_command(clap_commands: &Vec<Command>) -> Command {
+  let long_about = match enabled_features() {
+    Some(enabled_features) => format!("{} Enabled features: {}.", LONG_ABOUT, enabled_features.join(", ")),
+    None => LONG_ABOUT.to_string(),
+  };
   Command::new(APPLICATION_NAME)
     .about(ABOUT)
     .author(AUTHOR)
-    .long_about(LONG_ABOUT)
+    .long_about(long_about)
     .after_help(AFTER_HELP)
     .args(vec![
       platform_argument(),
@@ -545,6 +545,21 @@ pub fn parse_and_validate_guid(guid: String) -> Result<u16, DshApiError> {
   }
 }
 
+fn enabled_features() -> Option<Vec<&'static str>> {
+  let mut enabled_features = vec![];
+  #[cfg(feature = "appcatalog")]
+  enabled_features.push("appcatalog");
+  #[cfg(feature = "manage")]
+  enabled_features.push("manage");
+  #[cfg(feature = "robot")]
+  enabled_features.push("robot");
+  if enabled_features.is_empty() {
+    None
+  } else {
+    Some(enabled_features)
+  }
+}
+
 #[test]
 fn test_open_api_version() {
   assert_eq!(openapi_version(), "1.9.0");
@@ -552,5 +567,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.4.1");
+  assert_eq!(crate_version(), "0.5.0");
 }
