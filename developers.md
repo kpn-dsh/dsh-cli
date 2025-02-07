@@ -30,7 +30,7 @@ version of the library.
 
 ```toml
 # Cargo.toml
-dsh_api = "0.4.0"
+dsh_api = "0.5.0"
 ```
 
 When developing simultaneously on `dsh` and `dsh_api` consider changing the library dependency
@@ -38,7 +38,7 @@ to your local copy.
 
 ```toml
 # Cargo.toml
-dsh_api = { path = "../dsh-api/dsh-api" }
+dsh_api = { path = "../dsh-api/dsh-api", features = "generic" }
 ```
 
 ### Coding guidelines

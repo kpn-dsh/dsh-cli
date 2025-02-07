@@ -7,26 +7,31 @@
 > You can also send requests for new features to this e-mail address.
 
 This project provides a tool to call functions on the DSH resource management API from the
-command line of your workstation. The following DSH resources can be
-listed, queried, searched, created and deleted.
+command line of your workstation or from a script.
+Below in an overview of the capabilities of the tool:
 
-* api
-* app from the app catalog
-* application / service
-* bucket
-* certificate
-* environment variable
-* image
-* manifest
-* metric
-* platform
-* proxy
-* secret
-* topic
-* vhost
-* volume
+* Calling all operations exposed in DSH resource management API
+  from either the command line or from a script.
+* Many additional and easier to use functions are provided.
+* Extensive help information on each level using the `--help` and `-h` flags,
+  including listings of all available operations.
+* Configuring platform and tenant credentials interactively via the tool.
+  Sensitive passwords are stored in your computer's keychain, if available.
+* Retrieving information about the available platforms.
+* Opening web applications (e.g. the console, the swagger ui or the vhost of your app or service)
+  from the command line.
+* Reversed lookup functions. For example find all services that use a given secret or volume,
+  or have an environment value with a given value in their configuration.
 
-See the `README` file in the repository for more information.
+## Features
+
+By enabling/disabling the features described below you have some control over what's included
+in the tool and what's not. The features are disabled by default.
+The following features are defined:
+
+* `appcatalog` - Enables the app catalog methods.
+* `manage` - Enables the manage methods.
+* `robot` - Enables the robot operation.
 
 ## Installation
 
@@ -106,9 +111,6 @@ Options:
           Show execution time.
       --terminal-width <WIDTH>
           Set terminal width.
-      --generate-autocomplete-file <SHELL>
-          Generate autocomplete file [possible values: bash,
-          elvish, fish, powershell, zsh]
   -h, --help
           Print help (see more with '--help')
   -V, --version
