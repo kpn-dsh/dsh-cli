@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 pub(crate) const APP_ARGUMENT: &str = "app-argument";
-pub(crate) const GUID_ARGUMENT: &str = "guid-argument";
 pub(crate) const PASSWORD_FILE_ARGUMENT: &str = "password-file-argument";
 pub(crate) const PLATFORM_ARGUMENT: &str = "platform-argument";
 pub(crate) const SERVICE_ARGUMENT: &str = "service-argument";
@@ -122,24 +121,6 @@ pub(crate) fn force_argument() -> Arg {
 //     )
 //     .global(true)
 // }
-
-pub(crate) fn guid_argument() -> Arg {
-  Arg::new(GUID_ARGUMENT)
-    .long("guid")
-    .short('g')
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("GUID")
-    .help("Provide target group and user id.")
-    .long_help(
-      "This option specifies the group and user id of the target tenant. \
-          If this argument is not provided, \
-          the guid must be specified via the environment variable DSH_CLI_GUID, \
-          as a default setting in the settings file, or else the user will be prompted. \
-          Note that if the tenant is already provided, the target settings file will also be \
-          checked for the guid value.",
-    )
-}
 
 pub(crate) fn log_level_argument() -> Arg {
   Arg::new(LOG_LEVEL_ARGUMENT)

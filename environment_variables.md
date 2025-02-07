@@ -51,15 +51,6 @@
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_CLI_GUID</code></td>
-        <td>
-            Group and user id for the target tenant. 
-            This value must be provided as a single integer, e.g. <code>1903</code>.
-            This environment variable can be overridden via the <code>--guid</code>
-            command line argument.
-        </td>
-    </tr>
-    <tr valign="top">
         <td><code>DSH_CLI_HOME</code></td>
         <td> 
             Use this environment variable to change the location where <code>dsh</code> 

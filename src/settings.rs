@@ -56,7 +56,6 @@ pub(crate) struct Settings {
 ///
 /// * `platform` target's platform
 /// * `tenant` target's tenant name
-/// * `group_user_id` - target's group and user id
 /// * `password` - target's password, which will not be stored in the target settings file,
 ///   but instead in the keyring
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -64,21 +63,19 @@ pub(crate) struct Target {
   #[serde(serialize_with = "dsh_platform_to_name", deserialize_with = "dsh_platform_from_name")]
   pub(crate) platform: DshPlatform,
   pub(crate) tenant: String,
-  #[serde(rename = "group-user-id")]
-  pub(crate) group_user_id: u16,
   #[serde(skip_serializing)]
   pub(crate) password: Option<String>,
 }
 
 impl Target {
-  pub(crate) fn new(platform: DshPlatform, tenant: String, group_user_id: u16, password: Option<String>) -> Result<Self, String> {
-    Ok(Self { platform, tenant, group_user_id, password })
+  pub(crate) fn new(platform: DshPlatform, tenant: String, password: Option<String>) -> Result<Self, String> {
+    Ok(Self { platform, tenant, password })
   }
 }
 
 impl Display for Target {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}:{}@{}", self.tenant, self.group_user_id, self.platform)
+    write!(f, "{}@{}", self.tenant, self.platform)
   }
 }
 

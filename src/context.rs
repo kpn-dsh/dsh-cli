@@ -5,7 +5,7 @@ use crate::arguments::{
 use crate::formatters::OutputFormat;
 use crate::settings::{read_settings, Settings};
 use crate::subject::Requirements;
-use crate::{get_guid, get_platform, get_tenant_name};
+use crate::{get_platform, get_tenant_name};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::DshPlatform;
@@ -44,7 +44,6 @@ pub(crate) struct Context<'a> {
   pub(crate) platform: Option<DshPlatform>,
   pub(crate) quiet: bool,
   #[allow(unused)]
-  pub(crate) tenant_guid: Option<u16>,
   pub(crate) tenant_name: Option<String>,
   pub(crate) terminal_width: Option<usize>,
   pub(crate) show_execution_time: bool,
@@ -85,10 +84,6 @@ impl Context<'_> {
     let platform = get_platform(matches, settings.as_ref()).ok();
     let show_labels = true;
     let tenant_name = get_tenant_name(matches, settings.as_ref()).ok();
-    let tenant_guid = match (&platform, &tenant_name) {
-      (Some(platform), Some(tenant)) => get_guid(matches, platform, tenant).ok(),
-      _ => None,
-    };
     let terminal_width = Self::terminal_width(matches, settings.as_ref())?;
     if dry_run && verbosity >= Verbosity::Medium {
       eprintln!("dry-run mode enabled");
@@ -106,7 +101,6 @@ impl Context<'_> {
       quiet,
       show_execution_time,
       show_labels,
-      tenant_guid,
       tenant_name,
       terminal_width,
       _stderr_escape: stderr_escape,

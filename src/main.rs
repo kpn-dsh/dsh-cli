@@ -14,14 +14,14 @@ use std::process;
 use std::process::{ExitCode, Termination};
 
 use crate::arguments::{
-  dry_run_argument, force_argument, guid_argument, log_level_api_argument, log_level_argument, matching_style_argument, no_escape_argument, output_format_argument,
-  password_file_argument, platform_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, LogLevel,
-  GUID_ARGUMENT, LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT,
+  dry_run_argument, force_argument, log_level_api_argument, log_level_argument, matching_style_argument, no_escape_argument, output_format_argument, password_file_argument,
+  platform_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, LogLevel, LOG_LEVEL_API_ARGUMENT,
+  LOG_LEVEL_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT,
 };
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::settings::{get_password_from_keyring, read_settings, read_target, read_target_and_password, Settings};
+use crate::settings::{get_password_from_keyring, read_settings, read_target_and_password, Settings};
 use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::application::APPLICATION_SUBJECT;
@@ -32,7 +32,7 @@ use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
-use dsh_api::{crate_version, openapi_version, DshApiError};
+use dsh_api::{crate_version, openapi_version};
 use lazy_static::lazy_static;
 use log::{debug, LevelFilter};
 use rpassword::prompt_password;
@@ -97,7 +97,6 @@ static ENV_VAR_PLATFORMS_FILE_NAME: &str = "DSH_API_PLATFORMS_FILE";
 
 static ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
 static ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
-static ENV_VAR_GUID: &str = "DSH_CLI_GUID";
 static ENV_VAR_PASSWORD: &str = "DSH_CLI_PASSWORD";
 static ENV_VAR_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
 
@@ -228,14 +227,14 @@ fn initialize_logger(matches: &ArgMatches, settings: Option<&Settings>) -> Resul
     Some(log_level_from_argument) => log_level_from_argument.clone(),
     None => match std::env::var(ENV_VAR_LOG_LEVEL) {
       Ok(log_level_from_env_var) => LogLevel::try_from(log_level_from_env_var.as_str())?,
-      Err(_) => settings.and_then(|settings| settings.log_level.clone()).unwrap_or_else(|| LogLevel::Error),
+      Err(_) => settings.and_then(|settings| settings.log_level.clone()).unwrap_or(LogLevel::Error),
     },
   };
   let log_level_dsh_api: LogLevel = match matches.get_one::<LogLevel>(LOG_LEVEL_API_ARGUMENT) {
     Some(log_level_api_from_argument) => log_level_api_from_argument.clone(),
     None => match std::env::var(ENV_VAR_LOG_LEVEL_API) {
       Ok(log_level_api_from_env_var) => LogLevel::try_from(log_level_api_from_env_var.as_str())?,
-      Err(_) => settings.and_then(|settings| settings.log_level_api.clone()).unwrap_or_else(|| LogLevel::Error),
+      Err(_) => settings.and_then(|settings| settings.log_level_api.clone()).unwrap_or(LogLevel::Error),
     },
   };
   env_logger::builder()
@@ -258,7 +257,6 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .args(vec![
       platform_argument(),
       tenant_argument(),
-      guid_argument(),
       password_file_argument(),
       output_format_argument(), // TODO Should this one be at this level?
       set_verbosity_argument(),
@@ -298,8 +296,7 @@ async fn get_api_client_factory(matches: &ArgMatches, settings: Option<&Settings
 fn get_dsh_api_tenant(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshApiTenant, String> {
   let platform = get_platform(matches, settings)?;
   let tenant_name = get_tenant_name(matches, settings)?;
-  let guid = get_guid(matches, &platform, &tenant_name)?;
-  Ok(DshApiTenant::new(tenant_name, guid, platform))
+  Ok(DshApiTenant::new(tenant_name, platform))
 }
 
 /// # Get the target platform
@@ -365,42 +362,6 @@ fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<
             read_single_line("tenant: ")
           } else {
             Err("could not determine tenant, please check configuration".to_string())
-          }
-        }
-      },
-    },
-  }
-}
-
-/// # Get the target guid
-///
-/// This method will get the target group and user id.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--guid`.
-/// 1. Environment variable `DSH_CLI_GUID`.
-/// 1. Parameter `group-user-id` from the target settings file, if available.
-/// 1. If stdin is a terminal, ask the user to enter the value.
-/// 1. Else return with an error.
-///
-/// ## Parameters
-/// * `matches` - parsed clap command line arguments
-/// * `platform` - used to determine the target settings file
-/// * `tenant_name` - used to determine the environment variable or the target settings file
-///
-/// ## Returns
-/// An `Ok<u16>` containing the group and user id, or an `Err<String>`.
-fn get_guid(matches: &ArgMatches, platform: &DshPlatform, tenant_name: &str) -> Result<u16, String> {
-  match matches.get_one::<String>(GUID_ARGUMENT) {
-    Some(guid_from_argument) => Ok(parse_and_validate_guid(guid_from_argument.clone())?),
-    None => match std::env::var(ENV_VAR_GUID) {
-      Ok(guid_from_env_var) => Ok(parse_and_validate_guid(guid_from_env_var)?),
-      Err(_) => match read_target(platform, tenant_name)? {
-        Some(target) => Ok(target.group_user_id),
-        None => {
-          if stdin().is_terminal() {
-            read_single_line(format!("group and user id for tenant {}: ", tenant_name).as_str()).and_then(|guid| parse_and_validate_guid(guid).map_err(|e| e.to_string()))
-          } else {
-            Err("could not determine group and user id and unable to prompt user, please check configuration".to_string())
           }
         }
       },
@@ -514,38 +475,8 @@ pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
   environment_variables
 }
 
-/// # Parse and validate guid string
-///
-/// # Parameters
-/// * `guid` - Guid string
-///
-/// # Returns
-/// `OK(guid)` - when the guid is valid
-/// `Err(message)` - when the guid is invalid
-///
-/// # Examples
-/// ```rust
-/// use dsh_api::DshApiError;
-/// # fn main() -> Result<(), DshApiError> {
-/// # use dsh_api::dsh_api_tenant::parse_and_validate_guid;
-/// let guid = parse_and_validate_guid("1234".to_string())?;
-/// assert_eq!(1234, guid);
-/// # Ok(())
-/// # }
-pub fn parse_and_validate_guid(guid: String) -> Result<u16, DshApiError> {
-  match guid.parse::<u16>() {
-    Ok(guid) => {
-      if guid > 0 && guid < 60000 {
-        Ok(guid)
-      } else {
-        Err(DshApiError::Configuration(format!("guid {} not in range (1 <= guid < 60000)", guid)))
-      }
-    }
-    Err(_) => Err(DshApiError::Configuration(format!("could not parse guid '{}'", guid))),
-  }
-}
-
 fn enabled_features() -> Option<Vec<&'static str>> {
+  #[allow(unused_mut)]
   let mut enabled_features = vec![];
   #[cfg(feature = "appcatalog")]
   enabled_features.push("appcatalog");

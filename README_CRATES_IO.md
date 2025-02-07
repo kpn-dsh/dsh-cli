@@ -85,8 +85,6 @@ Options:
           prod-aws-lz-dsh]
   -t, --tenant <TENANT>
           Provide target tenant.
-  -g, --guid <GUID>
-          Provide target group and user id.
       --password-file <FILE>
           Provide password file name.
   -o, --output-format <FORMAT>

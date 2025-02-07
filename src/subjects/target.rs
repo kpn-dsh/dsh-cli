@@ -5,7 +5,7 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-use crate::arguments::{guid_argument, platform_argument, tenant_argument, GUID_ARGUMENT, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
+use crate::arguments::{platform_argument, tenant_argument, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
 use crate::capability::{
   Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR,
 };
@@ -14,7 +14,7 @@ use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
 use crate::subject::{Requirements, Subject};
-use crate::{parse_and_validate_guid, read_single_line, DshCliResult};
+use crate::{read_single_line, DshCliResult};
 
 pub(crate) struct TargetSubject {}
 
@@ -38,8 +38,8 @@ impl Subject for TargetSubject {
   /// Help text printed for --help flag
   fn subject_command_long_about(&self) -> String {
     "Show, manage and list dsh target configurations. \
-    A target configuration consists of a platform name, a tenant name, \
-    the tenant's group/user id and the tenant's api password for the platform. \
+    A target configuration consists of a platform name, a tenant name \
+    and the tenant's api password for the platform. \
     The target command can be used to create, list and delete target configurations. \
     The target configurations will be stored in the application's home directory, \
     except for the password, which will be stored in the more secure \
@@ -96,12 +96,12 @@ lazy_static! {
     CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create a new target configuration.")
       .set_long_about(
         "Create a new target configuration. \
-        You will be prompted for the target's platform, tenant, group/user id and password. \
-        The platform, tenant and id will be stored in an unencrypted configuration file. \
+        You will be prompted for the target's platform, tenant and password. \
+        The platform and tenant will be stored in an unencrypted configuration file. \
         The password will be stored in your computers keyring application, which is more secure.",
       )
       .set_default_command_executor(&TargetNew {})
-      .add_extra_arguments(vec![guid_argument(), platform_argument(), tenant_argument()])
+      .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
   static ref TARGET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![TARGET_DEFAULT_CAPABILITY.as_ref(), TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref(), TARGET_NEW_CAPABILITY.as_ref()];
@@ -198,7 +198,7 @@ impl CommandExecutor for TargetList {
     for target in targets {
       let is_default =
         default_platform.clone().is_some_and(|ref platform| target.platform.to_string() == *platform) && default_tenant.clone().is_some_and(|ref tenant| target.tenant == *tenant);
-      let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, group_user_id: target.group_user_id, is_default };
+      let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, is_default };
       target_formatters.push(target_formatter);
     }
     if target_formatters.is_empty() {
@@ -226,9 +226,8 @@ impl CommandExecutor for TargetNew {
         existing_target
       ));
     };
-    let guid = get_guid_argument_or_prompt(matches)?;
     let password = context.read_single_line_password("enter password: ")?;
-    let target = Target::new(platform, tenant, guid, Some(password))?;
+    let target = Target::new(platform, tenant, Some(password))?;
     if context.dry_run {
       context.print_warning(format!("dry-run mode, target {} not created", target));
     } else {
@@ -236,13 +235,6 @@ impl CommandExecutor for TargetNew {
       context.print_outcome(format!("target {} created", target));
     }
     Ok(())
-  }
-}
-
-fn get_guid_argument_or_prompt(matches: &ArgMatches) -> Result<u16, String> {
-  match matches.get_one::<String>(GUID_ARGUMENT) {
-    Some(tenant_argument) => Ok(parse_and_validate_guid(tenant_argument.to_string())?),
-    None => Ok(parse_and_validate_guid(read_single_line("enter group/user id: ")?)?),
   }
 }
 
@@ -263,7 +255,6 @@ fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String>
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum TargetFormatterLabel {
   Default,
-  GroupUserId,
   Platform,
   Tenant,
 }
@@ -272,7 +263,6 @@ impl Label for TargetFormatterLabel {
   fn as_str(&self) -> &str {
     match self {
       Self::Default => "default",
-      Self::GroupUserId => "id",
       Self::Platform => "platform",
       Self::Tenant => "tenant",
     }
@@ -287,7 +277,6 @@ impl Label for TargetFormatterLabel {
 pub struct TargetFormatter {
   pub(crate) platform: String,
   pub(crate) tenant: String,
-  pub(crate) group_user_id: u16,
   pub(crate) is_default: bool,
 }
 
@@ -301,7 +290,6 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
           "".to_string()
         }
       }
-      TargetFormatterLabel::GroupUserId => format!("{}:{}", self.group_user_id, self.group_user_id),
       TargetFormatterLabel::Platform => self.platform.to_string(),
       TargetFormatterLabel::Tenant => self.tenant.clone(),
     }
@@ -312,5 +300,4 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
   }
 }
 
-pub static TARGET_LABELS: [TargetFormatterLabel; 4] =
-  [TargetFormatterLabel::Tenant, TargetFormatterLabel::Platform, TargetFormatterLabel::GroupUserId, TargetFormatterLabel::Default];
+pub static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Tenant, TargetFormatterLabel::Platform, TargetFormatterLabel::Default];

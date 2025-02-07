@@ -20,6 +20,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Removed
 
+* Group and user id are not needed anymore.
 * Feature `actual` is removed. Its capabilities are now all enabled.
 
 ### Changed

@@ -75,7 +75,6 @@ Options:
   -p, --platform <PLATFORM>                 Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh,
                                             prod-aws-dsh, prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
   -t, --tenant <TENANT>                     Provide target tenant.
-  -g, --guid <GUID>                         Provide target group and user id.
       --password-file <FILE>                Provide password file name.
   -o, --output-format <FORMAT>              Set output format. [possible values: csv, json, json-compact, plain, quiet,
                                             table, table-no-border, toml, toml-compact, yaml]
