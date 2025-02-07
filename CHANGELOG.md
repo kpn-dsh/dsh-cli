@@ -4,12 +4,16 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.4.1] - yyy-mm-dd
+## [0.5.0] - 2025-02-07
+
+### Fixes
+
+* Saving targets works properly again.
 
 ### Added
 
 * Improved error handling for bad requests.
-* Features:
+* Features (disabled by default):
     * `appcatalog` - Controls availability of app catalog operations.
     * `manage` - Controls availability of manage operations.
     * `robot` - Controls availability of robot operation.
