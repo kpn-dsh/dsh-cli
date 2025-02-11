@@ -17,6 +17,10 @@ All notable changes to the `dsh` tool project will be documented in this file.
     * `appcatalog` - Controls availability of app catalog operations.
     * `manage` - Controls availability of manage operations.
     * `robot` - Controls availability of robot operation.
+* Set and unset default target.
+* Set and unset all settings via the tool.
+* Added csv output format.
+* Added flag to hide headers.
 
 ### Removed
 
