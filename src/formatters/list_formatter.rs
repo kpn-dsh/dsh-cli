@@ -1,6 +1,7 @@
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::OutputFormat;
+use itertools::Itertools;
 use serde::Serialize;
 use std::marker::PhantomData;
 use tabled::settings::peaker::PriorityMax;
@@ -11,7 +12,7 @@ pub struct ListFormatter<'a, L: Label, V: SubjectFormatter<L>> {
   labels: &'a [L],
   target_label: Option<&'a str>,
   values: Vec<(String, &'a V)>,
-  context: &'a Context<'a>,
+  context: &'a Context,
   phantom: PhantomData<&'a V>,
 }
 
@@ -74,33 +75,45 @@ where
     self.values.is_empty()
   }
 
+  fn label_to_header(&self, label: &L) -> String {
+    if label.is_target_label() {
+      self.add_csv_quote(self.target_label.unwrap_or(label.as_str_for_list()))
+    } else {
+      self.add_csv_quote(label.as_str_for_list())
+    }
+  }
+
+  fn add_csv_quote(&self, value: &str) -> String {
+    match self.context.csv_quote {
+      Some(csv_quote) => format!("{}{}{}", csv_quote, value, csv_quote),
+      None => value.to_string(),
+    }
+  }
+
   pub fn print(&self) -> Result<(), String> {
     match self.context.output_format {
-      OutputFormat::Csv => Err("csv list print not yet implemented".to_string()),
+      OutputFormat::Csv => {
+        if self.context.show_headers {
+          self.context.print(
+            self
+              .labels
+              .iter()
+              .map(|label| self.label_to_header(label))
+              .join(self.context.csv_separator.as_str()),
+          );
+        }
+        for (target_id, value) in &self.values {
+          self.context.print(
+            self
+              .labels
+              .iter()
+              .map(|label| self.add_csv_quote(value.value(label, target_id).as_str()))
+              .join(self.context.csv_separator.as_str()),
+          );
+        }
+        Ok(())
+      }
 
-      // OutputFormat::Csv => {
-      //   if self.context.show_labels {
-      //     self.context.print(
-      //       self
-      //         .labels
-      //         .iter()
-      //         .map(|label| self.context.csv_value(label.as_str_for_csv()))
-      //         .collect::<Result<Vec<_>, _>>()?
-      //         .join(self.context.csv_separator.as_str()),
-      //     );
-      //   }
-      //   for (target_id, value) in &self.values {
-      //     self.context.print(
-      //       self
-      //         .labels
-      //         .iter()
-      //         .map(|label| value.value(label, &target_id))
-      //         .collect::<Vec<_>>()
-      //         .join(self.context.csv_separator.as_str()),
-      //     );
-      //   }
-      //   Ok(())
-      // }
       OutputFormat::Json => match serde_json::to_string_pretty(&self.values) {
         Ok(json) => {
           self.context.print(json);
