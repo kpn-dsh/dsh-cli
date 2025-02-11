@@ -6,12 +6,6 @@
 > Please include the exact command, the erroneous output and an explanation of the expected output.
 > You can also send requests for new features to this e-mail address.
 
-* [Getting started](getting_started.md)
-* [Environment variables](environment_variables.md)
-* [Settings](settings.md)
-* [Set up autocompletion](autocompletion.md)
-* [Developers](developers.md)
-
 This project provides a tool to call functions on the DSH resource management API from the
 command line of your workstation or from a script.
 Below in an overview of the capabilities of the tool:
@@ -28,6 +22,15 @@ Below in an overview of the capabilities of the tool:
   from the command line.
 * Reversed lookup functions. For example find all services that use a given secret or volume,
   or have an environment value with a given value in their configuration.
+
+## Next steps
+
+* [Getting started - interactive](getting_started_interactive.md)
+* [Getting started - script](getting_started_script.md)
+* [Environment variables](environment_variables.md)
+* [Settings](settings.md)
+* [Set up autocompletion](autocompletion.md)
+* [Developers](developers.md)
 
 ## Features
 

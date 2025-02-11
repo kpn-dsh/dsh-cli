@@ -1,4 +1,59 @@
-# Getting started
+# Getting started - script
+
+## Interactive use
+
+## Use in scripts
+
+Trying to use the dsh-cli for creating everything.
+
+```bash
+dsh --version
+# expected output
+# dsh version: 0.4.0
+# dsh-api library version: 0.4.0
+# dsh rest api version: 1.9.0
+```
+
+First verify the connection:
+
+```bash
+dsh apps
+```
+
+Manual config:
+
+```text
+platform: prod-aws-lz-dsh
+tenant: kpnbm-e2e-01
+groupid: 2061
+password: see secrets
+```
+
+Create a target config with this data:
+
+```bash
+touch ~/.dsh_cli/targets/prod-aws-lz-dsh.kpnbm-e2e-01.toml
+cat >> ~/.dsh_cli/targets/prod-aws-lz-dsh.kpnbm-e2e-01.toml<< EOF
+platform = "prod-aws-lz-dsh"
+tenant = "kpnbm-e2e-01"
+group-user-id = 2061
+EOF
+```
+
+Now I am still getting the request for providing details. So I will also add a config.
+
+```bash
+touch ~/.dsh_cli/settings.toml
+cat >> ~/.dsh_cli/settings.toml<< EOF
+default-platform = "prod-aws-lz-dsh"
+default-tenant = "kpnbm-e2e-01"
+matching-style = "bold"
+show-execution-time = false
+verbosity = "medium"
+EOF
+```
+
+Now, `dsh apps` only requires a password.
 
 ## Installation
 

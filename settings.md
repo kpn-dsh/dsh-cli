@@ -34,7 +34,6 @@ the file `$HOME/.dsh_cli/targets/np-aws-lz-dsh.greenbox-dev.toml`:
 ```toml
 platform = "np-aws-lz-dsh"
 tenant = "greenbox-dev"
-group-user-id = 1903
 ```
 
 Each platform/tenant combination also needs a password.
