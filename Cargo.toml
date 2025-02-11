@@ -21,29 +21,29 @@ manage = ["dsh_api/manage"]
 robot = ["dsh_api/robot"]
 
 [dependencies]
-arboard = "3.4"
-async-trait = "0.1"
-chrono = { version = "0.4" }
-clap = { version = "4.5", features = ["color", "derive", "string", "wrap_help"] }
-clap_complete = "4.5"
-ctrlc = "3.4"
-env_logger = "0.11"
-futures = "0.3"
-homedir = "0.3"
-itertools = "0.14"
-keyring = { version = "3.6", features = ["apple-native", "windows-native"] }
-lazy_static = "1.5"
-log = "0.4"
-open = "5.3"
-regex = "1.11"
-rpassword = "7.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_yaml = "0.9.33"
-tabled = { version = "0.17", features = ["ansi"] }
-terminal_size = "0.4"
-tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "macros"] }
-toml = { version = "0.8", features = ["display"] }
+arboard = { version = "3.4", default-features = false }
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+clap = { version = "4.5", features = ["color", "derive", "string", "wrap_help"], default-features = false }
+clap_complete = { version = "4.5", default-features = false }
+ctrlc = { version = "3.4" }
+env_logger = { version = "0.11", default-features = false }
+futures = { version = "0.3", default-features = false }
+homedir = { version = "0.3", default-features = false }
+itertools = { version = "0.14", features = ["use_std"], default-features = false }
+keyring = { version = "3.6", features = ["apple-native", "windows-native"], default-features = false }
+lazy_static = { version = "1.5", default-features = false }
+log = { version = "0.4", default-features = false }
+open = { version = "5.3", default-features = false }
+regex = { version = "1.11", default-features = false }
+rpassword = { version = "7.3", default-features = false }
+serde = { version = "1.0", features = ["derive"], default-features = false }
+serde_json = { version = "1.0", default-features = false }
+serde_yaml = { version = "0.9.33", default-features = false }
+tabled = { version = "0.17", features = ["ansi"], default-features = false }
+terminal_size = { version = "0.4", default-features = false }
+tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "macros"], default-features = false }
+toml = { version = "0.8", features = ["display", "parse"], default-features = false }
 
 # When publishing, alway use the crates.io dependency.
 #dsh_api = { version = "0.5.0", features = ["generic"] }
