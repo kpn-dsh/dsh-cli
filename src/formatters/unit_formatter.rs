@@ -12,7 +12,7 @@ pub struct UnitFormatter<'a, L: Label, V: SubjectFormatter<L>> {
   labels: &'a [L],
   target_label: Option<&'a str>,
   value: &'a V,
-  context: &'a Context<'a>,
+  context: &'a Context,
   phantom: PhantomData<&'a V>,
 }
 
@@ -28,7 +28,7 @@ where
   pub fn print(&self) -> Result<(), String> {
     match self.context.output_format {
       OutputFormat::Csv => {
-        if self.context.show_labels {
+        if self.context.show_headers {
           self.context.print(
             self
               .labels
