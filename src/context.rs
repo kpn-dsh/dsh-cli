@@ -1,13 +1,20 @@
 use crate::arguments::{
-  Verbosity, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT,
-  TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
+  Verbosity, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, PASSWORD_FILE_ARGUMENT, PLATFORM_ARGUMENT,
+  QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT, TENANT_ARGUMENT, TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::formatters::OutputFormat;
-use crate::settings::{read_settings, Settings};
+use crate::settings::Settings;
 use crate::subject::Requirements;
-use crate::{get_platform, get_tenant_name};
+use crate::targets::{get_password_from_keyring, read_target_and_password};
+use crate::{
+  read_single_line, read_single_line_password, ENV_VAR_CSV_QUOTE, ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE,
+  ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_PASSWORD, ENV_VAR_PASSWORD_FILE, ENV_VAR_PLATFORM, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_TENANT,
+  ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
+};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
@@ -16,49 +23,35 @@ use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
 
-static ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
-static ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
-static ENV_VAR_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
-static ENV_VAR_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
-static ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-static ENV_VAR_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
-static ENV_VAR_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
-static ENV_VAR_QUIET: &str = "DSH_CLI_QUIET";
-static ENV_VAR_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
-static ENV_VAR_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
-static ENV_VAR_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
-
 #[derive(Debug)]
-pub(crate) struct Context<'a> {
+pub(crate) struct Context {
   pub(crate) csv_quote: Option<char>,
   pub(crate) csv_separator: String,
   pub(crate) dry_run: bool,
-  pub(crate) dsh_api_client: Option<DshApiClient<'a>>,
+  pub(crate) dsh_api_client: Option<DshApiClient>,
   pub(crate) force: bool,
   pub(crate) matching_style: Option<MatchingStyle>,
   pub(crate) no_escape: bool,
   pub(crate) output_format: OutputFormat,
   pub(crate) platform: Option<DshPlatform>,
   pub(crate) quiet: bool,
-  #[allow(unused)]
   pub(crate) tenant_name: Option<String>,
   pub(crate) terminal_width: Option<usize>,
   pub(crate) show_execution_time: bool,
-  pub(crate) show_labels: bool,
+  pub(crate) show_headers: bool,
   pub(crate) _stderr_escape: bool,
   pub(crate) stdin_is_terminal: bool,
   pub(crate) _stdout_escape: bool,
   pub(crate) verbosity: Verbosity,
 }
 
-impl Context<'_> {
-  pub(crate) fn create<'a>(matches: &'a ArgMatches, requirements: &Requirements, dsh_api_client: Option<DshApiClient<'a>>) -> Result<Context<'a>, String> {
-    let settings: Option<Settings> = read_settings(None)?;
+impl Context {
+  pub(crate) async fn create(matches: &ArgMatches, requirements: &Requirements, settings: Option<Settings>) -> Result<Context, String> {
     let stdin_is_terminal = stdin().is_terminal();
-
     let csv_quote = Self::csv_quote(settings.as_ref())?;
     let csv_separator = Self::csv_separator(settings.as_ref())?;
     if let Some(quote) = csv_quote {
@@ -67,6 +60,17 @@ impl Context<'_> {
       }
     }
     let dry_run = Self::dry_run(matches, settings.as_ref());
+    let platform = if requirements.needs_platform() { Some(get_platform(matches, settings.as_ref())?) } else { None };
+    let tenant_name = if requirements.needs_tenant_name() { Some(get_tenant_name(matches, settings.as_ref())?) } else { None };
+    let dsh_api_client = if requirements.needs_dsh_api_client {
+      let dsh_api_tenant = DshApiTenant::new(tenant_name.clone().unwrap(), platform.clone().unwrap());
+      let password = get_password(matches, &dsh_api_tenant)?;
+      let dsh_api_client_factory = DshApiClientFactory::create(dsh_api_tenant, password)?;
+      let client = dsh_api_client_factory.client().await?;
+      Some(client)
+    } else {
+      None
+    };
     let no_escape = Self::no_escape(matches, settings.as_ref());
     let (matching_style, stderr_escape, stdout_escape) =
       if no_escape { (None, false, false) } else { (Self::matching_style(matches, settings.as_ref())?, stderr().is_terminal(), stdout().is_terminal()) };
@@ -81,9 +85,7 @@ impl Context<'_> {
         Self::verbosity(matches, settings.as_ref())?,
       )
     };
-    let platform = get_platform(matches, settings.as_ref()).ok();
-    let show_labels = true;
-    let tenant_name = get_tenant_name(matches, settings.as_ref()).ok();
+    let show_headers = !Self::no_headers(matches, settings.as_ref());
     let terminal_width = Self::terminal_width(matches, settings.as_ref())?;
     if dry_run && verbosity >= Verbosity::Medium {
       eprintln!("dry-run mode enabled");
@@ -100,7 +102,7 @@ impl Context<'_> {
       platform,
       quiet,
       show_execution_time,
-      show_labels,
+      show_headers,
       tenant_name,
       terminal_width,
       _stderr_escape: stderr_escape,
@@ -202,7 +204,7 @@ impl Context<'_> {
     }
   }
 
-  /// Gets no_escape context value
+  /// Gets no escape context value
   ///
   /// 1. Try flag `--no-color` or `--no-ansi`
   /// 1. Try if environment variable `NO_COLOR` exists
@@ -214,6 +216,16 @@ impl Context<'_> {
       || std::env::var(ENV_VAR_NO_COLOR).is_ok()
       || std::env::var(ENV_VAR_NO_ESCAPE).is_ok()
       || settings.is_some_and(|settings| settings.no_escape.unwrap_or(false))
+  }
+
+  /// Gets no headers context value
+  ///
+  /// 1. Try flag `--no-headers`
+  /// 1. Try if environment variable `DSH_CLI_NO_HEADERS` exists
+  /// 1. Try settings file
+  /// 1. Default to `false`
+  fn no_headers(matches: &ArgMatches, settings: Option<&Settings>) -> bool {
+    matches.get_flag(NO_HEADERS_ARGUMENT) || std::env::var(ENV_VAR_NO_HEADERS).is_ok() || settings.is_some_and(|settings| settings.no_headers.unwrap_or(false))
   }
 
   /// Gets output_format context value
@@ -276,7 +288,7 @@ impl Context<'_> {
           Ok(terminal_width) => {
             if terminal_width < 40 {
               Err(format!(
-                "terminal width must be greater than 40 in environment variable {} must be greater or equal than 40",
+                "terminal width in environment variable {} must be greater than or equal to 40",
                 ENV_VAR_TERMINAL_WIDTH
               ))
             } else {
@@ -582,6 +594,135 @@ impl Context<'_> {
     } else {
       Ok(value.to_string())
     }
+  }
+}
+
+/// # Get the target platform
+///
+/// This method will get the target platform.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--platform`.
+/// 1. Environment variable `DSH_CLI_PLATFORM`.
+/// 1. Parameter `default-platform` from settings file, if available.
+/// 1. If stdin is a terminal, ask the user to enter the value.
+/// 1. Else return with an error.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
+fn get_platform(matches: &ArgMatches, settings: Option<&Settings>) -> Result<DshPlatform, String> {
+  match matches.get_one::<String>(PLATFORM_ARGUMENT) {
+    Some(platform_from_argument) => Ok(DshPlatform::try_from(platform_from_argument.as_str()).unwrap()),
+    None => match std::env::var(ENV_VAR_PLATFORM) {
+      Ok(platform_name_from_env_var) => DshPlatform::try_from(platform_name_from_env_var.as_str()),
+      Err(_) => match settings.and_then(|settings| settings.default_platform.clone()) {
+        Some(default_platform_name_from_settings) => DshPlatform::try_from(default_platform_name_from_settings.as_str()),
+        None => {
+          if stdin().is_terminal() {
+            DshPlatform::try_from(read_single_line("platform name: ")?.as_str())
+          } else {
+            Err("could not determine platform, please check configuration".to_string())
+          }
+        }
+      },
+    },
+  }
+}
+
+/// # Get the target tenant
+///
+/// This method will get the target tenant.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--tenant`.
+/// 1. Environment variable `DSH_CLI_TENANT`.
+/// 1. Parameter `default-tenant` from settings file, if available.
+/// 1. If stdin is a terminal, ask the user to enter the value.
+/// 1. Else return with an error.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// An `Ok<String>` containing the tenant name, or an `Err<String>`.
+fn get_tenant_name(matches: &ArgMatches, settings: Option<&Settings>) -> Result<String, String> {
+  match matches.get_one::<String>(TENANT_ARGUMENT) {
+    Some(tenant_name_from_argument) => Ok(tenant_name_from_argument.to_string()),
+    None => match std::env::var(ENV_VAR_TENANT) {
+      Ok(tenant_name_from_env_var) => Ok(tenant_name_from_env_var),
+      Err(_) => match settings.and_then(|settings| settings.default_tenant.clone()) {
+        Some(tenant_name_from_settings) => Ok(tenant_name_from_settings),
+        None => {
+          if stdin().is_terminal() {
+            read_single_line("tenant: ")
+          } else {
+            Err("could not determine tenant, please check configuration".to_string())
+          }
+        }
+      },
+    },
+  }
+}
+
+/// # Get the target password
+///
+/// This method will get the target password.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--password-file`, which should reference a file that
+///    contains the password.
+/// 1. Environment variable `DSH_CLI_PASSWORD_FILE`.
+/// 1. Environment variable `DSH_CLI_PASSWORD`.
+/// 1. Entry `dsh.[platform].[tenant_name]` from the keychain, if available.
+///    This can result in a pop-up where the user must authenticate for the keychain.
+/// 1. Parameter `password` from the target settings file, if available.
+/// 1. If stdin is a terminal, ask the user to enter the password.
+/// 1. Else return with an error.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `dsh_api_tenant` - used to determine the target settings file
+///
+/// ## Returns
+/// An `Ok<String>` containing the password, or an `Err<String>`.
+fn get_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
+  match matches.get_one::<PathBuf>(PASSWORD_FILE_ARGUMENT) {
+    Some(password_file_from_arg) => read_password_file(password_file_from_arg),
+    None => match std::env::var(ENV_VAR_PASSWORD_FILE) {
+      Ok(password_file_from_env) => read_password_file(password_file_from_env),
+      Err(_) => match std::env::var(ENV_VAR_PASSWORD) {
+        Ok(password_from_env_var) => Ok(password_from_env_var),
+        Err(_) => match get_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())? {
+          Some(password_from_keyring) => Ok(password_from_keyring),
+          None => match read_target_and_password(dsh_api_tenant.platform(), dsh_api_tenant.name())?.and_then(|target| target.password) {
+            Some(password_from_target) => Ok(password_from_target),
+            None => {
+              if stdin().is_terminal() {
+                read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
+              } else {
+                Err("could not determine password and unable to to prompt user, please check configuration".to_string())
+              }
+            }
+          },
+        },
+      },
+    },
+  }
+}
+
+fn read_password_file<T: AsRef<Path>>(password_file: T) -> Result<String, String> {
+  match std::fs::read_to_string(&password_file) {
+    Ok(password_string) => {
+      let trimmed_password = password_string.trim();
+      if trimmed_password.is_empty() {
+        Err(format!("password file '{}' is empty", password_file.as_ref().to_string_lossy()))
+      } else {
+        Ok(trimmed_password.to_string())
+      }
+    }
+    Err(_) => Err(format!("password file '{}' could not be read", password_file.as_ref().to_string_lossy())),
   }
 }
 

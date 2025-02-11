@@ -6,14 +6,14 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::arguments::{platform_argument, tenant_argument, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
-use crate::capability::{
-  Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR,
-};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
-use crate::settings::{all_targets, delete_target, read_settings, read_target, upsert_target, write_settings, Settings, Target};
+use crate::formatters::OutputFormat;
+use crate::settings::{read_settings, write_settings, Settings};
 use crate::subject::{Requirements, Subject};
+use crate::targets::{all_targets, delete_target, read_target, upsert_target, Target};
 use crate::{read_single_line, DshCliResult};
 
 pub(crate) struct TargetSubject {}
@@ -49,12 +49,11 @@ impl Subject for TargetSubject {
 
   // TODO Check this
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, Some(OutputFormat::Table))
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      DEFAULT_COMMAND => Some(TARGET_DEFAULT_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(TARGET_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(TARGET_LIST_CAPABILITY.as_ref()),
       NEW_COMMAND => Some(TARGET_NEW_CAPABILITY.as_ref()),
@@ -68,15 +67,6 @@ impl Subject for TargetSubject {
 }
 
 lazy_static! {
-  static ref TARGET_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DEFAULT_COMMAND_PAIR, "Set default target.")
-      .set_long_about(
-        "Set the default target. If you set a default target, \
-        you won't be prompted for the platform and tenant name."
-      )
-      .set_default_command_executor(&TargetDefault {})
-      .add_extra_arguments(vec![platform_argument(), tenant_argument()])
-  );
   static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete target configuration.")
       .set_long_about(
@@ -104,37 +94,7 @@ lazy_static! {
       .add_extra_arguments(vec![platform_argument(), tenant_argument()])
   );
   static ref TARGET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![TARGET_DEFAULT_CAPABILITY.as_ref(), TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref(), TARGET_NEW_CAPABILITY.as_ref()];
-}
-
-struct TargetDefault {}
-
-#[async_trait]
-impl CommandExecutor for TargetDefault {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("set default target");
-    let platform = get_platform_argument_or_prompt(matches)?;
-    let tenant = get_tenant_argument_or_prompt(matches)?;
-    match read_target(&platform, &tenant)? {
-      Some(ref target) => {
-        match read_settings(None)? {
-          Some(settings) => {
-            let settings = Settings { default_platform: Some(target.platform.to_string()), default_tenant: Some(target.tenant.clone()), ..settings };
-            write_settings(None, settings)?;
-          }
-          None => {
-            let settings = Settings { default_platform: Some(target.platform.to_string()), default_tenant: Some(target.tenant.clone()), ..Settings::default() };
-            write_settings(None, settings)?;
-          }
-        }
-        context.print_outcome(format!("target {} has been set as default", target));
-      }
-      None => {
-        return Err(format!("target {}@{} does not exist", tenant, platform));
-      }
-    }
-    Ok(())
-  }
+    vec![TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref(), TARGET_NEW_CAPABILITY.as_ref(),];
 }
 
 struct TargetDelete {}
