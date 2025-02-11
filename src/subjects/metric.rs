@@ -41,7 +41,7 @@ impl Subject for MetricSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -154,4 +154,4 @@ impl SubjectFormatter<MetricUsageLabel> for MetricUsage {
   }
 }
 
-static METRIC_USAGE_LABELS: [MetricUsageLabel; 4] = [MetricUsageLabel::Application, MetricUsageLabel::Instances, MetricUsageLabel::Path, MetricUsageLabel::Port];
+const METRIC_USAGE_LABELS: [MetricUsageLabel; 4] = [MetricUsageLabel::Application, MetricUsageLabel::Instances, MetricUsageLabel::Path, MetricUsageLabel::Port];

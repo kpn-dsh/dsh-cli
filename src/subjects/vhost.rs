@@ -41,7 +41,7 @@ impl Subject for VhostSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -63,7 +63,7 @@ lazy_static! {
       .set_default_command_executor(&VhostListUsage {})
   );
   // pub static ref VHOST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-  //   CapabilityBuilder::new(CapabilityType::Show, "Show vhost usage")
+  //   CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show vhost usage")
   //     .set_default_command_executor(&VhostShowUsage {})
   //     .add_target_argument(target_argument(VHOST_SUBJECT_TARGET, None))
   // );
@@ -100,27 +100,27 @@ impl CommandExecutor for VhostListUsage {
 
 // #[async_trait]
 // impl CommandExecutor for VhostShowUsage {
-//   async fn execute(&self, _target: Option<String>, _: Option<String>, _: &ArgMatches, _context: &Context) -> DshCliResult {
-// let vhost_target = target.unwrap_or_else(|| unreachable!());
-// context.print_explanation(format!("show the applications that use vhost '{}'", vhost_target));
-// let start_instant = Instant::now();
-// let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
-// context.print_execution_time(start_instant);
-// let mut builder = StringTableBuilder::new(&["application", "port", "a-zone"], context);
-// for (application_id, application) in &applications {
-//   for (port, port_mapping) in &application.exposed_ports {
-//     if let Some(vhost_string) = port_mapping.vhost.clone() {
-//       if let Some((vhost, a_zone)) = vhost::parse_vhost_string(&vhost_string) {
-//         if vhost_target == vhost {
-//           builder.vec(&vec![application_id.clone(), port.clone(), a_zone.unwrap_or_default()]);
+//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+//     let vhost_target = target.unwrap_or_else(|| unreachable!());
+//     context.print_explanation(format!("show the applications that use vhost '{}'", vhost_target));
+//     let start_instant = Instant::now();
+//     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+//     context.print_execution_time(start_instant);
+//     let mut builder = StringTableBuilder::new(&["application", "port", "a-zone"], context);
+//     for (application_id, application) in &applications {
+//       for (port, port_mapping) in &application.exposed_ports {
+//         if let Some(vhost_string) = port_mapping.vhost.clone() {
+//           if let Some((vhost, a_zone)) = vhost::parse_vhost_string(&vhost_string) {
+//             if vhost_target == vhost {
+//               builder.vec(&vec![application_id.clone(), port.clone(), a_zone.unwrap_or_default()]);
+//             }
+//           }
 //         }
 //       }
 //     }
+//     builder.print_show();
+//     Ok(())
 //   }
-// }
-// builder.print_show();
-// Ok(())
-// }
 // }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]

@@ -37,8 +37,8 @@ impl Subject for ApiSubject {
   }
 
   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    let needs_dsh_api_client = !matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, SHOW_COMMAND);
-    Requirements::new(needs_dsh_api_client, Some(OutputFormat::Json))
+    let needs_target_or_dsh_api_client = !matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, SHOW_COMMAND);
+    Requirements::new(needs_target_or_dsh_api_client, needs_target_or_dsh_api_client, Some(OutputFormat::Json))
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {

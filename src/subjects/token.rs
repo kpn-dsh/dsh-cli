@@ -31,7 +31,7 @@ impl Subject for TokenSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {

@@ -1,15 +1,14 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::subjects::image::parse_image_string;
 use async_trait::async_trait;
 use chrono::DateTime;
 use clap::ArgMatches;
+use dsh_api::application::parse_image_string;
 use dsh_api::types::Application;
+use dsh_api::types::{Task, TaskStatus};
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Instant;
-
-use dsh_api::types::{Task, TaskStatus};
 
 use crate::arguments::target_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
@@ -47,7 +46,7 @@ impl Subject for ApplicationSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {

@@ -49,7 +49,7 @@ impl Subject for SecretSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -112,8 +112,6 @@ lazy_static! {
   static ref SECRET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![SECRET_CREATE_CAPABILITY.as_ref(), SECRET_DELETE_CAPABILITY.as_ref(), SECRET_LIST_CAPABILITY.as_ref(), SECRET_SHOW_CAPABILITY.as_ref(), SECRET_UPDATE_CAPABILITY.as_ref()];
 }
-
-// TODO When too many secrets: 400 status with message: limit_exceeded: secretcount the quota of 40 secrets is full
 
 struct SecretCreate {}
 

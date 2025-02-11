@@ -47,7 +47,7 @@ impl Subject for PlatformSubject {
       Some((OPEN_COMMAND, subcommand_matches)) => matches!(subcommand_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_TARGET_SWAGGER),
       _ => false,
     };
-    Requirements::new(needs_dsh_api_client, None)
+    Requirements::new(false, needs_dsh_api_client, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -221,7 +221,7 @@ impl PlatformOpen {
     }
   }
 
-  async fn open_target_swagger(platform: DshPlatform, context: &Context<'_>) {
+  async fn open_target_swagger(platform: DshPlatform, context: &Context) {
     let token = match context.dsh_api_client.as_ref() {
       Some(client) => match client.token().await {
         Ok(token) => Some(token),

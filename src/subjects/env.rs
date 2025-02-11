@@ -44,7 +44,7 @@ impl Subject for EnvSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -153,5 +153,5 @@ impl Label for ApplicationEnvLabel {
   }
 }
 
-static APPLICATION_ENV_LABELS: [ApplicationEnvLabel; 4] =
+const APPLICATION_ENV_LABELS: [ApplicationEnvLabel; 4] =
   [ApplicationEnvLabel::Application, ApplicationEnvLabel::Instances, ApplicationEnvLabel::EnvVar, ApplicationEnvLabel::Value];

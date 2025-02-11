@@ -7,13 +7,22 @@ use crate::formatters::OutputFormat;
 use crate::DshCliResult;
 
 pub struct Requirements {
+  pub needs_target: bool,
   pub needs_dsh_api_client: bool,
   pub default_output_format: Option<OutputFormat>,
 }
 
 impl Requirements {
-  pub fn new(needs_dsh_api_client: bool, default_output_format: Option<OutputFormat>) -> Self {
-    Self { needs_dsh_api_client, default_output_format }
+  pub fn new(needs_target: bool, needs_dsh_api_client: bool, default_output_format: Option<OutputFormat>) -> Self {
+    Self { needs_target, needs_dsh_api_client, default_output_format }
+  }
+
+  pub fn needs_platform(&self) -> bool {
+    self.needs_target || self.needs_dsh_api_client
+  }
+
+  pub fn needs_tenant_name(&self) -> bool {
+    self.needs_target || self.needs_dsh_api_client
   }
 }
 
