@@ -121,6 +121,15 @@
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_NO_HEADERS</code></td>
+        <td>
+            When this environment variables is set (to any value) 
+            the output will not contain headers.
+            This environment variable can be overridden via the 
+            <code>--no-headers</code> command line argument.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_OUTPUT_FORMAT</code></td>
         <td>
             This option specifies the format used when printing the output. 

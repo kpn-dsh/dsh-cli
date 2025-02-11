@@ -24,6 +24,7 @@ pub(crate) const LOG_LEVEL_API_ARGUMENT: &str = "log-level-api-argument";
 pub(crate) const LOG_LEVEL_ARGUMENT: &str = "log-level-argument";
 pub(crate) const MATCHING_STYLE_ARGUMENT: &str = "matching-style-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
+pub(crate) const NO_HEADERS_ARGUMENT: &str = "no-headers-argument";
 pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
@@ -179,6 +180,19 @@ pub(crate) fn no_escape_argument() -> Arg {
           If this argument is not provided, the environment variable \
           DSH_CLI_NO_ESCAPE or the value from the settings file will be used. \
           The default behavior is to use ansi escape styling where applicable.",
+    )
+}
+
+pub(crate) fn no_headers_argument() -> Arg {
+  Arg::new(NO_HEADERS_ARGUMENT)
+    .long("no-headers")
+    .action(ArgAction::SetTrue)
+    .help("No headers.")
+    .long_help(
+      "When this option is provided the output will not contain headers. \
+          If this argument is not provided, the environment variable \
+          DSH_CLI_NO_HEADERS or the value from the settings file will be used. \
+          The default behavior is to use headers where applicable.",
     )
 }
 
