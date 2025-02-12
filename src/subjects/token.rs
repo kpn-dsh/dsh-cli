@@ -136,3 +136,29 @@ pub static ACCES_TOKEN_LABELS: [AccessTokenLabel; 7] = [
   AccessTokenLabel::RefreshExpiresIn,
   AccessTokenLabel::AccessToken,
 ];
+
+// use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+// use dsh_sdk::protocol_adapters::token::api_client_token_fetcher::ApiClientTokenFetcher;
+// use dsh_sdk::protocol_adapters::token::data_access_token::RequestDataAccessToken;
+// use dsh_sdk::Platform;
+//
+// #[tokio::main]
+// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//   let client = DshApiClientFactory::default().client().await?;
+//
+//   println!("{}", client.tenant());
+//
+//   // Create a request for the Data Access Token (this request for full access)
+//   let request = RequestDataAccessToken::new(client.tenant_name(), client.platform().client_id());
+//
+//   let sdk_platform = Platform::try_from(client.platform())?;
+//   let api_key = "";
+//
+//   let token_fetcher = ApiClientTokenFetcher::new(api_key, sdk_platform);
+//
+//   let token = token_fetcher.fetch_data_access_token(request).await.unwrap();
+//
+//   println!("{:#?}", token);
+//
+//   Ok(())
+// }
