@@ -215,8 +215,7 @@ impl CommandExecutor for CertificateShowAll {
     let certificate = context.dsh_api_client.as_ref().unwrap().get_certificate(certificate_id.as_str()).await?;
     if let Some(actual_certificate) = certificate.actual {
       context.print_execution_time(start_instant);
-      let formatter = UnitFormatter::new(certificate_id, &CERTIFICATE_LABELS_SHOW, None, &actual_certificate, context);
-      formatter.print()?;
+      UnitFormatter::new(certificate_id, &CERTIFICATE_LABELS_SHOW, None, context).print(&actual_certificate)?;
     }
     Ok(())
   }
@@ -232,15 +231,7 @@ impl CommandExecutor for CertificateShowAllocationStatus {
     let start_instant = Instant::now();
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_certificate_status(certificate_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(
-      certificate_id,
-      &DEFAULT_ALLOCATION_STATUS_LABELS,
-      Some("certificate id"),
-      &allocation_status,
-      context,
-    );
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(certificate_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("certificate id"), context).print(&allocation_status)
   }
 }
 

@@ -143,9 +143,7 @@ impl CommandExecutor for ManifestShowAll {
     let manifests_grouped = manifests_with_id.clone().into_iter().into_group_map();
     let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id.as_str()).unwrap().clone();
     manifests.sort_by_key(|m| m.version.clone());
-    let formatter = UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), *manifests.last().unwrap(), context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), context).print(*manifests.last().unwrap())
   }
 }
 

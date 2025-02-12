@@ -275,9 +275,7 @@ impl CommandExecutor for VolumeShowAll {
     let start_instant = Instant::now();
     let volume = context.dsh_api_client.as_ref().unwrap().get_volume(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(volume_id, &VOLUME_STATUS_LABELS, Some("volume id"), &volume, context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(volume_id, &VOLUME_STATUS_LABELS, Some("volume id"), context).print(&volume)
   }
 }
 
@@ -291,9 +289,7 @@ impl CommandExecutor for VolumeShowAllocationStatus {
     let start_instant = Instant::now();
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_volume_status(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), &allocation_status, context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context).print(&allocation_status)
   }
 }
 

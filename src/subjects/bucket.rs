@@ -121,9 +121,7 @@ impl CommandExecutor for BucketShowAll {
     let start_instant = Instant::now();
     let bucket = context.dsh_api_client.as_ref().unwrap().get_bucket(bucket_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, &bucket, context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket)
   }
 }
 

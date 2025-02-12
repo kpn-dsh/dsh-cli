@@ -214,9 +214,7 @@ impl CommandExecutor for ApplicationShowAll {
     context.print_execution_time(start_instant);
     // let table = ShowTable::new(application_id.as_str(), &application, &APPLICATION_LABELS_SHOW, context);
     // table.print();
-    let formatter = UnitFormatter::new(application_id, &APPLICATION_LABELS_SHOW, Some("application id"), &application, context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(application_id, &APPLICATION_LABELS_SHOW, Some("application id"), context).print(&application)
   }
 }
 
@@ -230,15 +228,7 @@ impl CommandExecutor for ApplicationShowAllocationStatus {
     let start_instant = Instant::now();
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_application_status(application_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(
-      application_id,
-      &DEFAULT_ALLOCATION_STATUS_LABELS,
-      Some("application id"),
-      &allocation_status,
-      context,
-    );
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(application_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("application id"), context).print(&allocation_status)
   }
 }
 

@@ -279,22 +279,14 @@ impl CommandExecutor for PlatformShow {
       })
       .map(|label| label.to_owned())
       .collect::<Vec<_>>();
-    UnitFormatter::new(
-      platform.name(),
-      labels.as_slice(),
-      Some("platform name"),
-      &(
-        platform.clone(),
-        app.unwrap_or_default(),
-        service.unwrap_or_default(),
-        tenant.unwrap_or_default(),
-        vendor.unwrap_or_default(),
-        vhost.unwrap_or_default(),
-      ),
-      context,
-    )
-    .print()?;
-    Ok(())
+    UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print(&(
+      platform.clone(),
+      app.unwrap_or_default(),
+      service.unwrap_or_default(),
+      tenant.unwrap_or_default(),
+      vendor.unwrap_or_default(),
+      vhost.unwrap_or_default(),
+    ))
   }
 }
 

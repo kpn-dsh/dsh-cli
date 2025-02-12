@@ -175,7 +175,7 @@ impl CommandExecutor for SettingList {
     let password = "********".to_string();
     context.print_explanation("list default settings");
     match read_settings(None)? {
-      Some(settings) => UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), &settings, context).print()?,
+      Some(settings) => UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings)?,
       None => context.print_warning("no default settings found"),
     }
     let env_vars = get_environment_variables();

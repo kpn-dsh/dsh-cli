@@ -135,25 +135,25 @@ impl CommandExecutor for AppShowAll {
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(application) => {
-          UnitFormatter::new(resource_name, &APPLICATION_LABELS_SHOW, Some("application resource"), application, context).print()?;
+          UnitFormatter::new(resource_name, &APPLICATION_LABELS_SHOW, Some("application resource"), context).print(application)?;
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
-          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), bucket, context).print()?;
+          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket)?;
         }
         AppCatalogAppResourcesValue::Certificate(certificate) => {
-          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), certificate, context).print()?;
+          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), context).print(certificate)?;
         }
         AppCatalogAppResourcesValue::Secret(secret) => {
-          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), &secret.name, context).print()?;
+          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), context).print(&secret.name)?;
         }
         AppCatalogAppResourcesValue::Topic(topic) => {
-          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), topic, context).print()?;
+          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), context).print(topic)?;
         }
         AppCatalogAppResourcesValue::Vhost(vhost) => {
-          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), vhost, context).print()?;
+          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), context).print(vhost)?;
         }
         AppCatalogAppResourcesValue::Volume(volume) => {
-          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), volume, context).print()?;
+          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), context).print(volume)?;
         }
       }
     }

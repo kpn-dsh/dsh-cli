@@ -307,8 +307,7 @@ impl CommandExecutor for SecretShowAllocationStatus {
     let start_instant = Instant::now();
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_secret_status(secret_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), &allocation_status, context).print()?;
-    Ok(())
+    UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context).print(&allocation_status)
   }
 }
 

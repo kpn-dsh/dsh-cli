@@ -229,8 +229,7 @@ impl CommandExecutor for TopicShowAllocationStatus {
     let start_instant = Instant::now();
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_topic_status(topic_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), &allocation_status, context).print()?;
-    Ok(())
+    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context).print(&allocation_status)
   }
 }
 
@@ -244,8 +243,7 @@ impl CommandExecutor for TopicShow {
     let start_instant = Instant::now();
     let topic = context.dsh_api_client.as_ref().unwrap().get_topic_configuration(topic_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, &topic, context).print()?;
-    Ok(())
+    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, context).print(&topic)
   }
 }
 

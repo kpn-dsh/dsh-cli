@@ -2,127 +2,89 @@ use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::OutputFormat;
 use serde::Serialize;
-use std::marker::PhantomData;
 use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style, Table};
 
-pub struct UnitFormatter<'a, L: Label, V: SubjectFormatter<L>> {
+pub struct UnitFormatter<'a, L: Label> {
   target_id: String,
   labels: &'a [L],
   target_label: Option<&'a str>,
-  value: &'a V,
   context: &'a Context,
-  phantom: PhantomData<&'a V>,
 }
 
-impl<'a, L, V> UnitFormatter<'a, L, V>
+impl<'a, L> UnitFormatter<'a, L>
 where
   L: Label,
-  V: SubjectFormatter<L> + Serialize,
 {
-  pub fn new<T: Into<String>>(target_id: T, labels: &'a [L], target_label: Option<&'a str>, value: &'a V, context: &'a Context) -> Self {
-    Self { target_id: target_id.into(), labels, target_label, value, context, phantom: PhantomData }
+  pub fn new<T: Into<String>>(target_id: T, labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
+    Self { target_id: target_id.into(), labels, target_label, context }
   }
 
-  pub fn print(&self) -> Result<(), String> {
+  pub fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
     match self.context.output_format {
-      OutputFormat::Csv => {
-        if self.context.show_headers {
-          self.context.print(
-            self
-              .labels
-              .iter()
-              .map(|label| self.context.csv_value(label.as_str_for_csv()))
-              .collect::<Result<Vec<_>, _>>()?
-              .join(self.context.csv_separator.as_str()),
-          );
-        }
-        self.context.print(
-          self
-            .labels
-            .iter()
-            .map(|label| self.context.csv_value(self.value.value(label, self.target_id.as_str()).as_str()))
-            .collect::<Result<Vec<_>, _>>()?
-            .join(self.context.csv_separator.as_str()),
-        );
-        Ok(())
-      }
-
-      OutputFormat::Json => match serde_json::to_string_pretty(self.value) {
-        Ok(json) => {
-          self.context.print(json);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert value to json ({})", error)),
-      },
-
-      OutputFormat::JsonCompact => match serde_json::to_string(self.value) {
-        Ok(json) => {
-          self.context.print(json);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert value to json compact ({})", error)),
-      },
-
-      OutputFormat::Plain => Err("csv unit print not yet implemented".to_string()),
-
+      OutputFormat::Csv => self.print_csv(value),
+      OutputFormat::Json => self.print_json(value),
+      OutputFormat::JsonCompact => self.print_json_compact(value),
+      OutputFormat::Plain => Err("plain unit print not yet implemented".to_string()),
       OutputFormat::Quiet => Ok(()),
-
-      OutputFormat::Table => {
-        let mut table = self.create_table();
-        table.with(Padding::new(1, 1, 0, 0));
-        table.with(Style::sharp());
-        self.context.print(table.to_string());
-        Ok(())
-      }
-
-      OutputFormat::TableNoBorder => {
-        let mut table = self.create_table();
-        table.with(Padding::new(0, 2, 0, 0));
-        table.with(Style::empty());
-        self.context.print(table.to_string());
-        Ok(())
-      }
-
-      OutputFormat::Toml => match toml::to_string_pretty(self.value) {
-        Ok(toml) => {
-          self.context.print(toml);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert value to toml ({})", error)),
-      },
-
-      OutputFormat::TomlCompact => match toml::to_string(self.value) {
-        Ok(toml) => {
-          self.context.print(toml);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert value to toml compact ({})", error)),
-      },
-
-      OutputFormat::Yaml => match serde_yaml::to_string(self.value) {
-        Ok(yaml) => {
-          self.context.print(yaml);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert value to yaml ({})", error)),
-      },
+      OutputFormat::Table => self.print_table(value),
+      OutputFormat::TableNoBorder => self.print_table_no_borders(value),
+      OutputFormat::Toml => self.print_toml(value),
+      OutputFormat::TomlCompact => self.print_toml_compact(value),
+      OutputFormat::Yaml => self.print_yaml(value),
     }
   }
 
-  fn create_table(&self) -> Table {
+  pub fn print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
+    match self.context.output_format {
+      OutputFormat::Csv => self.print_csv(value),
+      OutputFormat::Json => Err("serialization to json is not supported for this type".to_string()),
+      OutputFormat::JsonCompact => Err("serialization to compact json is not supported for this type".to_string()),
+      OutputFormat::Plain => Err("plain unit print not yet implemented".to_string()),
+      OutputFormat::Quiet => Ok(()),
+      OutputFormat::Table => self.print_table(value),
+      OutputFormat::TableNoBorder => self.print_table_no_borders(value),
+      OutputFormat::Toml => Err("serialization to toml is not supported for this type".to_string()),
+      OutputFormat::TomlCompact => Err("serialization to compact toml is not supported for this type".to_string()),
+      OutputFormat::Yaml => Err("serialization to yaml is not supported for this type".to_string()),
+    }
+  }
+
+  fn print_csv<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
+    if self.context.show_headers {
+      self.context.print(
+        self
+          .labels
+          .iter()
+          .map(|label| self.context.csv_value(label.as_str_for_csv()))
+          .collect::<Result<Vec<_>, _>>()?
+          .join(self.context.csv_separator.as_str()),
+      );
+    }
+    self.context.print(
+      self
+        .labels
+        .iter()
+        .map(|label| self.context.csv_value(value.value(label, self.target_id.as_str()).as_str()))
+        .collect::<Result<Vec<_>, _>>()?
+        .join(self.context.csv_separator.as_str()),
+    );
+    Ok(())
+  }
+
+  fn create_table<V: SubjectFormatter<L>>(&self, value: &V) -> Table {
     let mut tabled_builder = TabledBuilder::default();
     if let Some(target_label) = self.target_label {
       tabled_builder.push_record([target_label, self.target_id.as_str()]);
       for label in self.labels {
         if !label.is_target_label() && label.as_str_for_unit() != target_label {
-          tabled_builder.push_record([label.as_str_for_unit(), self.value.value(label, self.target_id.as_str()).as_str()]);
+          tabled_builder.push_record([label.as_str_for_unit(), value.value(label, self.target_id.as_str()).as_str()]);
         }
       }
     } else {
       for label in self.labels {
-        tabled_builder.push_record([label.as_str_for_unit(), self.value.value(label, self.target_id.as_str()).as_str()]);
+        tabled_builder.push_record([label.as_str_for_unit(), value.value(label, self.target_id.as_str()).as_str()]);
       }
     }
     let mut table = tabled_builder.build();
@@ -130,5 +92,71 @@ where
       table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
     }
     table
+  }
+
+  fn print_json<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
+    match serde_json::to_string_pretty(value) {
+      Ok(json) => {
+        self.context.print(json);
+        Ok(())
+      }
+      Err(error) => Err(format!("could not convert value to json ({})", error)),
+    }
+  }
+
+  fn print_json_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
+    match serde_json::to_string(value) {
+      Ok(json) => {
+        self.context.print(json);
+        Ok(())
+      }
+      Err(error) => Err(format!("could not convert value to compact json ({})", error)),
+    }
+  }
+
+  fn print_toml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
+    match toml::to_string_pretty(value) {
+      Ok(toml) => {
+        self.context.print(toml);
+        Ok(())
+      }
+      Err(error) => Err(format!("could not convert value to compact toml ({})", error)),
+    }
+  }
+
+  fn print_toml_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
+    match toml::to_string(value) {
+      Ok(toml) => {
+        self.context.print(toml);
+        Ok(())
+      }
+      Err(error) => Err(format!("could not convert value to compact toml ({})", error)),
+    }
+  }
+
+  fn print_yaml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
+    match serde_yaml::to_string(value) {
+      Ok(yaml) => {
+        self.context.print(yaml);
+        Ok(())
+      }
+      Err(error) => Err(format!("could not convert value to yaml ({})", error)),
+    }
+  }
+
+  fn print_table<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
+    let mut table = self.create_table(value);
+    table.with(Padding::new(1, 1, 0, 0));
+    table.with(Style::sharp());
+    self.context.print(table.to_string());
+    Ok(())
+  }
+
+  fn print_table_no_borders<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
+    let mut table = self.create_table(value);
+    table.with(Padding::new(0, 2, 0, 0));
+    table.with(Style::empty());
+    self.context.print(table.to_string());
+    Ok(())
   }
 }

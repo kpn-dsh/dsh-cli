@@ -162,9 +162,7 @@ impl CommandExecutor for ProxyShowConfiguration {
     let start_instant = Instant::now();
     let proxy = context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_configuration(proxy_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, &proxy, context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, context).print(&proxy)
   }
 }
 
