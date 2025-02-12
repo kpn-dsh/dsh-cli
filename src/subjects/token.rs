@@ -1,11 +1,15 @@
 use crate::capability::{Capability, CommandExecutor, REQUEST_COMMAND, REQUEST_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::formatters::formatter::{Label, SubjectFormatter};
+use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_sdk::management_api::AccessToken;
 use lazy_static::lazy_static;
+use serde::Serialize;
 use std::time::Instant;
 
 pub(crate) struct TokenSubject {}
@@ -63,18 +67,72 @@ impl CommandExecutor for TokenRequest {
     context.print_explanation("request dsh api token");
     let start_instant = Instant::now();
 
-    let rest_api_token = context.dsh_api_client.as_ref().unwrap().token().await?;
+    let access_token = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .token_fetcher()
+      .fetch_access_token_from_server()
+      .await
+      .map_err(|error| error.to_string())?;
     context.print_execution_time(start_instant);
-
-    if let Some(token) = rest_api_token.strip_prefix("Bearer ") {
-      // match jsonwebtoken::decode_header(token) {
-      //   Ok(header) => println!("header {:?}", header),
-      //   Err(error) => return Err(error.to_string()),
-      // }
-      // let token_data = jsonwebtoken::decode::<String>(&token, &DecodingKey::from_secret(token.as_ref()), &Validation::new(Algorithm::RS256));
-      // println!("{:?}", token_data);
-      context.print(token);
-    }
-    Ok(())
+    UnitFormatter::new("", &ACCES_TOKEN_LABELS, None, context).print_non_serializable(&access_token)
   }
 }
+
+#[derive(Clone, Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum AccessTokenLabel {
+  AccessToken,
+  ExpiresIn,
+  Formatted,
+  NotBeforePolicy,
+  RefreshExpiresIn,
+  Scope,
+  TokenType,
+}
+
+impl Label for AccessTokenLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::AccessToken => "access token",
+      Self::ExpiresIn => "expires in",
+      Self::Formatted => "formatted",
+      Self::NotBeforePolicy => "not before policy",
+      Self::RefreshExpiresIn => "refresh expires in",
+      Self::Scope => "scope",
+      Self::TokenType => "type",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::Formatted)
+  }
+}
+
+impl SubjectFormatter<AccessTokenLabel> for AccessToken {
+  fn value(&self, label: &AccessTokenLabel, _target_id: &str) -> String {
+    match label {
+      AccessTokenLabel::AccessToken => self.access_token().to_string(),
+      AccessTokenLabel::ExpiresIn => self.expires_in().to_string(),
+      AccessTokenLabel::Formatted => self.formatted_token(),
+      AccessTokenLabel::NotBeforePolicy => self.not_before_policy().to_string(),
+      AccessTokenLabel::RefreshExpiresIn => self.refresh_expires_in().to_string(),
+      AccessTokenLabel::Scope => self.scope().to_string(),
+      AccessTokenLabel::TokenType => self.token_type().to_string(),
+    }
+  }
+
+  fn target_label(&self) -> Option<AccessTokenLabel> {
+    Some(AccessTokenLabel::Scope)
+  }
+}
+
+pub static ACCES_TOKEN_LABELS: [AccessTokenLabel; 7] = [
+  AccessTokenLabel::Formatted,
+  AccessTokenLabel::Scope,
+  AccessTokenLabel::TokenType,
+  AccessTokenLabel::ExpiresIn,
+  AccessTokenLabel::NotBeforePolicy,
+  AccessTokenLabel::RefreshExpiresIn,
+  AccessTokenLabel::AccessToken,
+];

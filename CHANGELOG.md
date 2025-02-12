@@ -21,6 +21,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Set and unset all settings via the tool.
 * Added csv output format.
 * Added flag to hide headers.
+* Added basic token capability.
 
 ### Removed
 

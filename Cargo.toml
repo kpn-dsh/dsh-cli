@@ -27,6 +27,7 @@ chrono = { version = "0.4", default-features = false }
 clap = { version = "4.5", features = ["color", "derive", "string", "wrap_help"], default-features = false }
 clap_complete = { version = "4.5", default-features = false }
 ctrlc = { version = "3.4" }
+dsh_sdk = { version = "0.6", features = ["bootstrap", "management-api-token-fetcher"] }
 env_logger = { version = "0.11", default-features = false }
 futures = { version = "0.3", default-features = false }
 homedir = { version = "0.3", default-features = false }
