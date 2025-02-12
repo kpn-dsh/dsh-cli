@@ -90,6 +90,7 @@ const LONG_ABOUT: &str = "DSH resource management api command line interface\n\n
 const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
+const USAGE: &str = "dsh [OPTIONS] [SUBJECT/COMMAND]\n       dsh --help\n       dsh secret --help\n       dsh secret list --help";
 
 const VERSION: &str = "0.5.0";
 
@@ -259,6 +260,7 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .about(ABOUT)
     .author(AUTHOR)
     .long_about(long_about)
+    .override_usage(USAGE) // TODO This should be generated but that doesn't work
     .after_help(AFTER_HELP)
     .args(vec![
       platform_argument(),
