@@ -45,10 +45,6 @@ image list
 image list --started
 image list --stopped
 
-manifest list
-manifest list --ids
-manifest show $MANIFEST_UNDER_TEST
-
 metric list
 metric list --started
 metric list --stopped
