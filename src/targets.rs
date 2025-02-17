@@ -1,5 +1,6 @@
 use crate::{dsh_directory, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, APPLICATION_NAME, TARGETS_SUBDIRECTORY, TOML_FILENAME_EXTENSION};
 use dsh_api::platform::DshPlatform;
+use log::debug;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
@@ -66,13 +67,13 @@ pub(crate) fn all_targets() -> Result<Vec<Target>, String> {
 pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), String> {
   let target_file = target_file(platform, tenant)?;
   match delete_file(&target_file) {
-    Ok(_) => match delete_password_from_keyring(platform, tenant) {
+    Ok(_) => match delete_target_password_from_keyring(platform, tenant) {
       Ok(_) => {
-        log::debug!("target file '{}' and keyring entry successfully deleted", target_file.to_string_lossy());
+        debug!("target file '{}' and keyring entry successfully deleted", target_file.to_string_lossy());
         Ok(())
       }
       Err(keyring_error) => {
-        log::debug!(
+        debug!(
           "target file '{}' successfully deleted but deleting the password from the keyring resulted in an error ({})",
           target_file.to_string_lossy(),
           keyring_error
@@ -80,9 +81,9 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
         Err(keyring_error)
       }
     },
-    Err(target_file_error) => match delete_password_from_keyring(platform, tenant) {
+    Err(target_file_error) => match delete_target_password_from_keyring(platform, tenant) {
       Ok(_) => {
-        log::debug!(
+        debug!(
           "keyring entry successfully deleted but deleting the target file '{}' resulted in an error ({})",
           target_file.to_string_lossy(),
           target_file_error
@@ -90,44 +91,13 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
         Err(target_file_error)
       }
       Err(keyring_error) => {
-        log::debug!(
+        debug!(
           "deleting the target file resulted in an error ({}), as well as deleting the password from the keyring ({})",
-          target_file_error,
-          keyring_error
+          target_file_error, keyring_error
         );
         Err(format!("{} / {}", target_file_error, keyring_error))
       }
     },
-  }
-}
-
-/// # Read target and password
-///
-/// This function will read the target parameters from the target settings file (if it exists)
-/// and the target password from the keyring.
-/// If the target settings could be read, but the password entry from the keyring is not present,
-/// a [`Target`] will be returned with an empty `password` field.
-///
-/// ## Parameters
-/// * `platform` - target platform
-/// * `tenant` - target tenant name
-///
-/// ## Returns
-/// * `Ok(Some(target))` - if the target setting was available a `Target` will be returned,
-///   but the `password` field can be empty if there was no matching keyring entry
-/// * `Ok(None)` - if the target setting was not available
-/// * `Err(message)` - if an error occurred
-pub(crate) fn read_target_and_password(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
-  let target_file = target_file(platform, tenant)?;
-  match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
-    Some(target) => {
-      log::debug!("read target file '{}'", target_file.to_string_lossy());
-      Ok(Some(Target { password: get_password_from_keyring(platform, tenant)?, ..target }))
-    }
-    None => {
-      log::debug!("could not read target file '{}'", target_file.to_string_lossy());
-      Ok(None)
-    }
   }
 }
 
@@ -148,11 +118,11 @@ pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option
   let target_file = target_file(platform, tenant)?;
   match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
     Some(target) => {
-      log::debug!("read target file '{}'", target_file.to_string_lossy());
+      debug!("target '{}' read (file '{}')", target, target_file.to_string_lossy());
       Ok(Some(Target { password: None, ..target }))
     }
     None => {
-      log::debug!("could not read target file '{}'", target_file.to_string_lossy());
+      debug!("target could not read target file '{}'", target_file.to_string_lossy());
       Ok(None)
     }
   }
@@ -182,20 +152,25 @@ pub(crate) fn upsert_target(target: &Target) -> Result<(), String> {
   match target.password {
     Some(ref password) => match upsert_password_to_keyring(password, &target.platform, &target.tenant) {
       Ok(_) => {
-        log::debug!("target file '{}' and keyring upserted", target_file.to_string_lossy());
+        debug!("target file '{}' and keyring upserted with target '{}'", target_file.to_string_lossy(), target);
         Ok(())
       }
       Err(keyring_error) => {
-        log::debug!(
-          "target file '{}' upserted, but keyring update failed ({})",
+        debug!(
+          "target file '{}' upserted with target '{}', but keyring update failed ({})",
           target_file.to_string_lossy(),
+          target,
           keyring_error
         );
         Err(keyring_error)
       }
     },
     None => {
-      log::debug!("target file '{}' upserted, but password is empty", target_file.to_string_lossy());
+      debug!(
+        "target file '{}' upserted with target '{}', but password is empty",
+        target_file.to_string_lossy(),
+        target
+      );
       Ok(())
     }
   }
@@ -220,7 +195,7 @@ fn delete_file(toml_file: &PathBuf) -> Result<(), String> {
   }
 }
 
-/// # Get password from keyring
+/// # Get target password from keyring
 ///
 /// ## Parameters
 /// * `platform` - platform of the target
@@ -230,18 +205,24 @@ fn delete_file(toml_file: &PathBuf) -> Result<(), String> {
 /// * `Ok(Some(password))` - if the password entry was found in the keyring
 /// * `Ok(None)` - if the password entry could not be found in the keyring
 /// * `Err<String>` - if an error occurred
-pub(crate) fn get_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<Option<String>, String> {
+pub(crate) fn get_target_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<Option<String>, String> {
   let user = format!("{}.{}", platform, tenant);
   match keyring::Entry::new(APPLICATION_NAME, &user) {
     Ok(entry) => match entry.get_password() {
-      Ok(password) => Ok(Some(password)),
-      Err(_) => Ok(None),
+      Ok(password) => {
+        debug!("target password for '{}@{}' read from keyring", tenant, platform);
+        Ok(Some(password))
+      }
+      Err(_) => {
+        debug!("target password for '{}@{}' could not be read from keyring", tenant, platform);
+        Ok(None)
+      }
     },
     Err(keyring_error) => Err(keyring_error.to_string()),
   }
 }
 
-/// # Create or update password in the keyring
+/// # Create or update target password in the keyring
 ///
 /// ## Parameters
 /// * `password` - password to add to the keyring
@@ -255,14 +236,17 @@ pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform,
   let user = format!("{}.{}", platform, tenant);
   match keyring::Entry::new(APPLICATION_NAME, &user) {
     Ok(entry) => match entry.set_password(password) {
-      Ok(_) => Ok(()),
+      Ok(_) => {
+        debug!("target password for '{}@{}' written to keyring", tenant, platform);
+        Ok(())
+      }
       Err(keyring_error) => Err(keyring_error.to_string()),
     },
     Err(keyring_error) => Err(keyring_error.to_string()),
   }
 }
 
-/// # Delete password from the keyring
+/// # Delete target password from the keyring
 ///
 /// ## Parameters
 /// * `platform` - platform of the target
@@ -271,11 +255,14 @@ pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform,
 /// ## Returns
 /// * `Ok(())` - if the password entry was successfully deleted from the keyring
 /// * `Err<String>` - if an error occurred
-pub(crate) fn delete_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<(), String> {
+pub(crate) fn delete_target_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<(), String> {
   let user = format!("{}.{}", platform, tenant);
   match keyring::Entry::new(APPLICATION_NAME, &user) {
     Ok(entry) => match entry.delete_credential() {
-      Ok(_) => Ok(()),
+      Ok(_) => {
+        debug!("password for target '{}@{}' deleted from keyring", tenant, platform);
+        Ok(())
+      }
       Err(keyring_error) => Err(keyring_error.to_string()),
     },
     Err(keyring_error) => Err(keyring_error.to_string()),

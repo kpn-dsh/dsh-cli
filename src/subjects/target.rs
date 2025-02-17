@@ -5,13 +5,13 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-use crate::arguments::{platform_argument, tenant_argument, PLATFORM_ARGUMENT, TENANT_ARGUMENT};
+use crate::arguments::{platform_name_argument, tenant_name_argument, PLATFORM_NAME_ARGUMENT, TENANT_NAME_ARGUMENT};
 use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::OutputFormat;
-use crate::settings::{read_settings, write_settings, Settings};
+use crate::settings::{get_settings, write_settings, Settings};
 use crate::subject::{Requirements, Subject};
 use crate::targets::{all_targets, delete_target, read_target, upsert_target, Target};
 use crate::{read_single_line, DshCliResult};
@@ -49,7 +49,7 @@ impl Subject for TargetSubject {
 
   // TODO Check this
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, Some(OutputFormat::Table))
+    Requirements::new(false, false, false, Some(OutputFormat::Table))
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -75,7 +75,8 @@ lazy_static! {
         and you need to explicitly confirm the action.",
       )
       .set_default_command_executor(&TargetDelete {})
-      .add_extra_arguments(vec![platform_argument(), tenant_argument()])
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true))
   );
   static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND_PAIR, "List all target configurations.")
@@ -91,7 +92,8 @@ lazy_static! {
         The password will be stored in your computers keyring application, which is more secure.",
       )
       .set_default_command_executor(&TargetNew {})
-      .add_extra_arguments(vec![platform_argument(), tenant_argument()])
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true))
   );
   static ref TARGET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref(), TARGET_NEW_CAPABILITY.as_ref(),];
@@ -122,13 +124,12 @@ impl CommandExecutor for TargetDelete {
             } else {
               context.print_outcome(format!("target '{}' deleted", target));
             }
-            if let Some(settings) = read_settings(None)? {
-              if let (Some(default_platform), Some(default_tenant)) = (settings.default_platform, settings.default_tenant) {
-                if default_platform == target.platform.to_string() && default_tenant == target.tenant {
-                  let settings = Settings { default_platform: None, default_tenant: None, ..settings };
-                  write_settings(None, settings)?;
-                  context.print_outcome(format!("target '{}' unset as default", target));
-                }
+            let (settings, _) = get_settings(None)?;
+            if let (Some(default_platform), Some(default_tenant)) = (settings.default_platform, settings.default_tenant) {
+              if default_platform == target.platform.to_string() && default_tenant == target.tenant {
+                let settings = Settings { default_platform: None, default_tenant: None, ..settings };
+                write_settings(None, settings)?;
+                context.print_outcome(format!("target '{}' unset as default", target));
               }
             }
           }
@@ -136,7 +137,7 @@ impl CommandExecutor for TargetDelete {
           context.print_outcome("cancelled");
         }
       }
-      None => return Err(format!("target {}@{} does not exist", tenant, platform)),
+      None => return Err(format!("target '{}@{}' does not exist", tenant, platform)),
     }
     Ok(())
   }
@@ -148,17 +149,16 @@ struct TargetList {}
 impl CommandExecutor for TargetList {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all target configurations");
-    let settings = read_settings(None)?;
-    let (default_platform, default_tenant) = match settings {
-      Some(settings) => (settings.default_platform, settings.default_tenant),
-      None => (None, None),
-    };
+    let (settings, _) = get_settings(None)?;
     let targets = all_targets()?;
     let mut target_formatters = vec![];
     for target in targets {
-      let is_default =
-        default_platform.clone().is_some_and(|ref platform| target.platform.to_string() == *platform) && default_tenant.clone().is_some_and(|ref tenant| target.tenant == *tenant);
-      let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, is_default };
+      let platform_is_default = settings
+        .default_platform
+        .clone()
+        .is_some_and(|ref platform| target.platform.to_string() == *platform);
+      let tenant_is_default = settings.default_tenant.clone().is_some_and(|ref tenant| target.tenant == *tenant);
+      let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, is_default: platform_is_default && tenant_is_default };
       target_formatters.push(target_formatter);
     }
     if target_formatters.is_empty() {
@@ -199,14 +199,14 @@ impl CommandExecutor for TargetNew {
 }
 
 fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
-  match matches.get_one::<DshPlatform>(PLATFORM_ARGUMENT) {
-    Some(dsh_platform) => Ok(dsh_platform.clone()),
+  match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
+    Some(dsh_platform) => Ok(DshPlatform::try_from(dsh_platform.as_str())?),
     None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
   }
 }
 
 fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
-  match matches.get_one::<String>(TENANT_ARGUMENT) {
+  match matches.get_one::<String>(TENANT_NAME_ARGUMENT) {
     Some(tenant_argument) => Ok(tenant_argument.to_string()),
     None => Ok(read_single_line("enter tenant: ")?),
   }
