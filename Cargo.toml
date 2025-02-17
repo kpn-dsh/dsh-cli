@@ -28,7 +28,7 @@ clap = { version = "4.5", features = ["color", "derive", "string", "wrap_help"],
 clap_complete = { version = "4.5", default-features = false }
 ctrlc = { version = "3.4" }
 dsh_sdk = { version = "0.6", features = ["bootstrap", "management-api-token-fetcher"] }
-env_logger = { version = "0.11", default-features = false }
+env_logger = { version = "0.11", features = ["humantime"], default-features = false }
 futures = { version = "0.3", default-features = false }
 homedir = { version = "0.3", default-features = false }
 itertools = { version = "0.14", features = ["use_std"], default-features = false }
