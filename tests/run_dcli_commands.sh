@@ -17,9 +17,12 @@ export ENV_VALUE_UNDER_TEST_REGEX="^info$"
 export IMAGE_UNDER_TEST=registry:eavesdropper:0.9.3
 export IMAGE_UNDER_TEST_REGEX=registry
 export MANIFEST_UNDER_TEST="kpn/eavesdropper"
+export PLATFORM_UNDER_TEST=prodlz
 export PROXY_UNDER_TEST=broker
 export SECRET_UNDER_TEST=boss-account-ids
+export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_UNDER_TEST=reference-implementation-compliant
+export VENDOR_UNDER_TEST=kpn
 export VHOST_UNDER_TEST=greenbox-dev
 export VOLUME_UNDER_TEST=github-action-runner-home
 
@@ -28,7 +31,7 @@ export RUST_LOG=dsh=info,dsh_api=info
 export SEPARATOR="-------------------------------"
 
 #export MATCHING_STYLE="--matching-style bold"
-export OUTPUT_FORMAT="--output-format json"
+#export OUTPUT_FORMAT="--output-format json"
 #export SHOW_EXECUTION_TIME="--show-execution-time"
 #export VERBOSITY="-v high"
 
