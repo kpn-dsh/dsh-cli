@@ -4,7 +4,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.5.0] - 2025-02-07
+## [0.5.0] - 2025-02-17
 
 ### Fixes
 
@@ -13,6 +13,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 ### Added
 
 * Improved error handling for bad requests.
+* Improved documentation.
 * Features (disabled by default):
     * `appcatalog` - Controls availability of app catalog operations.
     * `manage` - Controls availability of manage operations.
@@ -32,6 +33,8 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 * Upgraded `dsh_api` dependency to 0.5.0.
 * Autocomplete flag now hidden.
+* Improved logging.
+* Renamed create capabilities to new.
 
 ## [0.4.0] - 2025-01-31
 
