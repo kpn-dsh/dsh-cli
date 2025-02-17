@@ -9,31 +9,36 @@ extern crate core;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::ErrorKind::NotFound;
-use std::io::{stdin, stdout, Write};
+use std::io::{stdin, stdout, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
 use std::{env, fs, process};
 
-use crate::arguments::{
-  dry_run_argument, force_argument, log_level_api_argument, log_level_argument, matching_style_argument, no_escape_argument, no_headers_argument, output_format_argument,
-  password_file_argument, platform_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument, tenant_argument, terminal_width_argument, LogLevel,
-  LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT,
-};
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::settings::{read_settings, Settings};
+use crate::global_arguments::{
+  dry_run_argument, force_argument, matching_style_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument,
+  show_execution_time_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, TARGET_PASSWORD_FILE_ARGUMENT,
+  TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT,
+};
+use crate::log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
+use crate::log_level::initialize_logger;
+use crate::settings::{get_settings, Settings};
 use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::application::APPLICATION_SUBJECT;
 use crate::subjects::platform::PLATFORM_SUBJECT;
 use crate::subjects::token::TOKEN_SUBJECT;
+use crate::targets::{get_target_password_from_keyring, read_target};
 use clap::builder::{styling, Styles};
 use clap::{ArgMatches, Command};
+use dsh_api::dsh_api_tenant::DshApiTenant;
+use dsh_api::platform::DshPlatform;
 use dsh_api::{crate_version, openapi_version};
 use homedir::my_home;
 use lazy_static::lazy_static;
-use log::LevelFilter;
+use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use subjects::app::APP_SUBJECT;
@@ -60,11 +65,15 @@ mod context;
 mod filter_flags;
 mod flags;
 mod formatters;
+mod global_arguments;
+mod log_arguments;
+mod log_level;
 mod modifier_flags;
 mod settings;
 mod subject;
 mod subjects;
 mod targets;
+mod verbosity;
 
 lazy_static! {
   static ref STYLES: Styles = Styles::styled()
@@ -105,6 +114,7 @@ const ENV_VAR_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
 const ENV_VAR_HOME_DIRECTORY: &str = "DSH_CLI_HOME";
 const ENV_VAR_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
 const ENV_VAR_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
+const ENV_VAR_LOG_LEVEL_SDK: &str = "DSH_CLI_LOG_LEVEL_SDK";
 const ENV_VAR_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
 const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 const ENV_VAR_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
@@ -183,19 +193,19 @@ async fn inner_main() -> DshCliResult {
   let mut subject_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
   let mut subject_list_shortcut_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
 
-  let mut clap_commands: Vec<Command> = Vec::new();
+  let mut subject_commands: Vec<Command> = Vec::new();
 
   for subject in subjects {
-    let (command_name, clap_command) = subject.clap_subject_command();
+    let (command_name, subject_command) = subject.subject_command();
     subject_registry.insert(command_name.to_string(), subject);
-    clap_commands.push(clap_command);
-    if let Some((list_shortcut_name, clap_list_command_shortcut)) = subject.clap_list_shortcut_command() {
+    subject_commands.push(subject_command);
+    if let Some((list_shortcut_name, clap_list_command_shortcut)) = subject.subject_list_shortcut_command() {
       subject_list_shortcut_registry.insert(list_shortcut_name.to_string(), subject);
-      clap_commands.push(clap_list_command_shortcut);
+      subject_commands.push(clap_list_command_shortcut);
     }
   }
 
-  let mut command = create_command(&clap_commands);
+  let mut command = create_command(&subject_commands);
 
   let matches = command.clone().get_matches();
 
@@ -204,21 +214,23 @@ async fn inner_main() -> DshCliResult {
     return Ok(());
   }
 
-  let settings = read_settings(None)?;
+  let (settings, settings_log) = get_settings(None)?;
 
-  initialize_logger(&matches, settings.as_ref())?;
+  initialize_logger(&matches, &settings)?;
+
+  debug!("{}", settings_log);
 
   match matches.subcommand() {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
-        let context = Context::create(&matches, &requirements, settings).await?;
+        let context = Context::create(&matches, &requirements, &settings).await?;
         subject.execute_subject_command(sub_matches, &context).await?;
       }
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject_list_shortcut) => {
           let requirements = subject_list_shortcut.requirements(sub_matches);
-          let context = Context::create(&matches, &requirements, settings).await?;
+          let context = Context::create(&matches, &requirements, &settings).await?;
           subject_list_shortcut.execute_subject_list_shortcut(sub_matches, &context).await?;
         }
         None => return Err("unexpected error, list shortcut not found".to_string()),
@@ -226,28 +238,6 @@ async fn inner_main() -> DshCliResult {
     },
     None => return Err("unexpected error, no command provided".to_string()),
   };
-  Ok(())
-}
-
-fn initialize_logger(matches: &ArgMatches, settings: Option<&Settings>) -> Result<(), String> {
-  let log_level_dsh: LogLevel = match matches.get_one::<LogLevel>(LOG_LEVEL_ARGUMENT) {
-    Some(log_level_from_argument) => log_level_from_argument.clone(),
-    None => match env::var(ENV_VAR_LOG_LEVEL) {
-      Ok(log_level_from_env_var) => LogLevel::try_from(log_level_from_env_var.as_str())?,
-      Err(_) => settings.and_then(|settings| settings.log_level.clone()).unwrap_or(LogLevel::Error),
-    },
-  };
-  let log_level_dsh_api: LogLevel = match matches.get_one::<LogLevel>(LOG_LEVEL_API_ARGUMENT) {
-    Some(log_level_api_from_argument) => log_level_api_from_argument.clone(),
-    None => match env::var(ENV_VAR_LOG_LEVEL_API) {
-      Ok(log_level_api_from_env_var) => LogLevel::try_from(log_level_api_from_env_var.as_str())?,
-      Err(_) => settings.and_then(|settings| settings.log_level_api.clone()).unwrap_or(LogLevel::Error),
-    },
-  };
-  env_logger::builder()
-    .filter_module("dsh", LevelFilter::from(log_level_dsh))
-    .filter_module("dsh_api", LevelFilter::from(log_level_dsh_api))
-    .init();
   Ok(())
 }
 
@@ -263,9 +253,9 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .override_usage(USAGE) // TODO This should be generated but that doesn't work
     .after_help(AFTER_HELP)
     .args(vec![
-      platform_argument(),
-      tenant_argument(),
-      password_file_argument(),
+      target_platform_argument(),
+      target_tenant_argument(),
+      target_password_file_argument(),
       output_format_argument(), // TODO Should this one be at this level?
       set_verbosity_argument(),
       dry_run_argument(),
@@ -276,6 +266,7 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
       quiet_argument(),
       log_level_argument(),
       log_level_api_argument(),
+      log_level_sdk_argument(),
       show_execution_time_argument(), // TODO Should this one be at this level?
       terminal_width_argument(),      // TODO Should this one be at this level?
       generate_autocomplete_file_argument(),
@@ -344,6 +335,206 @@ pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
   }
   environment_variables.sort_by(|(env_var_a, _), (env_var_b, _)| env_var_a.cmp(env_var_b));
   environment_variables
+}
+
+/// # Get the target platform from implicit sources
+///
+/// This method will get try to find the target platform from the implicit sources listed below,
+/// and returns at the first match.
+/// 1. Environment variable `DSH_CLI_PLATFORM`.
+/// 1. Parameter `default-platform` from settings file, if available.
+///
+/// ## Parameters
+/// * `settings` - contents of the settings file or default settings
+///
+/// ## Returns
+/// `Ok(Option<Platform>)` - containing the [`DshPlatform`]
+/// `Ok(None)` - when no implicit source is available
+/// `Err<String>` - when an invalid platform name was found
+fn get_target_platform_implicit(settings: &Settings) -> Result<Option<DshPlatform>, String> {
+  match env::var(ENV_VAR_PLATFORM) {
+    Ok(platform_name_from_env_var) => {
+      debug!("target platform '{}' (environment variable '{}')", platform_name_from_env_var, ENV_VAR_PASSWORD);
+      DshPlatform::try_from(platform_name_from_env_var.as_str()).map(Some)
+    }
+    Err(_) => match settings.default_platform.clone() {
+      Some(default_platform_name_from_settings) => {
+        debug!("default target platform '{}' (settings)", default_platform_name_from_settings);
+        DshPlatform::try_from(default_platform_name_from_settings.as_str()).map(Some)
+      }
+      None => Ok(None),
+    },
+  }
+}
+
+/// # Get the target platform
+///
+/// This method will get the target platform.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--platform`.
+/// 1. Environment variable `DSH_CLI_PLATFORM`.
+/// 1. Parameter `default-platform` from settings file, if available.
+/// 1. If stdin is a terminal, ask the user to enter the value.
+/// 1. Else return with an error.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
+fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshPlatform, String> {
+  match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
+    Some(platform_from_argument) => {
+      debug!("target platform '{}' (argument)", platform_from_argument);
+      Ok(DshPlatform::try_from(platform_from_argument.as_str()).unwrap())
+    }
+    None => match get_target_platform_implicit(settings)? {
+      Some(platform_name_from_implicit_source) => Ok(platform_name_from_implicit_source),
+      None => {
+        if stdin().is_terminal() {
+          DshPlatform::try_from(read_single_line("target platform: ")?.as_str())
+        } else {
+          Err("could not determine target platform, please check configuration".to_string())
+        }
+      }
+    },
+  }
+}
+
+/// # Get the target tenant from implicit sources
+///
+/// This method will get try to find the target tenant from the implicit sources listed below,
+/// and returns at the first match.
+/// 1. Environment variable `DSH_CLI_TENANT`.
+/// 1. Parameter `default-tenant` from settings file, if available.
+///
+/// ## Parameters
+/// * `settings` - contents of the settings file or default settings
+///
+/// ## Returns
+/// `Some<String>` - containing the tenant name
+/// `None` - when no implicit source is available
+fn get_target_tenant_implicit(settings: &Settings) -> Option<String> {
+  match env::var(ENV_VAR_TENANT) {
+    Ok(tenant_name_from_env_var) => {
+      debug!("target tenant '{}' (environment variable '{}')", tenant_name_from_env_var, ENV_VAR_TENANT);
+      Some(tenant_name_from_env_var)
+    }
+    Err(_) => match settings.default_tenant.clone() {
+      Some(default_tenant_name_from_settings) => {
+        debug!("default target tenant '{}' (settings)", default_tenant_name_from_settings);
+        Some(default_tenant_name_from_settings)
+      }
+      None => None,
+    },
+  }
+}
+
+/// # Get the target tenant
+///
+/// This method will get the target tenant.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--tenant`.
+/// 1. Environment variable `DSH_CLI_TENANT`.
+/// 1. Parameter `default-tenant` from settings file, if available.
+/// 1. If stdin is a terminal, ask the user to enter the value.
+/// 1. Else return with an error.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// An `Ok<String>` containing the tenant name, or an `Err<String>`.
+fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> Result<String, String> {
+  match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
+    Some(tenant_name_from_argument) => {
+      debug!("target tenant '{}' (argument)", tenant_name_from_argument);
+      Ok(tenant_name_from_argument.to_string())
+    }
+    None => match get_target_tenant_implicit(settings) {
+      Some(tenant_name_from_implicit_source) => Ok(tenant_name_from_implicit_source),
+      None => {
+        if stdin().is_terminal() {
+          let tenant_name = read_single_line("target tenant: ")?;
+          if tenant_name.is_empty() {
+            Err("target tenant name cannot be empty".to_string())
+          } else {
+            Ok(tenant_name)
+          }
+        } else {
+          Err("could not determine target tenant, please check configuration".to_string())
+        }
+      }
+    },
+  }
+}
+
+/// # Get the target password
+///
+/// This method will get the target password.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--password-file`, which should reference a file that
+///    contains the password.
+/// 1. Environment variable `DSH_CLI_PASSWORD_FILE`.
+/// 1. Environment variable `DSH_CLI_PASSWORD`.
+/// 1. If target file `[platform].[tenant_name].toml` exists,
+///    check entry `dsh.[platform].[tenant_name]` from the keychain, if available.
+///    This can result in a pop-up where the user must authenticate for the keychain.
+/// 1. If stdin is a terminal, ask the user to enter the password.
+/// 1. Else return with an error.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `dsh_api_tenant` - used to determine the target settings file
+///
+/// ## Returns
+/// An `Ok<String>` containing the password, or an `Err<String>`.
+fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
+  match matches.get_one::<PathBuf>(TARGET_PASSWORD_FILE_ARGUMENT) {
+    Some(password_file_from_arg) => read_target_password_file(password_file_from_arg),
+    None => match env::var(ENV_VAR_PASSWORD_FILE) {
+      Ok(password_file_from_env) => read_target_password_file(password_file_from_env),
+      Err(_) => match env::var(ENV_VAR_PASSWORD) {
+        Ok(password_from_env_var) => {
+          debug!("target password (environment variable '{}')", ENV_VAR_PASSWORD);
+          Ok(password_from_env_var)
+        }
+        Err(_) => match (
+          read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
+          get_target_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
+        ) {
+          (Some(_), Some(password_from_keyring)) => {
+            debug!("target exists, password read (keyring)");
+            Ok(password_from_keyring)
+          }
+          _ => {
+            if stdin().is_terminal() {
+              read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
+            } else {
+              Err("could not determine password and unable to to prompt user, please check configuration".to_string())
+            }
+          }
+        },
+      },
+    },
+  }
+}
+
+fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> Result<String, String> {
+  match fs::read_to_string(&password_file) {
+    Ok(password_string) => {
+      let trimmed_password = password_string.trim();
+      if trimmed_password.is_empty() {
+        Err(format!("target password file '{}' is empty", password_file.as_ref().to_string_lossy()))
+      } else {
+        debug!("target password (file '{}')", password_file.as_ref().to_string_lossy());
+        Ok(trimmed_password.to_string())
+      }
+    }
+    Err(_) => Err(format!("target password file '{}' could not be read", password_file.as_ref().to_string_lossy())),
+  }
 }
 
 /// # Returns the dsh application directory
