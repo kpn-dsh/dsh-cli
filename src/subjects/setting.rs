@@ -7,7 +7,6 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-use crate::arguments::{LogLevel, Verbosity};
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SET_COMMAND, SET_COMMAND_PAIR, UNSET_COMMAND, UNSET_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{Context, MatchingStyle};
@@ -15,8 +14,10 @@ use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
-use crate::settings::read_settings;
+use crate::log_level::LogLevel;
+use crate::settings::get_settings;
 use crate::subject::{Requirements, Subject};
+use crate::verbosity::Verbosity;
 use crate::{get_environment_variables, DshCliResult, ENV_VAR_PASSWORD};
 
 pub(crate) struct SettingSubject {}
@@ -38,7 +39,7 @@ impl Subject for SettingSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, Some(OutputFormat::Table))
+    Requirements::new(false, false, false, Some(OutputFormat::Table))
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -62,6 +63,7 @@ const SETTING_DEFAULT_TENANT: &str = "default-tenant";
 const SETTING_DRY_RUN: &str = "dry-run";
 const SETTING_LOG_LEVEL: &str = "log-level";
 const SETTING_LOG_LEVEL_API: &str = "log-level-api";
+const SETTING_LOG_LEVEL_SDK: &str = "log-level-sdk";
 const SETTING_MATCHING_STYLE: &str = "matching-style";
 const SETTING_NO_ESCAPE: &str = "no-escape";
 const SETTING_NO_HEADERS: &str = "no-headers";
@@ -106,6 +108,12 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
     ),
     Command::new(SETTING_LOG_LEVEL_API).arg(
       Arg::new(SETTING_LOG_LEVEL_API)
+        .action(ArgAction::Set)
+        .value_parser(EnumValueParser::<LogLevel>::new())
+        .required(required),
+    ),
+    Command::new(SETTING_LOG_LEVEL_SDK).arg(
+      Arg::new(SETTING_LOG_LEVEL_SDK)
         .action(ArgAction::Set)
         .value_parser(EnumValueParser::<LogLevel>::new())
         .required(required),
@@ -169,22 +177,27 @@ lazy_static! {
 
 struct SettingList {}
 
+const HIDE_PASSWORD: &str = "********";
+
 #[async_trait]
 impl CommandExecutor for SettingList {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-    let password = "********".to_string();
-    context.print_explanation("list default settings");
-    match read_settings(None)? {
-      Some(settings) => UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings)?,
-      None => context.print_warning("no default settings found"),
+    let (settings, _) = get_settings(None)?;
+    if let Some(ref settings_file) = settings.file_name {
+      context.print_explanation(format!("list settings from settings file '{}'", settings_file));
+      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings)?
+    } else {
+      context.print_explanation("list default settings");
+      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings)?
     }
     let env_vars = get_environment_variables();
     if !env_vars.is_empty() {
       context.print_explanation("list environment variables");
       let mut formatter = ListFormatter::new(&ENVIRONMENT_VARIABLE_LABELS, None, context);
+      let hide_password = HIDE_PASSWORD.to_string();
       for (env_var, value) in &env_vars {
         if env_var == ENV_VAR_PASSWORD {
-          formatter.push_target_id_value(env_var.clone(), &password);
+          formatter.push_target_id_value(env_var.clone(), &hide_password);
         } else {
           formatter.push_target_id_value(env_var.clone(), value);
         }
@@ -240,6 +253,11 @@ impl CommandExecutor for SettingSet {
         let log_level_api = matches.get_one::<LogLevel>(SETTING_LOG_LEVEL_API).unwrap();
         upsert_settings(None, |settings| Ok(Settings { log_level_api: Some(log_level_api.clone()), ..settings }))?;
         context.print_outcome(format!("log level for api set to {}", log_level_api));
+      }
+      SETTING_LOG_LEVEL_SDK => {
+        let log_level_sdk = matches.get_one::<LogLevel>(SETTING_LOG_LEVEL_SDK).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { log_level_sdk: Some(log_level_sdk.clone()), ..settings }))?;
+        context.print_outcome(format!("log level for sdk set to {}", log_level_sdk));
       }
       SETTING_MATCHING_STYLE => {
         let matching_style = matches.get_one::<MatchingStyle>(SETTING_MATCHING_STYLE).unwrap();
@@ -322,6 +340,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(None, |settings| Ok(Settings { log_level_api: None, ..settings }))?;
         context.print_outcome("log level for api unset");
       }
+      SETTING_LOG_LEVEL_SDK => {
+        upsert_settings(None, |settings| Ok(Settings { log_level_sdk: None, ..settings }))?;
+        context.print_outcome("log level for sdk unset");
+      }
       SETTING_MATCHING_STYLE => {
         upsert_settings(None, |settings| Ok(Settings { matching_style: None, ..settings }))?;
         context.print_outcome("matching style unset");
@@ -368,6 +390,9 @@ pub(crate) enum SettingLabel {
   DefaultTenant,
   DryRun,
   FileName,
+  LogLevel,
+  LogLevelApi,
+  LogLevelSdk,
   MatchingStyle,
   NoEscape,
   NoHeaders,
@@ -382,21 +407,24 @@ pub(crate) enum SettingLabel {
 impl Label for SettingLabel {
   fn as_str(&self) -> &str {
     match self {
-      Self::DefaultPlatform => SETTING_DEFAULT_PLATFORM,
-      Self::DefaultTenant => SETTING_DEFAULT_TENANT,
-      Self::FileName => "settings file name",
-      Self::ShowExecutionTime => SETTING_SHOW_EXECUTION_TIME,
-      Self::Target => "setting",
-      Self::Verbosity => SETTING_VERBOSITY,
       Self::CsvQuote => SETTING_CSV_QUOTE,
       Self::CsvSeparator => SETTING_CSV_SEPARATOR,
+      Self::DefaultPlatform => SETTING_DEFAULT_PLATFORM,
+      Self::DefaultTenant => SETTING_DEFAULT_TENANT,
       Self::DryRun => SETTING_DRY_RUN,
+      Self::FileName => "settings file name",
+      Self::LogLevel => SETTING_LOG_LEVEL,
+      Self::LogLevelApi => SETTING_LOG_LEVEL_API,
+      Self::LogLevelSdk => SETTING_LOG_LEVEL_SDK,
       Self::MatchingStyle => SETTING_MATCHING_STYLE,
       Self::NoEscape => SETTING_NO_ESCAPE,
       Self::NoHeaders => SETTING_NO_HEADERS,
       Self::OutputFormat => SETTING_OUTPUT_FORMAT,
       Self::Quiet => SETTING_QUIET,
+      Self::ShowExecutionTime => SETTING_SHOW_EXECUTION_TIME,
+      Self::Target => "setting",
       Self::TerminalWidth => SETTING_TERMINAL_WIDTH,
+      Self::Verbosity => SETTING_VERBOSITY,
     }
   }
 
@@ -408,24 +436,27 @@ impl Label for SettingLabel {
 impl SubjectFormatter<SettingLabel> for Settings {
   fn value(&self, label: &SettingLabel, target_id: &str) -> String {
     match label {
+      SettingLabel::CsvQuote => self.csv_quote.map(|csv_quote| csv_quote.to_string()).unwrap_or_default(),
+      SettingLabel::CsvSeparator => self.csv_separator.clone().unwrap_or_default(),
       SettingLabel::DefaultPlatform => self.default_platform.clone().unwrap_or_default(),
       SettingLabel::DefaultTenant => self.default_tenant.clone().unwrap_or_default(),
+      SettingLabel::DryRun => self.dry_run.map(|dry_run| dry_run.to_string()).unwrap_or_default(),
       SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
+      SettingLabel::MatchingStyle => self.matching_style.clone().map(|style| style.to_string()).unwrap_or_default(),
+      SettingLabel::LogLevel => self.log_level.clone().map(|log_level| log_level.to_string()).unwrap_or_default(),
+      SettingLabel::LogLevelApi => self.log_level_api.clone().map(|log_level_api| log_level_api.to_string()).unwrap_or_default(),
+      SettingLabel::LogLevelSdk => self.log_level_sdk.clone().map(|log_level_sdk| log_level_sdk.to_string()).unwrap_or_default(),
+      SettingLabel::NoEscape => self.no_escape.map(|no_escape| no_escape.to_string()).unwrap_or_default(),
+      SettingLabel::NoHeaders => self.no_headers.map(|no_headers| no_headers.to_string()).unwrap_or_default(),
+      SettingLabel::OutputFormat => self.output_format.clone().map(|format| format.to_string()).unwrap_or_default(),
+      SettingLabel::Quiet => self.quiet.map(|quiet| quiet.to_string()).unwrap_or_default(),
       SettingLabel::ShowExecutionTime => self
         .show_execution_time
         .map(|show_execution_time| show_execution_time.to_string())
         .unwrap_or_default(),
       SettingLabel::Target => target_id.to_string(),
-      SettingLabel::Verbosity => self.verbosity.clone().map(|verbosity| verbosity.to_string()).unwrap_or_default(),
-      SettingLabel::CsvQuote => self.csv_quote.map(|csv_quote| csv_quote.to_string()).unwrap_or_default(),
-      SettingLabel::CsvSeparator => self.csv_separator.clone().unwrap_or_default(),
-      SettingLabel::DryRun => self.dry_run.map(|dry_run| dry_run.to_string()).unwrap_or_default(),
-      SettingLabel::MatchingStyle => self.matching_style.clone().map(|style| style.to_string()).unwrap_or_default(),
-      SettingLabel::NoEscape => self.no_escape.map(|no_escape| no_escape.to_string()).unwrap_or_default(),
-      SettingLabel::NoHeaders => self.no_headers.map(|no_headers| no_headers.to_string()).unwrap_or_default(),
-      SettingLabel::OutputFormat => self.output_format.clone().map(|format| format.to_string()).unwrap_or_default(),
-      SettingLabel::Quiet => self.quiet.map(|quiet| quiet.to_string()).unwrap_or_default(),
       SettingLabel::TerminalWidth => self.terminal_width.map(|width| width.to_string()).unwrap_or_default(),
+      SettingLabel::Verbosity => self.verbosity.clone().map(|verbosity| verbosity.to_string()).unwrap_or_default(),
     }
   }
 
@@ -434,13 +465,16 @@ impl SubjectFormatter<SettingLabel> for Settings {
   }
 }
 
-pub static SETTING_LABELS: [SettingLabel; 15] = [
+pub static SETTING_LABELS: [SettingLabel; 18] = [
   SettingLabel::CsvQuote,
   SettingLabel::CsvSeparator,
   SettingLabel::DefaultPlatform,
   SettingLabel::DefaultTenant,
   SettingLabel::DryRun,
   SettingLabel::MatchingStyle,
+  SettingLabel::LogLevel,
+  SettingLabel::LogLevelApi,
+  SettingLabel::LogLevelSdk,
   SettingLabel::NoEscape,
   SettingLabel::NoHeaders,
   SettingLabel::OutputFormat,

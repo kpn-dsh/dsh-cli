@@ -1,7 +1,9 @@
-use crate::arguments::{LogLevel, Verbosity};
 use crate::context::MatchingStyle;
 use crate::formatters::OutputFormat;
+use crate::log_level::LogLevel;
+use crate::verbosity::Verbosity;
 use crate::{dsh_directory, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DEFAULT_DSH_CLI_SETTINGS_FILENAME};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -22,6 +24,8 @@ pub(crate) struct Settings {
   pub(crate) log_level: Option<LogLevel>,
   #[serde(rename = "log-level-api", skip_serializing_if = "Option::is_none")]
   pub(crate) log_level_api: Option<LogLevel>,
+  #[serde(rename = "log-level-sdk", skip_serializing_if = "Option::is_none")]
+  pub(crate) log_level_sdk: Option<LogLevel>,
   #[serde(rename = "matching-style", skip_serializing_if = "Option::is_none")]
   pub(crate) matching_style: Option<MatchingStyle>,
   #[serde(rename = "no-escape", skip_serializing_if = "Option::is_none")]
@@ -42,18 +46,24 @@ pub(crate) struct Settings {
   pub(crate) file_name: Option<String>,
 }
 
-pub(crate) fn read_settings(explicit_settings_filename: Option<&str>) -> Result<Option<Settings>, String> {
+pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> Result<(Settings, String), String> {
   match explicit_settings_filename {
-    Some(explicit_name) => {
-      log::debug!("read settings from explicit file '{}'", explicit_name);
-      let settings = read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(explicit_name))?;
-      Ok(settings.map(|settings| Settings { file_name: Some(explicit_name.to_string()), ..settings }))
-    }
+    Some(explicit_name) => match read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(explicit_name))? {
+      Some(settings) => Ok((
+        Settings { file_name: Some(explicit_name.to_string()), ..settings },
+        format!("read settings (explicit file '{}')", explicit_name),
+      )),
+      None => Err(format!("explicit settings file '{}' does not exist", explicit_name)),
+    },
     None => {
       let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
-      log::debug!("read settings from default file '{}'", default_settings_file.to_string_lossy());
-      let settings = read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))?;
-      Ok(settings.map(|settings| Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings }))
+      match read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))? {
+        Some(settings) => Ok((
+          Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings },
+          format!("read settings (default file '{}')", default_settings_file.to_string_lossy()),
+        )),
+        None => Ok((Settings::default(), "default settings".to_string())),
+      }
     }
   }
 }
@@ -61,12 +71,12 @@ pub(crate) fn read_settings(explicit_settings_filename: Option<&str>) -> Result<
 pub(crate) fn write_settings(explicit_settings_filename: Option<&str>, settings: Settings) -> Result<(), String> {
   match explicit_settings_filename {
     Some(explicit_name) => {
-      log::debug!("write settings to explicit file '{}'", explicit_name);
+      debug!("write settings to explicit file '{}'", explicit_name);
       serialize_and_write_to_toml_file::<Settings>(PathBuf::new().join(explicit_name), &settings)
     }
     None => {
       let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
-      log::debug!("write settings to default file '{}'", default_settings_file.to_string_lossy());
+      debug!("write settings to default file '{}'", default_settings_file.to_string_lossy());
       serialize_and_write_to_toml_file(default_settings_file, &settings)
     }
   }
@@ -76,17 +86,11 @@ pub(crate) fn upsert_settings<F>(explicit_settings_filename: Option<&str>, mut u
 where
   F: FnMut(Settings) -> Result<Settings, String>,
 {
-  match read_settings(explicit_settings_filename)? {
-    Some(existing_settings) => match upsert(existing_settings) {
-      Ok(upserted_settings) => write_settings(explicit_settings_filename, upserted_settings),
-      Err(_) => Err("unable to update settings".to_string()),
-    },
-    None => {
-      let new_settings = Settings::default();
-      match upsert(new_settings) {
-        Ok(upserted_settings) => write_settings(explicit_settings_filename, upserted_settings),
-        Err(_) => Err("unable to update settings".to_string()),
-      }
+  match upsert(get_settings(explicit_settings_filename)?.0) {
+    Ok(upserted_settings) => {
+      debug!("updated settings");
+      write_settings(explicit_settings_filename, upserted_settings)
     }
+    Err(error) => Err(format!("unable to update settings ({})", error)),
   }
 }
