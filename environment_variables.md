@@ -82,12 +82,25 @@
     <tr valign="top">
         <td><code>DSH_CLI_LOG_LEVEL_API</code></td>
         <td> 
-            Use this environment variable to set the log level for the funcions 
+            Use this environment variable to set the log level for the functions 
             in the library crate <code>dsh_api</code>, that supports the <code>dsh</code> tool.
             For the available log levels see the description of the 
             <code>DSH_CLI_LOG_LEVEL</code> environment variable.<br/>
             If this argument is not provided, the settings file will be checked. 
             When the <code>--log-level-api</code> command line argument is provided this will 
+            override this environment variable or the value in the settings file.
+            The default log level is <code>error</code>.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_LOG_LEVEL_SDK</code></td>
+        <td> 
+            Use this environment variable to set the log level for the functions 
+            in the library crate <code>dsh_sdk</code>, that supports the <code>dsh</code> tool.
+            For the available log levels see the description of the 
+            <code>DSH_CLI_LOG_LEVEL</code> environment variable.<br/>
+            If this argument is not provided, the settings file will be checked. 
+            When the <code>--log-level-sdk</code> command line argument is provided this will 
             override this environment variable or the value in the settings file.
             The default log level is <code>error</code>.
         </td>

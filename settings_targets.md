@@ -1,4 +1,4 @@
-# Settings
+# Settings and targets
 
 The `dsh` tool stores settings and configuration in settings files,
 and platform/tenant credentials in target files.

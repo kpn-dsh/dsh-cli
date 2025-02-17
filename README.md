@@ -8,7 +8,7 @@
 
 This project provides a tool to call functions on the DSH resource management API from the
 command line of your workstation or from a script.
-Below in an overview of the capabilities of the tool:
+Some of the capabilities of the tool are:
 
 * Calling all operations exposed in DSH resource management API
   from either the command line or from a script.
@@ -23,15 +23,6 @@ Below in an overview of the capabilities of the tool:
 * Reversed lookup functions. For example find all services that use a given secret or volume,
   or have an environment value with a given value in their configuration.
 
-## Next steps
-
-* [Getting started - interactive](getting_started_interactive.md)
-* [Getting started - script](getting_started_script.md)
-* [Environment variables](environment_variables.md)
-* [Settings](settings.md)
-* [Set up autocompletion](autocompletion.md)
-* [Developers](developers.md)
-
 ## Features
 
 By enabling/disabling the features described below you have some control over what's included
@@ -42,66 +33,31 @@ The following features are defined:
 * `manage` - Enables the manage methods.
 * `robot` - Enables the robot operation.
 
-## Run
+## Installation
 
-When installation is complete and the environment variables are set,
-you should be able to start the tool from the command line.
+If you have the `rust` tool chain installed, the DSH Api Command Line Tool (`dsh`) can be
+installed on your local machine directly from `crates.io` by executing the following command.
 
 ```bash
-> dsh
-DSH resource management api command line interface.
-
-Usage: dsh [OPTIONS] [SUBJECT/COMMAND]
-
-Subjects/commands:
-  api          List and call DSH resource management api.
-  app          Show, manage and list apps deployed from the DSH app catalog.
-  application  Show, manage and list applications deployed on the DSH.
-  bucket       Show, manage and list DSH buckets.
-  certificate  Show, manage and list DSH certificates.
-  env          Find values used in configurations.
-  image        Show image usage.
-  manifest     Show App Catalog manifests.
-  metric       Show metric exports.
-  platform     Show, list and open platform resources.
-  proxy        Show, manage and list DSH Kafka proxies.
-  secret       Show, manage and list DSH secrets.
-  token        Request DSH tokens.
-  topic        Show, manage and list DSH topics.
-  vhost        Show vhost usage.
-  volume       Show, manage and list DSH volumes.
-  setting      Show, manage and list dsh settings.
-  target       Show, manage and list dsh target configurations.
-  help         Print this message or the help of the given subcommand(s)
-
-Options:
-  -p, --platform <PLATFORM>                 Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh,
-                                            prod-aws-dsh, prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
-  -t, --tenant <TENANT>                     Provide target tenant.
-      --password-file <FILE>                Provide password file name.
-  -o, --output-format <FORMAT>              Set output format. [possible values: csv, json, json-compact, plain, quiet,
-                                            table, table-no-border, toml, toml-compact, yaml]
-  -v, --verbosity <VERBOSITY>               Set verbosity level. [possible values: off, low, medium, high]
-      --dry-run                             Execute in dry-run mode.
-      --force                               Force changes without confirmation.
-      --matching-style <STYLE>              Set styling for matches. [possible values: normal, bold, dim, italic,
-                                            underlined, reverse]
-      --no-color                            No color.
-  -q, --quiet                               Run in quiet mode.
-      --show-execution-time                 Show execution time.
-      --terminal-width <WIDTH>              Set terminal width.
-  -h, --help                                Print help (see more with '--help')
-  -V, --version                             Print version
-
-For most commands adding an 's' as a postfix will yield the same result as using the 'list' subcommand, e.g. using 'dsh
-apps' will be the same as using 'dsh app list'.
+> cargo install dsh
 ```
 
-You can have a more comprehensive explanation by using the `--help` command line option.
-Commands also have their own help text.
+This will install the `dsh` tool without any features.
 
+You can add one or more features by providing the appropriate flags.
+For example, to install the `manage` and the `robot` features, use:
+
+```bash
+> cargo install dsh --features manage,robot
 ```
-> dsh --help
-> dsh secret --help
-> dsh secret list --help
-```
+
+You can also use the `--all-features` flag to install all features.
+
+## Next steps
+
+* [Getting started - interactive](getting_started_interactive.md)
+* [Getting started - script](getting_started_script.md)
+* [Environment variables](environment_variables.md)
+* [Settings and targets](settings_and_targets.md)
+* [Set up autocompletion](autocompletion.md)
+* [Developers](developers.md)
