@@ -37,8 +37,13 @@ impl Subject for ApiSubject {
   }
 
   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    let needs_target_or_dsh_api_client = !matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, SHOW_COMMAND);
-    Requirements::new(needs_target_or_dsh_api_client, needs_target_or_dsh_api_client, Some(OutputFormat::Json))
+    let needs_platform_tenant_or_dsh_api_client = !matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, SHOW_COMMAND);
+    Requirements::new(
+      needs_platform_tenant_or_dsh_api_client,
+      needs_platform_tenant_or_dsh_api_client,
+      needs_platform_tenant_or_dsh_api_client,
+      Some(OutputFormat::Json),
+    )
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -62,7 +67,7 @@ impl Subject for ApiSubject {
 lazy_static! {
   static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, &ApiDelete {});
   static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, &ApiGet {});
-  static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, &ApiGet {});
+  static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, &ApiHead {});
   static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, &ApiPatch {});
   static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiPost {});
   static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiPut {});
@@ -223,6 +228,27 @@ impl CommandExecutor for ApiGet {
       .collect::<Vec<_>>();
     let start_instant = Instant::now();
     let response = context.dsh_api_client.as_ref().unwrap().get(selector, &parameters).await?;
+    context.print_execution_time(start_instant);
+    context.print_serializable(response);
+    Ok(())
+  }
+}
+
+struct ApiHead {}
+
+#[async_trait]
+impl CommandExecutor for ApiHead {
+  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
+    let method_descriptor = method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("HEAD {}", method_descriptor.path));
+    let parameters = method_descriptor
+      .parameters
+      .iter()
+      .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
+      .collect::<Vec<_>>();
+    let start_instant = Instant::now();
+    let response = context.dsh_api_client.as_ref().unwrap().head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_serializable(response);
     Ok(())
