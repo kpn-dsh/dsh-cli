@@ -250,7 +250,7 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .about(ABOUT)
     .author(AUTHOR)
     .long_about(long_about)
-    .override_usage(USAGE) // TODO This should be generated but that doesn't work
+    .override_usage(USAGE)
     .after_help(AFTER_HELP)
     .args(vec![
       target_platform_argument(),
