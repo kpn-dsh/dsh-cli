@@ -3,10 +3,8 @@ use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 
-pub(crate) const CREATE_COMMAND: &str = "create";
 pub(crate) const DEFAULT_COMMAND: &str = "default";
 pub(crate) const DELETE_COMMAND: &str = "delete";
-// pub(crate) const DIFF_COMMAND: &str = "diff";
 pub(crate) const FIND_COMMAND: &str = "find";
 pub(crate) const LIST_COMMAND: &str = "list";
 pub(crate) const NEW_COMMAND: &str = "new";
@@ -14,16 +12,11 @@ pub(crate) const OPEN_COMMAND: &str = "open";
 pub(crate) const REQUEST_COMMAND: &str = "request";
 pub(crate) const SHOW_COMMAND: &str = "show";
 pub(crate) const SET_COMMAND: &str = "set";
-// pub(crate) const START_COMMAND: &str = "start";
-// pub(crate) const STOP_COMMAND: &str = "stop";
 pub(crate) const UNSET_COMMAND: &str = "unset";
-// pub(crate) const UNSET_DEFAULT_COMMAND: &str = "unset-default";
 pub(crate) const UPDATE_COMMAND: &str = "update";
 
-pub(crate) const CREATE_COMMAND_PAIR: (&str, &str) = (CREATE_COMMAND, "");
 pub(crate) const DEFAULT_COMMAND_PAIR: (&str, &str) = (DEFAULT_COMMAND, "");
 pub(crate) const DELETE_COMMAND_PAIR: (&str, &str) = (DELETE_COMMAND, "");
-// pub(crate) const DIFF_COMMAND_PAIR: (&str, &str) = (DIFF_COMMAND, "");
 pub(crate) const FIND_COMMAND_PAIR: (&str, &str) = (FIND_COMMAND, "f");
 pub(crate) const LIST_COMMAND_PAIR: (&str, &str) = (LIST_COMMAND, "l");
 pub(crate) const NEW_COMMAND_PAIR: (&str, &str) = (NEW_COMMAND, "");
@@ -31,10 +24,7 @@ pub(crate) const OPEN_COMMAND_PAIR: (&str, &str) = (OPEN_COMMAND, "o");
 pub(crate) const REQUEST_COMMAND_PAIR: (&str, &str) = (REQUEST_COMMAND, "");
 pub(crate) const SET_COMMAND_PAIR: (&str, &str) = (SET_COMMAND, "");
 pub(crate) const SHOW_COMMAND_PAIR: (&str, &str) = (SHOW_COMMAND, "s");
-// pub(crate) const START_COMMAND_PAIR: (&str, &str) = (START_COMMAND, "");
-// pub(crate) const STOP_COMMAND_PAIR: (&str, &str) = (STOP_COMMAND, "");
 pub(crate) const UNSET_COMMAND_PAIR: (&str, &str) = (UNSET_COMMAND, "");
-// pub(crate) const UNSET_DEFAULT_COMMAND_PAIR: (&str, &str) = (UNSET_DEFAULT_COMMAND, "");
 pub(crate) const UPDATE_COMMAND_PAIR: (&str, &str) = (UPDATE_COMMAND, "");
 
 #[async_trait]

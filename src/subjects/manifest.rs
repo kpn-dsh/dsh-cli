@@ -13,7 +13,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 
 use dsh_api::types::AppCatalogManifest;
 
-use crate::arguments::target_argument;
+use crate::arguments::manifest_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -47,7 +47,7 @@ impl Subject for ManifestSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -74,7 +74,7 @@ lazy_static! {
   static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show manifest configuration")
       .set_default_command_executor(&ManifestShowAll {})
-      .add_target_argument(target_argument(MANIFEST_SUBJECT_TARGET, None))
+      .add_target_argument(manifest_id_argument().required(true))
   );
   static ref MANIFEST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];
 }

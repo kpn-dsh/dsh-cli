@@ -12,7 +12,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Instant;
 
-use crate::arguments::target_argument;
+use crate::arguments::topic_id_argument;
 use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -52,7 +52,7 @@ impl Subject for TopicSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -74,7 +74,7 @@ lazy_static! {
     CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete scratch topic")
       .set_long_about("Delete a scratch topic.")
       .set_default_command_executor(&TopicDelete {})
-      .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
+      .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND_PAIR, "List topics")
@@ -95,7 +95,7 @@ lazy_static! {
         (FlagType::Properties, &TopicShowProperties {}, None),
         (FlagType::Usage, &TopicShowUsage {}, None),
       ])
-      .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
+      .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![TOPIC_DELETE_CAPABILITY.as_ref(), TOPIC_LIST_CAPABILITY.as_ref(), TOPIC_SHOW_CAPABILITY.as_ref()];

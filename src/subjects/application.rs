@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Instant;
 
-use crate::arguments::target_argument;
+use crate::arguments::application_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -46,7 +46,7 @@ impl Subject for ApplicationSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -90,7 +90,7 @@ lazy_static! {
         (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
         (FlagType::Tasks, &ApplicationShowTasks {}, None),
       ])
-      .add_target_argument(target_argument(APPLICATION_SUBJECT_TARGET, None))
+      .add_target_argument(application_id_argument().required(true))
   );
   static ref APPLICATION_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APPLICATION_LIST_CAPABILITY.as_ref(), APPLICATION_SHOW_CAPABILITY.as_ref()];
 }

@@ -1,4 +1,4 @@
-use crate::arguments::target_argument;
+use crate::arguments::certificate_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -47,7 +47,7 @@ impl Subject for CertificateSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -83,7 +83,7 @@ lazy_static! {
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
         (FlagType::Usage, &CertificateShowUsage {}, None)
       ])
-      .add_target_argument(target_argument(CERTIFICATE_SUBJECT_TARGET, None))
+      .add_target_argument(certificate_id_argument().required(true))
   );
   static ref CERTIFICATE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()];
 }
@@ -252,10 +252,6 @@ impl CommandExecutor for CertificateShowUsage {
       formatter.push_values(&usages);
       formatter.print()?;
     }
-
-    // let mut builder: TableBuilder<UsedByLabel, UsedBy> = TableBuilder::list(&USED_BY_LABELS_LIST, context);
-    // builder.rows(&used_bys);
-    // builder.print();
     Ok(())
   }
 }

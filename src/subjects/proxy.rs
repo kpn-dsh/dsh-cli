@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Instant;
 
-use crate::arguments::target_argument;
+use crate::arguments::proxy_id_argument;
 use crate::capability::{
   Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR, UPDATE_COMMAND, UPDATE_COMMAND_PAIR,
 };
@@ -43,7 +43,7 @@ impl Subject for ProxySubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -66,7 +66,7 @@ lazy_static! {
     CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete proxy")
       .set_long_about("Delete a Kafka proxy.")
       .set_default_command_executor(&ProxyDelete {})
-      .add_target_argument(target_argument(PROXY_SUBJECT_TARGET, None))
+      .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND_PAIR, "List proxies")
@@ -78,13 +78,13 @@ lazy_static! {
   static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show Kafka proxy configuration")
       .set_default_command_executor(&ProxyShowConfiguration {})
-      .add_target_argument(target_argument(PROXY_SUBJECT_TARGET, None))
+      .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND_PAIR, "Update proxy")
       .set_long_about("Update a Kafka proxy configuration.")
       .set_default_command_executor(&ProxyUpdateConfiguration {})
-      .add_target_argument(target_argument(PROXY_SUBJECT_TARGET, None))
+      .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref(), PROXY_UPDATE_CAPABILITY.as_ref(),];

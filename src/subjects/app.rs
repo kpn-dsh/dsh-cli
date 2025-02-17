@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use dsh_api::types::AppCatalogAppResourcesValue;
 
-use crate::arguments::target_argument;
+use crate::arguments::app_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -47,7 +47,7 @@ impl Subject for AppSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -75,7 +75,7 @@ lazy_static! {
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .set_default_command_executor(&AppShowAll {})
-      .add_target_argument(target_argument(APP_SUBJECT_TARGET, None))
+      .add_target_argument(app_id_argument().required(true))
   );
   static ref APP_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APP_LIST_CAPABILITY.as_ref(), APP_SHOW_CAPABILITY.as_ref()];
 }

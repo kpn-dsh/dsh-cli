@@ -41,7 +41,7 @@ impl Subject for VhostSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -65,7 +65,7 @@ lazy_static! {
   // pub static ref VHOST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
   //   CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show vhost usage")
   //     .set_default_command_executor(&VhostShowUsage {})
-  //     .add_target_argument(target_argument(VHOST_SUBJECT_TARGET, None))
+  //     .add_target_argument(target_argument(VHOST_SUBJECT_TARGET, None).required(true))
   // );
   static ref VHOST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![VHOST_LIST_CAPABILITY.as_ref()];
 }
