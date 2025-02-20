@@ -340,6 +340,7 @@ pub(crate) enum DshPlatformLabel {
   ConsoleDomain,
   ConsoleUrl,
   Description,
+  InternalDomain,
   InternalServiceDomain,
   IsProduction,
   MqttTokenEndpoint,
@@ -386,6 +387,7 @@ impl Label for DshPlatformLabel {
       Self::SwaggerUrl => "swagger url",
       Self::TracingUrl => "tracing url",
 
+      Self::InternalDomain => "internal domain",
       Self::InternalServiceDomain => "internal domain (service)",
       Self::PublicVhostDomain => "public vhost domain",
       Self::TenantAppCatalogAppUrl => "app catalog url (tenant, app)",
@@ -442,7 +444,8 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
   fn value(&self, label: &DshPlatformLabel, target_id: &str) -> String {
     let (platform, app, service, tenant, vendor, vhost) = self;
     match label {
-      DshPlatformLabel::InternalServiceDomain => platform.internal_service_domain(service),
+      DshPlatformLabel::InternalDomain => platform.internal_domain(tenant),
+      DshPlatformLabel::InternalServiceDomain => platform.internal_service_domain(tenant, service),
       DshPlatformLabel::PublicVhostDomain => platform.public_vhost_domain(vhost),
       DshPlatformLabel::TenantAppCatalogAppUrl => platform.tenant_app_catalog_app_url(tenant, vendor, app),
       DshPlatformLabel::TenantAppCatalogUrl => platform.tenant_app_catalog_url(tenant),
@@ -466,7 +469,7 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
   }
 }
 
-pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 30] = [
+pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 31] = [
   // Items from platform configuration file
   DshPlatformLabel::Name,
   DshPlatformLabel::Description,
@@ -474,6 +477,7 @@ pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 30] = [
   DshPlatformLabel::IsProduction,
   DshPlatformLabel::CloudProvider,
   DshPlatformLabel::Realm,
+  DshPlatformLabel::AccessTokenEndpoint,
   DshPlatformLabel::PublicDomain,
   DshPlatformLabel::PrivateDomain,
   // Derived items that do not depend on tenant et cetera
@@ -481,7 +485,6 @@ pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 30] = [
   DshPlatformLabel::ConsoleUrl,
   DshPlatformLabel::ClientId,
   DshPlatformLabel::RestApiDomain,
-  DshPlatformLabel::AccessTokenEndpoint,
   DshPlatformLabel::MqttTokenEndpoint,
   DshPlatformLabel::RestApiEndpoint,
   DshPlatformLabel::SwaggerUrl,
@@ -499,6 +502,7 @@ pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 30] = [
   DshPlatformLabel::TenantMonitoringUrl,
   DshPlatformLabel::TenantClientId,
   DshPlatformLabel::TenantPrivateVhostDomain,
+  DshPlatformLabel::InternalDomain,
   DshPlatformLabel::InternalServiceDomain,
 ];
 
@@ -512,15 +516,15 @@ impl DshPlatformLabel {
     match self {
       DshPlatformLabel::TenantAppCatalogAppUrl => (true, false, true, true, false),
       DshPlatformLabel::TenantAppConsoleUrl | DshPlatformLabel::TenantPublicAppDomain => (true, false, true, false, false),
-      DshPlatformLabel::TenantServiceConsoleUrl => (false, true, true, false, false),
-      DshPlatformLabel::InternalServiceDomain => (false, true, false, false, false),
-      DshPlatformLabel::TenantPrivateVhostDomain => (false, false, true, false, true),
-      DshPlatformLabel::TenantAppCatalogUrl
+      DshPlatformLabel::TenantServiceConsoleUrl | DshPlatformLabel::InternalServiceDomain => (false, true, true, false, false),
+      DshPlatformLabel::InternalDomain
+      | DshPlatformLabel::TenantAppCatalogUrl
       | DshPlatformLabel::TenantClientId
       | DshPlatformLabel::TenantConsoleUrl
       | DshPlatformLabel::TenantDataCatalogUrl
       | DshPlatformLabel::TenantMonitoringUrl
       | DshPlatformLabel::TenantPublicAppsDomain => (false, false, true, false, false),
+      DshPlatformLabel::TenantPrivateVhostDomain => (false, false, true, false, true),
       DshPlatformLabel::PublicVhostDomain => (false, false, false, false, true),
       _ => (false, false, false, false, false),
     }
