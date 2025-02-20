@@ -44,7 +44,7 @@ impl Subject for EnvSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -68,7 +68,7 @@ lazy_static! {
         (FilterFlagType::Started, Some("Search in all started applications.".to_string())),
         (FilterFlagType::Stopped, Some("Search in all stopped applications.".to_string()))
       ])
-      .add_target_argument(query_argument(None))
+      .add_target_argument(query_argument(None).required(true))
       .add_modifier_flag(ModifierFlagType::Regex, None)
   );
   static ref ENV_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![ENV_FIND_CAPABILITY.as_ref()];
@@ -85,7 +85,7 @@ impl CommandExecutor for EnvFind {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation(format!("find environment variables in applications that {}", query_processor.describe()));
     let start_instant = Instant::now();
-    let applications = &context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = &context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
 
     let mut application_pairs = applications.iter().collect::<Vec<_>>();
@@ -153,5 +153,5 @@ impl Label for ApplicationEnvLabel {
   }
 }
 
-static APPLICATION_ENV_LABELS: [ApplicationEnvLabel; 4] =
+const APPLICATION_ENV_LABELS: [ApplicationEnvLabel; 4] =
   [ApplicationEnvLabel::Application, ApplicationEnvLabel::Instances, ApplicationEnvLabel::EnvVar, ApplicationEnvLabel::Value];

@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Instant;
 
-use crate::arguments::target_argument;
+use crate::arguments::bucket_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -46,7 +46,7 @@ impl Subject for BucketSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -73,7 +73,7 @@ lazy_static! {
   static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show bucket configuration")
       .set_default_command_executor(&BucketShowAll {})
-      .add_target_argument(target_argument(BUCKET_SUBJECT_TARGET, None))
+      .add_target_argument(bucket_id_argument().required(true))
   );
   static ref BUCKET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![BUCKET_LIST_CAPABILITY.as_ref(), BUCKET_SHOW_CAPABILITY.as_ref()];
 }
@@ -121,9 +121,7 @@ impl CommandExecutor for BucketShowAll {
     let start_instant = Instant::now();
     let bucket = context.dsh_api_client.as_ref().unwrap().get_bucket(bucket_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, &bucket, context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket)
   }
 }
 

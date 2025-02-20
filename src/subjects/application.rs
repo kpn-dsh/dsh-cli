@@ -1,17 +1,16 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::subjects::image::parse_image_string;
 use async_trait::async_trait;
 use chrono::DateTime;
 use clap::ArgMatches;
+use dsh_api::application::parse_image_string;
 use dsh_api::types::Application;
+use dsh_api::types::{Task, TaskStatus};
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Instant;
 
-use dsh_api::types::{Task, TaskStatus};
-
-use crate::arguments::target_argument;
+use crate::arguments::application_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -47,7 +46,7 @@ impl Subject for ApplicationSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -91,7 +90,7 @@ lazy_static! {
         (FlagType::AllocationStatus, &ApplicationShowAllocationStatus {}, None),
         (FlagType::Tasks, &ApplicationShowTasks {}, None),
       ])
-      .add_target_argument(target_argument(APPLICATION_SUBJECT_TARGET, None))
+      .add_target_argument(application_id_argument().required(true))
   );
   static ref APPLICATION_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APPLICATION_LIST_CAPABILITY.as_ref(), APPLICATION_SHOW_CAPABILITY.as_ref()];
 }
@@ -103,7 +102,7 @@ impl CommandExecutor for ApplicationListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all applications with their parameters");
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     application_ids.sort();
@@ -132,7 +131,7 @@ impl CommandExecutor for ApplicationListAllocationStatus {
     let allocation_statuses = try_join_all(
       application_ids
         .iter()
-        .map(|application_id| context.dsh_api_client.as_ref().unwrap().get_application_allocation_status(application_id.as_str())),
+        .map(|application_id| context.dsh_api_client.as_ref().unwrap().get_application_status(application_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -178,11 +177,11 @@ impl CommandExecutor for ApplicationListTasks {
 
     context.print_explanation("list all applications with their tasks");
     let start_instant = Instant::now();
-    let application_ids = context.dsh_api_client.as_ref().unwrap().list_application_ids_with_derived_tasks().await?;
+    let application_ids = context.dsh_api_client.as_ref().unwrap().get_task_ids().await?;
     let tasks: Vec<Vec<String>> = try_join_all(
       application_ids
         .iter()
-        .map(|application_id| context.dsh_api_client.as_ref().unwrap().list_application_derived_task_ids(application_id.as_str())),
+        .map(|application_id| context.dsh_api_client.as_ref().unwrap().get_task_appid_ids(application_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -206,13 +205,16 @@ impl CommandExecutor for ApplicationShowAll {
     let application_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for application '{}'", application_id));
     let start_instant = Instant::now();
-    let application = context.dsh_api_client.as_ref().unwrap().get_application(application_id.as_str()).await?;
+    let application = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .get_application_configuration(application_id.as_str())
+      .await?;
     context.print_execution_time(start_instant);
     // let table = ShowTable::new(application_id.as_str(), &application, &APPLICATION_LABELS_SHOW, context);
     // table.print();
-    let formatter = UnitFormatter::new(application_id, &APPLICATION_LABELS_SHOW, Some("application id"), &application, context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(application_id, &APPLICATION_LABELS_SHOW, Some("application id"), context).print(&application)
   }
 }
 
@@ -224,22 +226,9 @@ impl CommandExecutor for ApplicationShowAllocationStatus {
     let application_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show allocation status for application '{}'", application_id));
     let start_instant = Instant::now();
-    let allocation_status = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
-      .get_application_allocation_status(application_id.as_str())
-      .await?;
+    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_application_status(application_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let formatter = UnitFormatter::new(
-      application_id,
-      &DEFAULT_ALLOCATION_STATUS_LABELS,
-      Some("application id"),
-      &allocation_status,
-      context,
-    );
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(application_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("application id"), context).print(&allocation_status)
   }
 }
 
@@ -251,19 +240,12 @@ impl CommandExecutor for ApplicationShowTasks {
     let application_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all tasks for application '{}'", application_id));
     let start_instant = Instant::now();
-    let task_ids = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
-      .list_application_derived_task_ids(application_id.as_str())
-      .await?;
-    let task_statuses = try_join_all(task_ids.iter().map(|task_id| {
-      context
-        .dsh_api_client
-        .as_ref()
-        .unwrap()
-        .get_application_task(application_id.as_str(), task_id.as_str())
-    }))
+    let task_ids = context.dsh_api_client.as_ref().unwrap().get_task_appid_ids(application_id.as_str()).await?;
+    let task_statuses = try_join_all(
+      task_ids
+        .iter()
+        .map(|task_id| context.dsh_api_client.as_ref().unwrap().get_task(application_id.as_str(), task_id.as_str())),
+    )
     .await?;
     context.print_execution_time(start_instant);
     let mut tasks: Vec<(String, TaskStatus)> = task_ids.into_iter().zip(task_statuses).collect();

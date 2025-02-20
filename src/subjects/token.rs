@@ -1,11 +1,15 @@
-use crate::capability::{Capability, CommandExecutor, REQUEST_COMMAND, REQUEST_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, FETCH_COMMAND, FETCH_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::formatters::formatter::{Label, SubjectFormatter};
+use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_sdk::management_api::AccessToken;
 use lazy_static::lazy_static;
+use serde::Serialize;
 use std::time::Instant;
 
 pub(crate) struct TokenSubject {}
@@ -31,12 +35,13 @@ impl Subject for TokenSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      REQUEST_COMMAND => Some(TOKEN_REQUEST_CAPABILITY.as_ref()),
+      FETCH_COMMAND => Some(TOKEN_FETCH_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(TOKEN_SHOW_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -47,34 +52,141 @@ impl Subject for TokenSubject {
 }
 
 lazy_static! {
-  static ref TOKEN_REQUEST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(REQUEST_COMMAND_PAIR, "Request token")
-      .set_long_about("Request a DSH API token.")
-      .set_default_command_executor(&TokenRequest {})
+  static ref TOKEN_FETCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(FETCH_COMMAND_PAIR, "Fetch token")
+      .set_long_about("Fetch a DSH API token.")
+      .set_default_command_executor(&TokenFetch {})
   );
-  static ref TOKEN_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![TOKEN_REQUEST_CAPABILITY.as_ref()];
+  static ref TOKEN_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Fetch and show token")
+      .set_long_about("Fetch a DSH API token and display its parameters.")
+      .set_default_command_executor(&TokenShow {})
+  );
+  static ref TOKEN_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![TOKEN_FETCH_CAPABILITY.as_ref(), TOKEN_SHOW_CAPABILITY.as_ref()];
 }
 
-struct TokenRequest {}
+struct TokenFetch {}
 
 #[async_trait]
-impl CommandExecutor for TokenRequest {
+impl CommandExecutor for TokenFetch {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("request dsh api token");
+    context.print_explanation("fetch dsh api token");
     let start_instant = Instant::now();
 
-    let rest_api_token = context.dsh_api_client.as_ref().unwrap().token().await?;
+    let access_token = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .token_fetcher()
+      .fetch_access_token_from_server()
+      .await
+      .map_err(|error| error.to_string())?;
     context.print_execution_time(start_instant);
-
-    if let Some(token) = rest_api_token.strip_prefix("Bearer ") {
-      // match jsonwebtoken::decode_header(token) {
-      //   Ok(header) => println!("header {:?}", header),
-      //   Err(error) => return Err(error.to_string()),
-      // }
-      // let token_data = jsonwebtoken::decode::<String>(&token, &DecodingKey::from_secret(token.as_ref()), &Validation::new(Algorithm::RS256));
-      // println!("{:?}", token_data);
-      context.print(token);
-    }
+    context.print(access_token.access_token());
     Ok(())
   }
 }
+
+struct TokenShow {}
+
+#[async_trait]
+impl CommandExecutor for TokenShow {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+    context.print_explanation("fetch dsh api token");
+    let start_instant = Instant::now();
+
+    let access_token = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .token_fetcher()
+      .fetch_access_token_from_server()
+      .await
+      .map_err(|error| error.to_string())?;
+    context.print_execution_time(start_instant);
+    UnitFormatter::new("", &ACCES_TOKEN_LABELS, None, context).print_non_serializable(&access_token)
+  }
+}
+
+#[derive(Clone, Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum AccessTokenLabel {
+  AccessToken,
+  ExpiresIn,
+  Formatted,
+  NotBeforePolicy,
+  RefreshExpiresIn,
+  Scope,
+  TokenType,
+}
+
+impl Label for AccessTokenLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::AccessToken => "access token",
+      Self::ExpiresIn => "expires in",
+      Self::Formatted => "formatted",
+      Self::NotBeforePolicy => "not before policy",
+      Self::RefreshExpiresIn => "refresh expires in",
+      Self::Scope => "scope",
+      Self::TokenType => "type",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::Formatted)
+  }
+}
+
+impl SubjectFormatter<AccessTokenLabel> for AccessToken {
+  fn value(&self, label: &AccessTokenLabel, _target_id: &str) -> String {
+    match label {
+      AccessTokenLabel::AccessToken => self.access_token().to_string(),
+      AccessTokenLabel::ExpiresIn => self.expires_in().to_string(),
+      AccessTokenLabel::Formatted => self.formatted_token(),
+      AccessTokenLabel::NotBeforePolicy => self.not_before_policy().to_string(),
+      AccessTokenLabel::RefreshExpiresIn => self.refresh_expires_in().to_string(),
+      AccessTokenLabel::Scope => self.scope().to_string(),
+      AccessTokenLabel::TokenType => self.token_type().to_string(),
+    }
+  }
+
+  fn target_label(&self) -> Option<AccessTokenLabel> {
+    Some(AccessTokenLabel::Scope)
+  }
+}
+
+pub static ACCES_TOKEN_LABELS: [AccessTokenLabel; 7] = [
+  AccessTokenLabel::Formatted,
+  AccessTokenLabel::Scope,
+  AccessTokenLabel::TokenType,
+  AccessTokenLabel::ExpiresIn,
+  AccessTokenLabel::NotBeforePolicy,
+  AccessTokenLabel::RefreshExpiresIn,
+  AccessTokenLabel::AccessToken,
+];
+
+// use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+// use dsh_sdk::protocol_adapters::token::api_client_token_fetcher::ApiClientTokenFetcher;
+// use dsh_sdk::protocol_adapters::token::data_access_token::RequestDataAccessToken;
+// use dsh_sdk::Platform;
+//
+// #[tokio::main]
+// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//   let client = DshApiClientFactory::default().client().await?;
+//
+//   println!("{}", client.tenant());
+//
+//   // Create a request for the Data Access Token (this request for full access)
+//   let request = RequestDataAccessToken::new(client.tenant_name(), client.platform().client_id());
+//
+//   let sdk_platform = Platform::try_from(client.platform())?;
+//   let api_key = "";
+//
+//   let token_fetcher = ApiClientTokenFetcher::new(api_key, sdk_platform);
+//
+//   let token = token_fetcher.fetch_data_access_token(request).await.unwrap();
+//
+//   println!("{:#?}", token);
+//
+//   Ok(())
+// }

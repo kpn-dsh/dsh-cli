@@ -13,7 +13,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 
 use dsh_api::types::AppCatalogManifest;
 
-use crate::arguments::target_argument;
+use crate::arguments::manifest_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -47,7 +47,7 @@ impl Subject for ManifestSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -74,7 +74,7 @@ lazy_static! {
   static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show manifest configuration")
       .set_default_command_executor(&ManifestShowAll {})
-      .add_target_argument(target_argument(MANIFEST_SUBJECT_TARGET, None))
+      .add_target_argument(manifest_id_argument().required(true))
   );
   static ref MANIFEST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];
 }
@@ -86,7 +86,7 @@ impl CommandExecutor for ManifestListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifests");
     let start_instant = Instant::now();
-    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
@@ -136,16 +136,14 @@ impl CommandExecutor for ManifestShowAll {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app catalog manifest '{}'", manifest_id));
     let start_instant = Instant::now();
-    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
     let manifests_grouped = manifests_with_id.clone().into_iter().into_group_map();
     let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id.as_str()).unwrap().clone();
     manifests.sort_by_key(|m| m.version.clone());
-    let formatter = UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), *manifests.last().unwrap(), context);
-    formatter.print()?;
-    Ok(())
+    UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), context).print(*manifests.last().unwrap())
   }
 }
 

@@ -1,0 +1,3 @@
+manifest list
+manifest list --ids
+manifest show $MANIFEST_UNDER_TEST

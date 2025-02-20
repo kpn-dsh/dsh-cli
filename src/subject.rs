@@ -7,13 +7,31 @@ use crate::formatters::OutputFormat;
 use crate::DshCliResult;
 
 pub struct Requirements {
-  pub needs_dsh_api_client: bool,
-  pub default_output_format: Option<OutputFormat>,
+  needs_platform: bool,
+  needs_tenant_name: bool,
+  needs_dsh_api_client: bool,
+  default_output_format: Option<OutputFormat>,
 }
 
 impl Requirements {
-  pub fn new(needs_dsh_api_client: bool, default_output_format: Option<OutputFormat>) -> Self {
-    Self { needs_dsh_api_client, default_output_format }
+  pub fn new(needs_platform: bool, needs_tenant_name: bool, needs_dsh_api_client: bool, default_output_format: Option<OutputFormat>) -> Self {
+    Self { needs_platform, needs_tenant_name, needs_dsh_api_client, default_output_format }
+  }
+
+  pub fn default_output_format(&self) -> Option<OutputFormat> {
+    self.default_output_format.clone()
+  }
+
+  pub fn needs_dsh_api_client(&self) -> bool {
+    self.needs_dsh_api_client
+  }
+
+  pub fn needs_platform(&self) -> bool {
+    self.needs_platform || self.needs_dsh_api_client
+  }
+
+  pub fn needs_tenant_name(&self) -> bool {
+    self.needs_tenant_name || self.needs_dsh_api_client
   }
 }
 
@@ -43,7 +61,7 @@ pub trait Subject {
   fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)>;
 
   // Called once by main when building the clap command
-  fn clap_subject_command(&self) -> (String, Command) {
+  fn subject_command(&self) -> (String, Command) {
     let mut capability_subcommands: Vec<Command> = vec![];
     for capability in self.capabilities() {
       let capability_command = capability.clap_capability_command(self.subject());
@@ -52,7 +70,7 @@ pub trait Subject {
     let mut subject_command = Command::new(self.subject().to_string())
       .about(self.subject_command_about())
       .long_about(self.subject_command_long_about())
-      .arg_required_else_help(true)
+      .subcommand_required(true)
       .subcommands(capability_subcommands);
     if let Some(alias) = self.subject_command_alias() {
       subject_command = subject_command.alias(alias.to_string())
@@ -61,7 +79,7 @@ pub trait Subject {
   }
 
   // Called once by main when building the clap command
-  fn clap_list_shortcut_command(&self) -> Option<(String, Command)> {
+  fn subject_list_shortcut_command(&self) -> Option<(String, Command)> {
     if let Some(list_capability) = self.capability(LIST_COMMAND) {
       let list_shortcut_name = format!("{}s", self.subject());
       let list_flags = list_capability.clap_flags(self.subject());

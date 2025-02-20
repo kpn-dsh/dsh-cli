@@ -5,6 +5,7 @@ pub(crate) mod bucket;
 pub(crate) mod certificate;
 pub(crate) mod env;
 pub(crate) mod image;
+#[cfg(feature = "appcatalog")]
 pub(crate) mod manifest;
 pub(crate) mod metric;
 pub(crate) mod platform;
@@ -16,9 +17,6 @@ pub(crate) mod token;
 pub(crate) mod topic;
 pub(crate) mod vhost;
 pub(crate) mod volume;
-
-#[cfg(feature = "stream")]
-pub(crate) mod stream;
 
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::notifications_to_string;

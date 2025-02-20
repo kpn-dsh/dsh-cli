@@ -10,10 +10,10 @@ use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::application::parse_image_string;
 use dsh_api::query_processor::{DummyQueryProcessor, ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::Application;
 use lazy_static::lazy_static;
-use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -45,7 +45,7 @@ impl Subject for ImageSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -70,7 +70,7 @@ lazy_static! {
         (FilterFlagType::Started, Some("Search in all started applications.".to_string())),
         (FilterFlagType::Stopped, Some("Search in all stopped applications.".to_string()))
       ])
-      .add_target_argument(query_argument(None))
+      .add_target_argument(query_argument(None).required(true))
       .add_modifier_flag(ModifierFlagType::Regex, None)
   );
   static ref IMAGE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -100,7 +100,7 @@ impl CommandExecutor for ImageFind {
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(image_query.as_str())? } else { &ExactMatchQueryProcessor::create(image_query.as_str())? };
     context.print_explanation(format!("find images that {}", query_processor.describe()));
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(applications, query_processor, matches, context)?;
     Ok(())
@@ -114,7 +114,7 @@ impl CommandExecutor for ImageListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all images used in applications");
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(applications, &DummyQueryProcessor::create()?, matches, context)?;
     Ok(())
@@ -211,61 +211,4 @@ impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
   }
 }
 
-static IMAGE_USAGE_LABELS: [ImageUsageLabel; 4] = [ImageUsageLabel::Image, ImageUsageLabel::Registry, ImageUsageLabel::Application, ImageUsageLabel::Instances];
-
-lazy_static! {
-  static ref APP_CATALOG_IMAGE_REGEX: Regex =
-    Regex::new(r"APPCATALOG_REGISTRY/dsh-appcatalog/tenant/([a-z0-9-_]+)/([0-9]+)/([0-9]+)/(release|draft)/(klarrio|kpn)/([a-zA-Z0-9-_:.]+)").unwrap();
-  static ref REGISTRY_IMAGE_REGEX: Regex = Regex::new(r"registry.cp.kpn-dsh.com/([a-z0-9-_]+)/([a-zA-Z0-9-_:.]+)").unwrap();
-}
-
-/// # Parses an image string
-///
-/// # Returns
-/// When the provided string is valid, the method returns a 2-tuple containing:
-/// * registry of the image
-/// * image id
-// TODO Move to dsh-api
-pub(crate) fn parse_image_string(image_string: &str) -> Result<(String, String), String> {
-  match APP_CATALOG_IMAGE_REGEX.captures(image_string) {
-    Some(app_catalog_captures) => Ok((
-      format!(
-        "app:{}:{}",
-        app_catalog_captures.get(4).map(|m| m.as_str().to_string()).unwrap_or_default(),
-        app_catalog_captures.get(5).map(|m| m.as_str().to_string()).unwrap_or_default()
-      ),
-      app_catalog_captures.get(6).map(|m| m.as_str().to_string()).unwrap_or_default(),
-    )),
-    None => match REGISTRY_IMAGE_REGEX.captures(image_string) {
-      Some(registry_captures) => Ok(("registry".to_string(), registry_captures.get(2).map(|m| m.as_str().to_string()).unwrap_or_default())),
-      None => Err(format!("unrecognized image string {}", image_string)),
-    },
-  }
-}
-
-#[test]
-fn test_app_catalog_image_draft_kpn() {
-  const APP_CATALOG_IMAGE: &str = "APPCATALOG_REGISTRY/dsh-appcatalog/tenant/greenbox-dev/1903/1903/draft/kpn/schema-store-proxy:0.2.3-0";
-  assert_eq!(
-    parse_image_string(APP_CATALOG_IMAGE).unwrap(),
-    ("app:draft:kpn".to_string(), "schema-store-proxy:0.2.3-0".to_string())
-  );
-}
-
-#[test]
-fn test_app_catalog_image_release_klarrio() {
-  const APP_CATALOG_IMAGE: &str = "APPCATALOG_REGISTRY/dsh-appcatalog/tenant/greenbox-dev/1903/1903/release/klarrio/whoami:1.6.1";
-  assert_eq!(
-    parse_image_string(APP_CATALOG_IMAGE).unwrap(),
-    ("app:release:klarrio".to_string(), "whoami:1.6.1".to_string())
-  );
-}
-
-#[test]
-fn test_registry_image() {
-  const REGISTRY_IMAGE: &str = "registry.cp.kpn-dsh.com/greenbox-dev/cck-ingestor:0.0.18";
-  assert_eq!(
-    parse_image_string(REGISTRY_IMAGE).unwrap(),
-    ("registry".to_string(), "cck-ingestor:0.0.18".to_string())
-  );
-}
+const IMAGE_USAGE_LABELS: [ImageUsageLabel; 4] = [ImageUsageLabel::Image, ImageUsageLabel::Registry, ImageUsageLabel::Application, ImageUsageLabel::Instances];

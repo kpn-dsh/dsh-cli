@@ -142,10 +142,10 @@ impl Capability for CapabilityBuilder<'_> {
       .name(self.capability_command_name.clone())
       .about(&self.about)
       .subcommands(&self.subcommands)
-      .subcommand_required(!self.subcommands.is_empty())
       .args(&self.target_arguments)
       .args(self.clap_flags(subject_command))
-      .args(&self.extra_arguments);
+      .args(&self.extra_arguments)
+      .subcommand_required(!self.subcommands.is_empty());
     if let Some(ref alias) = self.capability_command_alias {
       capability_command = capability_command.alias(alias)
     }

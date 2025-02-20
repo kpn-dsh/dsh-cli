@@ -4,6 +4,38 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-02-20
+
+### Fixes
+
+* Saving targets works properly again.
+
+### Added
+
+* Improved error handling for bad requests.
+* Improved documentation.
+* Features (disabled by default):
+    * `appcatalog` - Controls availability of app catalog operations.
+    * `manage` - Controls availability of manage operations.
+    * `robot` - Controls availability of robot operation.
+* Set and unset default target.
+* Set and unset all settings via the tool.
+* Added csv output format.
+* Added flag to hide headers.
+* Added basic token capability.
+
+### Removed
+
+* Group and user id are not needed anymore.
+* Feature `actual` is removed. Its capabilities are now all enabled.
+
+### Changed
+
+* Upgraded `dsh_api` dependency to 0.5.1.
+* Autocomplete flag now hidden.
+* Improved logging.
+* Renamed create capabilities to new.
+
 ## [0.4.0] - 2025-01-31
 
 ### Added

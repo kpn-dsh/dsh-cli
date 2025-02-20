@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use dsh_api::types::AppCatalogAppResourcesValue;
 
-use crate::arguments::target_argument;
+use crate::arguments::app_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -47,7 +47,7 @@ impl Subject for AppSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -75,7 +75,7 @@ lazy_static! {
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .set_default_command_executor(&AppShowAll {})
-      .add_target_argument(target_argument(APP_SUBJECT_TARGET, None))
+      .add_target_argument(app_id_argument().required(true))
   );
   static ref APP_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APP_LIST_CAPABILITY.as_ref(), APP_SHOW_CAPABILITY.as_ref()];
 }
@@ -87,7 +87,7 @@ impl CommandExecutor for AppListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed apps and their configurations");
     let start_instant = Instant::now();
-    let apps = context.dsh_api_client.as_ref().unwrap().get_app_configurations().await?;
+    let apps = context.dsh_api_client.as_ref().unwrap().get_appcatalogapp_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     app_ids.sort();
@@ -125,30 +125,35 @@ impl CommandExecutor for AppShowAll {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
     let start_instant = Instant::now();
-    let app = context.dsh_api_client.as_ref().unwrap().get_app_configuration(app_id.as_str()).await?;
+    let app = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .get_appcatalogapp_appcatalogappid_configuration(app_id.as_str())
+      .await?;
     context.print_execution_time(start_instant);
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(application) => {
-          UnitFormatter::new(resource_name, &APPLICATION_LABELS_SHOW, Some("application resource"), application, context).print()?;
+          UnitFormatter::new(resource_name, &APPLICATION_LABELS_SHOW, Some("application resource"), context).print(application)?;
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
-          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), bucket, context).print()?;
+          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket)?;
         }
         AppCatalogAppResourcesValue::Certificate(certificate) => {
-          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), certificate, context).print()?;
+          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), context).print(certificate)?;
         }
         AppCatalogAppResourcesValue::Secret(secret) => {
-          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), &secret.name, context).print()?;
+          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), context).print(&secret.name)?;
         }
         AppCatalogAppResourcesValue::Topic(topic) => {
-          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), topic, context).print()?;
+          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), context).print(topic)?;
         }
         AppCatalogAppResourcesValue::Vhost(vhost) => {
-          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), vhost, context).print()?;
+          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), context).print(vhost)?;
         }
         AppCatalogAppResourcesValue::Volume(volume) => {
-          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), volume, context).print()?;
+          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), context).print(volume)?;
         }
       }
     }

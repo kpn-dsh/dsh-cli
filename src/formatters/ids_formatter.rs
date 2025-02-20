@@ -8,7 +8,7 @@ use tabled::{builder::Builder as TabledBuilder, settings::Style};
 pub struct IdsFormatter<'a> {
   label: &'a str,
   ids: Vec<&'a str>,
-  context: &'a Context<'a>,
+  context: &'a Context,
 }
 
 impl<'a> IdsFormatter<'a> {

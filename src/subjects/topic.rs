@@ -12,7 +12,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Instant;
 
-use crate::arguments::target_argument;
+use crate::arguments::topic_id_argument;
 use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -52,7 +52,7 @@ impl Subject for TopicSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -74,7 +74,7 @@ lazy_static! {
     CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete scratch topic")
       .set_long_about("Delete a scratch topic.")
       .set_default_command_executor(&TopicDelete {})
-      .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
+      .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND_PAIR, "List topics")
@@ -95,7 +95,7 @@ lazy_static! {
         (FlagType::Properties, &TopicShowProperties {}, None),
         (FlagType::Usage, &TopicShowUsage {}, None),
       ])
-      .add_target_argument(target_argument(TOPIC_SUBJECT_TARGET, None))
+      .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![TOPIC_DELETE_CAPABILITY.as_ref(), TOPIC_LIST_CAPABILITY.as_ref(), TOPIC_SHOW_CAPABILITY.as_ref()];
@@ -115,7 +115,7 @@ impl CommandExecutor for TopicDelete {
       if context.dry_run {
         context.print_warning("dry-run mode, topic not deleted");
       } else {
-        context.dsh_api_client.as_ref().unwrap().delete_topic(&topic_id).await?;
+        context.dsh_api_client.as_ref().unwrap().delete_topic_configuration(&topic_id).await?;
         context.print_outcome(format!("topic {} deleted", topic_id));
       }
     } else {
@@ -132,13 +132,8 @@ impl CommandExecutor for TopicListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topics with their allocation status");
     let start_instant = Instant::now();
-    let topic_ids = context.dsh_api_client.as_ref().unwrap().list_topic_ids().await?;
-    let allocation_statuses = try_join_all(
-      topic_ids
-        .iter()
-        .map(|id| context.dsh_api_client.as_ref().unwrap().get_topic_allocation_status(id.as_str())),
-    )
-    .await?;
+    let topic_ids = context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?;
+    let allocation_statuses = try_join_all(topic_ids.iter().map(|id| context.dsh_api_client.as_ref().unwrap().get_topic_status(id.as_str()))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context);
     formatter.push_target_ids_and_values(topic_ids.as_slice(), allocation_statuses.as_slice());
@@ -154,7 +149,7 @@ impl CommandExecutor for TopicListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topics with their configurations");
     let start_instant = Instant::now();
-    let topic_ids = context.dsh_api_client.as_ref().unwrap().list_topic_ids().await?;
+    let topic_ids = context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?;
     let configurations = try_join_all(
       topic_ids
         .iter()
@@ -176,7 +171,7 @@ impl CommandExecutor for TopicListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topic ids");
     let start_instant = Instant::now();
-    let topic_ids = context.dsh_api_client.as_ref().unwrap().list_topic_ids().await?;
+    let topic_ids = context.dsh_api_client.as_ref().unwrap().get_topic_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("topic id", context);
     formatter.push_target_ids(&topic_ids);
@@ -193,8 +188,8 @@ impl CommandExecutor for TopicListUsage {
     context.print_explanation("list all scratch topics with the applications that use them");
     let start_instant = Instant::now();
     let (topic_ids, applications) = try_join!(
-      context.dsh_api_client.as_ref().unwrap().list_topic_ids(),
-      context.dsh_api_client.as_ref().unwrap().get_applications(),
+      context.dsh_api_client.as_ref().unwrap().get_topic_ids(),
+      context.dsh_api_client.as_ref().unwrap().get_application_configuration_map(),
     )?;
     context.print_execution_time(start_instant);
     let mut tuples: Vec<(String, UsedBy)> = vec![];
@@ -232,10 +227,9 @@ impl CommandExecutor for TopicShowAllocationStatus {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for topic '{}'", topic_id));
     let start_instant = Instant::now();
-    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_topic_allocation_status(topic_id.as_str()).await?;
+    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_topic_status(topic_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), &allocation_status, context).print()?;
-    Ok(())
+    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context).print(&allocation_status)
   }
 }
 
@@ -247,10 +241,9 @@ impl CommandExecutor for TopicShow {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the configuration for topic '{}'", topic_id));
     let start_instant = Instant::now();
-    let topic = context.dsh_api_client.as_ref().unwrap().get_topic(topic_id.as_str()).await?;
+    let topic = context.dsh_api_client.as_ref().unwrap().get_topic_configuration(topic_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, &topic, context).print()?;
-    Ok(())
+    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, context).print(&topic)
   }
 }
 
@@ -282,7 +275,7 @@ impl CommandExecutor for TopicShowUsage {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the applications that use topic '{}'", topic_id));
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id.as_str(), &applications);
     let used_bys = usages

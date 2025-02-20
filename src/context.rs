@@ -1,16 +1,24 @@
-use crate::arguments::{
-  Verbosity, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT,
+use crate::formatters::OutputFormat;
+use crate::global_arguments::{
+  DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT,
   TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
-use crate::formatters::OutputFormat;
-use crate::settings::{read_settings, Settings};
+use crate::settings::Settings;
 use crate::subject::Requirements;
-use crate::{get_guid, get_platform, get_tenant_name};
+use crate::verbosity::Verbosity;
+use crate::{
+  get_target_password, get_target_platform, get_target_platform_non_interactive, get_target_tenant, get_target_tenant_non_interactive, ENV_VAR_CSV_QUOTE, ENV_VAR_CSV_SEPARATOR,
+  ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME,
+  ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
+};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
+use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
@@ -19,77 +27,68 @@ use std::io::{stderr, stdin, stdout, IsTerminal, Write};
 use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
 
-static ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
-static ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
-static ENV_VAR_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
-static ENV_VAR_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
-static ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-static ENV_VAR_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
-static ENV_VAR_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
-static ENV_VAR_QUIET: &str = "DSH_CLI_QUIET";
-static ENV_VAR_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
-static ENV_VAR_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
-static ENV_VAR_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
-
 #[derive(Debug)]
-pub(crate) struct Context<'a> {
+pub(crate) struct Context {
   pub(crate) csv_quote: Option<char>,
   pub(crate) csv_separator: String,
   pub(crate) dry_run: bool,
-  pub(crate) dsh_api_client: Option<DshApiClient<'a>>,
+  pub(crate) dsh_api_client: Option<DshApiClient>,
   pub(crate) force: bool,
   pub(crate) matching_style: Option<MatchingStyle>,
   pub(crate) no_escape: bool,
   pub(crate) output_format: OutputFormat,
-  pub(crate) platform: Option<DshPlatform>,
+  pub(crate) target_platform: Option<DshPlatform>,
   pub(crate) quiet: bool,
-  #[allow(unused)]
-  pub(crate) tenant_guid: Option<u16>,
-  pub(crate) tenant_name: Option<String>,
+  pub(crate) target_tenant_name: Option<String>,
   pub(crate) terminal_width: Option<usize>,
   pub(crate) show_execution_time: bool,
-  pub(crate) show_labels: bool,
+  pub(crate) show_headers: bool,
   pub(crate) _stderr_escape: bool,
   pub(crate) stdin_is_terminal: bool,
   pub(crate) _stdout_escape: bool,
   pub(crate) verbosity: Verbosity,
 }
 
-impl Context<'_> {
-  pub(crate) fn create<'a>(matches: &'a ArgMatches, requirements: &Requirements, dsh_api_client: Option<DshApiClient<'a>>) -> Result<Context<'a>, String> {
-    let settings: Option<Settings> = read_settings(None)?;
+impl Context {
+  pub(crate) async fn create(matches: &ArgMatches, requirements: &Requirements, settings: &Settings) -> Result<Context, String> {
     let stdin_is_terminal = stdin().is_terminal();
-
-    let csv_quote = Self::csv_quote(settings.as_ref())?;
-    let csv_separator = Self::csv_separator(settings.as_ref())?;
+    let csv_quote = Self::csv_quote(settings)?;
+    let csv_separator = Self::csv_separator(settings)?;
     if let Some(quote) = csv_quote {
       if csv_separator.contains(quote) {
         return Err("csv separator string cannot contain quote character".to_string());
       }
     }
-    let dry_run = Self::dry_run(matches, settings.as_ref());
-    let no_escape = Self::no_escape(matches, settings.as_ref());
+    let dry_run = Self::dry_run(matches, settings);
+    let target_platform = if requirements.needs_platform() { Some(get_target_platform(matches, settings)?) } else { get_target_platform_non_interactive(matches, settings)? };
+    let target_tenant_name = if requirements.needs_tenant_name() { Some(get_target_tenant(matches, settings)?) } else { get_target_tenant_non_interactive(matches, settings) };
+    let dsh_api_client = if requirements.needs_dsh_api_client() {
+      let dsh_api_tenant = DshApiTenant::new(target_tenant_name.clone().unwrap(), target_platform.clone().unwrap());
+      let password = get_target_password(matches, &dsh_api_tenant)?;
+      let dsh_api_client_factory = DshApiClientFactory::create(dsh_api_tenant, password)?;
+      let client = dsh_api_client_factory.client().await?;
+      debug!("api client created");
+      Some(client)
+    } else {
+      debug!("no api client required");
+      None
+    };
+    let no_escape = Self::no_escape(matches, settings);
     let (matching_style, stderr_escape, stdout_escape) =
-      if no_escape { (None, false, false) } else { (Self::matching_style(matches, settings.as_ref())?, stderr().is_terminal(), stdout().is_terminal()) };
-    let quiet = Self::quiet(matches, settings.as_ref());
-    let force = Self::force(matches, settings.as_ref());
+      if no_escape { (None, false, false) } else { (Self::matching_style(matches, settings)?, stderr().is_terminal(), stdout().is_terminal()) };
+    let quiet = Self::quiet(matches, settings);
+    let force = Self::force(matches, settings);
     let (output_format, show_execution_time, verbosity) = if quiet {
       (OutputFormat::Quiet, false, Verbosity::Off)
     } else {
       (
-        Self::output_format(matches, settings.as_ref(), requirements.default_output_format.clone())?,
-        Self::show_execution_time(matches, settings.as_ref()),
-        Self::verbosity(matches, settings.as_ref())?,
+        Self::output_format(matches, settings, requirements.default_output_format())?,
+        Self::show_execution_time(matches, settings),
+        Self::verbosity(matches, settings)?,
       )
     };
-    let platform = get_platform(matches, settings.as_ref()).ok();
-    let show_labels = true;
-    let tenant_name = get_tenant_name(matches, settings.as_ref()).ok();
-    let tenant_guid = match (&platform, &tenant_name) {
-      (Some(platform), Some(tenant)) => get_guid(matches, platform, tenant).ok(),
-      _ => None,
-    };
-    let terminal_width = Self::terminal_width(matches, settings.as_ref())?;
+    let show_headers = !Self::no_headers(matches, settings);
+    let terminal_width = Self::terminal_width(matches, settings)?;
     if dry_run && verbosity >= Verbosity::Medium {
       eprintln!("dry-run mode enabled");
     }
@@ -102,12 +101,11 @@ impl Context<'_> {
       matching_style,
       no_escape,
       output_format,
-      platform,
+      target_platform,
       quiet,
       show_execution_time,
-      show_labels,
-      tenant_guid,
-      tenant_name,
+      show_headers,
+      target_tenant_name,
       terminal_width,
       _stderr_escape: stderr_escape,
       stdin_is_terminal,
@@ -134,7 +132,7 @@ impl Context<'_> {
   /// 1. Try environment variable `DSH_CLI_CSV_QUOTE`
   /// 1. Try settings file
   /// 1. Default to `None`
-  fn csv_quote(settings: Option<&Settings>) -> Result<Option<char>, String> {
+  fn csv_quote(settings: &Settings) -> Result<Option<char>, String> {
     match std::env::var(ENV_VAR_CSV_QUOTE) {
       Ok(csv_quote_env_var) => {
         if csv_quote_env_var.len() == 1 {
@@ -143,7 +141,7 @@ impl Context<'_> {
           Err("csv quote must one character".to_string())
         }
       }
-      Err(_) => Ok(settings.and_then(|settings| settings.csv_quote)),
+      Err(_) => Ok(settings.csv_quote),
     }
   }
 
@@ -152,7 +150,7 @@ impl Context<'_> {
   /// 1. Try environment variable `DSH_CLI_CSV_SEPARATOR`
   /// 1. Try settings file
   /// 1. Default to `","` (comma)
-  fn csv_separator(settings: Option<&Settings>) -> Result<String, String> {
+  fn csv_separator(settings: &Settings) -> Result<String, String> {
     match std::env::var(ENV_VAR_CSV_SEPARATOR) {
       Ok(csv_separator_env_var) => {
         if !csv_separator_env_var.is_empty() {
@@ -161,7 +159,7 @@ impl Context<'_> {
           Err("seperator cannot be empty".to_string())
         }
       }
-      Err(_) => match settings.and_then(|settings| settings.csv_separator.clone()) {
+      Err(_) => match settings.csv_separator.clone() {
         Some(csv_separator_setting) => {
           if !csv_separator_setting.is_empty() {
             Ok(csv_separator_setting)
@@ -180,16 +178,44 @@ impl Context<'_> {
   /// 1. Try if environment variable `DSH_CLI_DRY_RUN` exists
   /// 1. Try settings file
   /// 1. Default to `false`
-  fn dry_run(matches: &ArgMatches, settings: Option<&Settings>) -> bool {
-    matches.get_flag(DRY_RUN_ARGUMENT) || std::env::var(ENV_VAR_DRY_RUN).is_ok() || settings.is_some_and(|settings| settings.dry_run.unwrap_or(false))
+  fn dry_run(matches: &ArgMatches, settings: &Settings) -> bool {
+    if matches.get_flag(DRY_RUN_ARGUMENT) {
+      debug!("dry run mode enabled (argument)");
+      true
+    } else if std::env::var(ENV_VAR_DRY_RUN).is_ok() {
+      debug!("dry run mode enabled (environment variable '{}')", ENV_VAR_DRY_RUN);
+      true
+    } else if let Some(dry_run) = settings.dry_run {
+      if dry_run {
+        debug!("dry run mode enabled (settings)");
+      }
+      dry_run
+    } else {
+      false
+    }
   }
 
   /// Gets force context value
   ///
   /// 1. Try flag `--force`
+  /// 1. Try if environment variable `DSH_CLI_FORCE` exists
+  /// 1. Try settings file
   /// 1. Default to `false`
-  fn force(matches: &ArgMatches, _settings: Option<&Settings>) -> bool {
-    matches.get_flag(FORCE_ARGUMENT)
+  fn force(matches: &ArgMatches, settings: &Settings) -> bool {
+    if matches.get_flag(FORCE_ARGUMENT) {
+      debug!("force mode enabled (argument)");
+      true
+    } else if std::env::var(ENV_VAR_DRY_RUN).is_ok() {
+      debug!("force mode enabled (environment variable '{}')", ENV_VAR_DRY_RUN);
+      true
+    } else if let Some(dry_run) = settings.dry_run {
+      if dry_run {
+        debug!("force mode enabled (settings)");
+      }
+      dry_run
+    } else {
+      false
+    }
   }
 
   /// Gets matching_style context value
@@ -198,28 +224,35 @@ impl Context<'_> {
   /// 1. Try environment variable `DSH_CLI_MATCHING_STYLE`
   /// 1. Try settings file
   /// 1. Default to `None`
-  fn matching_style(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Option<MatchingStyle>, String> {
+  fn matching_style(matches: &ArgMatches, settings: &Settings) -> Result<Option<MatchingStyle>, String> {
     match matches.get_one::<MatchingStyle>(MATCHING_STYLE_ARGUMENT) {
       Some(matching_style_argument) => Ok(Some(matching_style_argument.to_owned())),
       None => match std::env::var(ENV_VAR_MATCHING_STYLE) {
         Ok(matching_style_env_var) => MatchingStyle::try_from(matching_style_env_var.as_str()).map(Some),
-        Err(_) => Ok(settings.and_then(|settings| settings.matching_style.clone())),
+        Err(_) => Ok(settings.matching_style.clone()),
       },
     }
   }
 
-  /// Gets no_escape context value
+  /// Gets no escape context value
   ///
   /// 1. Try flag `--no-color` or `--no-ansi`
   /// 1. Try if environment variable `NO_COLOR` exists
   /// 1. Try if environment variable `DSH_CLI_NO_ESCAPE` exists
   /// 1. Try settings file
   /// 1. Default to `false`
-  fn no_escape(matches: &ArgMatches, settings: Option<&Settings>) -> bool {
-    matches.get_flag(NO_ESCAPE_ARGUMENT)
-      || std::env::var(ENV_VAR_NO_COLOR).is_ok()
-      || std::env::var(ENV_VAR_NO_ESCAPE).is_ok()
-      || settings.is_some_and(|settings| settings.no_escape.unwrap_or(false))
+  fn no_escape(matches: &ArgMatches, settings: &Settings) -> bool {
+    matches.get_flag(NO_ESCAPE_ARGUMENT) || std::env::var(ENV_VAR_NO_COLOR).is_ok() || std::env::var(ENV_VAR_NO_ESCAPE).is_ok() || settings.no_escape.unwrap_or(false)
+  }
+
+  /// Gets no headers context value
+  ///
+  /// 1. Try flag `--no-headers`
+  /// 1. Try if environment variable `DSH_CLI_NO_HEADERS` exists
+  /// 1. Try settings file
+  /// 1. Default to `false`
+  fn no_headers(matches: &ArgMatches, settings: &Settings) -> bool {
+    matches.get_flag(NO_HEADERS_ARGUMENT) || std::env::var(ENV_VAR_NO_HEADERS).is_ok() || settings.no_headers.unwrap_or(false)
   }
 
   /// Gets output_format context value
@@ -230,12 +263,12 @@ impl Context<'_> {
   /// 1. Try default_output_format parameter
   /// 1. If stdout is a terminal default to `OutputFormat::Table`,
   ///    else default to `OutputFormat::Json`
-  fn output_format(matches: &ArgMatches, settings: Option<&Settings>, default_output_format: Option<OutputFormat>) -> Result<OutputFormat, String> {
+  fn output_format(matches: &ArgMatches, settings: &Settings, default_output_format: Option<OutputFormat>) -> Result<OutputFormat, String> {
     match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
       Some(output_format_argument) => Ok(output_format_argument.to_owned()),
       None => match std::env::var(ENV_VAR_OUTPUT_FORMAT) {
         Ok(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str()).map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_OUTPUT_FORMAT)),
-        Err(_) => match settings.and_then(|settings| settings.output_format.clone()) {
+        Err(_) => match settings.output_format.clone() {
           Some(output_format_from_settings) => Ok(output_format_from_settings),
           None => match default_output_format {
             Some(output_format_from_default) => Ok(output_format_from_default),
@@ -252,8 +285,8 @@ impl Context<'_> {
   /// 1. Try if environment variable `DSH_CLI_QUIET` exists
   /// 1. Try settings file
   /// 1. Default to `false`
-  fn quiet(matches: &ArgMatches, settings: Option<&Settings>) -> bool {
-    matches.get_flag(QUIET_ARGUMENT) || std::env::var(ENV_VAR_QUIET).is_ok() || settings.is_some_and(|settings| settings.quiet.unwrap_or(false))
+  fn quiet(matches: &ArgMatches, settings: &Settings) -> bool {
+    matches.get_flag(QUIET_ARGUMENT) || std::env::var(ENV_VAR_QUIET).is_ok() || settings.quiet.unwrap_or(false)
   }
 
   /// Gets show_execution_time context value
@@ -262,10 +295,8 @@ impl Context<'_> {
   /// 1. Try if environment variable `DSH_CLI_SHOW_EXECUTION_TIME` exists
   /// 1. Try settings file
   /// 1. Default to `false`
-  fn show_execution_time(matches: &ArgMatches, settings: Option<&Settings>) -> bool {
-    matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT)
-      || std::env::var(ENV_VAR_SHOW_EXECUTION_TIME).is_ok()
-      || settings.is_some_and(|settings| settings.show_execution_time.unwrap_or(false))
+  fn show_execution_time(matches: &ArgMatches, settings: &Settings) -> bool {
+    matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT) || std::env::var(ENV_VAR_SHOW_EXECUTION_TIME).is_ok() || settings.show_execution_time.unwrap_or(false)
   }
 
   /// Gets terminal width context value
@@ -274,7 +305,7 @@ impl Context<'_> {
   /// 1. Try if environment variable `DSH_CLI_TERMINAL_WIDTH` exists
   /// 1. Try settings file
   /// 1. If stdout is a terminal use actual terminal width, else default to `None`
-  fn terminal_width(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Option<usize>, String> {
+  fn terminal_width(matches: &ArgMatches, settings: &Settings) -> Result<Option<usize>, String> {
     match matches.get_one::<usize>(TERMINAL_WIDTH_ARGUMENT) {
       Some(terminal_width_argument) => Ok(Some(terminal_width_argument.to_owned())),
       None => match std::env::var(ENV_VAR_TERMINAL_WIDTH) {
@@ -282,7 +313,7 @@ impl Context<'_> {
           Ok(terminal_width) => {
             if terminal_width < 40 {
               Err(format!(
-                "terminal width must be greater than 40 in environment variable {} must be greater or equal than 40",
+                "terminal width in environment variable {} must be greater than or equal to 40",
                 ENV_VAR_TERMINAL_WIDTH
               ))
             } else {
@@ -294,7 +325,7 @@ impl Context<'_> {
             terminal_width_env_var, ENV_VAR_TERMINAL_WIDTH
           )),
         },
-        Err(_) => match settings.and_then(|settings| settings.terminal_width) {
+        Err(_) => match settings.terminal_width {
           Some(terminal_width_from_settings) => Ok(Some(terminal_width_from_settings)),
           None => {
             if stdout().is_terminal() {
@@ -317,12 +348,12 @@ impl Context<'_> {
   /// 1. Try environment variable `DSH_CLI_VERBOSITY`
   /// 1. Try settings file
   /// 1. Default to `Verbosity::Low`
-  fn verbosity(matches: &ArgMatches, settings: Option<&Settings>) -> Result<Verbosity, String> {
+  fn verbosity(matches: &ArgMatches, settings: &Settings) -> Result<Verbosity, String> {
     match matches.get_one::<Verbosity>(VERBOSITY_ARGUMENT) {
       Some(verbosity_argument) => Ok(verbosity_argument.to_owned()),
       None => match std::env::var(ENV_VAR_VERBOSITY) {
         Ok(verbosity_env_var) => Verbosity::try_from(verbosity_env_var.as_str()).map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_VERBOSITY)),
-        Err(_) => match settings.and_then(|settings| settings.verbosity.clone()) {
+        Err(_) => match settings.verbosity.clone() {
           Some(verbosity_from_settings) => Ok(verbosity_from_settings),
           None => Ok(Verbosity::Low),
         },
@@ -608,7 +639,7 @@ pub enum MatchingStyle {
   /// Matches will be displayed underlined
   #[serde(rename = "underlined")]
   Underlined = 4,
-  /// Mathces will be displayed reversed
+  /// Matches will be displayed reversed
   #[serde(rename = "reverse")]
   Reverse = 7,
 }

@@ -41,7 +41,7 @@ impl Subject for MetricSubject {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, None)
+    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -74,7 +74,7 @@ impl CommandExecutor for MetricList {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation("find exported metrics in applications");
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let metrics_usage = metrics_usage_from_applications(&applications, include_started, include_stopped);
     if metrics_usage.is_empty() {
@@ -154,4 +154,4 @@ impl SubjectFormatter<MetricUsageLabel> for MetricUsage {
   }
 }
 
-static METRIC_USAGE_LABELS: [MetricUsageLabel; 4] = [MetricUsageLabel::Application, MetricUsageLabel::Instances, MetricUsageLabel::Path, MetricUsageLabel::Port];
+const METRIC_USAGE_LABELS: [MetricUsageLabel; 4] = [MetricUsageLabel::Application, MetricUsageLabel::Instances, MetricUsageLabel::Path, MetricUsageLabel::Port];

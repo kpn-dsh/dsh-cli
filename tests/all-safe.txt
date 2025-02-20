@@ -45,18 +45,24 @@ image list
 image list --started
 image list --stopped
 
-manifest list
-manifest list --ids
-manifest show $MANIFEST_UNDER_TEST
-
 metric list
 metric list --started
 metric list --stopped
 
+platform export
 platform list
-platform show np-aws-lz-dsh
-platform show nplz --service cmd
-platform show nplz --tenant greenbox
+platform open app $APP_UNDER_TEST
+platform open console
+platform open monitoring
+platform open service $APPLICATION_UNDER_TEST
+platform open swagger
+platform open tenant
+platform open tracing
+platform show
+platform show --app $APP_UNDER_TEST
+platform show --app $APP_UNDER_TEST --vendor $VENDOR_UNDER_TEST
+platform show --service $APPLICATION_UNDER_TEST
+platform show --vhost $VHOST_UNDER_TEST
 
 proxy list
 proxy list --ids

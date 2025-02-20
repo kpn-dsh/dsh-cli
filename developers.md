@@ -16,6 +16,22 @@ Then you can for example install the tool on your local machine using:
 
 ```bash
 > cargo install --path .
+...
+> dsh platform list
+...
+```
+
+When developing, it is convenient to set an alias:
+
+```bash
+> alias dsh-dev="cargo run --package dsh --bin dsh --"
+````
+
+You can then easily run the tool without installing it:
+
+```bash
+> dsh-dev platform list
+...
 ```
 
 ## Development
@@ -23,23 +39,35 @@ Then you can for example install the tool on your local machine using:
 ### Dependencies
 
 The `dsh` tool has a strong dependency on the [`dsh_api`](dsh_api) library,
-that provides the client for the DSH resource management API.
-This library is continuously being worked on, and is published to `crates.io`.
-Hence, at this time `dsh` depends on the [crates.io](https://crates.io/crates/dsh_api)
-version of the library.
+that provides the client and data types for the DSH resource management API.
+This library is published to `crates.io` and your `Cargo.toml` file
+should specify the dependency:
 
 ```toml
-# Cargo.toml
-dsh_api = "0.4.0"
+[dependencies]
+dsh_api = { version = "0.5.1", features = ["generic"] }
 ```
 
-When developing simultaneously on `dsh` and `dsh_api` consider changing the library dependency
-to your local copy.
+The `generic` feature must be enabled. The cli tool has some optional features specified,
+which correspond to features of the `dsh_api` crate with the same name:
 
 ```toml
-# Cargo.toml
-dsh_api = { path = "../dsh-api/dsh-api" }
+[features]
+appcatalog = ["dsh_api/appcatalog"]
+manage = ["dsh_api/manage"]
+robot = ["dsh_api/robot"]
 ```
+
+Because of the strong dependencies between the tool and the library,
+they are often been worked on at the same time.
+In that case it is convenient to set the dependency to the local copy of the library:
+
+```toml
+dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
+```
+
+However, when you publish the tool make sure that you set the dependency
+back to the `crates.io` version of the library,
 
 ### Coding guidelines
 
