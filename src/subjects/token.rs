@@ -1,4 +1,4 @@
-use crate::capability::{Capability, CommandExecutor, REQUEST_COMMAND, REQUEST_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, FETCH_COMMAND, FETCH_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
@@ -40,7 +40,8 @@ impl Subject for TokenSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      REQUEST_COMMAND => Some(TOKEN_REQUEST_CAPABILITY.as_ref()),
+      FETCH_COMMAND => Some(TOKEN_FETCH_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(TOKEN_SHOW_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -51,20 +52,47 @@ impl Subject for TokenSubject {
 }
 
 lazy_static! {
-  static ref TOKEN_REQUEST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(REQUEST_COMMAND_PAIR, "Request token")
-      .set_long_about("Request a DSH API token.")
-      .set_default_command_executor(&TokenRequest {})
+  static ref TOKEN_FETCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(FETCH_COMMAND_PAIR, "Fetch token")
+      .set_long_about("Fetch a DSH API token.")
+      .set_default_command_executor(&TokenFetch {})
   );
-  static ref TOKEN_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![TOKEN_REQUEST_CAPABILITY.as_ref()];
+  static ref TOKEN_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Fetch and show token")
+      .set_long_about("Fetch a DSH API token and display its parameters.")
+      .set_default_command_executor(&TokenShow {})
+  );
+  static ref TOKEN_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![TOKEN_FETCH_CAPABILITY.as_ref(), TOKEN_SHOW_CAPABILITY.as_ref()];
 }
 
-struct TokenRequest {}
+struct TokenFetch {}
 
 #[async_trait]
-impl CommandExecutor for TokenRequest {
+impl CommandExecutor for TokenFetch {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("request dsh api token");
+    context.print_explanation("fetch dsh api token");
+    let start_instant = Instant::now();
+
+    let access_token = context
+      .dsh_api_client
+      .as_ref()
+      .unwrap()
+      .token_fetcher()
+      .fetch_access_token_from_server()
+      .await
+      .map_err(|error| error.to_string())?;
+    context.print_execution_time(start_instant);
+    context.print(access_token.access_token());
+    Ok(())
+  }
+}
+
+struct TokenShow {}
+
+#[async_trait]
+impl CommandExecutor for TokenShow {
+  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+    context.print_explanation("fetch dsh api token");
     let start_instant = Instant::now();
 
     let access_token = context

@@ -7,9 +7,9 @@ use crate::settings::Settings;
 use crate::subject::Requirements;
 use crate::verbosity::Verbosity;
 use crate::{
-  get_target_password, get_target_platform, get_target_platform_implicit, get_target_tenant, get_target_tenant_implicit, ENV_VAR_CSV_QUOTE, ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN,
-  ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_TERMINAL_WIDTH,
-  ENV_VAR_VERBOSITY,
+  get_target_password, get_target_platform, get_target_platform_non_interactive, get_target_tenant, get_target_tenant_non_interactive, ENV_VAR_CSV_QUOTE, ENV_VAR_CSV_SEPARATOR,
+  ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME,
+  ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
 };
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -60,8 +60,8 @@ impl Context {
       }
     }
     let dry_run = Self::dry_run(matches, settings);
-    let target_platform = if requirements.needs_platform() { Some(get_target_platform(matches, settings)?) } else { get_target_platform_implicit(settings)? };
-    let target_tenant_name = if requirements.needs_tenant_name() { Some(get_target_tenant(matches, settings)?) } else { get_target_tenant_implicit(settings) };
+    let target_platform = if requirements.needs_platform() { Some(get_target_platform(matches, settings)?) } else { get_target_platform_non_interactive(matches, settings)? };
+    let target_tenant_name = if requirements.needs_tenant_name() { Some(get_target_tenant(matches, settings)?) } else { get_target_tenant_non_interactive(matches, settings) };
     let dsh_api_client = if requirements.needs_dsh_api_client() {
       let dsh_api_tenant = DshApiTenant::new(target_tenant_name.clone().unwrap(), target_platform.clone().unwrap());
       let password = get_target_password(matches, &dsh_api_tenant)?;

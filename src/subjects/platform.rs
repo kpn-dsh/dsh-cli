@@ -1,15 +1,15 @@
 use crate::arguments::{
-  app_id_argument, service_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT, SERVICE_ID_ARGUMENT, VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
+  app_id_argument, platform_name_argument, service_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT, PLATFORM_NAME_ARGUMENT, SERVICE_ID_ARGUMENT,
+  VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
 };
 use crate::capability::{
-  Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, OPEN_COMMAND, OPEN_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
+  Capability, CommandExecutor, EXPORT_COMMAND, EXPORT_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, OPEN_COMMAND, OPEN_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::global_arguments::TARGET_TENANT_ARGUMENT;
 use crate::subject::{Requirements, Subject};
 use crate::{read_single_line, DshCliResult};
 use arboard::Clipboard;
@@ -62,14 +62,14 @@ impl Subject for PlatformSubject {
         matches!(subcommand_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER),
         None,
       ),
-      Some((SHOW_COMMAND, _)) => Requirements::new(true, false, false, None),
+      Some((SHOW_COMMAND, subcommand_matches)) => Requirements::new(subcommand_matches.get_one::<String>(PLATFORM_NAME_ARGUMENT).is_none(), false, false, None),
       _ => Requirements::new(false, false, false, None),
     }
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      DEFAULT_COMMAND => Some(PLATFORM_DEFAULT.as_ref()),
+      EXPORT_COMMAND => Some(PLATFORM_EXPORT_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(PLATFORM_LIST_CAPABILITY.as_ref()),
       OPEN_COMMAND => Some(PLATFORM_OPEN_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(PLATFORM_SHOW_CAPABILITY.as_ref()),
@@ -83,13 +83,13 @@ impl Subject for PlatformSubject {
 }
 
 lazy_static! {
-  static ref PLATFORM_DEFAULT: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DEFAULT_COMMAND_PAIR, "Show default platform configuration")
+  static ref PLATFORM_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(EXPORT_COMMAND_PAIR, "Export default platform configuration")
       .set_long_about(
-        "Show the default platform configuration json file from the dsh-api library. \
+        "Export the default platform configuration json file from the dsh-api library. \
         This file can be used as a starting point when platform customization is required."
       )
-      .set_default_command_executor(&PlatformDefault {})
+      .set_default_command_executor(&PlatformExport {})
   );
   static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND_PAIR, "List platforms")
@@ -122,6 +122,7 @@ lazy_static! {
     CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show platform data")
       .set_long_about("Show platform data.")
       .set_default_command_executor(&PlatformShow {})
+      .add_target_argument(platform_name_argument())
       .add_extra_arguments(vec![
         app_id_argument().long("app").help_heading("Command options"),
         service_id_argument().long("service").help_heading("Command options"),
@@ -130,15 +131,15 @@ lazy_static! {
       ])
   );
   static ref PLATFORM__CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![PLATFORM_DEFAULT.as_ref(), PLATFORM_LIST_CAPABILITY.as_ref(), PLATFORM_OPEN_CAPABILITY.as_ref(), PLATFORM_SHOW_CAPABILITY.as_ref()];
+    vec![PLATFORM_EXPORT_CAPABILITY.as_ref(), PLATFORM_LIST_CAPABILITY.as_ref(), PLATFORM_OPEN_CAPABILITY.as_ref(), PLATFORM_SHOW_CAPABILITY.as_ref()];
 }
 
-struct PlatformDefault {}
+struct PlatformExport {}
 
 #[async_trait]
-impl CommandExecutor for PlatformDefault {
+impl CommandExecutor for PlatformExport {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("print the default platforms specification");
+    context.print_explanation("export the default platforms specification");
     context.print(DEFAULT_PLATFORMS);
     Ok(())
   }
@@ -247,7 +248,7 @@ impl PlatformOpen {
         Some(token) => match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(token)) {
           Ok(_) => {
             debug!("token copied to clipboard");
-            format!("swagger application for platform '{}' (and copying token to clipboard)", platform)
+            format!("swagger application for platform '{}' (token on clipboard)", platform)
           }
           Err(_) => {
             warn!("could not copy token to clipboard");
@@ -268,9 +269,11 @@ impl PlatformOpen {
 
   fn open_url(url: String, opening_target: String, context: &Context) -> DshCliResult {
     if context.dry_run {
+      debug!("url (dry-run enabled) '{}'", url);
       context.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
       Ok(())
     } else {
+      debug!("open url '{}'", url);
       context.print_explanation(format!("open {}", opening_target));
       open::that(url).map_err(|error| format!("could not open browser ({})", error))
     }
@@ -281,20 +284,14 @@ struct PlatformShow {}
 
 #[async_trait]
 impl CommandExecutor for PlatformShow {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = match target {
-      Some(platform_name) => DshPlatform::try_from(platform_name.as_str())?,
-      None => match context.target_platform {
-        Some(ref platform) => platform.clone(),
-        None => return Err("missing platform specification".to_string()),
-      },
+  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let platform = match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
+      Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
+      None => context.target_platform.clone().unwrap(),
     };
+    let tenant = context.target_tenant_name.clone();
     let app = matches.get_one::<String>(APP_ID_ARGUMENT).cloned();
     let service = matches.get_one::<String>(SERVICE_ID_ARGUMENT).cloned();
-    let tenant = match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
-      Some(tenant_name) => Some(tenant_name.to_string()),
-      None => context.target_tenant_name.clone(),
-    };
     let vendor = matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned();
     let vhost = matches.get_one::<String>(VHOST_ID_ARGUMENT).cloned();
     let labels = ALL_DSH_PLATFORM_LABELS
@@ -345,7 +342,6 @@ pub(crate) enum DshPlatformLabel {
   Description,
   InternalServiceDomain,
   IsProduction,
-  KeyCloakUrl,
   MqttTokenEndpoint,
   Name,
   PrivateDomain,
@@ -380,7 +376,6 @@ impl Label for DshPlatformLabel {
       Self::ConsoleUrl => "console url",
       Self::Description => "description",
       Self::IsProduction => "production",
-      Self::KeyCloakUrl => "key cloak url",
       Self::MqttTokenEndpoint => "mqtt token endpoint",
       Self::Name => "name",
       Self::PrivateDomain => "private domain",
@@ -416,7 +411,7 @@ impl Label for DshPlatformLabel {
 impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
   fn value(&self, label: &DshPlatformLabel, _target_id: &str) -> String {
     match label {
-      DshPlatformLabel::AccessTokenEndpoint => self.access_token_endpoint(),
+      DshPlatformLabel::AccessTokenEndpoint => self.access_token_endpoint().to_string(),
       DshPlatformLabel::Alias => self.alias().to_string(),
       DshPlatformLabel::ClientId => self.client_id(),
       DshPlatformLabel::CloudProvider => self.cloud_provider().to_string(),
@@ -424,7 +419,6 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
       DshPlatformLabel::ConsoleUrl => self.console_url(),
       DshPlatformLabel::Description => self.description().to_string(),
       DshPlatformLabel::IsProduction => self.is_production().to_string(),
-      DshPlatformLabel::KeyCloakUrl => self.key_cloak_url().to_string(),
       DshPlatformLabel::MqttTokenEndpoint => self.mqtt_token_endpoint(),
       DshPlatformLabel::Name => self.name().to_string(),
       DshPlatformLabel::PrivateDomain => self.private_domain().unwrap_or("not configured").to_string(),
@@ -472,14 +466,13 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
   }
 }
 
-pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 31] = [
+pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 30] = [
   // Items from platform configuration file
   DshPlatformLabel::Name,
   DshPlatformLabel::Description,
   DshPlatformLabel::Alias,
   DshPlatformLabel::IsProduction,
   DshPlatformLabel::CloudProvider,
-  DshPlatformLabel::KeyCloakUrl,
   DshPlatformLabel::Realm,
   DshPlatformLabel::PublicDomain,
   DshPlatformLabel::PrivateDomain,

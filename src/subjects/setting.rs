@@ -75,81 +75,105 @@ const SETTING_VERBOSITY: &str = "verbosity";
 
 fn set_unset_commands(required: bool) -> Vec<Command> {
   vec![
-    Command::new(SETTING_CSV_QUOTE).arg(
-      Arg::new(SETTING_CSV_QUOTE)
-        .action(ArgAction::Set)
-        .value_parser(builder::NonEmptyStringValueParser::new())
-        .required(required),
-    ),
-    Command::new(SETTING_CSV_SEPARATOR).arg(
-      Arg::new(SETTING_CSV_SEPARATOR)
-        .action(ArgAction::Set)
-        .value_parser(builder::NonEmptyStringValueParser::new())
-        .required(required),
-    ),
-    Command::new(SETTING_DEFAULT_PLATFORM).arg(
-      Arg::new(SETTING_DEFAULT_PLATFORM)
-        .action(ArgAction::Set)
-        .value_parser(builder::NonEmptyStringValueParser::new())
-        .required(required),
-    ),
-    Command::new(SETTING_DEFAULT_TENANT).arg(
-      Arg::new(SETTING_DEFAULT_TENANT)
-        .action(ArgAction::Set)
-        .value_parser(builder::NonEmptyStringValueParser::new())
-        .required(required),
-    ),
-    Command::new(SETTING_DRY_RUN),
-    Command::new(SETTING_LOG_LEVEL).arg(
-      Arg::new(SETTING_LOG_LEVEL)
-        .action(ArgAction::Set)
-        .value_parser(EnumValueParser::<LogLevel>::new())
-        .required(required),
-    ),
-    Command::new(SETTING_LOG_LEVEL_API).arg(
-      Arg::new(SETTING_LOG_LEVEL_API)
-        .action(ArgAction::Set)
-        .value_parser(EnumValueParser::<LogLevel>::new())
-        .required(required),
-    ),
-    Command::new(SETTING_LOG_LEVEL_SDK).arg(
-      Arg::new(SETTING_LOG_LEVEL_SDK)
-        .action(ArgAction::Set)
-        .value_parser(EnumValueParser::<LogLevel>::new())
-        .required(required),
-    ),
-    Command::new(SETTING_MATCHING_STYLE).arg(
-      Arg::new(SETTING_MATCHING_STYLE)
-        .action(ArgAction::Set)
-        .value_parser(EnumValueParser::<MatchingStyle>::new())
-        .required(required),
-    ),
-    Command::new(SETTING_NO_ESCAPE),
-    Command::new(SETTING_NO_HEADERS),
-    Command::new(SETTING_OUTPUT_FORMAT).arg(
-      Arg::new(SETTING_OUTPUT_FORMAT)
-        .action(ArgAction::Set)
-        .value_parser(EnumValueParser::<OutputFormat>::new())
-        .required(required),
-    ),
-    Command::new(SETTING_QUIET),
-    Command::new(SETTING_SHOW_EXECUTION_TIME).arg(
-      Arg::new(SETTING_SHOW_EXECUTION_TIME)
-        .action(ArgAction::Set)
-        .value_parser(builder::BoolValueParser::new()),
-    ),
-    Command::new(SETTING_TERMINAL_WIDTH).arg(
-      Arg::new(SETTING_TERMINAL_WIDTH)
-        .action(ArgAction::Set)
-        .value_parser(builder::RangedU64ValueParser::<usize>::from(40..))
-        .required(required),
-    ),
-    Command::new(SETTING_VERBOSITY).arg(
-      Arg::new(SETTING_VERBOSITY)
-        .action(ArgAction::Set)
-        .value_parser(EnumValueParser::<Verbosity>::new())
-        .required(required),
-    ),
+    Command::new(SETTING_CSV_QUOTE)
+      .arg(
+        Arg::new(SETTING_CSV_QUOTE)
+          .action(ArgAction::Set)
+          .value_parser(builder::NonEmptyStringValueParser::new())
+          .required(required),
+      )
+      .about("Character used to quote values for the csv output format"),
+    Command::new(SETTING_CSV_SEPARATOR)
+      .arg(
+        Arg::new(SETTING_CSV_SEPARATOR)
+          .action(ArgAction::Set)
+          .value_parser(builder::NonEmptyStringValueParser::new())
+          .required(required),
+      )
+      .about("Character used to separate values for the csv output format"),
+    Command::new(SETTING_DEFAULT_PLATFORM)
+      .arg(
+        Arg::new(SETTING_DEFAULT_PLATFORM)
+          .action(ArgAction::Set)
+          .value_parser(builder::NonEmptyStringValueParser::new())
+          .required(required),
+      )
+      .about("Default target platform, used for authentication and authorization"),
+    Command::new(SETTING_DEFAULT_TENANT)
+      .arg(
+        Arg::new(SETTING_DEFAULT_TENANT)
+          .action(ArgAction::Set)
+          .value_parser(builder::NonEmptyStringValueParser::new())
+          .required(required),
+      )
+      .about("Default target tenant, used for authentication and authorization"),
+    Command::new(SETTING_DRY_RUN).about("Inhibits any changes to the platform"),
+    Command::new(SETTING_LOG_LEVEL)
+      .arg(
+        Arg::new(SETTING_LOG_LEVEL)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<LogLevel>::new())
+          .required(required),
+      )
+      .about("Log level for the dsh cli tool"),
+    Command::new(SETTING_LOG_LEVEL_API)
+      .arg(
+        Arg::new(SETTING_LOG_LEVEL_API)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<LogLevel>::new())
+          .required(required),
+      )
+      .about("Log level for the 'dsh_api' library functions"),
+    Command::new(SETTING_LOG_LEVEL_SDK)
+      .arg(
+        Arg::new(SETTING_LOG_LEVEL_SDK)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<LogLevel>::new())
+          .required(required),
+      )
+      .about("Log level for the 'dsh_sdk' library functions"),
+    Command::new(SETTING_MATCHING_STYLE)
+      .arg(
+        Arg::new(SETTING_MATCHING_STYLE)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<MatchingStyle>::new())
+          .required(required),
+      )
+      .about("Styling to be used when printing matching results for the find functions"),
+    Command::new(SETTING_NO_ESCAPE).about("Inhibits any color or other ansi escape sequences"),
+    Command::new(SETTING_NO_HEADERS).about("Disables headers in the output"),
+    Command::new(SETTING_OUTPUT_FORMAT)
+      .arg(
+        Arg::new(SETTING_OUTPUT_FORMAT)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<OutputFormat>::new())
+          .required(required),
+      )
+      .about("Default/preferred format used when printing the output"),
+    Command::new(SETTING_QUIET).about("Run in quiet mode"),
+    Command::new(SETTING_SHOW_EXECUTION_TIME)
+      .arg(
+        Arg::new(SETTING_SHOW_EXECUTION_TIME)
+          .action(ArgAction::Set)
+          .value_parser(builder::BoolValueParser::new()),
+      )
+      .about("Enables display of the execution time of the executed DSH api functions in milliseconds"),
+    Command::new(SETTING_TERMINAL_WIDTH)
+      .arg(
+        Arg::new(SETTING_TERMINAL_WIDTH)
+          .action(ArgAction::Set)
+          .value_parser(builder::RangedU64ValueParser::<usize>::from(40..))
+          .required(required),
+      )
+      .about("Maximum terminal width"),
+    Command::new(SETTING_VERBOSITY)
+      .arg(
+        Arg::new(SETTING_VERBOSITY)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<Verbosity>::new())
+          .required(required),
+      )
+      .about("Default verbosity level"),
   ]
 }
 

@@ -235,7 +235,11 @@ pub(crate) fn terminal_width_argument() -> Arg {
     .value_parser(builder::RangedU64ValueParser::<usize>::from(40..))
     .value_name("WIDTH")
     .help("Set terminal width.")
-    .long_help("With this option the maximum terminal width can be set. If not set, the environment variable  By default")
+    .long_help(
+      "With this option the maximum terminal width can be set. \
+          If not set, the environment variable DSH_CLI_TERMINAL_WIDTH will be used \
+          or else no terminal width value will be used.",
+    )
     .global(true)
 }
 

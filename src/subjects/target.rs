@@ -234,10 +234,10 @@ impl Label for TargetFormatterLabel {
 }
 
 #[derive(Serialize)]
-pub struct TargetFormatter {
-  pub(crate) platform: String,
-  pub(crate) tenant: String,
-  pub(crate) is_default: bool,
+struct TargetFormatter {
+  platform: String,
+  tenant: String,
+  is_default: bool,
 }
 
 impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
