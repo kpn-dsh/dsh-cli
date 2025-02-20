@@ -4,7 +4,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.5.0] - 2025-02-17
+## [0.5.0] - 2025-02-20
 
 ### Fixes
 
@@ -31,7 +31,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Changed
 
-* Upgraded `dsh_api` dependency to 0.5.0.
+* Upgraded `dsh_api` dependency to 0.5.1.
 * Autocomplete flag now hidden.
 * Improved logging.
 * Renamed create capabilities to new.
