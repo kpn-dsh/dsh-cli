@@ -1,6 +1,6 @@
 use crate::{dsh_directory, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, APPLICATION_NAME, TARGETS_SUBDIRECTORY, TOML_FILENAME_EXTENSION};
 use dsh_api::platform::DshPlatform;
-use log::debug;
+use log::{debug, error};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
@@ -240,9 +240,15 @@ pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform,
         debug!("target password for '{}@{}' written to keyring", tenant, platform);
         Ok(())
       }
-      Err(keyring_error) => Err(keyring_error.to_string()),
+      Err(keyring_error) => {
+        error!("could not set password for '{}@{}': {}", tenant, platform, keyring_error);
+        Err(keyring_error.to_string())
+      }
     },
-    Err(keyring_error) => Err(keyring_error.to_string()),
+    Err(keyring_error) => {
+      error!("could not get keyring entry for '{}@{}': {}", tenant, platform, keyring_error);
+      Err(keyring_error.to_string())
+    }
   }
 }
 

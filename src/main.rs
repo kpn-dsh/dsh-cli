@@ -251,24 +251,25 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .author(AUTHOR)
     .long_about(long_about)
     .override_usage(USAGE)
+    .disable_help_subcommand(true)
     .after_help(AFTER_HELP)
     .args(vec![
       target_platform_argument(),
       target_tenant_argument(),
       target_password_file_argument(),
-      output_format_argument(), // TODO Should this one be at this level?
+      output_format_argument(),
       set_verbosity_argument(),
       dry_run_argument(),
       force_argument(),
-      matching_style_argument(), // TODO Should this one be at this level?
-      no_escape_argument(),      // TODO Should this one be at this level?
-      no_headers_argument(),     // TODO Should this one be at this level?
+      matching_style_argument(),
+      no_escape_argument(),
+      no_headers_argument(),
       quiet_argument(),
       log_level_argument(),
       log_level_api_argument(),
       log_level_sdk_argument(),
-      show_execution_time_argument(), // TODO Should this one be at this level?
-      terminal_width_argument(),      // TODO Should this one be at this level?
+      show_execution_time_argument(),
+      terminal_width_argument(),
       generate_autocomplete_file_argument(),
     ])
     .subcommand_value_name("SUBJECT/COMMAND")
@@ -343,6 +344,7 @@ pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
 /// and returns at the first match.
 /// 1. Environment variable `DSH_CLI_PLATFORM`.
 /// 1. Parameter `default-platform` from settings file, if available.
+/// 1. Else return with `None`.
 ///
 /// ## Parameters
 /// * `settings` - contents of the settings file or default settings
@@ -367,6 +369,33 @@ fn get_target_platform_implicit(settings: &Settings) -> Result<Option<DshPlatfor
   }
 }
 
+/// # Get the target platform without user interaction
+///
+/// This method will get the target platform.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--platform`.
+/// 1. Environment variable `DSH_CLI_PLATFORM`.
+/// 1. Parameter `default-platform` from settings file, if available.
+/// 1. Else return with `None`.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// `Ok(Option<Platform>)` - containing the [`DshPlatform`]
+/// `Ok(None)` - when no implicit source is available
+/// `Err<String>` - when an invalid platform name was found
+fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> Result<Option<DshPlatform>, String> {
+  match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
+    Some(platform_from_argument) => {
+      debug!("target platform '{}' (argument)", platform_from_argument);
+      DshPlatform::try_from(platform_from_argument.as_str()).map(Some)
+    }
+    None => get_target_platform_implicit(settings),
+  }
+}
+
 /// # Get the target platform
 ///
 /// This method will get the target platform.
@@ -384,21 +413,15 @@ fn get_target_platform_implicit(settings: &Settings) -> Result<Option<DshPlatfor
 /// ## Returns
 /// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
 fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshPlatform, String> {
-  match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
-    Some(platform_from_argument) => {
-      debug!("target platform '{}' (argument)", platform_from_argument);
-      Ok(DshPlatform::try_from(platform_from_argument.as_str()).unwrap())
-    }
-    None => match get_target_platform_implicit(settings)? {
-      Some(platform_name_from_implicit_source) => Ok(platform_name_from_implicit_source),
-      None => {
-        if stdin().is_terminal() {
-          DshPlatform::try_from(read_single_line("target platform: ")?.as_str())
-        } else {
-          Err("could not determine target platform, please check configuration".to_string())
-        }
+  match get_target_platform_non_interactive(matches, settings)? {
+    Some(platform_non_interactive) => Ok(platform_non_interactive),
+    None => {
+      if stdin().is_terminal() {
+        DshPlatform::try_from(read_single_line("target platform: ")?.as_str())
+      } else {
+        Err("could not determine target platform, please check configuration".to_string())
       }
-    },
+    }
   }
 }
 
@@ -408,13 +431,14 @@ fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshP
 /// and returns at the first match.
 /// 1. Environment variable `DSH_CLI_TENANT`.
 /// 1. Parameter `default-tenant` from settings file, if available.
+/// 1. Else return with `None`.
 ///
 /// ## Parameters
 /// * `settings` - contents of the settings file or default settings
 ///
 /// ## Returns
 /// `Some<String>` - containing the tenant name
-/// `None` - when no implicit source is available
+/// `None` - when no implicit tenant name is available
 fn get_target_tenant_implicit(settings: &Settings) -> Option<String> {
   match env::var(ENV_VAR_TENANT) {
     Ok(tenant_name_from_env_var) => {
@@ -428,6 +452,32 @@ fn get_target_tenant_implicit(settings: &Settings) -> Option<String> {
       }
       None => None,
     },
+  }
+}
+
+/// # Get the target tenant without user interaction
+///
+/// This method will get the target tenant.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--tenant`.
+/// 1. Environment variable `DSH_CLI_TENANT`.
+/// 1. Parameter `default-tenant` from settings file, if available.
+/// 1. Else return with `None`.
+///
+/// ## Parameters
+/// * `matches` - parsed clap command line arguments
+/// * `settings` - optional contents of the settings file, if available
+///
+/// ## Returns
+/// `Some<String>` - containing the tenant name
+/// `None` - when no tenant name is available without asking the user
+fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) -> Option<String> {
+  match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
+    Some(tenant_name_from_argument) => {
+      debug!("target tenant '{}' (argument)", tenant_name_from_argument);
+      Some(tenant_name_from_argument.to_string())
+    }
+    None => get_target_tenant_implicit(settings),
   }
 }
 
@@ -448,26 +498,20 @@ fn get_target_tenant_implicit(settings: &Settings) -> Option<String> {
 /// ## Returns
 /// An `Ok<String>` containing the tenant name, or an `Err<String>`.
 fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> Result<String, String> {
-  match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
-    Some(tenant_name_from_argument) => {
-      debug!("target tenant '{}' (argument)", tenant_name_from_argument);
-      Ok(tenant_name_from_argument.to_string())
-    }
-    None => match get_target_tenant_implicit(settings) {
-      Some(tenant_name_from_implicit_source) => Ok(tenant_name_from_implicit_source),
-      None => {
-        if stdin().is_terminal() {
-          let tenant_name = read_single_line("target tenant: ")?;
-          if tenant_name.is_empty() {
-            Err("target tenant name cannot be empty".to_string())
-          } else {
-            Ok(tenant_name)
-          }
+  match get_target_tenant_non_interactive(matches, settings) {
+    Some(tenant_name_non_interactive) => Ok(tenant_name_non_interactive),
+    None => {
+      if stdin().is_terminal() {
+        let tenant_name = read_single_line("target tenant: ")?;
+        if tenant_name.is_empty() {
+          Err("target tenant name cannot be empty".to_string())
         } else {
-          Err("could not determine target tenant, please check configuration".to_string())
+          Ok(tenant_name)
         }
+      } else {
+        Err("could not determine target tenant, please check configuration".to_string())
       }
-    },
+    }
   }
 }
 
