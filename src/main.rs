@@ -690,5 +690,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.5.0");
+  assert_eq!(crate_version(), "0.5.1");
 }
