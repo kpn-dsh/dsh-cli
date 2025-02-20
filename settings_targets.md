@@ -5,7 +5,7 @@ and platform/tenant credentials in target files.
 The settings and target files can be created and managed via the tool itself,
 which is the preferred way,
 but since they are `toml` files, they can also be edited (at your own risk)
-using your favorite editor.
+using your favourite text editor.
 
 The settings and targets are typically stored in a subdirectory of the user's home directory
 (`$HOME/.dsh_cli`).
@@ -38,4 +38,6 @@ tenant = "greenbox-dev"
 
 Each platform/tenant combination also needs a password.
 The passwords are not stored in the target files.
-For security reasons, passwords are stored in your computers keychain (for Mac OsX and Windows). 
+For security reasons, passwords are stored in your computers keychain,
+supported for Mac OsX and Windows.
+Support for the linux keychain is available, but not tested yet.

@@ -10,7 +10,7 @@ This project provides a tool to call functions on the DSH resource management AP
 command line of your workstation or from a script.
 Some of the capabilities of the tool are:
 
-* Calling all operations exposed in DSH resource management API
+* Calling all operations exposed in the DSH resource management API
   from either the command line or from a script.
 * Many additional and easier to use functions are provided.
 * Extensive help information on each level using the `--help` and `-h` flags,
@@ -55,9 +55,10 @@ You can also use the `--all-features` flag to install all features.
 
 ## Next steps
 
-* [Getting started - interactive](getting_started_interactive.md)
-* [Getting started - script](getting_started_script.md)
+* [Quick start](quick_start.md)
+* [User guide](user_guide.md)
 * [Environment variables](environment_variables.md)
-* [Settings and targets](settings_and_targets.md)
+* [Settings and targets](settings_targets.md)
+* [Platforms specification](platforms-specification.md)
 * [Set up autocompletion](autocompletion.md)
 * [Developers](developers.md)

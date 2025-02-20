@@ -66,7 +66,6 @@ Subjects/commands:
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
   image        Show image usage.
-  manifest     Show App Catalog manifests.
   metric       Show metric exports.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
@@ -77,7 +76,6 @@ Subjects/commands:
   volume       Show, manage and list DSH volumes.
   setting      Show, manage and list dsh settings.
   target       Show, manage and list dsh target configurations.
-  help         Print this message or the help of the given subcommand(s)
 
 Options:
   -p, --platform <PLATFORM>     Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,

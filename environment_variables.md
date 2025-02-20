@@ -1,5 +1,10 @@
 # Environment variables
 
+The `dsh` tool can be run entirely from the command line and
+all configurations and parameters can be specified via command line arguments.
+However, especially when using `dsh` interactively,
+it is much more convenient to make some settings persistent via environment variables.
+
 <table>
     <tr valign="top">
         <th align="left">variable</th>
@@ -15,9 +20,7 @@
             When this environment variable is set, the normal list of default platforms 
             will <em>not</em> be included. If you need these too, make sure that you also 
             include the default platforms in your platforms file.
-            The default platforms file is defined in the <code>dsh-api</code> library crate and
-            can be printed using the command: 
-            <pre>> dsh platform default</pre>
+            See the bottom of this page for more information.
         </td>
     </tr>
     <tr valign="top">
