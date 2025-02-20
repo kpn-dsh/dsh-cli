@@ -19,7 +19,7 @@ password for tenant my-tenant@np-aws-lz-dsh: ********
 └─────────────────────────────────────────┘
 ```
 
-The password can be obtained by logging in to the DSH console application for `my-platform`
+The password can be obtained by logging in to the DSH console application for `np-aws-lz-dsh`
 and selecting `my-tenant`. Then go to the `Resources > Secrets` menu.
 The password will be listed as `system/rest-api-client`.
 
@@ -39,7 +39,7 @@ Now you can get the list of all secrets for tenant `my-tenant`
 on platform `np-aws-lz-dsh` by typing the following command:
 
 ```bash
-> dsh secret list --platform np-aws-lz-dsh --tenant my-tenant --password-file ~/.password
+> dsh secret list --platform np-aws-lz-dsh --tenant my-tenant --password-file .password
 ...
 ```
 
