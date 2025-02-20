@@ -4,3 +4,5 @@
 .DS_Store
 /target
 /.idea
+/demo/
+/.dsh_cli/
