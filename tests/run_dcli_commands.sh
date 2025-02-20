@@ -40,7 +40,7 @@ export SEPARATOR="-------------------------------"
 #export VERBOSITY="-v high"
 #export LOG_LEVEL="--log-level debug"
 
-#export DRY_RUN="--dry-run"
+export DRY_RUN="--dry-run"
 
 IFS=$'\n'
 set -f
