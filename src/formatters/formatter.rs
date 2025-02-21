@@ -213,3 +213,22 @@ impl Label for EnvironmentVariableLabel {
 }
 
 pub static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [EnvironmentVariableLabel::Variable, EnvironmentVariableLabel::Value];
+
+/// Converts hashmap to a sorted table string
+pub fn hashmap_to_table<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -> String {
+  let mut key_value_length_pairs: Vec<(&str, &str, usize)> = hashmap
+    .iter()
+    .map(|(key, value)| (key.as_ref(), value.as_ref(), key.as_ref().len()))
+    .collect::<Vec<_>>();
+  match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
+    Some(first_column_width) => {
+      key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
+      key_value_length_pairs
+        .into_iter()
+        .map(|(key, value, len)| format!("{}{}  {}", key, " ".repeat(first_column_width - len), value))
+        .collect::<Vec<_>>()
+        .join("\n")
+    }
+    None => "".to_string(),
+  }
+}
