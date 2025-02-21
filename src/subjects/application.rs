@@ -1,4 +1,4 @@
-use crate::formatters::formatter::{Label, SubjectFormatter};
+use crate::formatters::formatter::{hashmap_to_table, Label, SubjectFormatter};
 use async_trait::async_trait;
 use chrono::DateTime;
 use clap::ArgMatches;
@@ -338,15 +338,7 @@ impl SubjectFormatter<ApplicationLabel> for Application {
   fn value(&self, label: &ApplicationLabel, application_id: &str) -> String {
     match label {
       ApplicationLabel::Cpus => self.cpus.to_string(),
-      ApplicationLabel::Env => {
-        let mut key = self.env.keys().map(|k| k.to_string()).collect::<Vec<_>>();
-        key.sort();
-        key
-          .iter()
-          .map(|key| format!("{} -> {}", key, self.env.get(key).unwrap()))
-          .collect::<Vec<_>>()
-          .join("\n")
-      }
+      ApplicationLabel::Env => hashmap_to_table(&self.env),
       ApplicationLabel::ExposedPorts => self.exposed_ports.keys().map(|port| port.to_string()).collect::<Vec<_>>().join(","),
       ApplicationLabel::HealthCheck => match self.health_check {
         Some(ref health_check) => match health_check.protocol {
