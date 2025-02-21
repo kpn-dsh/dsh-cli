@@ -198,14 +198,14 @@ impl CommandExecutor for TargetNew {
   }
 }
 
-fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
+pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
   match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
     Some(dsh_platform) => Ok(DshPlatform::try_from(dsh_platform.as_str())?),
     None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
   }
 }
 
-fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
   match matches.get_one::<String>(TENANT_NAME_ARGUMENT) {
     Some(tenant_argument) => Ok(tenant_argument.to_string()),
     None => Ok(read_single_line("enter tenant: ")?),

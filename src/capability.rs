@@ -3,6 +3,7 @@ use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 
+pub(crate) const DEFAULT_COMMAND: &str = "default";
 pub(crate) const DELETE_COMMAND: &str = "delete";
 pub(crate) const EXPORT_COMMAND: &str = "export";
 pub(crate) const FETCH_COMMAND: &str = "fetch";
@@ -15,6 +16,7 @@ pub(crate) const SHOW_COMMAND: &str = "show";
 pub(crate) const UNSET_COMMAND: &str = "unset";
 pub(crate) const UPDATE_COMMAND: &str = "update";
 
+pub(crate) const DEFAULT_COMMAND_PAIR: (&str, &str) = (DEFAULT_COMMAND, "d");
 pub(crate) const DELETE_COMMAND_PAIR: (&str, &str) = (DELETE_COMMAND, "");
 pub(crate) const EXPORT_COMMAND_PAIR: (&str, &str) = (EXPORT_COMMAND, "");
 pub(crate) const FETCH_COMMAND_PAIR: (&str, &str) = (FETCH_COMMAND, "");

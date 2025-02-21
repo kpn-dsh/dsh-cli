@@ -7,7 +7,10 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SET_COMMAND, SET_COMMAND_PAIR, UNSET_COMMAND, UNSET_COMMAND_PAIR};
+use crate::arguments::{platform_name_argument, tenant_name_argument};
+use crate::capability::{
+  Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SET_COMMAND, SET_COMMAND_PAIR, UNSET_COMMAND, UNSET_COMMAND_PAIR,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{Context, MatchingStyle};
 use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
@@ -17,6 +20,8 @@ use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::settings::get_settings;
 use crate::subject::{Requirements, Subject};
+use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
+use crate::targets::{get_target_password_from_keyring, read_target};
 use crate::verbosity::Verbosity;
 use crate::{get_environment_variables, DshCliResult, ENV_VAR_PASSWORD};
 
@@ -44,6 +49,7 @@ impl Subject for SettingSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      DEFAULT_COMMAND => Some(SETTING_DEFAULT_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SETTING_LIST_CAPABILITY.as_ref()),
       SET_COMMAND => Some(SETTING_SETTING_CAPABILITY.as_ref()),
       UNSET_COMMAND => Some(SETTING_UNSETTING_CAPABILITY.as_ref()),
@@ -178,6 +184,13 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
 }
 
 lazy_static! {
+  static ref SETTING_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DEFAULT_COMMAND_PAIR, "Set default platform and tenant")
+      .set_long_about("Sets the default target platform and target tenant.")
+      .add_target_argument(platform_name_argument())
+      .add_target_argument(tenant_name_argument())
+      .set_default_command_executor(&SettingDefault {})
+  );
   static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND_PAIR, "List settings")
       .set_long_about("Lists all dsh settings.")
@@ -196,7 +209,29 @@ lazy_static! {
       .set_default_command_executor(&SettingUnset {})
   );
   static ref SETTING_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![SETTING_LIST_CAPABILITY.as_ref(), SETTING_SETTING_CAPABILITY.as_ref(), SETTING_UNSETTING_CAPABILITY.as_ref()];
+    vec![SETTING_DEFAULT_CAPABILITY.as_ref(), SETTING_LIST_CAPABILITY.as_ref(), SETTING_SETTING_CAPABILITY.as_ref(), SETTING_UNSETTING_CAPABILITY.as_ref()];
+}
+
+struct SettingDefault {}
+
+#[async_trait]
+impl CommandExecutor for SettingDefault {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    context.print_explanation("set default platform and tenant");
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
+    if read_target(&platform, &tenant)?.is_none() {
+      return Err(format!("target '{}@{}' does not exist", tenant, platform));
+    };
+    if get_target_password_from_keyring(&platform, &tenant)?.is_none() {
+      return Err(format!("keyring contains no password for target '{}@{}'", tenant, platform));
+    }
+    upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
+    context.print_outcome(format!("default platform set to {}", platform));
+    upsert_settings(None, |settings| Ok(Settings { default_tenant: Some(tenant.to_string()), ..settings }))?;
+    context.print_outcome(format!("default tenant set to {}", tenant));
+    Ok(())
+  }
 }
 
 struct SettingList {}

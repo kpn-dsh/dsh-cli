@@ -4,6 +4,12 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.1] - yyyy-mm-dd
+
+### Added
+
+* One command to set default platform and tenant.
+
 ## [0.5.0] - 2025-02-20
 
 ### Fixes
