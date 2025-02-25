@@ -84,3 +84,25 @@ return without any remarks:
 ```
 
 Consider configuring your IDE to automatically apply the formatting rules when saving a file.
+
+## Testing
+
+The `tests` directory contains a number of shell scripts that will run a
+fairly large number of command automatically. This is not a full test,
+but it will catch many bugs which have to do with the command line part of the application.
+The tests need to be run from within the `tests` directory.
+
+```bash
+> cd tests
+> ./run_all_safe_commands.sh
+```
+
+This will run many commands and print the output to the terminal.
+Be careful that if you redirect the output to a file,
+the default output format will be `json` instead of `table`.
+If you want to check the `table` rendering from a file,
+you have to explicitly specify the format.
+
+```bash
+> ./run_all_safe_commands.sh --output-format table > output-table.txt
+```
