@@ -130,7 +130,15 @@ where
         Err(error) => Err(format!("could not convert values to json compact ({})", error)),
       },
 
-      OutputFormat::Plain => Err("plain list print not yet implemented".to_string()),
+      OutputFormat::Plain => {
+        if self.context.show_headers {
+          self.context.print(self.labels.iter().map(|label| label.as_str()).join(","));
+        }
+        for (target_id, value) in &self.values {
+          self.context.print(self.labels.iter().map(|label| value.value(label, target_id)).join(","));
+        }
+        Ok(())
+      }
 
       OutputFormat::Quiet => Ok(()),
 
@@ -150,7 +158,11 @@ where
           table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
         }
         table.with(Padding::new(1, 1, 0, 0));
-        table.with(Style::sharp());
+        if self.values.is_empty() {
+          table.with(Style::modern());
+        } else {
+          table.with(Style::sharp());
+        }
         self.context.print(table.to_string());
         Ok(())
       }
