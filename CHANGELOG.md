@@ -17,6 +17,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 ### Fixes
 
 * Fixed bug with duplicate ids in json output.
+* Better rendering of empty results.
 
 ## [0.5.0] - 2025-02-20
 
