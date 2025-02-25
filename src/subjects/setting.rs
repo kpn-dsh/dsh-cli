@@ -528,10 +528,6 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::Verbosity => self.verbosity.clone().map(|verbosity| verbosity.to_string()).unwrap_or_default(),
     }
   }
-
-  fn target_label(&self) -> Option<SettingLabel> {
-    Some(SettingLabel::Target)
-  }
 }
 
 pub static SETTING_LABELS: [SettingLabel; 18] = [

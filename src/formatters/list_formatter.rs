@@ -114,20 +114,38 @@ where
         Ok(())
       }
 
-      OutputFormat::Json => match serde_json::to_string_pretty(&self.values) {
-        Ok(json) => {
-          self.context.print(json);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert values to json ({})", error)),
+      OutputFormat::Json => match self.simplified_values() {
+        Some(simplified_values) => match serde_json::to_string_pretty(&simplified_values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert simplified values to json ({})", error)),
+        },
+        None => match serde_json::to_string_pretty(&self.values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert values to json ({})", error)),
+        },
       },
 
-      OutputFormat::JsonCompact => match serde_json::to_string(&self.values) {
-        Ok(json) => {
-          self.context.print(json);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert values to json compact ({})", error)),
+      OutputFormat::JsonCompact => match self.simplified_values() {
+        Some(simplified_values) => match serde_json::to_string(&simplified_values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert simplified values to json compact ({})", error)),
+        },
+        None => match serde_json::to_string_pretty(&self.values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert values to json compact ({})", error)),
+        },
       },
 
       OutputFormat::Plain => {
@@ -150,8 +168,21 @@ where
             .iter()
             .map(|label| if label.is_target_label() { self.target_label.unwrap_or(label.as_str_for_list()) } else { label.as_str_for_list() }),
         );
+        let mut last_target_id: Option<String> = None;
         for (target_id, value) in &self.values {
-          tabled_builder.push_record(self.labels.iter().map(|label| value.value(label, target_id)));
+          let record = self.labels.iter().map(|label| {
+            if label.is_target_label() {
+              if last_target_id.clone().is_some_and(|ref last| last == target_id) {
+                "".to_string()
+              } else {
+                last_target_id = Some(target_id.to_string());
+                value.value(label, target_id)
+              }
+            } else {
+              value.value(label, target_id)
+            }
+          });
+          tabled_builder.push_record(record);
         }
         let mut table = tabled_builder.build();
         if let Some(terminal_width) = self.context.terminal_width {
@@ -188,29 +219,68 @@ where
         Ok(())
       }
 
-      OutputFormat::Toml => match toml::to_string_pretty(&self.values) {
-        Ok(toml) => {
-          self.context.print(toml);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert values to toml ({})", error)),
+      OutputFormat::Toml => match self.simplified_values() {
+        Some(simplified_values) => match toml::to_string_pretty(&simplified_values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert simplified values to toml ({})", error)),
+        },
+        None => match serde_json::to_string_pretty(&self.values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert values to toml ({})", error)),
+        },
       },
 
-      OutputFormat::TomlCompact => match toml::to_string(&self.values) {
-        Ok(toml) => {
-          self.context.print(toml);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert values to toml compact ({})", error)),
+      OutputFormat::TomlCompact => match self.simplified_values() {
+        Some(simplified_values) => match toml::to_string(&simplified_values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert simplified values to toml compact ({})", error)),
+        },
+        None => match serde_json::to_string_pretty(&self.values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert values to toml compact ({})", error)),
+        },
       },
 
-      OutputFormat::Yaml => match serde_yaml::to_string(&self.values) {
-        Ok(yaml) => {
-          self.context.print(yaml);
-          Ok(())
-        }
-        Err(error) => Err(format!("could not convert values to yaml ({})", error)),
+      OutputFormat::Yaml => match self.simplified_values() {
+        Some(simplified_values) => match serde_yaml::to_string(&simplified_values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert simplified values to yaml ({})", error)),
+        },
+        None => match serde_json::to_string_pretty(&self.values) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(format!("could not convert values to yaml ({})", error)),
+        },
       },
+    }
+  }
+
+  fn has_target_label(&self) -> bool {
+    self.labels.iter().any(|label| label.is_target_label())
+  }
+
+  fn simplified_values(&self) -> Option<Vec<&'a V>> {
+    if self.has_target_label() {
+      None
+    } else {
+      Some(self.values.iter().map(|(_, value)| *value).collect::<Vec<_>>())
     }
   }
 }

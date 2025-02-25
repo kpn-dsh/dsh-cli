@@ -243,14 +243,8 @@ impl CommandExecutor for SecretListUsage {
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("secret id"), context);
     for (secret_id, used_bys) in &secrets_with_usage {
-      let mut first = true;
       for used_by in used_bys {
-        if first {
-          formatter.push_target_id_value(secret_id.clone(), used_by);
-        } else {
-          formatter.push_target_id_value("".to_string(), used_by);
-        }
-        first = false;
+        formatter.push_target_id_value(secret_id.clone(), used_by);
       }
     }
     if formatter.is_empty() {

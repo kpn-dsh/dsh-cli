@@ -94,14 +94,8 @@ impl CommandExecutor for ManifestListAll {
     for manifest_id in manifest_ids {
       let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id).unwrap().clone();
       manifests.sort_by_key(|m| m.version.clone());
-      let mut first = true;
       for manifest in manifests {
-        if first {
-          formatter.push_target_id_value(manifest_id.clone(), manifest);
-          first = false;
-        } else {
-          formatter.push_target_id_value("".to_string(), manifest);
-        }
+        formatter.push_target_id_value(manifest_id.clone(), manifest);
       }
     }
     formatter.print()?;

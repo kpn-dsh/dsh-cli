@@ -206,17 +206,10 @@ impl CommandExecutor for TopicListUsage {
     context.print_execution_time(start_instant);
     let mut tuples: Vec<(String, UsedBy)> = vec![];
     for topic_id in &topic_ids {
-      let mut first = true;
       let application_usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id, &applications);
       for (application_id, application, injections) in application_usages {
         if !injections.is_empty() {
-          let used_by = UsedBy::Application(application_id, application.instances, injections);
-          if first {
-            tuples.push((topic_id.to_string(), used_by));
-          } else {
-            tuples.push(("".to_string(), used_by));
-          }
-          first = false;
+          tuples.push((topic_id.to_string(), UsedBy::Application(application_id, application.instances, injections)));
         }
       }
     }
@@ -389,10 +382,6 @@ impl SubjectFormatter<TopicLabel> for Topic {
       TopicLabel::TimestampType => self.kafka_properties.get("message.timestamp.type").cloned().unwrap_or_default(),
     }
   }
-
-  fn target_label(&self) -> Option<TopicLabel> {
-    Some(TopicLabel::Target)
-  }
 }
 
 impl SubjectFormatter<TopicLabel> for TopicStatus {
@@ -423,10 +412,6 @@ impl SubjectFormatter<TopicLabel> for TopicStatus {
         .cloned()
         .unwrap_or_default(),
     }
-  }
-
-  fn target_label(&self) -> Option<TopicLabel> {
-    Some(TopicLabel::Target)
   }
 }
 

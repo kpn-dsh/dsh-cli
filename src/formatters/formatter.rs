@@ -74,14 +74,6 @@ where
   fn target_id(&self) -> Option<String> {
     None
   }
-
-  /// # Returns the target label for the data type
-  ///
-  /// If the data type has a unique identifying target id, this method must return its label,
-  /// wrapped in a `Some`.
-  /// Else it should return `None`.
-  #[allow(dead_code)]
-  fn target_label(&self) -> Option<L>;
 }
 
 /// # Defines how a `String` pair can be formatted
@@ -102,10 +94,6 @@ where
 
   fn target_id(&self) -> Option<String> {
     Some(self.0.clone())
-  }
-
-  fn target_label(&self) -> Option<L> {
-    None
   }
 }
 
@@ -130,10 +118,6 @@ where
   fn target_id(&self) -> Option<String> {
     Some(self.clone())
   }
-
-  fn target_label(&self) -> Option<L> {
-    None
-  }
 }
 
 /// # Defines how a `HashMap` can be formatted
@@ -153,10 +137,6 @@ where
   }
 
   fn target_id(&self) -> Option<String> {
-    None
-  }
-
-  fn target_label(&self) -> Option<L> {
     None
   }
 }

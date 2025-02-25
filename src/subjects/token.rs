@@ -154,10 +154,6 @@ impl SubjectFormatter<AccessTokenLabel> for AccessToken {
       AccessTokenLabel::TokenType => self.token_type().to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<AccessTokenLabel> {
-    Some(AccessTokenLabel::Scope)
-  }
 }
 
 pub static ACCES_TOKEN_LABELS: [AccessTokenLabel; 7] = [

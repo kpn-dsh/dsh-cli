@@ -77,14 +77,8 @@ impl CommandExecutor for VhostListUsage {
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("vhost"), context);
     for (vhost, used_bys) in &vhosts_with_usage {
-      let mut first = true;
       for used_by in used_bys {
-        if first {
-          formatter.push_target_id_value(vhost.clone(), used_by);
-        } else {
-          formatter.push_target_id_value("".to_string(), used_by);
-        }
-        first = false;
+        formatter.push_target_id_value(vhost.clone(), used_by);
       }
     }
     formatter.print()?;
@@ -148,10 +142,6 @@ impl SubjectFormatter<VhostLabel> for Vhost {
       VhostLabel::Target => target_id.to_string(),
       VhostLabel::Value => self.value.to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<VhostLabel> {
-    Some(VhostLabel::Target)
   }
 }
 

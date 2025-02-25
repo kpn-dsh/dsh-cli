@@ -260,10 +260,6 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
       }
     }
   }
-
-  fn target_label(&self) -> Option<ProxyLabel> {
-    Some(ProxyLabel::Target)
-  }
 }
 
 pub static PROXY_LABELS_LIST: [ProxyLabel; 6] =

@@ -350,7 +350,6 @@ impl Label for ApplicationLabel {
       Self::WritableStreams => "writable streams",
     }
   }
-
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
   }
@@ -404,10 +403,6 @@ impl SubjectFormatter<ApplicationLabel> for Application {
         .collect::<Vec<_>>()
         .join(", "),
     }
-  }
-
-  fn target_label(&self) -> Option<ApplicationLabel> {
-    Some(ApplicationLabel::Target)
   }
 }
 
@@ -513,10 +508,6 @@ impl SubjectFormatter<TaskLabel> for TaskStatus {
       },
       None => "".to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<TaskLabel> {
-    Some(TaskLabel::Target)
   }
 }
 

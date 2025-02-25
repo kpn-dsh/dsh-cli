@@ -216,10 +216,6 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
       AppCatalogAppLabel::Target => target_id.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<AppCatalogAppLabel> {
-    Some(AppCatalogAppLabel::Target)
-  }
 }
 
 pub static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrl, AppCatalogAppLabel::Configuration];

@@ -62,10 +62,6 @@ impl SubjectFormatter<AllocationStatusLabel> for AllocationStatus {
       AllocationStatusLabel::Target => target_id.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<AllocationStatusLabel> {
-    Some(AllocationStatusLabel::Target)
-  }
 }
 
 pub static _ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
@@ -130,10 +126,6 @@ impl SubjectFormatter<UsedByLabel> for UsedBy {
       UsedBy::App(app_id, _) => app_id.to_string(),
       UsedBy::Application(application_id, _, _) => application_id.to_string(),
     })
-  }
-
-  fn target_label(&self) -> Option<UsedByLabel> {
-    Some(UsedByLabel::User)
   }
 }
 

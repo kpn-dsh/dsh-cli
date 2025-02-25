@@ -148,10 +148,6 @@ impl SubjectFormatter<MetricUsageLabel> for MetricUsage {
       MetricUsageLabel::Port => self.port.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<MetricUsageLabel> {
-    None
-  }
 }
 
 const METRIC_USAGE_LABELS: [MetricUsageLabel; 4] = [MetricUsageLabel::Application, MetricUsageLabel::Instances, MetricUsageLabel::Path, MetricUsageLabel::Port];

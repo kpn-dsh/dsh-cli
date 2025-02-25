@@ -198,14 +198,8 @@ impl CommandExecutor for CertificateListUsage {
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("certificate id"), context);
     for (certificate_id, _certificate, used_bys) in &certificates_with_usage {
-      let mut first = true;
       for used_by in used_bys {
-        if first {
-          formatter.push_target_id_value(certificate_id.clone(), used_by);
-        } else {
-          formatter.push_target_id_value("".to_string(), used_by);
-        }
-        first = false;
+        formatter.push_target_id_value(certificate_id.clone(), used_by);
       }
     }
     if formatter.is_empty() {
@@ -346,10 +340,6 @@ impl SubjectFormatter<CertificateLabel> for ActualCertificate {
       CertificateLabel::Target => target_id.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<CertificateLabel> {
-    Some(CertificateLabel::Target)
-  }
 }
 
 impl SubjectFormatter<CertificateLabel> for Certificate {
@@ -361,10 +351,6 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
       CertificateLabel::Target => target_id.to_string(),
       _ => unreachable!(),
     }
-  }
-
-  fn target_label(&self) -> Option<CertificateLabel> {
-    Some(CertificateLabel::Target)
   }
 }
 

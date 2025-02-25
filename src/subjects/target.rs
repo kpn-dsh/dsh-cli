@@ -260,10 +260,6 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
       TargetFormatterLabel::Tenant => self.tenant.clone(),
     }
   }
-
-  fn target_label(&self) -> Option<TargetFormatterLabel> {
-    None
-  }
 }
 
 pub static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Tenant, TargetFormatterLabel::Platform, TargetFormatterLabel::Default];

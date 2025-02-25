@@ -100,18 +100,12 @@ impl CommandExecutor for EnvFind {
           })
           .collect();
         envs.sort_by_key(|env| env.0.clone());
-        let mut first = true;
         for (key, value) in envs {
           let mut env_map: HashMap<ApplicationEnvLabel, String> = HashMap::new();
           env_map.insert(ApplicationEnvLabel::Instances, application.instances.to_string());
           env_map.insert(ApplicationEnvLabel::EnvVar, key);
           env_map.insert(ApplicationEnvLabel::Value, value);
-          if first {
-            matching_applications.push((application_id.clone(), env_map));
-          } else {
-            matching_applications.push(("".to_string(), env_map));
-          }
-          first = false;
+          matching_applications.push((application_id.clone(), env_map));
         }
       }
     }

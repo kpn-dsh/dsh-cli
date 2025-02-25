@@ -145,14 +145,8 @@ fn list_images(applications: HashMap<String, Application>, query_processor: &dyn
   let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, None, context);
   for (image, image_usages) in &images {
     if let Some(image_parts) = query_processor.matching_parts(image) {
-      let mut first = true;
       for image_usage in image_usages {
-        if first {
-          formatter.push_target_id_value(context.parts_to_string_stdout(&image_parts), image_usage);
-        } else {
-          formatter.push_target_id_value("".to_string(), image_usage);
-        }
-        first = false;
+        formatter.push_target_id_value(context.parts_to_string_stdout(&image_parts), image_usage);
       }
     }
   }
@@ -208,10 +202,6 @@ impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
       ImageUsageLabel::Instances => self.instances.to_string(),
       ImageUsageLabel::Registry => self.registry.to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<ImageUsageLabel> {
-    Some(ImageUsageLabel::Image)
   }
 }
 

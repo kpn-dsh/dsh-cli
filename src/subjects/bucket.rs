@@ -177,10 +177,6 @@ impl SubjectFormatter<BucketLabel> for BucketStatus {
       BucketLabel::Versioned => self.configuration.as_ref().map(|bs| bs.versioned.to_string()).unwrap_or_default(),
     }
   }
-
-  fn target_label(&self) -> Option<BucketLabel> {
-    Some(BucketLabel::Target)
-  }
 }
 
 impl SubjectFormatter<BucketLabel> for Bucket {
@@ -191,10 +187,6 @@ impl SubjectFormatter<BucketLabel> for Bucket {
       BucketLabel::Versioned => self.versioned.to_string(),
       _ => "".to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<BucketLabel> {
-    Some(BucketLabel::Target)
   }
 }
 

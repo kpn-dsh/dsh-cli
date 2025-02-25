@@ -337,7 +337,7 @@ fn get_service_argument_or_prompt(matches: &ArgMatches) -> Result<String, String
   }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Eq, Hash, PartialEq, Serialize, Debug)]
 pub(crate) enum DshPlatformLabel {
   AccessTokenEndpoint,
   Alias,
@@ -396,17 +396,17 @@ impl Label for DshPlatformLabel {
       Self::InternalDomain => "internal domain",
       Self::InternalServiceDomain => "internal domain (service)",
       Self::PublicVhostDomain => "public vhost domain",
-      Self::TenantAppCatalogAppUrl => "app catalog url (tenant, app)",
+      Self::TenantAppCatalogAppUrl => "app catalog url (app/tenant)",
       Self::TenantAppCatalogUrl => "app catalog url (tenant)",
-      Self::TenantAppConsoleUrl => "console url (tenant, app)",
+      Self::TenantAppConsoleUrl => "console url (app/tenant)",
       Self::TenantClientId => "client id (tenant)",
       Self::TenantConsoleUrl => "console url (tenant)",
       Self::TenantDataCatalogUrl => "data catalog url (tenant)",
       Self::TenantMonitoringUrl => "monitoring url (tenant)",
-      Self::TenantPrivateVhostDomain => "private domain (tenant, vhost)",
-      Self::TenantPublicAppDomain => "public domain (tenant, app)",
+      Self::TenantPrivateVhostDomain => "private domain (tenant/vhost)",
+      Self::TenantPublicAppDomain => "public domain (app/tenant)",
       Self::TenantPublicAppsDomain => "public apps domain (tenant)",
-      Self::TenantServiceConsoleUrl => "console url (tenant, service)",
+      Self::TenantServiceConsoleUrl => "console url (service/tenant)",
     }
   }
 
@@ -439,10 +439,6 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
       _ => unreachable!(),
     }
   }
-
-  fn target_label(&self) -> Option<DshPlatformLabel> {
-    Some(DshPlatformLabel::Name)
-  }
 }
 
 // Subject formatter for (DshPlatform/app/service/tenant/vendor/vhost) sextets
@@ -468,10 +464,6 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
       DshPlatformLabel::TenantServiceConsoleUrl => platform.tenant_service_console_url(tenant, service),
       _ => platform.value(label, target_id),
     }
-  }
-
-  fn target_label(&self) -> Option<DshPlatformLabel> {
-    Some(DshPlatformLabel::Name)
   }
 }
 

@@ -237,14 +237,8 @@ impl CommandExecutor for VolumeListUsage {
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("volume id"), context);
     for (volume_id, used_bys) in &volumes_with_usage {
-      let mut first = true;
       for used_by in used_bys {
-        if first {
-          formatter.push_target_id_value(volume_id.clone(), used_by);
-        } else {
-          formatter.push_target_id_value("".to_string(), used_by);
-        }
-        first = false;
+        formatter.push_target_id_value(volume_id.clone(), used_by);
       }
     }
     if formatter.is_empty() {
@@ -388,10 +382,6 @@ impl SubjectFormatter<VolumeLabel> for Volume {
       _ => "".to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<VolumeLabel> {
-    Some(VolumeLabel::Target)
-  }
 }
 
 impl SubjectFormatter<VolumeLabel> for VolumeStatus {
@@ -402,10 +392,6 @@ impl SubjectFormatter<VolumeLabel> for VolumeStatus {
       VolumeLabel::Size => self.actual.clone().map(|a| a.size_gi_b.to_string()).unwrap_or("NA".to_string()),
       VolumeLabel::Target => target_id.to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<VolumeLabel> {
-    Some(VolumeLabel::Target)
   }
 }
 
