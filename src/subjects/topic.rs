@@ -1,5 +1,5 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::formatters::notifications_to_string;
+use crate::formatters::{notifications_to_string, OutputFormat};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::application::find_applications_that_use_topic;
@@ -13,7 +13,7 @@ use serde::Serialize;
 use std::time::Instant;
 
 use crate::arguments::topic_id_argument;
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -51,10 +51,6 @@ impl Subject for TopicSubject {
     Some("t")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       DELETE_COMMAND => Some(TOPIC_DELETE_CAPABILITY.as_ref()),
@@ -71,13 +67,13 @@ impl Subject for TopicSubject {
 
 lazy_static! {
   static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete scratch topic")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete scratch topic")
       .set_long_about("Delete a scratch topic.")
       .set_default_command_executor(&TopicDelete {})
       .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List topics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List topics")
       .set_long_about("Lists all available scratch topics.")
       .set_default_command_executor(&TopicListConfiguration {})
       .add_command_executors(vec![
@@ -88,7 +84,7 @@ lazy_static! {
       .set_run_all_executors(true)
   );
   static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show topic configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show topic configuration")
       .set_default_command_executor(&TopicShow {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
@@ -123,6 +119,10 @@ impl CommandExecutor for TopicDelete {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct TopicListAllocationStatus {}
@@ -139,6 +139,10 @@ impl CommandExecutor for TopicListAllocationStatus {
     formatter.push_target_ids_and_values(topic_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -162,6 +166,10 @@ impl CommandExecutor for TopicListConfiguration {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct TopicListIds {}
@@ -177,6 +185,10 @@ impl CommandExecutor for TopicListIds {
     formatter.push_target_ids(&topic_ids);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -217,6 +229,10 @@ impl CommandExecutor for TopicListUsage {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct TopicShowAllocationStatus {}
@@ -231,6 +247,10 @@ impl CommandExecutor for TopicShowAllocationStatus {
     context.print_execution_time(start_instant);
     UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context).print(&allocation_status)
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct TopicShow {}
@@ -244,6 +264,10 @@ impl CommandExecutor for TopicShow {
     let topic = context.dsh_api_client.as_ref().unwrap().get_topic_configuration(topic_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, context).print(&topic)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -264,6 +288,10 @@ impl CommandExecutor for TopicShowProperties {
     formatter.push_target_ids_and_values(&properties, &values);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -292,6 +320,10 @@ impl CommandExecutor for TopicShowUsage {
       context.print_outcome("topic not used");
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

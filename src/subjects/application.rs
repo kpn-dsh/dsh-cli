@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::time::Instant;
 
 use crate::arguments::application_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -19,6 +19,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{include_started_stopped, DshCliResult};
@@ -45,10 +46,6 @@ impl Subject for ApplicationSubject {
     Some("a")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(APPLICATION_LIST_CAPABILITY.as_ref()),
@@ -64,7 +61,7 @@ impl Subject for ApplicationSubject {
 
 lazy_static! {
   static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List applications")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List applications")
       .set_long_about(
         "Lists all deployed DSH applications. \
         This will also include applications that are stopped \
@@ -83,7 +80,7 @@ lazy_static! {
       ])
   );
   static ref APPLICATION_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show application configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show application configuration")
       .set_long_about("Show the configuration of an application deployed on the DSH.")
       .set_default_command_executor(&ApplicationShowAll {})
       .add_command_executors(vec![
@@ -118,6 +115,10 @@ impl CommandExecutor for ApplicationListAll {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ApplicationListAllocationStatus {}
@@ -140,6 +141,10 @@ impl CommandExecutor for ApplicationListAllocationStatus {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ApplicationListIds {}
@@ -155,6 +160,10 @@ impl CommandExecutor for ApplicationListIds {
     formatter.push_target_ids(ids.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -174,7 +183,6 @@ impl CommandExecutor for ApplicationListTasks {
         )
       }
     }
-
     context.print_explanation("list all applications with their tasks");
     let start_instant = Instant::now();
     let application_ids = context.dsh_api_client.as_ref().unwrap().get_task_ids().await?;
@@ -195,6 +203,10 @@ impl CommandExecutor for ApplicationListTasks {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ApplicationShowAll {}
@@ -212,9 +224,11 @@ impl CommandExecutor for ApplicationShowAll {
       .get_application_configuration(application_id.as_str())
       .await?;
     context.print_execution_time(start_instant);
-    // let table = ShowTable::new(application_id.as_str(), &application, &APPLICATION_LABELS_SHOW, context);
-    // table.print();
     UnitFormatter::new(application_id, &APPLICATION_LABELS_SHOW, Some("application id"), context).print(&application)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -229,6 +243,10 @@ impl CommandExecutor for ApplicationShowAllocationStatus {
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_application_status(application_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(application_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("application id"), context).print(&allocation_status)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -254,6 +272,10 @@ impl CommandExecutor for ApplicationShowTasks {
     formatter.push_target_id_value_pairs(tasks.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

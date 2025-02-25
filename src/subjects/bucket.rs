@@ -1,5 +1,5 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::formatters::notifications_to_string;
+use crate::formatters::{notifications_to_string, OutputFormat};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::types::{Bucket, BucketStatus};
@@ -9,7 +9,7 @@ use serde::Serialize;
 use std::time::Instant;
 
 use crate::arguments::bucket_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -45,10 +45,6 @@ impl Subject for BucketSubject {
     Some("b")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(BUCKET_LIST_CAPABILITY.as_ref()),
@@ -64,14 +60,14 @@ impl Subject for BucketSubject {
 
 lazy_static! {
   static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List buckets")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List buckets")
       .set_long_about("Lists all available buckets.")
       .set_default_command_executor(&BucketListAll {})
       .add_command_executor(FlagType::Ids, &BucketListIds {}, None)
       .set_run_all_executors(true)
   );
   static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show bucket configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show bucket configuration")
       .set_default_command_executor(&BucketShowAll {})
       .add_target_argument(bucket_id_argument().required(true))
   );
@@ -93,6 +89,10 @@ impl CommandExecutor for BucketListAll {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct BucketListIds {}
@@ -109,6 +109,10 @@ impl CommandExecutor for BucketListIds {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
+  }
 }
 
 struct BucketShowAll {}
@@ -122,6 +126,10 @@ impl CommandExecutor for BucketShowAll {
     let bucket = context.dsh_api_client.as_ref().unwrap().get_bucket(bucket_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

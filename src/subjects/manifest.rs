@@ -14,13 +14,14 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use dsh_api::types::AppCatalogManifest;
 
 use crate::arguments::manifest_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 
@@ -46,10 +47,6 @@ impl Subject for ManifestSubject {
     "Show the manifest files for the apps in the DSH App Catalog.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(MANIFEST_LIST_CAPABILITY.as_ref()),
@@ -65,14 +62,14 @@ impl Subject for ManifestSubject {
 
 lazy_static! {
   static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List manifests")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List manifests")
       .set_long_about("Lists all manifest files from the App Catalog.")
       .set_default_command_executor(&ManifestListAll {})
       .add_command_executor(FlagType::Ids, &ManifestListIds {}, None)
       .set_run_all_executors(true)
   );
   static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show manifest configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show manifest configuration")
       .set_default_command_executor(&ManifestShowAll {})
       .add_target_argument(manifest_id_argument().required(true))
   );
@@ -110,6 +107,10 @@ impl CommandExecutor for ManifestListAll {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ManifestListIds {}
@@ -125,6 +126,10 @@ impl CommandExecutor for ManifestListIds {
     formatter.push_target_ids(&manifest_ids);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -144,6 +149,10 @@ impl CommandExecutor for ManifestShowAll {
     let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id.as_str()).unwrap().clone();
     manifests.sort_by_key(|m| m.version.clone());
     UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), context).print(*manifests.last().unwrap())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

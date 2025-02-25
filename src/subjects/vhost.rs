@@ -1,4 +1,4 @@
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
@@ -40,10 +40,6 @@ impl Subject for VhostSubject {
     Some("v")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
@@ -58,7 +54,7 @@ impl Subject for VhostSubject {
 
 lazy_static! {
   static ref VHOST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List configured vhosts")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List configured vhosts")
       .set_long_about("List applications that have vhosts configured. Vhosts that are provisioned but are not configured in any applications will not be shown.")
       .set_default_command_executor(&VhostListUsage {})
   );
@@ -93,6 +89,10 @@ impl CommandExecutor for VhostListUsage {
     }
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

@@ -1,5 +1,5 @@
 use crate::arguments::query_argument;
-use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -43,10 +43,6 @@ impl Subject for EnvSubject {
     Some("e")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       FIND_COMMAND => Some(ENV_FIND_CAPABILITY.as_ref()),
@@ -61,7 +57,7 @@ impl Subject for EnvSubject {
 
 lazy_static! {
   static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FIND_COMMAND_PAIR, "Find environment variable values")
+    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), "Find environment variable values")
       .set_long_about("Find values in environment variables in the configurations of applications and apps deployed on the DSH.")
       .set_default_command_executor(&EnvFind {})
       .add_filter_flags(vec![
@@ -127,6 +123,10 @@ impl CommandExecutor for EnvFind {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

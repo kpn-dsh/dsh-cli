@@ -1,4 +1,4 @@
-use crate::capability::{Capability, CommandExecutor, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::OutputFormat;
@@ -38,16 +38,6 @@ impl Subject for ApiSubject {
     "List and call DSH resource management api.".to_string()
   }
 
-  fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    let needs_platform_tenant_or_dsh_api_client = !matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, SHOW_COMMAND);
-    Requirements::new(
-      needs_platform_tenant_or_dsh_api_client,
-      needs_platform_tenant_or_dsh_api_client,
-      needs_platform_tenant_or_dsh_api_client,
-      Some(OutputFormat::Json),
-    )
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       DELETE_COMMAND => Some(API_DELETE_CAPABILITY.as_ref()),
@@ -77,7 +67,7 @@ lazy_static! {
   static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiPost {});
   static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiPut {});
   static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Print the open api specification.").set_default_command_executor(&ApiShow {}));
+    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification.").set_default_command_executor(&ApiShow {}));
   static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     API_DELETE_CAPABILITY.as_ref(),
     API_GET_CAPABILITY.as_ref(),
@@ -96,7 +86,7 @@ lazy_static! {
   static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiPost {});
   static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiPut {});
   static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Print the open api specification.").set_default_command_executor(&ApiShow {}));
+    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification.").set_default_command_executor(&ApiShow {}));
   static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![API_DELETE_CAPABILITY.as_ref(), API_GET_CAPABILITY.as_ref(), API_POST_CAPABILITY.as_ref(), API_PUT_CAPABILITY.as_ref(), API_SHOW_CAPABILITY.as_ref(),];
 }
@@ -141,7 +131,7 @@ fn create_generic_capability<'a>(method: &'static str, command_executor: &'a (dy
     .map(|(selector, method_descriptor)| create_generic_capability_selector_command(method, selector, method_descriptor))
     .collect::<Vec<_>>();
   Box::new(
-    CapabilityBuilder::new((method, ""), format!("{} methods ", method))
+    CapabilityBuilder::new(method, None, format!("{} methods ", method))
       .add_subcommands(subcommands)
       .set_default_command_executor(command_executor),
   )
@@ -222,15 +212,18 @@ impl CommandExecutor for ApiDelete {
           .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
           .collect::<Vec<_>>();
         let start_instant = Instant::now();
-        let response = context.dsh_api_client.as_ref().unwrap().delete(selector, &parameters).await?;
+        context.dsh_api_client.as_ref().unwrap().delete(selector, &parameters).await?;
         context.print_execution_time(start_instant);
-        context.print_serializable(response);
         context.print_outcome("deleted");
       }
     } else {
       context.print_outcome("cancelled, nothing deleted");
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -253,6 +246,10 @@ impl CommandExecutor for ApiGet {
     context.print_serializable(response);
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Json))
+  }
 }
 
 #[cfg(feature = "manage")]
@@ -271,10 +268,14 @@ impl CommandExecutor for ApiHead {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let start_instant = Instant::now();
-    let response = context.dsh_api_client.as_ref().unwrap().head(selector, &parameters).await?;
+    context.dsh_api_client.as_ref().unwrap().head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
-    context.print_serializable(response);
+    context.print_outcome("ok");
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -305,6 +306,10 @@ impl CommandExecutor for ApiPatch {
       Ok(())
     }
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ApiPost {}
@@ -331,6 +336,10 @@ impl CommandExecutor for ApiPost {
       context.print_outcome("posted");
       Ok(())
     }
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -359,6 +368,10 @@ impl CommandExecutor for ApiPut {
       Ok(())
     }
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ApiShow {}
@@ -369,5 +382,9 @@ impl CommandExecutor for ApiShow {
     context.print_explanation("print the open api specification");
     context.print(DshApiClient::openapi_spec());
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(Some(OutputFormat::Json))
   }
 }

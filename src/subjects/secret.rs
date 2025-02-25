@@ -1,8 +1,5 @@
 use crate::arguments::secret_id_argument;
-use crate::capability::{
-  Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
-  UPDATE_COMMAND, UPDATE_COMMAND_PAIR,
-};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, NEW_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UPDATE_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -10,6 +7,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
@@ -48,10 +46,6 @@ impl Subject for SecretSubject {
     Some("s")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       NEW_COMMAND => Some(SECRET_NEW_CAPABILITY.as_ref()),
@@ -70,13 +64,13 @@ impl Subject for SecretSubject {
 
 lazy_static! {
   static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete secret")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete secret")
       .set_long_about("Delete a secret.")
       .set_default_command_executor(&SecretDelete {})
       .add_target_argument(secret_id_argument().required(true))
   );
   static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List secrets")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List secrets")
       .set_long_about("Lists all secrets used by the applications/services and apps on the DSH.")
       .set_default_command_executor(&SecretListIds {})
       .add_command_executors(vec![
@@ -90,20 +84,20 @@ lazy_static! {
       ])
   );
   static ref SECRET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create new secret")
+    CapabilityBuilder::new(NEW_COMMAND, None, "Create new secret")
       .set_long_about("Create a new secret.")
       .set_default_command_executor(&SecretNew {})
       .add_target_argument(secret_id_argument().required(true))
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );
   static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show secret configuration or value")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show secret configuration or value")
       .set_default_command_executor(&SecretShowAllocationStatus {})
       .add_command_executors(vec![(FlagType::Usage, &SecretShowUsage {}, None), (FlagType::Value, &SecretShowValue {}, None),])
       .add_target_argument(secret_id_argument().required(true))
   );
   static ref SECRET_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(UPDATE_COMMAND_PAIR, "Update secret")
+    CapabilityBuilder::new(UPDATE_COMMAND, None, "Update secret")
       .set_long_about("Update a secret.")
       .set_default_command_executor(&SecretUpdate {})
       .add_target_argument(secret_id_argument().required(true))
@@ -135,6 +129,10 @@ impl CommandExecutor for SecretDelete {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct SecretListAllocationStatus {}
@@ -164,6 +162,10 @@ impl CommandExecutor for SecretListAllocationStatus {
     formatter.push_target_ids_and_values(non_system_secret_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -195,6 +197,10 @@ impl CommandExecutor for SecretListSystem {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct SecretListIds {}
@@ -219,6 +225,10 @@ impl CommandExecutor for SecretListIds {
     formatter.push_target_ids(non_system_secrets.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -249,6 +259,10 @@ impl CommandExecutor for SecretListUsage {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -295,6 +309,10 @@ impl CommandExecutor for SecretNew {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct SecretShowAllocationStatus {}
@@ -308,6 +326,10 @@ impl CommandExecutor for SecretShowAllocationStatus {
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_secret_status(secret_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context).print(&allocation_status)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -330,6 +352,10 @@ impl CommandExecutor for SecretShowUsage {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct SecretShowValue {}
@@ -344,6 +370,10 @@ impl CommandExecutor for SecretShowValue {
     context.print_execution_time(start_instant);
     context.print(secret);
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -386,5 +416,9 @@ impl CommandExecutor for SecretUpdate {
       }
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }

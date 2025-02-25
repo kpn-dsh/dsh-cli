@@ -1,4 +1,4 @@
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -40,10 +40,6 @@ impl Subject for MetricSubject {
     Some("m")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(METRIC_LIST_CAPABILITY.as_ref()),
@@ -58,7 +54,7 @@ impl Subject for MetricSubject {
 
 lazy_static! {
   static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List exported metrics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List exported metrics")
       .set_long_about("List all applications/apps that have metrics export configured.")
       .set_default_command_executor(&MetricList {})
       .add_filter_flags(vec![(FilterFlagType::Started, None), (FilterFlagType::Stopped, None)])
@@ -85,6 +81,10 @@ impl CommandExecutor for MetricList {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

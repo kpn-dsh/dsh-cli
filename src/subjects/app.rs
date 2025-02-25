@@ -12,13 +12,14 @@ use serde::Serialize;
 use dsh_api::types::AppCatalogAppResourcesValue;
 
 use crate::arguments::app_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::application::APPLICATION_LABELS_SHOW;
 use crate::subjects::bucket::BUCKET_LABELS;
@@ -46,10 +47,6 @@ impl Subject for AppSubject {
     "Show, manage and list apps deployed from the DSH app catalog.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(APP_LIST_CAPABILITY.as_ref()),
@@ -65,14 +62,14 @@ impl Subject for AppSubject {
 
 lazy_static! {
   static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List deployed apps")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List deployed apps")
       .set_long_about("Lists all apps deployed from the DSH app catalog.")
       .set_default_command_executor(&AppListConfiguration {})
       .add_command_executor(FlagType::Ids, &AppListIds {}, None)
       .set_run_all_executors(true)
   );
   static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show app configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .set_default_command_executor(&AppShowAll {})
       .add_target_argument(app_id_argument().required(true))
@@ -99,6 +96,10 @@ impl CommandExecutor for AppListConfiguration {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct AppListIds {}
@@ -114,6 +115,10 @@ impl CommandExecutor for AppListIds {
     formatter.push_target_ids(&ids);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -158,6 +163,10 @@ impl CommandExecutor for AppShowAll {
       }
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 

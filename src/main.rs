@@ -224,12 +224,14 @@ async fn inner_main() -> DshCliResult {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
+        debug!("{:?}", requirements);
         let context = Context::create(&matches, &requirements, &settings).await?;
         subject.execute_subject_command(sub_matches, &context).await?;
       }
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject_list_shortcut) => {
-          let requirements = subject_list_shortcut.requirements(sub_matches);
+          let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
+          debug!("{:?}", requirements);
           let context = Context::create(&matches, &requirements, &settings).await?;
           subject_list_shortcut.execute_subject_list_shortcut(sub_matches, &context).await?;
         }

@@ -2,9 +2,7 @@ use crate::arguments::{
   app_id_argument, platform_name_argument, service_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT, PLATFORM_NAME_ARGUMENT, SERVICE_ID_ARGUMENT,
   VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
 };
-use crate::capability::{
-  Capability, CommandExecutor, EXPORT_COMMAND, EXPORT_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, OPEN_COMMAND, OPEN_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
-};
+use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
@@ -51,22 +49,6 @@ impl Subject for PlatformSubject {
     Some("p")
   }
 
-  fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    match sub_matches.subcommand() {
-      Some((OPEN_COMMAND, subcommand_matches)) => Requirements::new(
-        true,
-        matches!(
-          subcommand_matches.subcommand().unwrap_or_else(|| unreachable!()),
-          (OPEN_APP, _) | (OPEN_MONITORING, _) | (OPEN_SERVICE, _) | (OPEN_TENANT, _)
-        ),
-        matches!(subcommand_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER),
-        None,
-      ),
-      Some((SHOW_COMMAND, subcommand_matches)) => Requirements::new(subcommand_matches.get_one::<String>(PLATFORM_NAME_ARGUMENT).is_none(), false, false, None),
-      _ => Requirements::new(false, false, false, None),
-    }
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       EXPORT_COMMAND => Some(PLATFORM_EXPORT_CAPABILITY.as_ref()),
@@ -84,7 +66,7 @@ impl Subject for PlatformSubject {
 
 lazy_static! {
   static ref PLATFORM_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(EXPORT_COMMAND_PAIR, "Export default platform configuration")
+    CapabilityBuilder::new(EXPORT_COMMAND, None, "Export default platform configuration")
       .set_long_about(
         "Export the default platform configuration json file from the dsh-api library. \
         This file can be used as a starting point when platform customization is required."
@@ -92,12 +74,12 @@ lazy_static! {
       .set_default_command_executor(&PlatformExport {})
   );
   static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List platforms")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List platforms")
       .set_long_about("Lists all dsh platforms.")
       .set_default_command_executor(&PLatformList {}),
   );
   static ref PLATFORM_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(OPEN_COMMAND_PAIR, "Open console or web application")
+    CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), "Open console or web application")
       .set_long_about("Open the DSH console, monitoring page or the web application for the tenant or a service.")
       .set_default_command_executor(&PlatformOpen {})
       .add_subcommands(vec![
@@ -119,7 +101,7 @@ lazy_static! {
       ])
   );
   static ref PLATFORM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show platform data")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show platform data")
       .set_long_about("Show platform data.")
       .set_default_command_executor(&PlatformShow {})
       .add_target_argument(platform_name_argument())
@@ -143,6 +125,10 @@ impl CommandExecutor for PlatformExport {
     context.print(DEFAULT_PLATFORMS);
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 struct PLatformList {}
@@ -156,6 +142,10 @@ impl CommandExecutor for PLatformList {
     formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
   }
 }
 
@@ -177,6 +167,18 @@ impl CommandExecutor for PlatformOpen {
       },
       None => Err("missing target argument".to_string()),
     }
+  }
+
+  fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(
+      true,
+      matches!(
+        sub_matches.subcommand().unwrap_or_else(|| unreachable!()),
+        (OPEN_APP, _) | (OPEN_MONITORING, _) | (OPEN_SERVICE, _) | (OPEN_TENANT, _)
+      ),
+      matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER),
+      None,
+    )
   }
 }
 
@@ -314,6 +316,10 @@ impl CommandExecutor for PlatformShow {
       vendor.unwrap_or_default(),
       vhost.unwrap_or_default(),
     ))
+  }
+
+  fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
+    Requirements::new(sub_matches.get_one::<String>(PLATFORM_NAME_ARGUMENT).is_none(), false, false, None)
   }
 }
 

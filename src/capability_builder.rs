@@ -3,6 +3,7 @@ use crate::context::Context;
 use crate::filter_flags::{create_filter_flag, FilterFlagType};
 use crate::flags::{create_flag, FlagType};
 use crate::modifier_flags::{create_modifier_flag, ModifierFlagType};
+use crate::subject::Requirements;
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
@@ -28,10 +29,10 @@ impl<'a> CapabilityBuilder<'a> {
   /// ## Parameters
   /// * `capability_type` -
   /// * `about` - help text printed when -h flag is provided
-  pub fn new(command_pair: (&str, &str), about: impl Into<String>) -> Self {
+  pub fn new(command: &str, alias: Option<&str>, about: impl Into<String>) -> Self {
     Self {
-      capability_command_name: command_pair.0.to_string(),
-      capability_command_alias: if command_pair.1.is_empty() { None } else { Some(command_pair.1.to_string()) },
+      capability_command_name: command.to_string(),
+      capability_command_alias: alias.map(|alias| alias.to_string()),
       about: about.into(),
       long_about: None,
       subcommands: vec![],
@@ -182,6 +183,32 @@ impl Capability for CapabilityBuilder<'_> {
 
   fn command_target_argument_ids(&self) -> Vec<String> {
     self.target_arguments.clone().iter().map(|arg| arg.get_id().to_string()).collect::<Vec<_>>()
+  }
+
+  fn requirements(&self, matches: &ArgMatches) -> Requirements {
+    let mut match_found = false;
+    let mut composite_requirements = Requirements::new(false, false, false, None);
+    if self.run_all_executors {
+      for (flag_type, executor, _) in &self.executors {
+        if matches.get_flag(flag_type.id()) {
+          composite_requirements = composite_requirements.or(&executor.requirements(matches));
+          match_found = true;
+        }
+      }
+    } else {
+      for (flag_type, executor, _) in &self.executors {
+        if matches.get_flag(flag_type.id()) && !match_found {
+          composite_requirements = composite_requirements.or(&executor.requirements(matches));
+          match_found = true;
+        }
+      }
+    }
+    if !match_found {
+      if let Some(default_executor) = self.default_executor {
+        composite_requirements = composite_requirements.or(&default_executor.requirements(matches));
+      }
+    }
+    composite_requirements
   }
 
   async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {

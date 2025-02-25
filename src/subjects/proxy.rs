@@ -8,13 +8,14 @@ use serde::Serialize;
 use std::time::Instant;
 
 use crate::arguments::proxy_id_argument;
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, SHOW_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 
@@ -40,16 +41,11 @@ impl Subject for ProxySubject {
     "Show, manage and list Kafka proxies used by the applications/services and apps on the DSH.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       DELETE_COMMAND => Some(PROXY_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(PROXY_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(PROXY_SHOW_CAPABILITY.as_ref()),
-      // UPDATE_COMMAND => Some(PROXY_UPDATE_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -61,29 +57,23 @@ impl Subject for ProxySubject {
 
 lazy_static! {
   static ref PROXY_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete proxy")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete proxy")
       .set_long_about("Delete a Kafka proxy.")
       .set_default_command_executor(&ProxyDelete {})
       .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List proxies")
+    CapabilityBuilder::new(LIST_COMMAND, None, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the applications/services and apps on the DSH.")
       .set_default_command_executor(&ProxyListAll {})
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
       .set_run_all_executors(true)
   );
   static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show Kafka proxy configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, None, "Show Kafka proxy configuration")
       .set_default_command_executor(&ProxyShowConfiguration {})
       .add_target_argument(proxy_id_argument().required(true))
   );
-  // static ref PROXY_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-  //   CapabilityBuilder::new(UPDATE_COMMAND_PAIR, "Update proxy")
-  //     .set_long_about("Update a Kafka proxy configuration.")
-  //     .set_default_command_executor(&ProxyUpdateConfiguration {})
-  //     .add_target_argument(proxy_id_argument().required(true))
-  // );
   static ref PROXY_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref()];
 }
@@ -110,6 +100,10 @@ impl CommandExecutor for ProxyDelete {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ProxyListAll {}
@@ -132,6 +126,10 @@ impl CommandExecutor for ProxyListAll {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ProxyListIds {}
@@ -148,6 +146,10 @@ impl CommandExecutor for ProxyListIds {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
+  }
 }
 
 struct ProxyShowConfiguration {}
@@ -162,23 +164,11 @@ impl CommandExecutor for ProxyShowConfiguration {
     context.print_execution_time(start_instant);
     UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, context).print(&proxy)
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
-
-// struct ProxyUpdateConfiguration {}
-
-// #[async_trait]
-// impl CommandExecutor for ProxyUpdateConfiguration {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-//     let proxy_id = target.unwrap_or_else(|| unreachable!());
-//     context.print_explanation(format!("update configuration for proxy '{}'", proxy_id));
-//     if context.dsh_api_client.as_ref().unwrap().get_kafkaproxy_configuration(&proxy_id).await.is_err() {
-//       return Err(format!("proxy '{}' does not exists", proxy_id));
-//     }
-//     // TODO
-//     context.print_outcome("function not implemented, proxy not updated");
-//     Ok(())
-//   }
-// }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub enum ProxyLabel {

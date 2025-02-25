@@ -6,11 +6,10 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::arguments::{platform_name_argument, tenant_name_argument, PLATFORM_NAME_ARGUMENT, TENANT_NAME_ARGUMENT};
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, NEW_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
-use crate::formatters::OutputFormat;
 use crate::settings::{get_settings, write_settings, Settings};
 use crate::subject::{Requirements, Subject};
 use crate::targets::{all_targets, delete_target, read_target, upsert_target, Target};
@@ -47,11 +46,6 @@ impl Subject for TargetSubject {
       .to_string()
   }
 
-  // TODO Check this
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, false, Some(OutputFormat::Table))
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       DELETE_COMMAND => Some(TARGET_DELETE_CAPABILITY.as_ref()),
@@ -68,7 +62,7 @@ impl Subject for TargetSubject {
 
 lazy_static! {
   static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete target configuration.")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete target configuration.")
       .set_long_about(
         "Delete a target configuration. \
         You will be prompted for the target's platform and tenant, \
@@ -79,12 +73,12 @@ lazy_static! {
       .add_target_argument(tenant_name_argument().required(true))
   );
   static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List all target configurations.")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List all target configurations.")
       .set_long_about("Lists all target configurations.")
       .set_default_command_executor(&TargetList {})
   );
   static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create a new target configuration.")
+    CapabilityBuilder::new(NEW_COMMAND, None, "Create a new target configuration.")
       .set_long_about(
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant and password. \
@@ -141,6 +135,10 @@ impl CommandExecutor for TargetDelete {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 struct TargetList {}
@@ -170,6 +168,10 @@ impl CommandExecutor for TargetList {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 struct TargetNew {}
@@ -195,6 +197,10 @@ impl CommandExecutor for TargetNew {
       context.print_outcome(format!("target {} created", target));
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
   }
 }
 

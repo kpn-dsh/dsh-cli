@@ -1,7 +1,5 @@
 use crate::arguments::volume_id_argument;
-use crate::capability::{
-  Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
-};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, NEW_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -10,6 +8,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
 use crate::DshCliResult;
@@ -44,10 +43,6 @@ impl Subject for VolumeSubject {
     "Show, manage and list volumes deployed on the DSH.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       DELETE_COMMAND => Some(VOLUME_DELETE_CAPABILITY.as_ref()),
@@ -65,13 +60,13 @@ impl Subject for VolumeSubject {
 
 lazy_static! {
   static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete volume")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete volume")
       .set_long_about("Delete a volume.")
       .set_default_command_executor(&VolumeDelete {})
       .add_target_argument(volume_id_argument().required(true))
   );
   static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List volumes")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List volumes")
       .set_long_about("Lists all available volumes.")
       .set_default_command_executor(&VolumeListAll {})
       .add_command_executors(vec![
@@ -87,13 +82,13 @@ lazy_static! {
       ])
   );
   static ref VOLUME_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create new volume")
+    CapabilityBuilder::new(NEW_COMMAND, None, "Create new volume")
       .set_long_about("Create a new volume.")
       .set_default_command_executor(&VolumeNew {})
       .add_target_argument(volume_id_argument().required(true))
   );
   static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show secret configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show secret configuration")
       .set_default_command_executor(&VolumeShowAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
@@ -127,6 +122,10 @@ impl CommandExecutor for VolumeDelete {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct VolumeListAll {}
@@ -148,6 +147,10 @@ impl CommandExecutor for VolumeListAll {
     formatter.push_target_ids_and_values(volume_ids.as_slice(), volumes.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -171,6 +174,10 @@ impl CommandExecutor for VolumeListAllocationStatus {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct VolumeListConfiguration {}
@@ -193,6 +200,10 @@ impl CommandExecutor for VolumeListConfiguration {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct VolumeListIds {}
@@ -208,6 +219,10 @@ impl CommandExecutor for VolumeListIds {
     formatter.push_target_ids(volume_ids.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -239,6 +254,10 @@ impl CommandExecutor for VolumeListUsage {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct VolumeNew {}
@@ -262,6 +281,10 @@ impl CommandExecutor for VolumeNew {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct VolumeShowAll {}
@@ -276,6 +299,10 @@ impl CommandExecutor for VolumeShowAll {
     context.print_execution_time(start_instant);
     UnitFormatter::new(volume_id, &VOLUME_STATUS_LABELS, Some("volume id"), context).print(&volume)
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct VolumeShowAllocationStatus {}
@@ -289,6 +316,10 @@ impl CommandExecutor for VolumeShowAllocationStatus {
     let allocation_status = context.dsh_api_client.as_ref().unwrap().get_volume_status(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context).print(&allocation_status)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -310,6 +341,10 @@ impl CommandExecutor for VolumeShowUsage {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
