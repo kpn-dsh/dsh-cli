@@ -172,11 +172,12 @@ where
         for (target_id, value) in &self.values {
           let record = self.labels.iter().map(|label| {
             if label.is_target_label() {
-              if last_target_id.clone().is_some_and(|ref last| last == target_id) {
+              let target_id_value = value.value(label, target_id);
+              if last_target_id.clone().is_some_and(|last| last == target_id_value) {
                 "".to_string()
               } else {
-                last_target_id = Some(target_id.to_string());
-                value.value(label, target_id)
+                last_target_id = Some(target_id_value.clone());
+                target_id_value
               }
             } else {
               value.value(label, target_id)
