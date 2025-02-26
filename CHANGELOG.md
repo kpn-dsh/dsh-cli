@@ -8,16 +8,17 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Added
 
-* One command to set default platform and tenant.
+* Single command to set default platform and tenant.
 
 ### Changed
 
 * Simplified json output.
+* Better rendering of empty results.
 
 ### Fixes
 
 * Fixed bug with duplicate ids in json output.
-* Better rendering of empty results.
+* Lists of identifiers and lists derived from them are sorted again.
 
 ## [0.5.0] - 2025-02-20
 
