@@ -156,7 +156,7 @@ impl CommandExecutor for TargetList {
         .clone()
         .is_some_and(|ref platform| target.platform.to_string() == *platform);
       let tenant_is_default = settings.default_tenant.clone().is_some_and(|ref tenant| target.tenant == *tenant);
-      let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, is_default: platform_is_default && tenant_is_default };
+      let target_formatter = TargetFormatter { platform: target.platform, tenant: target.tenant, is_default: platform_is_default && tenant_is_default };
       target_formatters.push(target_formatter);
     }
     if target_formatters.is_empty() {
@@ -235,13 +235,13 @@ impl Label for TargetFormatterLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    false
+    matches!(self, Self::Platform)
   }
 }
 
 #[derive(Serialize)]
 struct TargetFormatter {
-  platform: String,
+  platform: DshPlatform,
   tenant: String,
   is_default: bool,
 }
@@ -256,10 +256,10 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
           "".to_string()
         }
       }
-      TargetFormatterLabel::Platform => self.platform.to_string(),
+      TargetFormatterLabel::Platform => format!("{} / {}", self.platform.name(), self.platform.alias()),
       TargetFormatterLabel::Tenant => self.tenant.clone(),
     }
   }
 }
 
-pub static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Tenant, TargetFormatterLabel::Platform, TargetFormatterLabel::Default];
+pub static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Platform, TargetFormatterLabel::Tenant, TargetFormatterLabel::Default];

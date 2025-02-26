@@ -507,7 +507,10 @@ impl SubjectFormatter<SettingLabel> for Settings {
     match label {
       SettingLabel::CsvQuote => self.csv_quote.map(|csv_quote| csv_quote.to_string()).unwrap_or_default(),
       SettingLabel::CsvSeparator => self.csv_separator.clone().unwrap_or_default(),
-      SettingLabel::DefaultPlatform => self.default_platform.clone().unwrap_or_default(),
+      SettingLabel::DefaultPlatform => match self.default_platform.clone().map(|platform| DshPlatform::try_from(platform.as_str())) {
+        Some(Ok(platform)) => format!("{} / {}", platform.name(), platform.alias()),
+        _ => "".to_string(),
+      },
       SettingLabel::DefaultTenant => self.default_tenant.clone().unwrap_or_default(),
       SettingLabel::DryRun => self.dry_run.map(|dry_run| dry_run.to_string()).unwrap_or_default(),
       SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
