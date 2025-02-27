@@ -1,7 +1,6 @@
 #!/bin/bash
 
 export APP_UNDER_TEST=kafdrop
-export APPLICATION_UNDER_TEST=keyring-dev
 export BUCKET_UNDER_TEST=cpr
 export CERTIFICATE_UNDER_TEST=broker
 export ENV_VALUE_UNDER_TEST=info
@@ -11,6 +10,7 @@ export IMAGE_UNDER_TEST_REGEX=registry
 export PLATFORM_UNDER_TEST=prodlz
 export PROXY_UNDER_TEST=broker
 export SECRET_UNDER_TEST=boss-account-ids
+export SERVICE_UNDER_TEST=keyring-dev
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_UNDER_TEST=reference-implementation-compliant
 export VENDOR_UNDER_TEST=kpn
@@ -24,20 +24,6 @@ export SAFE_COMMANDS=(
   "app list --ids"
   "app list"
   "app show $APP_UNDER_TEST"
-
-  "application delete $APPLICATION_UNDER_TEST --dry-run"
-  "application list --ids"
-  "application list --started"
-  "application list --status"
-  "application list --stopped"
-  "application list --tasks"
-  "application list"
-  "application show $APPLICATION_UNDER_TEST --status"
-  "application show $APPLICATION_UNDER_TEST --tasks"
-  "application show $APPLICATION_UNDER_TEST"
-  "application start $APPLICATION_UNDER_TEST --dry-run"
-  "application start $APPLICATION_UNDER_TEST --instances 2 --dry-run"
-  "application stop $APPLICATION_UNDER_TEST --dry-run"
 
   "bucket list --ids"
   "bucket list"
@@ -81,8 +67,8 @@ export SAFE_COMMANDS=(
   "platform open console --dry-run"
   "platform open monitoring --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open monitoring --dry-run"
-  "platform open service $APPLICATION_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
-  "platform open service $APPLICATION_UNDER_TEST --dry-run"
+  "platform open service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
+  "platform open service $SERVICE_UNDER_TEST --dry-run"
   "platform open swagger --platform $PLATFORM_UNDER_TEST --dry-run"
   "platform open swagger --dry-run"
   "platform open tenant --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
@@ -94,8 +80,8 @@ export SAFE_COMMANDS=(
   "platform show --app $APP_UNDER_TEST --vendor $VENDOR_UNDER_TEST"
   "platform show --app $APP_UNDER_TEST"
   "platform show --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
-  "platform show --service $APPLICATION_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
-  "platform show --service $APPLICATION_UNDER_TEST"
+  "platform show --service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
+  "platform show --service $SERVICE_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST"
   "platform show"
@@ -104,9 +90,9 @@ export SAFE_COMMANDS=(
   "proxy list"
   "proxy show $PROXY_UNDER_TEST"
 
-  "secret delete $SECRET_UNDER_TEST --dry-run"
+  "secret delete $SECRET_UNDER_TEST --force --dry-run"
   "secret list --app"
-  "secret list --application"
+  "secret list --service"
   "secret list --status"
   "secret list --system"
   "secret list --usage"
@@ -114,6 +100,20 @@ export SAFE_COMMANDS=(
   "secret show $SECRET_UNDER_TEST --usage"
   "secret show $SECRET_UNDER_TEST --value"
   "secret show $SECRET_UNDER_TEST"
+
+  "service delete $SERVICE_UNDER_TEST --force --dry-run"
+  "service list --ids"
+  "service list --started"
+  "service list --status"
+  "service list --stopped"
+  "service list --tasks"
+  "service list"
+  "service show $SERVICE_UNDER_TEST --status"
+  "service show $SERVICE_UNDER_TEST --tasks"
+  "service show $SERVICE_UNDER_TEST"
+  "service start $SERVICE_UNDER_TEST --force --dry-run"
+  "service start $SERVICE_UNDER_TEST --force --instances 2 --dry-run"
+  "service stop $SERVICE_UNDER_TEST --force --dry-run"
 
   "setting list"
 
@@ -131,7 +131,7 @@ export SAFE_COMMANDS=(
   "vhost list"
 
   "volume list --app"
-  "volume list --application"
+  "volume list --service"
   "volume list --configuration"
   "volume list --ids"
   "volume list --status"

@@ -9,22 +9,20 @@ export DSH_CLI_PLATFORM=nplz
 export DSH_CLI_TENANT=greenbox-dev
 export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
 
-export SEPARATOR="-------------------------------"
+export DSH_CLI_LOG_LEVEL="error"
+export DSH_CLI_OUTPUT_FORMAT="table"
+export DSH_CLI_VERBOSITY="low"
 
-export OUTPUT_FORMAT="--output-format table"
-#export VERBOSITY="-v high"
-#export LOG_LEVEL="--log-level debug"
-
-source export_safe_commands.sh
+source safe_commands.sh
 
 set -f
 for COMMAND in "${SAFE_COMMANDS[@]}"
 do
-  CMD=`echo "dsh $OUTPUT_FORMAT $VERBOSITY $LOG_LEVEL $COMMAND" | envsubst`
-  echo "$SEPARATOR"
+  CMD=`echo "dsh $COMMAND" | envsubst`
+  echo "-------------------------------"
   echo "$CMD"
-  echo "$SEPARATOR"
+  echo "-------------------------------"
   eval "$CMD"
-  echo "$SEPARATOR"
+  echo "-------------------------------"
   echo
 done
