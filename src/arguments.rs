@@ -3,7 +3,7 @@ use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
 
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
-pub(crate) const APPLICATION__ID_ARGUMENT: &str = "application-id-argument";
+pub(crate) const APPLICATION_ID_ARGUMENT: &str = "application-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
 pub(crate) const CERTIFICATE_ID_ARGUMENT: &str = "certificate-id-argument";
 #[cfg(feature = "appcatalog")]
@@ -29,7 +29,7 @@ pub(crate) fn app_id_argument() -> Arg {
 }
 
 pub(crate) fn application_id_argument() -> Arg {
-  Arg::new(APPLICATION__ID_ARGUMENT)
+  Arg::new(APPLICATION_ID_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("APPLICATION")
