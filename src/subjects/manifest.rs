@@ -233,10 +233,6 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
       ManifestLabel::Target => target_id.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<ManifestLabel> {
-    Some(ManifestLabel::Target)
-  }
 }
 
 pub static MANIFEST_LABELS_LIST: [ManifestLabel; 6] =
