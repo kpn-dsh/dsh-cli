@@ -127,16 +127,22 @@ impl Context {
     self.dsh_api_client.as_ref()
   }
 
+  /// Ask for confirmation
+  ///
+  /// 1. If `force` is enabled, confirmation is always `true`.
+  /// 1. Else, if run from a terminal the user will be prompted for confirmation.
+  /// 1. When not run from a terminal confirmation is always false.
   pub(crate) fn confirmed(&self, prompt: impl AsRef<str>) -> Result<bool, String> {
     if self.force {
       Ok(true)
-    } else {
-      print!("{}", prompt.as_ref());
+    } else if stdin().is_terminal() {
+      eprint!("{}", prompt.as_ref());
       let _ = stdout().lock().flush();
       let mut line = String::new();
       stdin().read_line(&mut line).expect("could not read line");
-      line = line.trim().to_string();
-      Ok(line == *"yes")
+      Ok(line.trim() == "yes")
+    } else {
+      Ok(false)
     }
   }
 
@@ -523,7 +529,6 @@ impl Context {
     }
   }
 
-  // TODO Needs better testing
   pub(crate) fn read_multi_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
     if stdin().is_terminal() {
       self.print_prompt(prompt.as_ref());
