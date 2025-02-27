@@ -106,10 +106,10 @@ lazy_static! {
       .set_default_command_executor(&PlatformShow {})
       .add_target_argument(platform_name_argument())
       .add_extra_arguments(vec![
-        app_id_argument().long("app").help_heading("Command options"),
-        service_id_argument().long("service").help_heading("Command options"),
-        vendor_name_argument().long("vendor").help_heading("Command options"),
-        vhost_id_argument().long("vhost").help_heading("Command options")
+        app_id_argument().long("app"),
+        service_id_argument().long("service"),
+        vendor_name_argument().long("vendor"),
+        vhost_id_argument().long("vhost")
       ])
   );
   static ref PLATFORM__CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
