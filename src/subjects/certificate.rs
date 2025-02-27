@@ -187,7 +187,7 @@ struct CertificateListUsage {}
 #[async_trait]
 impl CommandExecutor for CertificateListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all certificates with the applications where they are used");
+    context.print_explanation("list all certificates with the services where they are used");
     let start_instant = Instant::now();
     let certificates_with_usage: Vec<(String, CertificateStatus, Vec<UsedBy>)> = context.client_unchecked().list_certificates_with_usage().await?;
     context.print_execution_time(start_instant);
@@ -198,7 +198,7 @@ impl CommandExecutor for CertificateListUsage {
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no certificate found in apps or applications");
+      context.print_outcome("no certificate found in apps or services");
     } else {
       formatter.print()?;
     }
@@ -255,7 +255,7 @@ struct CertificateShowUsage {}
 impl CommandExecutor for CertificateShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show all applications and apps that use certificate '{}'", certificate_id));
+    context.print_explanation(format!("show all services and apps that use certificate '{}'", certificate_id));
     let start_instant = Instant::now();
     let (_, usages) = context.client_unchecked().get_certificate_with_usage(certificate_id.as_str()).await?;
     context.print_execution_time(start_instant);

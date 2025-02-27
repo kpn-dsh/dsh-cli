@@ -1,6 +1,6 @@
 # User guide
 
-When installation is complete you should be able to start the tool from the command line.
+When installation is complete you should be able to start the `dsh` tool from the command line.
 
 ```bash
 > dsh
@@ -14,7 +14,6 @@ Usage: dsh [OPTIONS] [SUBJECT/COMMAND]
 Subjects/commands:
   api          List and call DSH resource management api.
   app          Show, manage and list apps deployed from the DSH app catalog.
-  application  Show, manage and list applications deployed on the DSH.
   bucket       Show, manage and list DSH buckets.
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
@@ -23,6 +22,7 @@ Subjects/commands:
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
   secret       Show, manage and list DSH secrets.
+  service      Show, manage and list services deployed on the DSH.
   token        Request DSH tokens.
   topic        Show, manage and list DSH topics.
   vhost        Show vhost usage.
@@ -83,7 +83,7 @@ three target values are required:
 * `password` - Each combination of a `platform` and a `tenant` is considered
   a separate entity with respect to authentication and authorization,
   and therefor needs a separate `password`.
-  This password can be obtained by logging in to the DSH console application
+  This password can be obtained by logging in to the DSH console web application
   for the `platform` and `tenant`, and selecting the `Resources > Secrets` menu.
   There it will be listed as `system/rest-api-client`.
 
@@ -92,12 +92,12 @@ The values can be provided as follows:
 
 1. If the command line argument is given, use its value,
 1. else if the environment variable is specified, use its value,
-1. else if the value is defined in the settings/targets files in the program directory,
+1. else if the value is defined in the settings/targets files in the `dsh` tool directory,
    use that value,
-1. else if the tool is used from a terminal, the user will be prompted for the value.
+1. else if the `dsh` tool is used from a terminal, the user will be prompted for the value.
 
-The tool will check these possible sources for the target parameters in this order.
-Passwords can also be stored in the computer's keyring application
+The `dsh` tool will check these possible sources for the target parameters in this order.
+Passwords can also be stored in the computer's keyring
 (currently only available on OsX and Windows).
 
 Functions that do not need to access the web service do not require these target parameters.
@@ -109,7 +109,7 @@ Functions that do not need to access the web service do not require these target
 * `--tenant` - Specify the target tenant name.
 * `--password-file` - Specify the name of a file containing the target password.
   This can either be an absolute file name
-  or a file name relative to the working directory of your application.
+  or a file name relative to the working directory.
 
 ```bash
 > dsh --platform nplz --tenant my-tenant --password-file ~/.password secret list
@@ -128,14 +128,14 @@ and is not supported.
 ### Environment variables
 
 If you did not specify the target platform and/or target tenant on the command line,
-the tool will try to get the values from environment variables:
+the `dsh` tool will try to get the values from environment variables:
 
 * `DSH_CLI_PLATFORM` - Specify the target platform by providing either the full name or the alias
   (e.g. `np-aws-lz-dsh` or `nplz`).
 * `DSH_CLI_TENANT` - Specify the tenant name.
 * `DSH_CLI_PASSWORD_FILE` - Specify the name of a file containing the target password.
   This can either be an absolute file name
-  or a relative file name from the working directory of your application.
+  or a relative file name from the working directory.
 * `DSH_CLI_PASSWORD` - The password can also be specified directly from an environment variable.
 
 ```bash
@@ -153,7 +153,7 @@ see [Environment variables](environment_variables.md).
 
 If you did not specify the target platform and/or target tenant on the command line
 and the environment variables are not defined,
-the tool will try the `default-platform` and `default-tenant` values in the settings file
+the `dsh` tool will try the `default-platform` and `default-tenant` values in the settings file
 and the password from the targets files. See [Settings and targets](settings_targets.md)
 for more information.
 

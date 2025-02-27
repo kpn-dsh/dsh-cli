@@ -38,7 +38,7 @@ impl Subject for ProxySubject {
   }
 
   fn subject_command_long_about(&self) -> String {
-    "Show, manage and list Kafka proxies used by the applications/services and apps on the DSH.".to_string()
+    "Show, manage and list Kafka proxies used by the services and apps on the DSH.".to_string()
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -64,7 +64,7 @@ lazy_static! {
   );
   static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, None, "List proxies")
-      .set_long_about("Lists all Kafka proxies used by the applications/services and apps on the DSH.")
+      .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
       .set_default_command_executor(&ProxyListAll {})
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
       .set_run_all_executors(true)

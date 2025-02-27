@@ -192,24 +192,24 @@ struct TopicListUsage {}
 #[async_trait]
 impl CommandExecutor for TopicListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all scratch topics with the applications that use them");
+    context.print_explanation("list all scratch topics with the services that use them");
     let start_instant = Instant::now();
-    let (topic_ids, applications) = try_join!(
+    let (topic_ids, services) = try_join!(
       context.client_unchecked().get_topic_ids(),
       context.client_unchecked().get_application_configuration_map(),
     )?;
     context.print_execution_time(start_instant);
     let mut tuples: Vec<(String, UsedBy)> = vec![];
     for topic_id in &topic_ids {
-      let application_usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id, &applications);
-      for (application_id, application, injections) in application_usages {
+      let service_usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id, &services);
+      for (service_id, service, injections) in service_usages {
         if !injections.is_empty() {
-          tuples.push((topic_id.to_string(), UsedBy::Application(application_id, application.instances, injections)));
+          tuples.push((topic_id.to_string(), UsedBy::Application(service_id, service.instances, injections)));
         }
       }
     }
     if tuples.is_empty() {
-      context.print_outcome("no topics found in applications");
+      context.print_outcome("no topics found in services");
     } else {
       let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);
       formatter.push_target_id_value_pairs(&tuples);
@@ -289,16 +289,14 @@ struct TopicShowUsage {}
 impl CommandExecutor for TopicShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the applications that use topic '{}'", topic_id));
+    context.print_explanation(format!("show the services that use topic '{}'", topic_id));
     let start_instant = Instant::now();
-    let applications = context.client_unchecked().get_application_configuration_map().await?;
+    let services = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-    let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id.as_str(), &applications);
+    let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id.as_str(), &services);
     let used_bys = usages
       .into_iter()
-      .filter_map(
-        |(application_id, application, injections)| if injections.is_empty() { None } else { Some(UsedBy::Application(application_id.clone(), application.instances, injections)) },
-      )
+      .filter_map(|(service_id, service, injections)| if injections.is_empty() { None } else { Some(UsedBy::Application(service_id.clone(), service.instances, injections)) })
       .collect::<Vec<_>>();
     if !used_bys.is_empty() {
       let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);

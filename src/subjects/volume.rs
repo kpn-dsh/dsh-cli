@@ -78,7 +78,7 @@ lazy_static! {
       .set_run_all_executors(true)
       .add_filter_flags(vec![
         (FilterFlagType::App, Some("List all apps that use the volume.".to_string())),
-        (FilterFlagType::Application, Some("List all applications that use the volume.".to_string()))
+        (FilterFlagType::Service, Some("List all services that use the volume.".to_string()))
       ])
   );
   static ref VOLUME_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -226,7 +226,7 @@ struct VolumeListUsage {}
 #[async_trait]
 impl CommandExecutor for VolumeListUsage {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all volumes that are used in apps or applications");
+    context.print_explanation("list all volumes that are used in apps or services");
     let start_instant = Instant::now();
     let volumes_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_volumes_with_usage().await?;
     context.print_execution_time(start_instant);
@@ -237,7 +237,7 @@ impl CommandExecutor for VolumeListUsage {
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no volumes found in apps or applications");
+      context.print_outcome("no volumes found in apps or services");
     } else {
       formatter.print()?;
     }
@@ -318,7 +318,7 @@ struct VolumeShowUsage {}
 impl CommandExecutor for VolumeShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the apps and applications that use volume '{}'", volume_id));
+    context.print_explanation(format!("show the apps and services that use volume '{}'", volume_id));
     let start_instant = Instant::now();
     let (_, usages) = context.client_unchecked().get_volume_with_usage(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);

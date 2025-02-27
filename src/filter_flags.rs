@@ -5,8 +5,8 @@ use crate::filter_flags::FilterFlagType::*;
 #[derive(Debug)]
 pub(crate) enum FilterFlagType {
   App,
-  Application,
   Killed,
+  Service,
   Started,
   Stopped,
 }
@@ -15,8 +15,8 @@ impl FilterFlagType {
   pub(crate) fn id(&self) -> &'static str {
     match &self {
       App => "app-flag",
-      Application => "application-flag",
       Killed => "killed-flag",
+      Service => "service-flag",
       Started => "started-flag",
       Stopped => "stopped-flag",
     }
@@ -25,8 +25,8 @@ impl FilterFlagType {
   pub(crate) fn option(&self) -> &'static str {
     match &self {
       App => "app",
-      Application => "application",
       Killed => "killed",
+      Service => "service",
       Started => "started",
       Stopped => "stopped",
     }
@@ -35,8 +35,8 @@ impl FilterFlagType {
   pub(crate) fn shortcut(&self) -> Option<char> {
     match &self {
       App => None,
-      Application => None,
       Killed => None,
+      Service => None,
       Started => None,
       Stopped => None,
     }
@@ -46,8 +46,8 @@ impl FilterFlagType {
 pub(crate) fn create_filter_flag(flag_type: &FilterFlagType, subject: &str, long_help: Option<&str>) -> Arg {
   match flag_type {
     App => app_flag(subject, long_help),
-    Application => application_flag(subject, long_help),
     Killed => killed_flag(subject, long_help),
+    Service => service_flag(subject, long_help),
     Started => started_flag(subject, long_help),
     Stopped => stopped_flag(subject, long_help),
   }
@@ -57,12 +57,12 @@ fn app_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_filter_flag(App, subject, format!("Include apps related to this {}.", subject), long_help)
 }
 
-fn application_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_filter_flag(Application, subject, format!("Include applications related to this {}.", subject), long_help)
-}
-
 fn killed_flag(subject: &str, long_help: Option<&str>) -> Arg {
   create_clap_filter_flag(Killed, subject, format!("Include killed {}'s.", subject), long_help)
+}
+
+fn service_flag(subject: &str, long_help: Option<&str>) -> Arg {
+  create_clap_filter_flag(Service, subject, format!("Include services related to this {}.", subject), long_help)
 }
 
 fn started_flag(subject: &str, long_help: Option<&str>) -> Arg {

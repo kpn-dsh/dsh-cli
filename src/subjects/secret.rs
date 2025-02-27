@@ -39,11 +39,7 @@ impl Subject for SecretSubject {
   }
 
   fn subject_command_long_about(&self) -> String {
-    "Show, manage and list secrets used by the applications/services and apps on the DSH.".to_string()
-  }
-
-  fn subject_command_alias(&self) -> Option<&str> {
-    Some("s")
+    "Show, manage and list secrets used by the services and apps on the DSH.".to_string()
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -71,7 +67,7 @@ lazy_static! {
   );
   static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List secrets")
-      .set_long_about("Lists all secrets used by the applications/services and apps on the DSH.")
+      .set_long_about("Lists all secrets used by the services and apps on the DSH.")
       .set_default_command_executor(&SecretListIds {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
@@ -80,7 +76,7 @@ lazy_static! {
       ])
       .add_filter_flags(vec![
         (FilterFlagType::App, Some("List all apps that use the secret.".to_string())),
-        (FilterFlagType::Application, Some("List all applications that use the secret.".to_string())),
+        (FilterFlagType::Service, Some("List all services that use the secret.".to_string())),
       ])
   );
   static ref SECRET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -221,7 +217,7 @@ struct SecretListUsage {}
 #[async_trait]
 impl CommandExecutor for SecretListUsage {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all secrets that are used in apps or applications");
+    context.print_explanation("list all secrets that are used in apps or services");
     let start_instant = Instant::now();
     let secrets_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_secrets_with_usage().await?;
     context.print_execution_time(start_instant);
@@ -232,7 +228,7 @@ impl CommandExecutor for SecretListUsage {
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no secrets found in apps or applications");
+      context.print_outcome("no secrets found in apps or services");
     } else {
       formatter.print()?;
     }
@@ -317,7 +313,7 @@ struct SecretShowUsage {}
 impl CommandExecutor for SecretShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the apps and applications that use secret '{}'", secret_id));
+    context.print_explanation(format!("show the apps and services that use secret '{}'", secret_id));
     let start_instant = Instant::now();
     let usages = context.client_unchecked().get_secret_with_usage(secret_id.as_str()).await?;
     context.print_execution_time(start_instant);

@@ -4,7 +4,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.5.1] - yyyy-mm-dd
+## [0.6.0] - yyyy-mm-dd
 
 ### Added
 
@@ -12,6 +12,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Changed
 
+* Renamed subject `application` to `service`. This results in changed commands and options.
 * Simplified json output.
 * Better rendering of empty results.
 

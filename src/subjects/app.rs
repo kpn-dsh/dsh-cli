@@ -21,9 +21,9 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::application::APPLICATION_LABELS_SHOW;
 use crate::subjects::bucket::BUCKET_LABELS;
 use crate::subjects::certificate::CERTIFICATE_LABELS_SHOW;
+use crate::subjects::service::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
 use crate::subjects::vhost::VHOST_LABELS;
 use crate::subjects::volume::VOLUME_LABELS;
@@ -134,8 +134,8 @@ impl CommandExecutor for AppShowAll {
     context.print_execution_time(start_instant);
     for (resource_name, resource) in &app.resources {
       match resource {
-        AppCatalogAppResourcesValue::Application(application) => {
-          UnitFormatter::new(resource_name, &APPLICATION_LABELS_SHOW, Some("application resource"), context).print(application)?;
+        AppCatalogAppResourcesValue::Application(service) => {
+          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, Some("service resource"), context).print(service)?;
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
           UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket)?;
