@@ -405,7 +405,9 @@ impl CommandExecutor for ApplicationStart {
     match context.client_unchecked().get_application_configuration(application_id.as_str()).await {
       Ok(mut configuration) => {
         if configuration.instances > 0 {
-          context.print_warning(format!("service '{}' already started", application_id));
+          context.print_warning(format!("service '{}' already running", application_id));
+        } else if context.dry_run {
+          context.print_warning("dry-run mode, application not started");
         } else {
           configuration.instances = instances;
           context
@@ -447,6 +449,8 @@ impl CommandExecutor for ApplicationStop {
         let running_instances = configuration.instances;
         if running_instances == 0 {
           context.print_warning(format!("service '{}' not running", application_id));
+        } else if context.dry_run {
+          context.print_warning("dry-run mode, application not stopped");
         } else {
           configuration.instances = 0;
           context
