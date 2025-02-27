@@ -110,7 +110,7 @@ impl CommandExecutor for TargetDelete {
         };
         if context.confirmed(prompt)? {
           if context.dry_run {
-            context.print_warning(format!("dry-run mode, target {} not deleted", target));
+            context.print_warning(format!("dry-run mode, target '{}' not deleted", target));
           } else {
             delete_target(&platform, &tenant)?;
             if target.password.is_some() {
@@ -184,17 +184,17 @@ impl CommandExecutor for TargetNew {
     let tenant = get_tenant_argument_or_prompt(matches)?;
     if let Some(existing_target) = read_target(&platform, &tenant)? {
       return Err(format!(
-        "target configuration {} already exists (first delete the existing target configuration)",
+        "target configuration '{}' already exists (first delete the existing target configuration)",
         existing_target
       ));
     };
     let password = context.read_single_line_password("enter password: ")?;
     let target = Target::new(platform, tenant, Some(password))?;
     if context.dry_run {
-      context.print_warning(format!("dry-run mode, target {} not created", target));
+      context.print_warning(format!("dry-run mode, target '{}' not created", target));
     } else {
       upsert_target(&target)?;
-      context.print_outcome(format!("target {} created", target));
+      context.print_outcome(format!("target '{}' created", target));
     }
     Ok(())
   }
