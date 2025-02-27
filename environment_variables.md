@@ -16,7 +16,7 @@ it is much more convenient to make some settings persistent via environment vari
             Set this environment variable to override the default list of available platforms.
             The value of the environment variable must be the name 
             of the alternative platforms file. It can either be an absolute file name, 
-            or a relative file name from the working directory of your application. 
+            or a relative file name from the working directory. 
             When this environment variable is set, the normal list of default platforms 
             will <em>not</em> be included. If you need these too, make sure that you also 
             include the default platforms in your platforms file.
@@ -29,7 +29,7 @@ it is much more convenient to make some settings persistent via environment vari
             This environment variable specifies the quote character that will be used 
             when printing csv data. If this variable is not provided, the value from the 
             settings file will be used. The default setting is not to use any quote characters.
-            Note that the tool will fail when the generated output already contains 
+            Note that the <code>dsh</code> tool will fail when the generated output already contains 
             the quote character.
         </td>
     </tr>
@@ -39,14 +39,14 @@ it is much more convenient to make some settings persistent via environment vari
             This environment variable specifies the separator string that will be used 
             when printing csv data. If this variable is not provided, the value from the 
             settings file will be used. The default separator is <code>","</code> (comma).
-            Note that the tool will fail when the generated output already contains 
+            Note that the <code>dsh</code> tool will fail when the generated output already contains 
             the csv separator string.
         </td>
     </tr>
     <tr valign="top">
         <td><code>DSH_CLI_DRY_RUN</code></td>
         <td>
-            If this environment variable is set (to any value) the tool will not call 
+            If this environment variable is set (to any value) the <code>dsh</code> tool will not call 
             any api operations that could potentially make changes, like delete, create or change.
             The input parameters will be validated and checked.
             The same effect can be accomplished via the <code>--dry-run</code>
@@ -64,7 +64,7 @@ it is much more convenient to make some settings persistent via environment vari
     <tr valign="top">
         <td><code>DSH_CLI_LOG_LEVEL</code></td>
         <td> 
-            Use this environment variable to set the log level of the tool.
+            Use this environment variable to set the log level of the <code>dsh</code> tool.
             The available log levels are:
             <ul>
               <li><code>off</code> - Logging is off</li>
@@ -211,7 +211,7 @@ it is much more convenient to make some settings persistent via environment vari
     <tr valign="top">
         <td><code>DSH_CLI_QUIET</code></td>
         <td>
-            When this environment variable is set (to any value) the tool will run in quiet mode, 
+            When this environment variable is set (to any value) the <code>dsh</code> tool will run in quiet mode, 
             meaning that no output will be produced to the terminal 
             (<code>stdout</code> and <code>stderr</code>).
             This environment variable can be overridden via the 

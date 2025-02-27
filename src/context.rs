@@ -382,10 +382,10 @@ impl Context {
 
   /// # Prints the output to stdout
   ///
-  /// This method is used to print the output of the tool to the standard output device.
+  /// This method is used to print the output of the `dsh` tool to the standard output device.
   /// If `quiet` is `true`, nothing will be printed.
   /// This standard output device can either be a tty, a pipe or an output file,
-  /// depending on how the tool was run from a shell or script.
+  /// depending on how the `dsh` tool was run from a shell or script.
   pub(crate) fn print<T: AsRef<str>>(&self, output: T) {
     if !self.quiet {
       println!("{}", output.as_ref());
@@ -394,11 +394,11 @@ impl Context {
 
   /// # Prints serializable output to stdout
   ///
-  /// This method is used to print a serialized version of the output of the tool
+  /// This method is used to print a serialized version of the output of the `dsh` tool
   /// to the standard output device.
   /// If `quiet` is `true`, nothing will be printed.
   /// This standard output device can either be a tty, a pipe or an output file,
-  /// depending on how the tool was run from a shell or script.
+  /// depending on how the `dsh` tool was run from a shell or script.
   pub(crate) fn print_serializable<T: Serialize>(&self, output: T) {
     if !self.quiet {
       match self.output_format {
@@ -445,7 +445,7 @@ impl Context {
 
   /// # Prints the outcome to stderr
   ///
-  /// This method is used to print the outcome of the tool to the standard error device.
+  /// This method is used to print the outcome of the `dsh` tool to the standard error device.
   /// The outcome is not the output of the tool, but indicates whether a function was
   /// successful or not.
   /// This method is typically used when the function has side effects,
@@ -465,7 +465,7 @@ impl Context {
   /// # Prints a warning to stderr
   ///
   /// This method is used to print a warning to the standard error device.
-  /// The warning is not the output of the tool, but indicates a special situation.
+  /// The warning is not the output of the `dsh` tool, but indicates a special situation.
   /// This method is typically used when the function behaves differently
   /// then the user might expect, like when the `--dry-run` option was provided.
   /// If `--quiet` is provided or `--verbosity` is `off`, nothing will be printed.

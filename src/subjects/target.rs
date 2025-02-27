@@ -40,9 +40,9 @@ impl Subject for TargetSubject {
     A target configuration consists of a platform name, a tenant name \
     and the tenant's api password for the platform. \
     The target command can be used to create, list and delete target configurations. \
-    The target configurations will be stored in the application's home directory, \
+    The target configurations will be stored in the dsh tool's home directory, \
     except for the password, which will be stored in the more secure \
-    keyring application of your computer."
+    keyring of your computer."
       .to_string()
   }
 
@@ -83,7 +83,7 @@ lazy_static! {
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant and password. \
         The platform and tenant will be stored in an unencrypted configuration file. \
-        The password will be stored in your computers keyring application, which is more secure.",
+        The password will be stored in your computer's keyring, which is more secure.",
       )
       .set_default_command_executor(&TargetNew {})
       .add_target_argument(platform_name_argument().required(true))

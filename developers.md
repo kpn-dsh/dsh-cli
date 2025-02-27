@@ -12,7 +12,7 @@ First clone the repository to your local machine:
 > cd dsh-cli
 ```
 
-Then you can for example install the tool on your local machine using:
+Then you can for example install the `dsh` tool on your local machine using:
 
 ```bash
 > cargo install --path .
@@ -27,7 +27,7 @@ When developing, it is convenient to set an alias:
 > alias dsh-dev="cargo run --package dsh --bin dsh --"
 ````
 
-You can then easily run the tool without installing it:
+You can then easily run the `dsh` tool without installing it:
 
 ```bash
 > dsh-dev platform list
@@ -48,7 +48,7 @@ should specify the dependency:
 dsh_api = { version = "0.5.1", features = ["generic"] }
 ```
 
-The `generic` feature must be enabled. The cli tool has some optional features specified,
+The `generic` feature must be enabled. The `dsh` tool has some optional features specified,
 which correspond to features of the `dsh_api` crate with the same name:
 
 ```toml
@@ -58,7 +58,7 @@ manage = ["dsh_api/manage"]
 robot = ["dsh_api/robot"]
 ```
 
-Because of the strong dependencies between the tool and the library,
+Because of the strong dependencies between the `dsh` tool and the library,
 they are often been worked on at the same time.
 In that case it is convenient to set the dependency to the local copy of the library:
 
@@ -66,7 +66,7 @@ In that case it is convenient to set the dependency to the local copy of the lib
 dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
 ```
 
-However, when you publish the tool make sure that you set the dependency
+However, when you publish the `dsh` tool make sure that you set the dependency
 back to the `crates.io` version of the library,
 
 ### Coding guidelines
@@ -77,32 +77,40 @@ return without any remarks:
 
 ```bash
 > cargo +nightly fmt --check
-```
-
-```bash
-> cargo clippy
+> cargo clippy --all-features
 ```
 
 Consider configuring your IDE to automatically apply the formatting rules when saving a file.
 
-## Testing
+## Unit testing
 
-The `tests` directory contains a number of shell scripts that will run a
-fairly large number of command automatically. This is not a full test,
-but it will catch many bugs which have to do with the command line part of the application.
-The tests need to be run from within the `tests` directory.
+Be sure to include the `--all-features` flag when you run the unit tests:
 
 ```bash
-> cd tests
-> ./run_all_safe_commands.sh
+> cargo test --all-features
 ```
 
-This will run many commands and print the output to the terminal.
+## Integration testing
+
+The `tests` directory contains some shell scripts that will run a
+fairly large number of commands in sequence. This is not a full test,
+but it will catch many bugs which have to do with the command line part of the program.
+The tests need to be run from within the `tests` directory.
+
+### `run_commands.sh`
+
+This will run many correct commands and print the output to `stdout` (and possibly `stderr`).
 Be careful that if you redirect the output to a file,
 the default output format will be `json` instead of `table`.
 If you want to check the `table` rendering from a file,
-you have to explicitly specify the format.
+you have to explicitly change the output format in the script file.
 
-```bash
-> ./run_all_safe_commands.sh --output-format table > output-table.txt
-```
+### `run_erroneous_commands.sh`
+
+This will run many erroneous commands and print the error message to `stderr`.
+All commands must produce a controlled error message and never terminate in panic.
+
+### `run_platform_open_commands.sh`
+
+This will run some `dsh platform open` commands which will try to open DSH resources and web
+applications. If successful, you will have some open tabs in your browser.

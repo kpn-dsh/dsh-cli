@@ -8,14 +8,14 @@
 
 This project provides a tool to call functions on the DSH resource management API from the
 command line of your workstation or from a script.
-Some of the capabilities of the tool are:
+Some of the capabilities of the `dsh` tool are:
 
 * Calling all operations exposed in the DSH resource management API
   from either the command line or from a script.
 * Many additional and easier to use functions are provided.
 * Extensive help information on each level using the `--help` and `-h` flags,
   including listings of all available operations.
-* Configuring platform and tenant credentials interactively via the tool.
+* Configuring platform and tenant credentials interactively via the `dsh` tool.
   Sensitive passwords are stored in your computer's keychain, if available.
 * Retrieving information about the available platforms.
 * Opening web applications (e.g. the console, the swagger ui or the vhost of your app or service)
@@ -26,7 +26,7 @@ Some of the capabilities of the tool are:
 ## Features
 
 By enabling/disabling the features described below you have some control over what's included
-in the tool and what's not. The features are all disabled by default.
+in the `dsh` tool and what's not. The features are all disabled by default.
 The following features are defined:
 
 * `appcatalog` - Enables the app catalog methods.
@@ -35,7 +35,7 @@ The following features are defined:
 
 ## Installation
 
-If you have the `rust` tool chain installed, the DSH Api Command Line Tool (`dsh`) can be
+If you have the `rust` tool-chain installed, the DSH Api Command Line Tool (`dsh`) can be
 installed on your local machine directly from `crates.io` by executing the following command.
 
 ```bash

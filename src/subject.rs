@@ -59,7 +59,7 @@ impl Requirements {
   }
 }
 
-// A subject represents something that the tool can act upon, such as an Application,
+// A subject represents something that the dsh tool can act upon, such as an Application,
 // a Secret, a Target or the API itself.
 // The subject is always selected by the first command on the command line.
 #[async_trait]

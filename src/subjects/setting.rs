@@ -115,7 +115,7 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .value_parser(EnumValueParser::<LogLevel>::new())
           .required(required),
       )
-      .about("Log level for the dsh cli tool"),
+      .about("Log level for the dsh tool"),
     Command::new(SETTING_LOG_LEVEL_API)
       .arg(
         Arg::new(SETTING_LOG_LEVEL_API)
