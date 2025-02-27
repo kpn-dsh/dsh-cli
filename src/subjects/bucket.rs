@@ -81,8 +81,8 @@ impl CommandExecutor for BucketListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all buckets with their parameters");
     let start_instant = Instant::now();
-    let bucket_ids = context.dsh_api_client.as_ref().unwrap().list_bucket_ids().await?;
-    let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| context.dsh_api_client.as_ref().unwrap().get_bucket(id.as_str()))).await?;
+    let bucket_ids = context.client_unchecked().list_bucket_ids().await?;
+    let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| context.client_unchecked().get_bucket(id.as_str()))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&BUCKET_STATUS_LABELS, None, context);
     formatter.push_target_ids_and_values(bucket_ids.as_slice(), bucket_statuses.as_slice());
@@ -102,7 +102,7 @@ impl CommandExecutor for BucketListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all bucket ids");
     let start_instant = Instant::now();
-    let bucket_ids = context.dsh_api_client.as_ref().unwrap().list_bucket_ids().await?;
+    let bucket_ids = context.client_unchecked().list_bucket_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("bucket id", context);
     formatter.push_target_ids(&bucket_ids);
@@ -123,7 +123,7 @@ impl CommandExecutor for BucketShowAll {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for bucket '{}'", bucket_id));
     let start_instant = Instant::now();
-    let bucket = context.dsh_api_client.as_ref().unwrap().get_bucket(bucket_id.as_str()).await?;
+    let bucket = context.client_unchecked().get_bucket(bucket_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket)
   }

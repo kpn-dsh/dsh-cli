@@ -73,7 +73,7 @@ impl CommandExecutor for VhostListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list applications with a vhost configuration");
     let start_instant = Instant::now();
-    let vhosts_with_usage: Vec<(String, Vec<UsedBy>)> = context.dsh_api_client.as_ref().unwrap().list_vhosts_with_usage().await?;
+    let vhosts_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_vhosts_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("vhost"), context);
     for (vhost, used_bys) in &vhosts_with_usage {
@@ -98,7 +98,7 @@ impl CommandExecutor for VhostListUsage {
 //     let vhost_target = target.unwrap_or_else(|| unreachable!());
 //     context.print_explanation(format!("show the applications that use vhost '{}'", vhost_target));
 //     let start_instant = Instant::now();
-//     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+//     let applications = context.client_unchecked().get_applications().await?;
 //     context.print_execution_time(start_instant);
 //     let mut builder = StringTableBuilder::new(&["application", "port", "a-zone"], context);
 //     for (application_id, application) in &applications {

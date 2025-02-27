@@ -83,7 +83,7 @@ impl CommandExecutor for ManifestListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifests");
     let start_instant = Instant::now();
-    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().get_appcatalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.client_unchecked().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
@@ -114,7 +114,7 @@ impl CommandExecutor for ManifestListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifest ids");
     let start_instant = Instant::now();
-    let manifest_ids: Vec<String> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifest_ids().await?;
+    let manifest_ids: Vec<String> = context.client_unchecked().list_app_catalog_manifest_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("manifest id", context);
     formatter.push_target_ids(&manifest_ids);
@@ -135,7 +135,7 @@ impl CommandExecutor for ManifestShowAll {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app catalog manifest '{}'", manifest_id));
     let start_instant = Instant::now();
-    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().get_appcatalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.client_unchecked().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();

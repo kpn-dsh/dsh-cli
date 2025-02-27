@@ -92,13 +92,8 @@ impl CommandExecutor for CertificateListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their parameters");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
-    let certificate_statuses = futures::future::join_all(
-      certificate_ids
-        .iter()
-        .map(|id| context.dsh_api_client.as_ref().unwrap().get_certificate(id.as_str())),
-    )
-    .await;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
+    let certificate_statuses = futures::future::join_all(certificate_ids.iter().map(|id| context.client_unchecked().get_certificate(id.as_str()))).await;
     context.print_execution_time(start_instant);
     let certificates_statuses_unwrapped = certificate_statuses
       .iter()
@@ -122,11 +117,11 @@ impl CommandExecutor for CertificateListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their allocation status");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
     let allocation_statuses = try_join_all(
       certificate_ids
         .iter()
-        .map(|certificate_id| context.dsh_api_client.as_ref().unwrap().get_certificate_status(certificate_id)),
+        .map(|certificate_id| context.client_unchecked().get_certificate_status(certificate_id)),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -148,11 +143,11 @@ impl CommandExecutor for CertificateListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their configuration");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
     let certificates = try_join_all(
       certificate_ids
         .iter()
-        .map(|id| context.dsh_api_client.as_ref().unwrap().get_certificate_configuration(id.as_str())),
+        .map(|id| context.client_unchecked().get_certificate_configuration(id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -174,7 +169,7 @@ impl CommandExecutor for CertificateListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificate ids");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("certificate id", context);
     formatter.push_target_ids(&certificate_ids);
@@ -194,7 +189,7 @@ impl CommandExecutor for CertificateListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with the applications where they are used");
     let start_instant = Instant::now();
-    let certificates_with_usage: Vec<(String, CertificateStatus, Vec<UsedBy>)> = context.dsh_api_client.as_ref().unwrap().list_certificates_with_usage().await?;
+    let certificates_with_usage: Vec<(String, CertificateStatus, Vec<UsedBy>)> = context.client_unchecked().list_certificates_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("certificate id"), context);
     for (certificate_id, _certificate, used_bys) in &certificates_with_usage {
@@ -223,7 +218,7 @@ impl CommandExecutor for CertificateShowAll {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let certificate = context.dsh_api_client.as_ref().unwrap().get_certificate(certificate_id.as_str()).await?;
+    let certificate = context.client_unchecked().get_certificate(certificate_id.as_str()).await?;
     if let Some(actual_certificate) = certificate.actual {
       context.print_execution_time(start_instant);
       UnitFormatter::new(certificate_id, &CERTIFICATE_LABELS_SHOW, None, context).print(&actual_certificate)?;
@@ -244,7 +239,7 @@ impl CommandExecutor for CertificateShowAllocationStatus {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_certificate_status(certificate_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_certificate_status(certificate_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(certificate_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("certificate id"), context).print(&allocation_status)
   }
@@ -262,7 +257,7 @@ impl CommandExecutor for CertificateShowUsage {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all applications and apps that use certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let (_, usages) = context.dsh_api_client.as_ref().unwrap().get_certificate_with_usage(certificate_id.as_str()).await?;
+    let (_, usages) = context.client_unchecked().get_certificate_with_usage(certificate_id.as_str()).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("certificate not used")

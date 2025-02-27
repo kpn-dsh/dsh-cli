@@ -70,7 +70,7 @@ impl CommandExecutor for MetricList {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation("find exported metrics in applications");
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
+    let applications = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let metrics_usage = metrics_usage_from_applications(&applications, include_started, include_stopped);
     if metrics_usage.is_empty() {

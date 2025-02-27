@@ -212,7 +212,7 @@ impl CommandExecutor for ApiDelete {
           .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
           .collect::<Vec<_>>();
         let start_instant = Instant::now();
-        context.dsh_api_client.as_ref().unwrap().delete(selector, &parameters).await?;
+        context.client_unchecked().delete(selector, &parameters).await?;
         context.print_execution_time(start_instant);
         context.print_outcome("deleted");
       }
@@ -241,7 +241,7 @@ impl CommandExecutor for ApiGet {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let start_instant = Instant::now();
-    let response = context.dsh_api_client.as_ref().unwrap().get(selector, &parameters).await?;
+    let response = context.client_unchecked().get(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_serializable(response);
     Ok(())
@@ -268,7 +268,7 @@ impl CommandExecutor for ApiHead {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let start_instant = Instant::now();
-    context.dsh_api_client.as_ref().unwrap().head(selector, &parameters).await?;
+    context.client_unchecked().head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_outcome("ok");
     Ok(())
@@ -300,7 +300,7 @@ impl CommandExecutor for ApiPatch {
       Ok(())
     } else {
       let start_instant = Instant::now();
-      context.dsh_api_client.as_ref().unwrap().patch(selector, &parameters, body).await?;
+      context.client_unchecked().patch(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("patched");
       Ok(())
@@ -331,7 +331,7 @@ impl CommandExecutor for ApiPost {
       Ok(())
     } else {
       let start_instant = Instant::now();
-      context.dsh_api_client.as_ref().unwrap().post(selector, &parameters, body).await?;
+      context.client_unchecked().post(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("posted");
       Ok(())
@@ -362,7 +362,7 @@ impl CommandExecutor for ApiPut {
       Ok(())
     } else {
       let start_instant = Instant::now();
-      context.dsh_api_client.as_ref().unwrap().put(selector, &parameters, body).await?;
+      context.client_unchecked().put(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("put");
       Ok(())

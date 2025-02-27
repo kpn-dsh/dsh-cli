@@ -232,7 +232,7 @@ impl PlatformOpen {
 
   async fn open_swagger(context: &Context) -> DshCliResult {
     let platform = context.target_platform.clone().unwrap();
-    let token = match context.dsh_api_client.as_ref() {
+    let token = match context.client() {
       Some(client) => match client.token().await {
         Ok(token) => {
           debug!("token fetched");

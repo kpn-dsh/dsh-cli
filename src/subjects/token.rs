@@ -71,9 +71,7 @@ impl CommandExecutor for TokenFetch {
     let start_instant = Instant::now();
 
     let access_token = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
+      .client_unchecked()
       .token_fetcher()
       .fetch_access_token_from_server()
       .await
@@ -97,9 +95,7 @@ impl CommandExecutor for TokenShow {
     let start_instant = Instant::now();
 
     let access_token = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
+      .client_unchecked()
       .token_fetcher()
       .fetch_access_token_from_server()
       .await

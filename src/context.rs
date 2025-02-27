@@ -32,7 +32,7 @@ pub(crate) struct Context {
   pub(crate) csv_quote: Option<char>,
   pub(crate) csv_separator: String,
   pub(crate) dry_run: bool,
-  pub(crate) dsh_api_client: Option<DshApiClient>,
+  dsh_api_client: Option<DshApiClient>,
   pub(crate) force: bool,
   pub(crate) matching_style: Option<MatchingStyle>,
   pub(crate) no_escape: bool,
@@ -112,6 +112,19 @@ impl Context {
       _stdout_escape: stdout_escape,
       verbosity,
     })
+  }
+
+  /// Get client without check
+  ///
+  /// This method will panic when no client was created.
+  /// Make sure to have a pre-emptive indication that a client will be available
+  /// by setting the proper `Requirements` in your `CommandExecutor` implementation.
+  pub(crate) fn client_unchecked(&self) -> &DshApiClient {
+    self.dsh_api_client.as_ref().unwrap_or_else(|| unreachable!())
+  }
+
+  pub(crate) fn client(&self) -> Option<&DshApiClient> {
+    self.dsh_api_client.as_ref()
   }
 
   pub(crate) fn confirmed(&self, prompt: impl AsRef<str>) -> Result<bool, String> {
