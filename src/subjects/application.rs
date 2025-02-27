@@ -1,21 +1,12 @@
-use crate::formatters::formatter::{hashmap_to_table, Label, SubjectFormatter};
-use async_trait::async_trait;
-use chrono::DateTime;
-use clap::ArgMatches;
-use dsh_api::application::parse_image_string;
-use dsh_api::types::Application;
-use dsh_api::types::{Task, TaskStatus};
-use futures::future::try_join_all;
-use lazy_static::lazy_static;
-use serde::Serialize;
-use std::time::Instant;
-
 use crate::arguments::application_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{
+  Capability, CommandExecutor, DELETE_COMMAND, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
+use crate::formatters::formatter::{hashmap_to_table, Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -23,6 +14,17 @@ use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{include_started_stopped, DshCliResult};
+use async_trait::async_trait;
+use chrono::DateTime;
+use clap::{builder, Arg, ArgAction, ArgMatches};
+use dsh_api::application::parse_image_string;
+use dsh_api::types::Application;
+use dsh_api::types::{Task, TaskStatus};
+use dsh_api::DshApiError;
+use futures::future::try_join_all;
+use lazy_static::lazy_static;
+use serde::Serialize;
+use std::time::Instant;
 
 pub(crate) struct ApplicationSubject {}
 
@@ -48,8 +50,13 @@ impl Subject for ApplicationSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      DELETE_COMMAND => Some(APPLICATION_DELETE_CAPABILITY.as_ref()),
+      DEPLOY_COMMAND => Some(APPLICATION_DEPLOY_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(APPLICATION_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(APPLICATION_SHOW_CAPABILITY.as_ref()),
+      START_COMMAND => Some(APPLICATION_START_CAPABILITY.as_ref()),
+      STOP_COMMAND => Some(APPLICATION_STOP_CAPABILITY.as_ref()),
+      UPDATE_COMMAND => Some(APPLICATION_UPDATE_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -60,6 +67,19 @@ impl Subject for ApplicationSubject {
 }
 
 lazy_static! {
+  static ref APPLICATION_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete application")
+      .set_long_about("Deletes an application from the DSH platform.")
+      .set_default_command_executor(&ApplicationDelete {})
+      .add_target_argument(application_id_argument().required(true))
+  );
+  static ref APPLICATION_DEPLOY_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DEPLOY_COMMAND, None, "Deploy application")
+      .set_long_about("Deploy a new application.")
+      .set_default_command_executor(&ApplicationDeploy {})
+      .add_target_argument(application_id_argument().required(true))
+      .add_extra_argument(instances_flag())
+  );
   static ref APPLICATION_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List applications")
       .set_long_about(
@@ -89,7 +109,102 @@ lazy_static! {
       ])
       .add_target_argument(application_id_argument().required(true))
   );
-  static ref APPLICATION_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APPLICATION_LIST_CAPABILITY.as_ref(), APPLICATION_SHOW_CAPABILITY.as_ref()];
+  static ref APPLICATION_START_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(START_COMMAND, None, "Start application")
+      .set_long_about("Starts an already deployed application.")
+      .set_default_command_executor(&ApplicationStart {})
+      .add_target_argument(application_id_argument().required(true))
+      .add_extra_argument(instances_flag())
+  );
+  static ref APPLICATION_STOP_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(STOP_COMMAND, None, "Stop application")
+      .set_long_about("Stops a running application, by setting the number of instances to 0.")
+      .set_default_command_executor(&ApplicationStop {})
+      .add_target_argument(application_id_argument().required(true))
+  );
+  static ref APPLICATION_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(UPDATE_COMMAND, None, "Update application")
+      .set_long_about("Update an already deployed application.")
+      .set_default_command_executor(&ApplicationUpdate {})
+      .add_target_argument(application_id_argument().required(true))
+      .add_extra_argument(instances_flag())
+  );
+  static ref APPLICATION_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
+    APPLICATION_DELETE_CAPABILITY.as_ref(),
+    APPLICATION_DEPLOY_CAPABILITY.as_ref(),
+    APPLICATION_LIST_CAPABILITY.as_ref(),
+    APPLICATION_SHOW_CAPABILITY.as_ref(),
+    APPLICATION_START_CAPABILITY.as_ref(),
+    APPLICATION_STOP_CAPABILITY.as_ref(),
+    APPLICATION_UPDATE_CAPABILITY.as_ref()
+  ];
+}
+
+fn instances_flag() -> Arg {
+  Arg::new("instances")
+    .long("instances")
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
+    .value_name("INSTANCES")
+    .help("Number of instances.")
+    .long_help("Number of application instances that will be started.")
+}
+
+struct ApplicationDelete {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationDelete {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("delete application '{}'", application_id));
+    if context.client_unchecked().get_application_configuration(&application_id).await.is_err() {
+      return Err(format!("application '{}' does not exist", application_id));
+    }
+    if context.confirmed(format!("type 'yes' to delete application '{}': ", application_id).as_str())? {
+      if context.dry_run {
+        context.print_warning("dry-run mode, application not deleted");
+      } else {
+        context.client_unchecked().delete_application_configuration(application_id.as_str()).await?;
+        context.print_outcome(format!("application '{}' deleted", application_id));
+      }
+    } else {
+      context.print_outcome(format!("cancelled, application '{}' not deleted", application_id));
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
+}
+
+struct ApplicationDeploy {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationDeploy {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    if context.client_unchecked().get_application_configuration(&application_id).await.is_ok() {
+      return Err(format!("application '{}' already exists", application_id));
+    }
+    context.print_explanation(format!("deploy application '{}'", application_id));
+    let configuration = context.read_multi_line("enter json configuration text (terminate input with ctrl-d after last line)")?;
+    match serde_json::from_str::<Application>(&configuration) {
+      Ok(application) => {
+        if context.dry_run {
+          Ok(context.print_warning("dry-run mode, application not deployed"))
+        } else {
+          context.client_unchecked().put_application_configuration(&application_id, &application).await?;
+          Ok(context.print_outcome(format!("application '{}' deployed", application_id)))
+        }
+      }
+      Err(error) => Err(format!("invalid json configuration ({})", error)),
+    }
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct ApplicationListAll {}
@@ -97,9 +212,9 @@ struct ApplicationListAll {}
 #[async_trait]
 impl CommandExecutor for ApplicationListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all applications with their parameters");
+    context.print_explanation("list all deployed services with their parameters");
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
+    let applications = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut application_ids = applications.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     application_ids.sort();
@@ -128,11 +243,11 @@ impl CommandExecutor for ApplicationListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all applications with their allocation status");
     let start_instant = Instant::now();
-    let application_ids = context.dsh_api_client.as_ref().unwrap().list_application_ids().await?;
+    let application_ids = context.client_unchecked().list_application_ids().await?;
     let allocation_statuses = try_join_all(
       application_ids
         .iter()
-        .map(|application_id| context.dsh_api_client.as_ref().unwrap().get_application_status(application_id.as_str())),
+        .map(|application_id| context.client_unchecked().get_application_status(application_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -154,7 +269,7 @@ impl CommandExecutor for ApplicationListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all application ids");
     let start_instant = Instant::now();
-    let ids = context.dsh_api_client.as_ref().unwrap().list_application_ids().await?;
+    let ids = context.client_unchecked().list_application_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("application id", context);
     formatter.push_target_ids(ids.as_slice());
@@ -185,11 +300,11 @@ impl CommandExecutor for ApplicationListTasks {
     }
     context.print_explanation("list all applications with their tasks");
     let start_instant = Instant::now();
-    let application_ids = context.dsh_api_client.as_ref().unwrap().get_task_ids().await?;
+    let application_ids = context.client_unchecked().get_task_ids().await?;
     let tasks: Vec<Vec<String>> = try_join_all(
       application_ids
         .iter()
-        .map(|application_id| context.dsh_api_client.as_ref().unwrap().get_task_appid_ids(application_id.as_str())),
+        .map(|application_id| context.client_unchecked().get_task_appid_ids(application_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -217,12 +332,7 @@ impl CommandExecutor for ApplicationShowAll {
     let application_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for application '{}'", application_id));
     let start_instant = Instant::now();
-    let application = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
-      .get_application_configuration(application_id.as_str())
-      .await?;
+    let application = context.client_unchecked().get_application_configuration(application_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(application_id, &APPLICATION_LABELS_SHOW, Some("application id"), context).print(&application)
   }
@@ -240,7 +350,7 @@ impl CommandExecutor for ApplicationShowAllocationStatus {
     let application_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show allocation status for application '{}'", application_id));
     let start_instant = Instant::now();
-    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_application_status(application_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_application_status(application_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(application_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("application id"), context).print(&allocation_status)
   }
@@ -258,11 +368,11 @@ impl CommandExecutor for ApplicationShowTasks {
     let application_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all tasks for application '{}'", application_id));
     let start_instant = Instant::now();
-    let task_ids = context.dsh_api_client.as_ref().unwrap().get_task_appid_ids(application_id.as_str()).await?;
+    let task_ids = context.client_unchecked().get_task_appid_ids(application_id.as_str()).await?;
     let task_statuses = try_join_all(
       task_ids
         .iter()
-        .map(|task_id| context.dsh_api_client.as_ref().unwrap().get_task(application_id.as_str(), task_id.as_str())),
+        .map(|task_id| context.client_unchecked().get_task(application_id.as_str(), task_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -272,6 +382,120 @@ impl CommandExecutor for ApplicationShowTasks {
     formatter.push_target_id_value_pairs(tasks.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
+}
+
+struct ApplicationStart {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationStart {
+  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    let instances: u64 = matches.get_one("instances").cloned().unwrap_or(1);
+    if instances == 1 {
+      context.print_explanation(format!("start service '{}'", application_id));
+    } else {
+      context.print_explanation(format!("start {} instances of service '{}'", instances, application_id));
+    }
+    match context.client_unchecked().get_application_configuration(application_id.as_str()).await {
+      Ok(mut configuration) => {
+        if configuration.instances > 0 {
+          Ok(context.print_warning(format!("service '{}' already started", application_id)))
+        } else {
+          configuration.instances = instances;
+          context
+            .client_unchecked()
+            .put_application_configuration(application_id.as_str(), &configuration)
+            .await?;
+          if instances == 1 {
+            Ok(context.print_outcome(format!("service '{}' started", application_id)))
+          } else {
+            Ok(context.print_outcome(format!("service '{}' started ({} instances)", application_id, instances)))
+          }
+        }
+      }
+      Err(error) => match error {
+        DshApiError::NotFound => Ok(context.print_error(format!("service '{}' is not deployed", application_id))),
+        error => Err(String::from(error)),
+      },
+    }
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
+}
+
+struct ApplicationStop {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationStop {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("stop service '{}'", application_id));
+    match context.client_unchecked().get_application_configuration(application_id.as_str()).await {
+      Ok(mut configuration) => {
+        let running_instances = configuration.instances;
+        if running_instances == 0 {
+          Ok(context.print_warning(format!("service '{}' not running", application_id)))
+        } else {
+          configuration.instances = 0;
+          context
+            .client_unchecked()
+            .put_application_configuration(application_id.as_str(), &configuration)
+            .await?;
+          if running_instances == 1 {
+            Ok(context.print_outcome(format!("service '{}' stopped", application_id)))
+          } else {
+            Ok(context.print_outcome(format!("service '{}' stopped ({} instances)", application_id, running_instances)))
+          }
+        }
+      }
+      Err(error) => match error {
+        DshApiError::NotFound => Ok(context.print_error(format!("service '{}' is not deployed", application_id))),
+        error => Err(String::from(error)),
+      },
+    }
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
+}
+
+struct ApplicationUpdate {}
+
+#[async_trait]
+impl CommandExecutor for ApplicationUpdate {
+  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let application_id = target.unwrap_or_else(|| unreachable!());
+    let _instances: u64 = matches.get_one("instances").cloned().unwrap_or(1);
+    context.print_explanation(format!("update service '{}'", application_id));
+    Ok(())
+    // match context.client_unchecked().get_application_configuration(application_id.as_str()).await
+    // {
+    //   Ok(mut configuration) => {
+    //     if configuration.instances > 0 {
+    //       Ok(context.print_warning(format!("service '{}' already started", application_id)))
+    //     } else {
+    //       configuration.instances = instances;
+    //       context.put_application_configuration(application_id.as_str(), &configuration).await?;
+    //       if instances == 1 {
+    //         Ok(context.print_outcome(format!("service '{}' started", application_id)))
+    //       } else {
+    //         Ok(context.print_outcome(format!("service '{}' started ({} instances)", application_id, instances)))
+    //       }
+    //     }
+    //   }
+    //   Err(error) => match error {
+    //     DshApiError::NotFound => Ok(context.print_error(format!("service '{}' is not deployed", application_id))),
+    //     error => Err(String::from(error)),
+    //   },
+    // }
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {

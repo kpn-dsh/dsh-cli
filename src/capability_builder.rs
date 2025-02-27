@@ -101,7 +101,7 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn _add_extra_argument(mut self, argument: Arg) -> Self {
+  pub fn add_extra_argument(mut self, argument: Arg) -> Self {
     self.extra_arguments.push(argument);
     self
   }
@@ -162,7 +162,7 @@ impl Capability for CapabilityBuilder<'_> {
         .executors
         .iter()
         .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help.as_deref()))
-        .collect::<Vec<Arg>>(),
+        .collect::<Vec<_>>(),
       self
         .filter_flags
         .iter()
