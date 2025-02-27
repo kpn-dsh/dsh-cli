@@ -48,9 +48,9 @@ impl Subject for SecretSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      NEW_COMMAND => Some(SECRET_NEW_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(SECRET_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SECRET_LIST_CAPABILITY.as_ref()),
+      NEW_COMMAND => Some(SECRET_NEW_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(SECRET_SHOW_CAPABILITY.as_ref()),
       UPDATE_COMMAND => Some(SECRET_UPDATE_CAPABILITY.as_ref()),
       _ => None,
