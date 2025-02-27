@@ -11,7 +11,7 @@ export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
 
 export SEPARATOR="-------------------------------"
 
-#export OUTPUT_FORMAT="--output-format json"
+export OUTPUT_FORMAT="--output-format table"
 #export VERBOSITY="-v high"
 #export LOG_LEVEL="--log-level debug"
 
