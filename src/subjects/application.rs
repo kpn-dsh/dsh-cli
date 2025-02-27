@@ -192,11 +192,12 @@ impl CommandExecutor for ApplicationDeploy {
     match serde_json::from_str::<Application>(&configuration) {
       Ok(application) => {
         if context.dry_run {
-          Ok(context.print_warning("dry-run mode, application not deployed"))
+          context.print_warning("dry-run mode, application not deployed");
         } else {
           context.client_unchecked().put_application_configuration(&application_id, &application).await?;
-          Ok(context.print_outcome(format!("application '{}' deployed", application_id)))
+          context.print_outcome(format!("application '{}' deployed", application_id));
         }
+        Ok(())
       }
       Err(error) => Err(format!("invalid json configuration ({})", error)),
     }
@@ -404,7 +405,7 @@ impl CommandExecutor for ApplicationStart {
     match context.client_unchecked().get_application_configuration(application_id.as_str()).await {
       Ok(mut configuration) => {
         if configuration.instances > 0 {
-          Ok(context.print_warning(format!("service '{}' already started", application_id)))
+          context.print_warning(format!("service '{}' already started", application_id));
         } else {
           configuration.instances = instances;
           context
@@ -412,14 +413,18 @@ impl CommandExecutor for ApplicationStart {
             .put_application_configuration(application_id.as_str(), &configuration)
             .await?;
           if instances == 1 {
-            Ok(context.print_outcome(format!("service '{}' started", application_id)))
+            context.print_outcome(format!("service '{}' started", application_id));
           } else {
-            Ok(context.print_outcome(format!("service '{}' started ({} instances)", application_id, instances)))
+            context.print_outcome(format!("service '{}' started ({} instances)", application_id, instances));
           }
         }
+        Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound => Ok(context.print_error(format!("service '{}' is not deployed", application_id))),
+        DshApiError::NotFound => {
+          context.print_error(format!("service '{}' is not deployed", application_id));
+          Ok(())
+        }
         error => Err(String::from(error)),
       },
     }
@@ -441,7 +446,7 @@ impl CommandExecutor for ApplicationStop {
       Ok(mut configuration) => {
         let running_instances = configuration.instances;
         if running_instances == 0 {
-          Ok(context.print_warning(format!("service '{}' not running", application_id)))
+          context.print_warning(format!("service '{}' not running", application_id));
         } else {
           configuration.instances = 0;
           context
@@ -449,14 +454,18 @@ impl CommandExecutor for ApplicationStop {
             .put_application_configuration(application_id.as_str(), &configuration)
             .await?;
           if running_instances == 1 {
-            Ok(context.print_outcome(format!("service '{}' stopped", application_id)))
+            context.print_outcome(format!("service '{}' stopped", application_id));
           } else {
-            Ok(context.print_outcome(format!("service '{}' stopped ({} instances)", application_id, running_instances)))
+            context.print_outcome(format!("service '{}' stopped ({} instances)", application_id, running_instances));
           }
         }
+        Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound => Ok(context.print_error(format!("service '{}' is not deployed", application_id))),
+        DshApiError::NotFound => {
+          context.print_error(format!("service '{}' is not deployed", application_id));
+          Ok(())
+        }
         error => Err(String::from(error)),
       },
     }
@@ -480,19 +489,23 @@ impl CommandExecutor for ApplicationUpdate {
     // {
     //   Ok(mut configuration) => {
     //     if configuration.instances > 0 {
-    //       Ok(context.print_warning(format!("service '{}' already started", application_id)))
+    //       context.print_warning(format!("service '{}' already started", application_id));
     //     } else {
     //       configuration.instances = instances;
     //       context.put_application_configuration(application_id.as_str(), &configuration).await?;
     //       if instances == 1 {
-    //         Ok(context.print_outcome(format!("service '{}' started", application_id)))
+    //         context.print_outcome(format!("service '{}' started", application_id));
     //       } else {
-    //         Ok(context.print_outcome(format!("service '{}' started ({} instances)", application_id, instances)))
+    //         context.print_outcome(format!("service '{}' started ({} instances)", application_id, instances));
     //       }
     //     }
+    //     Ok(())
     //   }
     //   Err(error) => match error {
-    //     DshApiError::NotFound => Ok(context.print_error(format!("service '{}' is not deployed", application_id))),
+    //     DshApiError::NotFound => {
+    //       context.print_error(format!("service '{}' is not deployed", application_id));
+    //       Ok(())
+    //     }
     //     error => Err(String::from(error)),
     //   },
     // }
