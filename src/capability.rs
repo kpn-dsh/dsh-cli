@@ -17,6 +17,7 @@ pub(crate) const LIST_COMMAND_ALIAS: &str = "l";
 pub(crate) const NEW_COMMAND: &str = "new";
 pub(crate) const OPEN_COMMAND: &str = "open";
 pub(crate) const OPEN_COMMAND_ALIAS: &str = "o";
+pub(crate) const RESTART_COMMAND: &str = "restart";
 pub(crate) const SET_COMMAND: &str = "set";
 pub(crate) const SHOW_COMMAND: &str = "show";
 pub(crate) const SHOW_COMMAND_ALIAS: &str = "s";

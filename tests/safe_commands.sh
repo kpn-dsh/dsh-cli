@@ -102,18 +102,21 @@ export SAFE_COMMANDS=(
   "secret show $SECRET_UNDER_TEST"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
+  "service deploy $SERVICE_UNDER_TEST < /dev/null --force --dry-run"
   "service list --ids"
   "service list --started"
   "service list --status"
   "service list --stopped"
   "service list --tasks"
   "service list"
+  "service restart $SERVICE_UNDER_TEST --force --dry-run"
   "service show $SERVICE_UNDER_TEST --status"
   "service show $SERVICE_UNDER_TEST --tasks"
   "service show $SERVICE_UNDER_TEST"
   "service start $SERVICE_UNDER_TEST --force --dry-run"
   "service start $SERVICE_UNDER_TEST --force --instances 2 --dry-run"
   "service stop $SERVICE_UNDER_TEST --force --dry-run"
+  "service update $SERVICE_UNDER_TEST --cpus 1 --instances 1 --mem 32 --force --dry-run"
 
   "setting list"
 

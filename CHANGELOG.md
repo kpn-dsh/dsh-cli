@@ -8,7 +8,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Added
 
-* Dedicated functions to create, delete, start and stop DSH services.
+* Dedicated functions to delete, deploy, restart, start, stop and update DSH services.
 * Single command to set default platform and tenant.
 
 ### Changed

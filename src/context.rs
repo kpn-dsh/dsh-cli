@@ -430,12 +430,22 @@ impl Context {
     }
   }
 
+  /// # Prints the next progress bar character to stderr
+  ///
+  /// If `quiet` is `true`, nothing will be printed.
+  /// The prompt is only printed when stderr is a terminal.
+  pub(crate) fn print_progress_step(&self) {
+    if !self.quiet && stderr().is_terminal() {
+      eprint!(".");
+    }
+  }
+
   /// # Prints a prompt to stderr
   ///
   /// This method is used to print a prompt to the standard error device.
   /// The prompt is used when input from the user is expected.
   /// If `quiet` is `true`, nothing will be printed.
-  /// The prompt is only printed when stderr is a tty,
+  /// The prompt is only printed when stderr is a terminal,
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: AsRef<str>>(&self, prompt: T) {
     if !self.quiet && stderr().is_terminal() {

@@ -1,6 +1,7 @@
 use crate::arguments::service_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, DELETE_COMMAND, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
+  Capability, CommandExecutor, DELETE_COMMAND, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND,
+  UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -18,13 +19,14 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::application::parse_image_string;
-use dsh_api::types::Application;
+use dsh_api::types::{Application, TaskState};
 use dsh_api::types::{Task, TaskStatus};
 use dsh_api::DshApiError;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::time::Instant;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 pub(crate) struct ServiceSubject {}
 
@@ -53,6 +55,7 @@ impl Subject for ServiceSubject {
       DELETE_COMMAND => Some(SERVICE_DELETE_CAPABILITY.as_ref()),
       DEPLOY_COMMAND => Some(SERVICE_DEPLOY_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SERVICE_LIST_CAPABILITY.as_ref()),
+      RESTART_COMMAND => Some(SERVICE_RESTART_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(SERVICE_SHOW_CAPABILITY.as_ref()),
       START_COMMAND => Some(SERVICE_START_CAPABILITY.as_ref()),
       STOP_COMMAND => Some(SERVICE_STOP_CAPABILITY.as_ref()),
@@ -99,6 +102,12 @@ lazy_static! {
         (FilterFlagType::Stopped, Some("List all stopped services.".to_string()))
       ])
   );
+  static ref SERVICE_RESTART_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(RESTART_COMMAND, None, "Restart service")
+      .set_long_about("Restarts an already running service.")
+      .set_default_command_executor(&ServiceRestart {})
+      .add_target_argument(service_id_argument().required(true))
+  );
   static ref SERVICE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show service configuration")
       .set_long_about("Show the configuration of a service deployed on the DSH.")
@@ -127,12 +136,15 @@ lazy_static! {
       .set_long_about("Update an already deployed service.")
       .set_default_command_executor(&ServiceUpdate {})
       .add_target_argument(service_id_argument().required(true))
+      .add_extra_argument(cpus_flag())
       .add_extra_argument(instances_flag())
+      .add_extra_argument(mem_flag())
   );
   static ref SERVICE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     SERVICE_DELETE_CAPABILITY.as_ref(),
     SERVICE_DEPLOY_CAPABILITY.as_ref(),
     SERVICE_LIST_CAPABILITY.as_ref(),
+    SERVICE_RESTART_CAPABILITY.as_ref(),
     SERVICE_SHOW_CAPABILITY.as_ref(),
     SERVICE_START_CAPABILITY.as_ref(),
     SERVICE_STOP_CAPABILITY.as_ref(),
@@ -140,14 +152,40 @@ lazy_static! {
   ];
 }
 
+const CPUS_FLAG: &str = "cpus";
+
+fn cpus_flag() -> Arg {
+  Arg::new(CPUS_FLAG)
+    .long("cpus")
+    .action(ArgAction::Set)
+    .value_parser(clap::value_parser!(f64))
+    .value_name("CPUS")
+    .help("Number of cpus.")
+    .long_help("Number of cpus that will be started.")
+}
+
+const INSTANCES_FLAG: &str = "instances";
+
 fn instances_flag() -> Arg {
-  Arg::new("instances")
+  Arg::new(INSTANCES_FLAG)
     .long("instances")
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
     .value_name("INSTANCES")
     .help("Number of instances.")
     .long_help("Number of service instances that will be started.")
+}
+
+const MEM_FLAG: &str = "mem";
+
+fn mem_flag() -> Arg {
+  Arg::new(MEM_FLAG)
+    .long("mem")
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
+    .value_name("MEM")
+    .help("Amount of memory.")
+    .long_help("Amount of memory your application needs in MB.")
 }
 
 struct ServiceDelete {}
@@ -320,6 +358,93 @@ impl CommandExecutor for ServiceListTasks {
   }
 }
 
+struct ServiceRestart {}
+
+#[async_trait]
+impl CommandExecutor for ServiceRestart {
+  async fn execute(&self, target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let service_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("restart service '{}'", service_id));
+    match context.client_unchecked().get_application_configuration(&service_id).await {
+      Ok(mut configuration) => {
+        let instances = configuration.instances;
+        if instances == 0 {
+          context.print_warning(format!("service '{}' not started", service_id));
+        } else if context.dry_run {
+          context.print_warning("dry-run mode, service not restarted");
+        } else {
+          let task_ids = context.client_unchecked().get_task_appid_ids(&service_id).await?;
+          let task_statuses = try_join_all(
+            task_ids
+              .iter()
+              .map(|task_id| context.client_unchecked().get_task(service_id.as_str(), task_id.as_str())),
+          )
+          .await?;
+          let running_task_ids = task_ids
+            .into_iter()
+            .zip(task_statuses)
+            .filter(|(_, task_status)| task_status.actual.clone().is_some_and(|t| t.state == TaskState::Running))
+            .map(|(task_id, _)| task_id)
+            .collect::<Vec<_>>();
+          configuration.instances = 0;
+          if running_task_ids.len() == 1 {
+            context.print_outcome(format!("stop service '{}'", service_id));
+          } else {
+            context.print_outcome(format!("stop service '{}' ({} instances)", service_id, running_task_ids.len()));
+          }
+          context
+            .client_unchecked()
+            .put_application_configuration(service_id.as_str(), &configuration)
+            .await?;
+          loop {
+            context.print_progress_step();
+            sleep(Duration::from_millis(1000));
+            let poll_tasks = try_join_all(
+              running_task_ids
+                .iter()
+                .map(|running_task_id| context.client_unchecked().get_task(&service_id, running_task_id)),
+            )
+            .await?;
+            if poll_tasks
+              .iter()
+              .all(|task_status| task_status.actual.clone().is_some_and(|task| task.state == TaskState::Killed))
+            {
+              break;
+            }
+          }
+          if running_task_ids.len() == 1 {
+            context.print_outcome(format!("\nservice '{}' stopped", service_id));
+          } else {
+            context.print_outcome(format!("\nservice '{}' stopped ({} instances)", service_id, running_task_ids.len()));
+          }
+          configuration.instances = instances;
+          context
+            .client_unchecked()
+            .put_application_configuration(service_id.as_str(), &configuration)
+            .await?;
+          if instances == 1 {
+            context.print_outcome(format!("service '{}' started", service_id));
+          } else {
+            context.print_outcome(format!("service '{}' started ({} instances)", service_id, instances));
+          }
+        }
+        Ok(())
+      }
+      Err(error) => match error {
+        DshApiError::NotFound => {
+          context.print_error(format!("service '{}' is not deployed", service_id));
+          Ok(())
+        }
+        error => Err(String::from(error)),
+      },
+    }
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
+}
+
 struct ServiceShowAll {}
 
 #[async_trait]
@@ -374,7 +499,7 @@ impl CommandExecutor for ServiceShowTasks {
     context.print_execution_time(start_instant);
     let mut tasks: Vec<(String, TaskStatus)> = task_ids.into_iter().zip(task_statuses).collect();
     tasks.sort_by(|first, second| second.1.actual.clone().unwrap().staged_at.cmp(&first.1.actual.clone().unwrap().staged_at));
-    let mut formatter = ListFormatter::new(&TASK_LABELS_LIST, Some("service id"), context);
+    let mut formatter = ListFormatter::new(&TASK_LABELS_LIST, None, context);
     formatter.push_target_id_value_pairs(tasks.as_slice());
     formatter.print()?;
     Ok(())
@@ -391,7 +516,7 @@ struct ServiceStart {}
 impl CommandExecutor for ServiceStart {
   async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    let instances: u64 = matches.get_one("instances").cloned().unwrap_or(1);
+    let instances: u64 = matches.get_one::<u64>(INSTANCES_FLAG).cloned().unwrap_or(1);
     if instances == 1 {
       context.print_explanation(format!("start service '{}'", service_id));
     } else {
@@ -481,33 +606,60 @@ struct ServiceUpdate {}
 impl CommandExecutor for ServiceUpdate {
   async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    let _instances: u64 = matches.get_one("instances").cloned().unwrap_or(1);
+    let cpus: Option<f64> = match matches.get_one::<f64>(CPUS_FLAG).cloned() {
+      Some(cpus) => {
+        if cpus >= 0.1 {
+          Some(cpus)
+        } else {
+          return Err("cpus should be greater than or equal to 0.1".to_string());
+        }
+      }
+      None => None,
+    };
+    let instances = matches.get_one::<u64>(INSTANCES_FLAG).cloned();
+    let mem = matches.get_one::<u64>(MEM_FLAG).cloned();
+    if cpus.is_none() && instances.is_none() && mem.is_none() {
+      return Err("at least one update argument must be provided".to_string());
+    }
     context.print_explanation(format!("update service '{}'", service_id));
-    Ok(())
-    // match context.client_unchecked().get_application_configuration(service_id.as_str()).await
-    // {
-    //   Ok(mut configuration) => {
-    //     if configuration.instances > 0 {
-    //       context.print_warning(format!("service '{}' already started", service_id));
-    //     } else {
-    //       configuration.instances = _instances;
-    //       context.put_application_configuration(service_id.as_str(), &configuration).await?;
-    //       if _instances == 1 {
-    //         context.print_outcome(format!("service '{}' started", service_id));
-    //       } else {
-    //         context.print_outcome(format!("service '{}' started ({} instances)", service_id, _instances));
-    //       }
-    //     }
-    //     Ok(())
-    //   }
-    //   Err(error) => match error {
-    //     DshApiError::NotFound => {
-    //       context.print_error(format!("service '{}' is not deployed", service_id));
-    //       Ok(())
-    //     }
-    //     error => Err(String::from(error)),
-    //   },
-    // }
+    match context.client_unchecked().get_application_configuration(service_id.as_str()).await {
+      Ok(mut configuration) => {
+        if cpus.iter().any(|cpus| *cpus != configuration.cpus)
+          | instances.iter().any(|instances| *instances != configuration.instances)
+          | mem.iter().any(|mem| *mem != configuration.mem)
+        {
+          if context.dry_run {
+            context.print_warning("dry-run mode, service not updated");
+          } else {
+            if let Some(cpus) = cpus {
+              configuration.cpus = cpus
+            }
+            if let Some(instances) = instances {
+              configuration.instances = instances
+            }
+            if let Some(mem) = mem {
+              configuration.mem = mem
+            }
+            context
+              .client_unchecked()
+              .put_application_configuration(service_id.as_str(), &configuration)
+              .await?;
+            context.print_outcome(format!("service '{}' updated", service_id));
+          }
+          Ok(())
+        } else {
+          context.print_outcome("provided arguments are equal to the current configuration, service not updated");
+          Ok(())
+        }
+      }
+      Err(error) => match error {
+        DshApiError::NotFound => {
+          context.print_error(format!("service '{}' is not deployed", service_id));
+          Ok(())
+        }
+        error => Err(String::from(error)),
+      },
+    }
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
