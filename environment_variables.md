@@ -1,5 +1,7 @@
 # Environment variables
 
+[&#x2190; User guide](user_guide.md)
+
 The `dsh` tool can be run entirely from the command line and
 all configurations and parameters can be specified via command line arguments.
 However, especially when using `dsh` interactively,
@@ -269,3 +271,5 @@ it is much more convenient to make some settings persistent via environment vari
     </tr>
 
 </table>
+
+[Settings and targets &#x2192;](settings_targets.md)

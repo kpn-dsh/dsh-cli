@@ -1,5 +1,7 @@
 # Quick start
 
+[&#x2190; README](README.md)
+
 ### Prompts
 
 When the `dsh` tool is installed properly, you can run it by simply typing a command and
@@ -108,3 +110,5 @@ variables, the default settings will be used:
 > dsh secret list
 ...
 ```
+
+[User guide &#x2192;](user_guide.md)

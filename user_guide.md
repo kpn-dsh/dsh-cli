@@ -1,5 +1,7 @@
 # User guide
 
+[&#x2190; Quick start](quick_start.md)
+
 When installation is complete you should be able to start the `dsh` tool from the command line.
 
 ```bash
@@ -174,3 +176,5 @@ password for tenant my-tenant@np-aws-lz-dsh: ********
 
 In non-interactive use, e.g. in a script, a terminal is not available and an error message
 will be shown.
+
+[Environment variables &#x2192;](environment_variables.md)

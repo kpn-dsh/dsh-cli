@@ -1,5 +1,7 @@
 # Settings and targets
 
+[&#x2190; Environment variables](environment_variables.md)
+
 The `dsh` tool stores settings and configuration in settings files,
 and platform/tenant credentials in target files.
 The settings and target files can be created and managed via the tool itself,
@@ -41,3 +43,5 @@ The passwords are not stored in the target files.
 For security reasons, passwords are stored in your computers keychain,
 supported for Mac OsX and Windows.
 Support for the linux keychain is available, but not tested yet.
+
+[Platforms specification &#x2192;](platforms-specification.md)

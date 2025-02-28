@@ -1,5 +1,7 @@
 # Autocompletion
 
+[&#x2190; Platforms specification](platforms-specification.md)
+
 The `dsh` tool has a hidden argument `--generate-autocomplete-file`, which can be used
 to generate an autocompletion file for the following shells:
 
@@ -59,3 +61,5 @@ Finally, add the following two lines to your `~/.zshrc` file.
 autoload -Uz compinit
 compinit
 ```
+
+[Developers &#x2192;](developers.md)
