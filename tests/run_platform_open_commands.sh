@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # This script can be used as a run test for dsh.
 # It will run a number of commands that will open a DSH resource or web application.
