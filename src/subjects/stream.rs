@@ -169,18 +169,18 @@ use clap::ArgMatches;
 // #[async_trait]
 // impl CommandExecutor for StreamListUsage {
 //   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
-//     context.print_explanation("list all internal and public streams with the applications that use them");
-//     let (stream_ids, applications) = try_join!(dsh_api_client.get_stream_ids(), dsh_api_client.get_application_configurations())?;
+//     context.print_explanation("list all internal and public streams with the services that use them");
+//     let (stream_ids, services) = try_join!(dsh_api_client.get_stream_ids(), dsh_api_client.get_application_configurations())?;
 //     let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
 //     for stream_id in &stream_ids {
 //       let mut first = true;
-//       let usages: Vec<(String, Vec<String>)> = applications_that_use_topic(stream_id, &applications);
-//       for (application_id, envs) in usages {
+//       let usages: Vec<(String, Vec<String>)> = services_that_use_topic(stream_id, &services);
+//       for (service_id, envs) in usages {
 //         if !envs.is_empty() {
 //           if first {
-//             builder.row(&Usage::application(stream_id.to_string(), application_id, envs));
+//             builder.row(&Usage::application(stream_id.to_string(), service_id, envs));
 //           } else {
-//             builder.row(&Usage::application("".to_string(), application_id, envs));
+//             builder.row(&Usage::application("".to_string(), service_id, envs));
 //           }
 //           first = false;
 //         }
@@ -234,13 +234,13 @@ use clap::ArgMatches;
 // impl CommandExecutor for StreamShowUsage {
 //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
 //     let topic_id = target.unwrap_or_else(|| unreachable!());
-//     context.print_explanation(format!("show the applications that use topic '{}'", topic_id));
-//     let applications = dsh_api_client.get_application_configurations().await?;
-//     let usages: Vec<(String, Vec<String>)> = applications_that_use_topic(topic_id.as_str(), &applications);
+//     context.print_explanation(format!("show the services that use topic '{}'", topic_id));
+//     let services = dsh_api_client.get_application_configurations().await?;
+//     let usages: Vec<(String, Vec<String>)> = services_that_use_topic(topic_id.as_str(), &services);
 //     if !usages.is_empty() {
 //       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_LABELS_SHOW, context);
-//       for (application_id, envs) in usages {
-//         builder.row(&Usage::application(application_id.clone(), application_id.to_string(), envs));
+//       for (service_id, envs) in usages {
+//         builder.row(&Usage::application(service_id.clone(), service_id.to_string(), envs));
 //       }
 //       builder.print();
 //     } else {
@@ -250,16 +250,16 @@ use clap::ArgMatches;
 //   }
 // }
 //
-// fn _applications_that_use_stream(topic_id: &str, applications: &HashMap<String, Application>) -> Vec<(String, Vec<String>)> {
-//   let mut application_ids: Vec<String> = applications.keys().map(|p| p.to_string()).collect();
-//   application_ids.sort();
+// fn _services_that_use_stream(topic_id: &str, services: &HashMap<String, Application>) -> Vec<(String, Vec<String>)> {
+//   let mut service_ids: Vec<String> = services.keys().map(|p| p.to_string()).collect();
+//   service_ids.sort();
 //   let mut pairs: Vec<(String, Vec<String>)> = vec![];
-//   for application_id in application_ids {
-//     let application = applications.get(&application_id).unwrap();
-//     if !application.env.is_empty() {
-//       let mut envs_that_contain_topic_id: Vec<String> = application.env.clone().into_iter().filter(|(_, v)| v.contains(topic_id)).map(|(k, _)| k).collect();
+//   for service_id in service_ids {
+//     let service = services.get(&service_id).unwrap();
+//     if !service.env.is_empty() {
+//       let mut envs_that_contain_topic_id: Vec<String> = service.env.clone().into_iter().filter(|(_, v)| v.contains(topic_id)).map(|(k, _)| k).collect();
 //       envs_that_contain_topic_id.sort();
-//       pairs.push((application_id.clone(), envs_that_contain_topic_id));
+//       pairs.push((service_id.clone(), envs_that_contain_topic_id));
 //     }
 //   }
 //   pairs

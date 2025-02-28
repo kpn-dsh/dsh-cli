@@ -32,7 +32,7 @@ pub(crate) struct Context {
   pub(crate) csv_quote: Option<char>,
   pub(crate) csv_separator: String,
   pub(crate) dry_run: bool,
-  pub(crate) dsh_api_client: Option<DshApiClient>,
+  dsh_api_client: Option<DshApiClient>,
   pub(crate) force: bool,
   pub(crate) matching_style: Option<MatchingStyle>,
   pub(crate) no_escape: bool,
@@ -114,16 +114,35 @@ impl Context {
     })
   }
 
+  /// Get client without check
+  ///
+  /// This method will panic when no client was created.
+  /// Make sure to have a pre-emptive indication that a client will be available
+  /// by setting the proper `Requirements` in your `CommandExecutor` implementation.
+  pub(crate) fn client_unchecked(&self) -> &DshApiClient {
+    self.dsh_api_client.as_ref().unwrap_or_else(|| unreachable!())
+  }
+
+  pub(crate) fn client(&self) -> Option<&DshApiClient> {
+    self.dsh_api_client.as_ref()
+  }
+
+  /// Ask for confirmation
+  ///
+  /// 1. If `force` is enabled, confirmation is always `true`.
+  /// 1. Else, if run from a terminal the user will be prompted for confirmation.
+  /// 1. When not run from a terminal confirmation is always false.
   pub(crate) fn confirmed(&self, prompt: impl AsRef<str>) -> Result<bool, String> {
     if self.force {
       Ok(true)
-    } else {
-      print!("{}", prompt.as_ref());
+    } else if stdin().is_terminal() {
+      eprint!("{}", prompt.as_ref());
       let _ = stdout().lock().flush();
       let mut line = String::new();
       stdin().read_line(&mut line).expect("could not read line");
-      line = line.trim().to_string();
-      Ok(line == *"yes")
+      Ok(line.trim() == "yes")
+    } else {
+      Ok(false)
     }
   }
 
@@ -363,10 +382,10 @@ impl Context {
 
   /// # Prints the output to stdout
   ///
-  /// This method is used to print the output of the tool to the standard output device.
+  /// This method is used to print the output of the `dsh` tool to the standard output device.
   /// If `quiet` is `true`, nothing will be printed.
   /// This standard output device can either be a tty, a pipe or an output file,
-  /// depending on how the tool was run from a shell or script.
+  /// depending on how the `dsh` tool was run from a shell or script.
   pub(crate) fn print<T: AsRef<str>>(&self, output: T) {
     if !self.quiet {
       println!("{}", output.as_ref());
@@ -375,11 +394,11 @@ impl Context {
 
   /// # Prints serializable output to stdout
   ///
-  /// This method is used to print a serialized version of the output of the tool
+  /// This method is used to print a serialized version of the output of the `dsh` tool
   /// to the standard output device.
   /// If `quiet` is `true`, nothing will be printed.
   /// This standard output device can either be a tty, a pipe or an output file,
-  /// depending on how the tool was run from a shell or script.
+  /// depending on how the `dsh` tool was run from a shell or script.
   pub(crate) fn print_serializable<T: Serialize>(&self, output: T) {
     if !self.quiet {
       match self.output_format {
@@ -411,12 +430,22 @@ impl Context {
     }
   }
 
+  /// # Prints the next progress bar character to stderr
+  ///
+  /// If `quiet` is `true`, nothing will be printed.
+  /// The prompt is only printed when stderr is a terminal.
+  pub(crate) fn print_progress_step(&self) {
+    if !self.quiet && stderr().is_terminal() {
+      eprint!(".");
+    }
+  }
+
   /// # Prints a prompt to stderr
   ///
   /// This method is used to print a prompt to the standard error device.
   /// The prompt is used when input from the user is expected.
   /// If `quiet` is `true`, nothing will be printed.
-  /// The prompt is only printed when stderr is a tty,
+  /// The prompt is only printed when stderr is a terminal,
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: AsRef<str>>(&self, prompt: T) {
     if !self.quiet && stderr().is_terminal() {
@@ -426,7 +455,7 @@ impl Context {
 
   /// # Prints the outcome to stderr
   ///
-  /// This method is used to print the outcome of the tool to the standard error device.
+  /// This method is used to print the outcome of the `dsh` tool to the standard error device.
   /// The outcome is not the output of the tool, but indicates whether a function was
   /// successful or not.
   /// This method is typically used when the function has side effects,
@@ -446,7 +475,7 @@ impl Context {
   /// # Prints a warning to stderr
   ///
   /// This method is used to print a warning to the standard error device.
-  /// The warning is not the output of the tool, but indicates a special situation.
+  /// The warning is not the output of the `dsh` tool, but indicates a special situation.
   /// This method is typically used when the function behaves differently
   /// then the user might expect, like when the `--dry-run` option was provided.
   /// If `--quiet` is provided or `--verbosity` is `off`, nothing will be printed.
@@ -510,7 +539,6 @@ impl Context {
     }
   }
 
-  // TODO Needs better testing
   pub(crate) fn read_multi_line(&self, prompt: impl AsRef<str>) -> Result<String, String> {
     if stdin().is_terminal() {
       self.print_prompt(prompt.as_ref());

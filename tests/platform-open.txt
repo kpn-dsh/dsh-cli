@@ -1,7 +1,0 @@
-platform open app $APP_UNDER_TEST
-platform open console
-platform open monitoring
-platform open service $APPLICATION_UNDER_TEST
-platform open swagger
-platform open tenant
-platform open tracing

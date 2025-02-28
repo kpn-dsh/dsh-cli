@@ -4,7 +4,7 @@ If you need a different set of platform configurations,
 you can use the `DSH_API_PLATFORMS_FILE` environment variable to provide
 the name of a file with an alternative list of platform specifications.
 It can either be an absolute file name
-or a relative file name from the working directory of your application.
+or a relative file name from the working directory.
 When this environment variable is set, the normal list of default platforms
 will <em>not</em> be included. If you need these too, make sure that you also
 include the default platforms in your platforms file.

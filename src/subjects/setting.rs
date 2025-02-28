@@ -7,7 +7,8 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SET_COMMAND, SET_COMMAND_PAIR, UNSET_COMMAND, UNSET_COMMAND_PAIR};
+use crate::arguments::{platform_name_argument, tenant_name_argument};
+use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{Context, MatchingStyle};
 use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
@@ -17,6 +18,8 @@ use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::settings::get_settings;
 use crate::subject::{Requirements, Subject};
+use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
+use crate::targets::{get_target_password_from_keyring, read_target};
 use crate::verbosity::Verbosity;
 use crate::{get_environment_variables, DshCliResult, ENV_VAR_PASSWORD};
 
@@ -38,12 +41,9 @@ impl Subject for SettingSubject {
     "Show, manage and list dsh settings.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, false, Some(OutputFormat::Table))
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      DEFAULT_COMMAND => Some(SETTING_DEFAULT_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SETTING_LIST_CAPABILITY.as_ref()),
       SET_COMMAND => Some(SETTING_SETTING_CAPABILITY.as_ref()),
       UNSET_COMMAND => Some(SETTING_UNSETTING_CAPABILITY.as_ref()),
@@ -115,7 +115,7 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .value_parser(EnumValueParser::<LogLevel>::new())
           .required(required),
       )
-      .about("Log level for the dsh cli tool"),
+      .about("Log level for the dsh tool"),
     Command::new(SETTING_LOG_LEVEL_API)
       .arg(
         Arg::new(SETTING_LOG_LEVEL_API)
@@ -178,25 +178,58 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
 }
 
 lazy_static! {
+  static ref SETTING_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DEFAULT_COMMAND, Some(DEFAULT_COMMAND_ALIAS), "Set default platform and tenant")
+      .set_long_about("Sets the default target platform and target tenant.")
+      .add_target_argument(platform_name_argument())
+      .add_target_argument(tenant_name_argument())
+      .set_default_command_executor(&SettingDefault {})
+  );
   static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List settings")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List settings")
       .set_long_about("Lists all dsh settings.")
       .set_default_command_executor(&SettingList {})
   );
   static ref SETTING_SETTING_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SET_COMMAND_PAIR, "Set setting")
+    CapabilityBuilder::new(SET_COMMAND, None, "Set setting")
       .set_long_about("Set value to persistent storage.")
       .add_subcommands(set_unset_commands(true))
       .set_default_command_executor(&SettingSet {})
   );
   static ref SETTING_UNSETTING_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(UNSET_COMMAND_PAIR, "Unset setting")
+    CapabilityBuilder::new(UNSET_COMMAND, None, "Unset setting")
       .set_long_about("Unset value from persistent storage.")
       .add_subcommands(set_unset_commands(false))
       .set_default_command_executor(&SettingUnset {})
   );
   static ref SETTING_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![SETTING_LIST_CAPABILITY.as_ref(), SETTING_SETTING_CAPABILITY.as_ref(), SETTING_UNSETTING_CAPABILITY.as_ref()];
+    vec![SETTING_DEFAULT_CAPABILITY.as_ref(), SETTING_LIST_CAPABILITY.as_ref(), SETTING_SETTING_CAPABILITY.as_ref(), SETTING_UNSETTING_CAPABILITY.as_ref()];
+}
+
+struct SettingDefault {}
+
+#[async_trait]
+impl CommandExecutor for SettingDefault {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    context.print_explanation("set default platform and tenant");
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
+    if read_target(&platform, &tenant)?.is_none() {
+      return Err(format!("target '{}@{}' does not exist", tenant, platform));
+    };
+    if get_target_password_from_keyring(&platform, &tenant)?.is_none() {
+      return Err(format!("keyring contains no password for target '{}@{}'", tenant, platform));
+    }
+    upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
+    context.print_outcome(format!("default platform set to {}", platform));
+    upsert_settings(None, |settings| Ok(Settings { default_tenant: Some(tenant.to_string()), ..settings }))?;
+    context.print_outcome(format!("default tenant set to {}", tenant));
+    Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 struct SettingList {}
@@ -229,6 +262,10 @@ impl CommandExecutor for SettingList {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
   }
 }
 
@@ -327,6 +364,10 @@ impl CommandExecutor for SettingSet {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 struct SettingUnset {}
@@ -404,6 +445,10 @@ impl CommandExecutor for SettingUnset {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
@@ -462,7 +507,10 @@ impl SubjectFormatter<SettingLabel> for Settings {
     match label {
       SettingLabel::CsvQuote => self.csv_quote.map(|csv_quote| csv_quote.to_string()).unwrap_or_default(),
       SettingLabel::CsvSeparator => self.csv_separator.clone().unwrap_or_default(),
-      SettingLabel::DefaultPlatform => self.default_platform.clone().unwrap_or_default(),
+      SettingLabel::DefaultPlatform => match self.default_platform.clone().map(|platform| DshPlatform::try_from(platform.as_str())) {
+        Some(Ok(platform)) => format!("{} / {}", platform.name(), platform.alias()),
+        _ => "".to_string(),
+      },
       SettingLabel::DefaultTenant => self.default_tenant.clone().unwrap_or_default(),
       SettingLabel::DryRun => self.dry_run.map(|dry_run| dry_run.to_string()).unwrap_or_default(),
       SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
@@ -482,10 +530,6 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::TerminalWidth => self.terminal_width.map(|width| width.to_string()).unwrap_or_default(),
       SettingLabel::Verbosity => self.verbosity.clone().map(|verbosity| verbosity.to_string()).unwrap_or_default(),
     }
-  }
-
-  fn target_label(&self) -> Option<SettingLabel> {
-    Some(SettingLabel::Target)
   }
 }
 

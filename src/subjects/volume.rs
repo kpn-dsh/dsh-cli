@@ -1,7 +1,5 @@
 use crate::arguments::volume_id_argument;
-use crate::capability::{
-  Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR,
-};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, NEW_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -10,6 +8,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
 use crate::DshCliResult;
@@ -44,10 +43,6 @@ impl Subject for VolumeSubject {
     "Show, manage and list volumes deployed on the DSH.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       DELETE_COMMAND => Some(VOLUME_DELETE_CAPABILITY.as_ref()),
@@ -65,13 +60,13 @@ impl Subject for VolumeSubject {
 
 lazy_static! {
   static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete volume")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete volume")
       .set_long_about("Delete a volume.")
       .set_default_command_executor(&VolumeDelete {})
       .add_target_argument(volume_id_argument().required(true))
   );
   static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List volumes")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List volumes")
       .set_long_about("Lists all available volumes.")
       .set_default_command_executor(&VolumeListAll {})
       .add_command_executors(vec![
@@ -83,17 +78,17 @@ lazy_static! {
       .set_run_all_executors(true)
       .add_filter_flags(vec![
         (FilterFlagType::App, Some("List all apps that use the volume.".to_string())),
-        (FilterFlagType::Application, Some("List all applications that use the volume.".to_string()))
+        (FilterFlagType::Service, Some("List all services that use the volume.".to_string()))
       ])
   );
   static ref VOLUME_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create new volume")
+    CapabilityBuilder::new(NEW_COMMAND, None, "Create new volume")
       .set_long_about("Create a new volume.")
       .set_default_command_executor(&VolumeNew {})
       .add_target_argument(volume_id_argument().required(true))
   );
   static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show secret configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show secret configuration")
       .set_default_command_executor(&VolumeShowAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
@@ -112,20 +107,24 @@ impl CommandExecutor for VolumeDelete {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("delete volume '{}'", volume_id));
-    if context.dsh_api_client.as_ref().unwrap().get_volume(&volume_id).await.is_err() {
+    if context.client_unchecked().get_volume(&volume_id).await.is_err() {
       return Err(format!("volume '{}' does not exists", volume_id));
     }
     if context.confirmed(format!("type 'yes' to delete volume '{}': ", volume_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, volume not deleted");
       } else {
-        context.dsh_api_client.as_ref().unwrap().delete_volume_configuration(&volume_id).await?;
+        context.client_unchecked().delete_volume_configuration(&volume_id).await?;
         context.print_outcome("volume deleted");
       }
     } else {
       context.print_outcome("cancelled, volume not deleted");
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -136,11 +135,11 @@ impl CommandExecutor for VolumeListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all volumes with their parameters");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
+    let volume_ids = context.client_unchecked().get_volume_ids().await?;
     let volumes = try_join_all(
       volume_ids
         .iter()
-        .map(|volume_id| context.dsh_api_client.as_ref().unwrap().get_volume_configuration(volume_id.as_str())),
+        .map(|volume_id| context.client_unchecked().get_volume_configuration(volume_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -148,6 +147,10 @@ impl CommandExecutor for VolumeListAll {
     formatter.push_target_ids_and_values(volume_ids.as_slice(), volumes.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -158,18 +161,17 @@ impl CommandExecutor for VolumeListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all volumes with their allocation status");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
-    let allocation_statuses = try_join_all(
-      volume_ids
-        .iter()
-        .map(|volume_id| context.dsh_api_client.as_ref().unwrap().get_volume_status(volume_id.as_str())),
-    )
-    .await?;
+    let volume_ids = context.client_unchecked().get_volume_ids().await?;
+    let allocation_statuses = try_join_all(volume_ids.iter().map(|volume_id| context.client_unchecked().get_volume_status(volume_id.as_str()))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context);
     formatter.push_target_ids_and_values(volume_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -180,11 +182,11 @@ impl CommandExecutor for VolumeListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all volumes with their configurations");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
+    let volume_ids = context.client_unchecked().get_volume_ids().await?;
     let configurations = try_join_all(
       volume_ids
         .iter()
-        .map(|volume_id| context.dsh_api_client.as_ref().unwrap().get_volume_configuration(volume_id.as_str())),
+        .map(|volume_id| context.client_unchecked().get_volume_configuration(volume_id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -192,6 +194,10 @@ impl CommandExecutor for VolumeListConfiguration {
     formatter.push_target_ids_and_values(volume_ids.as_slice(), configurations.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -202,12 +208,16 @@ impl CommandExecutor for VolumeListIds {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list volume ids");
     let start_instant = Instant::now();
-    let volume_ids = context.dsh_api_client.as_ref().unwrap().get_volume_ids().await?;
+    let volume_ids = context.client_unchecked().get_volume_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("volume id", context);
     formatter.push_target_ids(volume_ids.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -216,28 +226,26 @@ struct VolumeListUsage {}
 #[async_trait]
 impl CommandExecutor for VolumeListUsage {
   async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all volumes that are used in apps or applications");
+    context.print_explanation("list all volumes that are used in apps or services");
     let start_instant = Instant::now();
-    let volumes_with_usage: Vec<(String, Vec<UsedBy>)> = context.dsh_api_client.as_ref().unwrap().list_volumes_with_usage().await?;
+    let volumes_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_volumes_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("volume id"), context);
     for (volume_id, used_bys) in &volumes_with_usage {
-      let mut first = true;
       for used_by in used_bys {
-        if first {
-          formatter.push_target_id_value(volume_id.clone(), used_by);
-        } else {
-          formatter.push_target_id_value("".to_string(), used_by);
-        }
-        first = false;
+        formatter.push_target_id_value(volume_id.clone(), used_by);
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no volumes found in apps or applications");
+      context.print_outcome("no volumes found in apps or services");
     } else {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -248,7 +256,7 @@ impl CommandExecutor for VolumeNew {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("create new volume '{}'", volume_id));
-    if context.dsh_api_client.as_ref().unwrap().get_volume(&volume_id).await.is_ok() {
+    if context.client_unchecked().get_volume(&volume_id).await.is_ok() {
       return Err(format!("volume '{}' already exists", volume_id));
     }
     let line = context.read_single_line("enter size in gigabytes: ")?;
@@ -257,10 +265,14 @@ impl CommandExecutor for VolumeNew {
     if context.dry_run {
       context.print_warning("dry-run mode, volume not created");
     } else {
-      context.dsh_api_client.as_ref().unwrap().put_volume_configuration(&volume_id, &volume).await?;
+      context.client_unchecked().put_volume_configuration(&volume_id, &volume).await?;
       context.print_outcome("volume created");
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -272,9 +284,13 @@ impl CommandExecutor for VolumeShowAll {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for volume '{}'", volume_id));
     let start_instant = Instant::now();
-    let volume = context.dsh_api_client.as_ref().unwrap().get_volume(volume_id.as_str()).await?;
+    let volume = context.client_unchecked().get_volume(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(volume_id, &VOLUME_STATUS_LABELS, Some("volume id"), context).print(&volume)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -286,9 +302,13 @@ impl CommandExecutor for VolumeShowAllocationStatus {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for volume '{}'", volume_id));
     let start_instant = Instant::now();
-    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_volume_status(volume_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_volume_status(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context).print(&allocation_status)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -298,9 +318,9 @@ struct VolumeShowUsage {}
 impl CommandExecutor for VolumeShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the apps and applications that use volume '{}'", volume_id));
+    context.print_explanation(format!("show the apps and services that use volume '{}'", volume_id));
     let start_instant = Instant::now();
-    let (_, usages) = context.dsh_api_client.as_ref().unwrap().get_volume_with_usage(volume_id.as_str()).await?;
+    let (_, usages) = context.client_unchecked().get_volume_with_usage(volume_id.as_str()).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("volume not used")
@@ -310,6 +330,10 @@ impl CommandExecutor for VolumeShowUsage {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -353,10 +377,6 @@ impl SubjectFormatter<VolumeLabel> for Volume {
       _ => "".to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<VolumeLabel> {
-    Some(VolumeLabel::Target)
-  }
 }
 
 impl SubjectFormatter<VolumeLabel> for VolumeStatus {
@@ -367,10 +387,6 @@ impl SubjectFormatter<VolumeLabel> for VolumeStatus {
       VolumeLabel::Size => self.actual.clone().map(|a| a.size_gi_b.to_string()).unwrap_or("NA".to_string()),
       VolumeLabel::Target => target_id.to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<VolumeLabel> {
-    Some(VolumeLabel::Target)
   }
 }
 

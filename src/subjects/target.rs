@@ -6,11 +6,10 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::arguments::{platform_name_argument, tenant_name_argument, PLATFORM_NAME_ARGUMENT, TENANT_NAME_ARGUMENT};
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR, NEW_COMMAND, NEW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, NEW_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
-use crate::formatters::OutputFormat;
 use crate::settings::{get_settings, write_settings, Settings};
 use crate::subject::{Requirements, Subject};
 use crate::targets::{all_targets, delete_target, read_target, upsert_target, Target};
@@ -41,15 +40,10 @@ impl Subject for TargetSubject {
     A target configuration consists of a platform name, a tenant name \
     and the tenant's api password for the platform. \
     The target command can be used to create, list and delete target configurations. \
-    The target configurations will be stored in the application's home directory, \
+    The target configurations will be stored in the dsh tool's home directory, \
     except for the password, which will be stored in the more secure \
-    keyring application of your computer."
+    keyring of your computer."
       .to_string()
-  }
-
-  // TODO Check this
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, false, Some(OutputFormat::Table))
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -68,7 +62,7 @@ impl Subject for TargetSubject {
 
 lazy_static! {
   static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND_PAIR, "Delete target configuration.")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete target configuration.")
       .set_long_about(
         "Delete a target configuration. \
         You will be prompted for the target's platform and tenant, \
@@ -79,17 +73,17 @@ lazy_static! {
       .add_target_argument(tenant_name_argument().required(true))
   );
   static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List all target configurations.")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List all target configurations.")
       .set_long_about("Lists all target configurations.")
       .set_default_command_executor(&TargetList {})
   );
   static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(NEW_COMMAND_PAIR, "Create a new target configuration.")
+    CapabilityBuilder::new(NEW_COMMAND, None, "Create a new target configuration.")
       .set_long_about(
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant and password. \
         The platform and tenant will be stored in an unencrypted configuration file. \
-        The password will be stored in your computers keyring application, which is more secure.",
+        The password will be stored in your computer's keyring, which is more secure.",
       )
       .set_default_command_executor(&TargetNew {})
       .add_target_argument(platform_name_argument().required(true))
@@ -116,7 +110,7 @@ impl CommandExecutor for TargetDelete {
         };
         if context.confirmed(prompt)? {
           if context.dry_run {
-            context.print_warning(format!("dry-run mode, target {} not deleted", target));
+            context.print_warning(format!("dry-run mode, target '{}' not deleted", target));
           } else {
             delete_target(&platform, &tenant)?;
             if target.password.is_some() {
@@ -141,6 +135,10 @@ impl CommandExecutor for TargetDelete {
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 struct TargetList {}
@@ -158,7 +156,7 @@ impl CommandExecutor for TargetList {
         .clone()
         .is_some_and(|ref platform| target.platform.to_string() == *platform);
       let tenant_is_default = settings.default_tenant.clone().is_some_and(|ref tenant| target.tenant == *tenant);
-      let target_formatter = TargetFormatter { platform: target.platform.to_string(), tenant: target.tenant, is_default: platform_is_default && tenant_is_default };
+      let target_formatter = TargetFormatter { platform: target.platform, tenant: target.tenant, is_default: platform_is_default && tenant_is_default };
       target_formatters.push(target_formatter);
     }
     if target_formatters.is_empty() {
@@ -169,6 +167,10 @@ impl CommandExecutor for TargetList {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
   }
 }
 
@@ -182,30 +184,34 @@ impl CommandExecutor for TargetNew {
     let tenant = get_tenant_argument_or_prompt(matches)?;
     if let Some(existing_target) = read_target(&platform, &tenant)? {
       return Err(format!(
-        "target configuration {} already exists (first delete the existing target configuration)",
+        "target configuration '{}' already exists (first delete the existing target configuration)",
         existing_target
       ));
     };
     let password = context.read_single_line_password("enter password: ")?;
     let target = Target::new(platform, tenant, Some(password))?;
     if context.dry_run {
-      context.print_warning(format!("dry-run mode, target {} not created", target));
+      context.print_warning(format!("dry-run mode, target '{}' not created", target));
     } else {
       upsert_target(&target)?;
-      context.print_outcome(format!("target {} created", target));
+      context.print_outcome(format!("target '{}' created", target));
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
-fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
+pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
   match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
     Some(dsh_platform) => Ok(DshPlatform::try_from(dsh_platform.as_str())?),
     None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
   }
 }
 
-fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
   match matches.get_one::<String>(TENANT_NAME_ARGUMENT) {
     Some(tenant_argument) => Ok(tenant_argument.to_string()),
     None => Ok(read_single_line("enter tenant: ")?),
@@ -229,13 +235,13 @@ impl Label for TargetFormatterLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    false
+    matches!(self, Self::Platform)
   }
 }
 
 #[derive(Serialize)]
 struct TargetFormatter {
-  platform: String,
+  platform: DshPlatform,
   tenant: String,
   is_default: bool,
 }
@@ -250,14 +256,10 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
           "".to_string()
         }
       }
-      TargetFormatterLabel::Platform => self.platform.to_string(),
+      TargetFormatterLabel::Platform => format!("{} / {}", self.platform.name(), self.platform.alias()),
       TargetFormatterLabel::Tenant => self.tenant.clone(),
     }
   }
-
-  fn target_label(&self) -> Option<TargetFormatterLabel> {
-    None
-  }
 }
 
-pub static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Tenant, TargetFormatterLabel::Platform, TargetFormatterLabel::Default];
+pub static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Platform, TargetFormatterLabel::Tenant, TargetFormatterLabel::Default];

@@ -1,5 +1,5 @@
 use crate::arguments::query_argument;
-use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -36,15 +36,11 @@ impl Subject for EnvSubject {
   }
 
   fn subject_command_long_about(&self) -> String {
-    "Find values used in environment variables used to configure applications/services and apps deployed on the DSH.".to_string()
+    "Find values used in environment variables used to configure services and apps deployed on the DSH.".to_string()
   }
 
   fn subject_command_alias(&self) -> Option<&str> {
     Some("e")
-  }
-
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
@@ -61,12 +57,12 @@ impl Subject for EnvSubject {
 
 lazy_static! {
   static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FIND_COMMAND_PAIR, "Find environment variable values")
-      .set_long_about("Find values in environment variables in the configurations of applications and apps deployed on the DSH.")
+    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), "Find environment variable values")
+      .set_long_about("Find values in environment variables in the configurations of services and apps deployed on the DSH.")
       .set_default_command_executor(&EnvFind {})
       .add_filter_flags(vec![
-        (FilterFlagType::Started, Some("Search in all started applications.".to_string())),
-        (FilterFlagType::Stopped, Some("Search in all stopped applications.".to_string()))
+        (FilterFlagType::Started, Some("Search in all started services.".to_string())),
+        (FilterFlagType::Stopped, Some("Search in all stopped services.".to_string()))
       ])
       .add_target_argument(query_argument(None).required(true))
       .add_modifier_flag(ModifierFlagType::Regex, None)
@@ -83,18 +79,18 @@ impl CommandExecutor for EnvFind {
     let query_processor: &dyn QueryProcessor =
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(query.as_str())? } else { &ExactMatchQueryProcessor::create(query.as_str())? };
     let (include_started, include_stopped) = include_started_stopped(matches);
-    context.print_explanation(format!("find environment variables in applications that {}", query_processor.describe()));
+    context.print_explanation(format!("find environment variables in services that {}", query_processor.describe()));
     let start_instant = Instant::now();
-    let applications = &context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
+    let services = &context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
 
-    let mut application_pairs = applications.iter().collect::<Vec<_>>();
-    application_pairs.sort_by(|(application_id_a, _), (application_id_b, _)| application_id_a.cmp(application_id_b));
+    let mut service_pairs = services.iter().collect::<Vec<_>>();
+    service_pairs.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
 
-    let mut matching_applications: Vec<(String, HashMap<ApplicationEnvLabel, String>)> = vec![];
-    for (application_id, application) in application_pairs {
-      if (application.instances > 0 && include_started) || (application.instances == 0 && include_stopped) {
-        let mut envs: Vec<(String, String)> = application
+    let mut matching_services: Vec<(String, HashMap<ServiceEnvLabel, String>)> = vec![];
+    for (service_id, service) in service_pairs {
+      if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {
+        let mut envs: Vec<(String, String)> = service
           .env
           .iter()
           .filter_map(|(key, value)| {
@@ -104,54 +100,51 @@ impl CommandExecutor for EnvFind {
           })
           .collect();
         envs.sort_by_key(|env| env.0.clone());
-        let mut first = true;
         for (key, value) in envs {
-          let mut env_map: HashMap<ApplicationEnvLabel, String> = HashMap::new();
-          env_map.insert(ApplicationEnvLabel::Instances, application.instances.to_string());
-          env_map.insert(ApplicationEnvLabel::EnvVar, key);
-          env_map.insert(ApplicationEnvLabel::Value, value);
-          if first {
-            matching_applications.push((application_id.clone(), env_map));
-          } else {
-            matching_applications.push(("".to_string(), env_map));
-          }
-          first = false;
+          let mut env_map: HashMap<ServiceEnvLabel, String> = HashMap::new();
+          env_map.insert(ServiceEnvLabel::Instances, service.instances.to_string());
+          env_map.insert(ServiceEnvLabel::EnvVar, key);
+          env_map.insert(ServiceEnvLabel::Value, value);
+          matching_services.push((service_id.clone(), env_map));
         }
       }
     }
-    if matching_applications.is_empty() {
-      context.print_outcome("no matches found in applications");
+    if matching_services.is_empty() {
+      context.print_outcome("no matches found in services");
     } else {
-      let mut formatter = ListFormatter::new(&APPLICATION_ENV_LABELS, None, context);
-      formatter.push_target_id_value_pairs(&matching_applications);
+      let mut formatter = ListFormatter::new(&SERVICE_ENV_LABELS, None, context);
+      formatter.push_target_id_value_pairs(&matching_services);
       formatter.print()?;
     }
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, Serialize)]
-enum ApplicationEnvLabel {
-  Application,
-  Instances,
+enum ServiceEnvLabel {
   EnvVar,
+  Instances,
+  Service,
   Value,
 }
 
-impl Label for ApplicationEnvLabel {
+impl Label for ServiceEnvLabel {
   fn as_str(&self) -> &str {
     match self {
-      ApplicationEnvLabel::Application => "application id",
-      ApplicationEnvLabel::Instances => "#",
-      ApplicationEnvLabel::EnvVar => "environment variable",
-      ApplicationEnvLabel::Value => "value",
+      ServiceEnvLabel::Service => "service id",
+      ServiceEnvLabel::Instances => "#",
+      ServiceEnvLabel::EnvVar => "environment variable",
+      ServiceEnvLabel::Value => "value",
     }
   }
 
   fn is_target_label(&self) -> bool {
-    matches!(self, Self::Application)
+    matches!(self, Self::Service)
   }
 }
 
-const APPLICATION_ENV_LABELS: [ApplicationEnvLabel; 4] =
-  [ApplicationEnvLabel::Application, ApplicationEnvLabel::Instances, ApplicationEnvLabel::EnvVar, ApplicationEnvLabel::Value];
+const SERVICE_ENV_LABELS: [ServiceEnvLabel; 4] = [ServiceEnvLabel::Service, ServiceEnvLabel::Instances, ServiceEnvLabel::EnvVar, ServiceEnvLabel::Value];

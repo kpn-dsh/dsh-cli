@@ -28,12 +28,12 @@ pub(crate) fn dry_run_argument() -> Arg {
     .action(ArgAction::SetTrue)
     .help("Execute in dry-run mode.")
     .long_help(
-      "When this option is provided the tool will run in dry-run mode, \
+      "When this option is provided the dsh tool will run in dry-run mode, \
           meaning that no changes will be made to the \
-          resources and applications on the DSH. Dry-run mode can also be set by the \
-          environment variable DSH_CLI_DRY_RUN or in the settings file.",
+          resources and services on the DSH. Dry-run mode can also be set by the \
+          environment variable DSH_CLI_DRY_RUN or in the settings file. \
+          Dry-run mode will take precedence over the --force flag.",
     )
-    .conflicts_with(FORCE_ARGUMENT)
     .global(true)
 }
 
@@ -43,8 +43,9 @@ pub(crate) fn force_argument() -> Arg {
     .action(ArgAction::SetTrue)
     .help("Force changes without confirmation.")
     .long_help(
-      "When this option is provided any change, update and delete actions \
-          will be executed without asking for confirmation.",
+      "When this option is provided all change, update and delete actions \
+          will be executed without asking for confirmation. \
+          Note that dry-run mode will take precedence over the --force flag.",
     )
     .global(true)
 }
@@ -134,7 +135,7 @@ pub(crate) fn quiet_argument() -> Arg {
     .action(ArgAction::SetTrue)
     .help("Run in quiet mode.")
     .long_help(
-      "When this option is provided the tool will run in quiet mode, \
+      "When this option is provided the dsh tool will run in quiet mode, \
           meaning that no output will be produced to the terminal (stdout and stderr).",
     )
     .global(true)

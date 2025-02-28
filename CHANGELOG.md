@@ -4,6 +4,25 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - yyyy-mm-dd
+
+### Added
+
+* Dedicated functions to delete, deploy, restart, start, stop and update DSH services.
+* Single command to set default platform and tenant.
+
+### Changed
+
+* Renamed subject `application` to `service`. This results in changed commands and options.
+* Simplified json output.
+* Better rendering of empty results.
+* Dependency to `dsh_api` crate to version `0.5.2`.
+
+### Fixes
+
+* Fixed bug with duplicate ids in json output.
+* Lists of identifiers and lists derived from them are sorted again.
+
 ## [0.5.0] - 2025-02-20
 
 ### Fixes

@@ -1,5 +1,5 @@
 use crate::arguments::query_argument;
-use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_PAIR, LIST_COMMAND, LIST_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -44,10 +44,6 @@ impl Subject for ImageSubject {
     Some("i")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       FIND_COMMAND => Some(IMAGE_FIND_CAPABILITY.as_ref()),
@@ -63,28 +59,28 @@ impl Subject for ImageSubject {
 
 lazy_static! {
   static ref IMAGE_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FIND_COMMAND_PAIR, "Find used images")
-      .set_long_about("Find all applications and/or apps that use a given Harbor image.")
+    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), "Find used images")
+      .set_long_about("Find all services and/or apps that use a given Harbor image.")
       .set_default_command_executor(&ImageFind {})
       .add_filter_flags(vec![
-        (FilterFlagType::Started, Some("Search in all started applications.".to_string())),
-        (FilterFlagType::Stopped, Some("Search in all stopped applications.".to_string()))
+        (FilterFlagType::Started, Some("Search in all started services.".to_string())),
+        (FilterFlagType::Stopped, Some("Search in all stopped services.".to_string()))
       ])
       .add_target_argument(query_argument(None).required(true))
       .add_modifier_flag(ModifierFlagType::Regex, None)
   );
   static ref IMAGE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List images")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List images")
       .set_long_about(
-        "Lists all images that are deployed in at least one application. \
-        This will also include applications that are stopped \
+        "Lists all images that are deployed in at least one service. \
+        This will also include services that are stopped \
         (deployed with 0 instances)."
       )
       .set_default_command_executor(&ImageListAll {})
       .set_run_all_executors(true)
       .add_filter_flags(vec![
-        (FilterFlagType::Started, Some("Search all started applications.".to_string())),
-        (FilterFlagType::Stopped, Some("Search all stopped applications.".to_string()))
+        (FilterFlagType::Started, Some("Search all started services.".to_string())),
+        (FilterFlagType::Stopped, Some("Search all stopped services.".to_string()))
       ])
   );
   static ref IMAGE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![IMAGE_FIND_CAPABILITY.as_ref(), IMAGE_LIST_CAPABILITY.as_ref()];
@@ -100,10 +96,14 @@ impl CommandExecutor for ImageFind {
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(image_query.as_str())? } else { &ExactMatchQueryProcessor::create(image_query.as_str())? };
     context.print_explanation(format!("find images that {}", query_processor.describe()));
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
+    let services = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-    list_images(applications, query_processor, matches, context)?;
+    list_images(services, query_processor, matches, context)?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -112,28 +112,32 @@ struct ImageListAll {}
 #[async_trait]
 impl CommandExecutor for ImageListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all images used in applications");
+    context.print_explanation("list all images used in services");
     let start_instant = Instant::now();
-    let applications = context.dsh_api_client.as_ref().unwrap().get_application_configuration_map().await?;
+    let services = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-    list_images(applications, &DummyQueryProcessor::create()?, matches, context)?;
+    list_images(services, &DummyQueryProcessor::create()?, matches, context)?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
-fn list_images(applications: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> Result<(), String> {
+fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> Result<(), String> {
   let (include_started, include_stopped) = include_started_stopped(matches);
-  let mut applications = applications.iter().collect::<Vec<_>>();
-  applications.sort_by(|(application_id_a, _), (application_id_b, _)| application_id_a.cmp(application_id_b));
+  let mut services = services.iter().collect::<Vec<_>>();
+  services.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
   let mut images: HashMap<String, Vec<ImageUsage>> = HashMap::new();
-  for (application_id, application) in applications {
-    if (application.instances > 0 && include_started) || (application.instances == 0 && include_stopped) {
-      let image = application.image.clone();
+  for (service_id, service) in services {
+    if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {
+      let image = service.image.clone();
       let (registry, image) = parse_image_string(&image)?;
       images
         .entry(image)
         .or_default()
-        .push(ImageUsage::new(registry, application_id.to_string(), application.instances));
+        .push(ImageUsage::new(registry, service_id.to_string(), service.instances));
     }
   }
   let mut images: Vec<(String, Vec<ImageUsage>)> = images.into_iter().collect::<Vec<_>>();
@@ -141,19 +145,13 @@ fn list_images(applications: HashMap<String, Application>, query_processor: &dyn
   let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, None, context);
   for (image, image_usages) in &images {
     if let Some(image_parts) = query_processor.matching_parts(image) {
-      let mut first = true;
       for image_usage in image_usages {
-        if first {
-          formatter.push_target_id_value(context.parts_to_string_stdout(&image_parts), image_usage);
-        } else {
-          formatter.push_target_id_value("".to_string(), image_usage);
-        }
-        first = false;
+        formatter.push_target_id_value(context.parts_to_string_stdout(&image_parts), image_usage);
       }
     }
   }
   if formatter.is_empty() {
-    context.print_outcome("no matches found in applications");
+    context.print_outcome("no matches found in services");
   } else {
     formatter.print()?;
   }
@@ -162,19 +160,19 @@ fn list_images(applications: HashMap<String, Application>, query_processor: &dyn
 
 #[derive(Debug, Eq, Hash, PartialEq, Serialize)]
 enum ImageUsageLabel {
-  Application,
   Image,
   Instances,
   Registry,
+  Service,
 }
 
 impl Label for ImageUsageLabel {
   fn as_str(&self) -> &str {
     match self {
-      ImageUsageLabel::Application => "application_id",
       ImageUsageLabel::Image => "image",
       ImageUsageLabel::Instances => "#",
       ImageUsageLabel::Registry => "registry",
+      ImageUsageLabel::Service => "service id",
     }
   }
 
@@ -186,29 +184,25 @@ impl Label for ImageUsageLabel {
 #[derive(Debug, Eq, Hash, PartialEq, Serialize)]
 struct ImageUsage {
   registry: String,
-  application_id: String,
+  service_id: String,
   instances: u64,
 }
 
 impl ImageUsage {
-  fn new(registry: String, application_id: String, instances: u64) -> Self {
-    Self { registry, application_id, instances }
+  fn new(registry: String, service_id: String, instances: u64) -> Self {
+    Self { registry, service_id, instances }
   }
 }
 
 impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
   fn value(&self, label: &ImageUsageLabel, target_id: &str) -> String {
     match label {
-      ImageUsageLabel::Application => self.application_id.clone(),
+      ImageUsageLabel::Service => self.service_id.clone(),
       ImageUsageLabel::Image => target_id.to_string(),
       ImageUsageLabel::Instances => self.instances.to_string(),
       ImageUsageLabel::Registry => self.registry.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<ImageUsageLabel> {
-    Some(ImageUsageLabel::Image)
-  }
 }
 
-const IMAGE_USAGE_LABELS: [ImageUsageLabel; 4] = [ImageUsageLabel::Image, ImageUsageLabel::Registry, ImageUsageLabel::Application, ImageUsageLabel::Instances];
+const IMAGE_USAGE_LABELS: [ImageUsageLabel; 4] = [ImageUsageLabel::Image, ImageUsageLabel::Registry, ImageUsageLabel::Service, ImageUsageLabel::Instances];

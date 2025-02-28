@@ -27,8 +27,8 @@ use crate::log_level::initialize_logger;
 use crate::settings::{get_settings, Settings};
 use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
-use crate::subjects::application::APPLICATION_SUBJECT;
 use crate::subjects::platform::PLATFORM_SUBJECT;
+use crate::subjects::service::SERVICE_SUBJECT;
 use crate::subjects::token::TOKEN_SUBJECT;
 use crate::targets::{get_target_password_from_keyring, read_target};
 use clap::builder::{styling, Styles};
@@ -93,7 +93,7 @@ const LONG_ABOUT: &str = "DSH resource management api command line interface\n\n
    The DSH api command line tool enables the user to call a subset of the functions \
    in the DSH api from the command line. \
    It also supports functions that are not supported directly from the DSH api, \
-   such as finding all applications that use a certain resource (e.g. a secret) or showing a \
+   such as finding all services that use a certain resource (e.g. a secret) or showing a \
    list of all resources of a certain type (e.g. list all volumes).";
 /// Will be shown after normal help text, when `-h` was provided
 const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
@@ -101,7 +101,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 const USAGE: &str = "dsh [OPTIONS] [SUBJECT/COMMAND]\n       dsh --help\n       dsh secret --help\n       dsh secret list --help";
 
-const VERSION: &str = "0.5.0";
+const VERSION: &str = "0.6.0";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
@@ -171,7 +171,6 @@ async fn inner_main() -> DshCliResult {
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
     API_SUBJECT.as_ref(),
     APP_SUBJECT.as_ref(),
-    APPLICATION_SUBJECT.as_ref(),
     BUCKET_SUBJECT.as_ref(),
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
@@ -182,6 +181,7 @@ async fn inner_main() -> DshCliResult {
     PLATFORM_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
+    SERVICE_SUBJECT.as_ref(),
     TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
@@ -224,12 +224,14 @@ async fn inner_main() -> DshCliResult {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
+        debug!("{:?}", requirements);
         let context = Context::create(&matches, &requirements, &settings).await?;
         subject.execute_subject_command(sub_matches, &context).await?;
       }
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject_list_shortcut) => {
-          let requirements = subject_list_shortcut.requirements(sub_matches);
+          let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
+          debug!("{:?}", requirements);
           let context = Context::create(&matches, &requirements, &settings).await?;
           subject_list_shortcut.execute_subject_list_shortcut(sub_matches, &context).await?;
         }
@@ -303,8 +305,8 @@ pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<Strin
   }
 }
 
-pub(crate) fn _include_app_application(matches: &ArgMatches) -> (bool, bool) {
-  match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Application.id())) {
+pub(crate) fn _include_app_service(matches: &ArgMatches) -> (bool, bool) {
+  match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Service.id())) {
     (false, false) => (true, true),
     (false, true) => (false, true),
     (true, false) => (true, false),
@@ -581,14 +583,14 @@ fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> Result<String,
   }
 }
 
-/// # Returns the dsh application directory
+/// # Returns the `dsh` tool directory
 ///
-/// This function returns the application directory.
+/// This function returns the `dsh` tool's directory.
 /// If it doesn't already exist the directory (and possibly its parent directories)
 /// will be created.
 ///
 /// To determine the directory, first the environment variable DSH_CLI_HOME will be checked.
-/// If this variable is not defined, `${HOME}/.dsh_cli` will be used as the application directory.
+/// If this variable is not defined, `${HOME}/.dsh_cli` will be used as the `dsh` tool directory.
 fn dsh_directory() -> Result<PathBuf, String> {
   let dsh_directory = match env::var(ENV_VAR_HOME_DIRECTORY) {
     Ok(dsh_directory) => PathBuf::new().join(dsh_directory),
@@ -690,5 +692,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.5.1");
+  assert_eq!(crate_version(), "0.5.2");
 }

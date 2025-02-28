@@ -12,17 +12,18 @@ use serde::Serialize;
 use dsh_api::types::AppCatalogAppResourcesValue;
 
 use crate::arguments::app_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::application::APPLICATION_LABELS_SHOW;
 use crate::subjects::bucket::BUCKET_LABELS;
 use crate::subjects::certificate::CERTIFICATE_LABELS_SHOW;
+use crate::subjects::service::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
 use crate::subjects::vhost::VHOST_LABELS;
 use crate::subjects::volume::VOLUME_LABELS;
@@ -46,10 +47,6 @@ impl Subject for AppSubject {
     "Show, manage and list apps deployed from the DSH app catalog.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(APP_LIST_CAPABILITY.as_ref()),
@@ -65,14 +62,14 @@ impl Subject for AppSubject {
 
 lazy_static! {
   static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List deployed apps")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List deployed apps")
       .set_long_about("Lists all apps deployed from the DSH app catalog.")
       .set_default_command_executor(&AppListConfiguration {})
       .add_command_executor(FlagType::Ids, &AppListIds {}, None)
       .set_run_all_executors(true)
   );
   static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show app configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .set_default_command_executor(&AppShowAll {})
       .add_target_argument(app_id_argument().required(true))
@@ -87,7 +84,7 @@ impl CommandExecutor for AppListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed apps and their configurations");
     let start_instant = Instant::now();
-    let apps = context.dsh_api_client.as_ref().unwrap().get_appcatalogapp_configuration_map().await?;
+    let apps = context.client_unchecked().get_appcatalogapp_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     app_ids.sort();
@@ -99,6 +96,10 @@ impl CommandExecutor for AppListConfiguration {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct AppListIds {}
@@ -108,12 +109,16 @@ impl CommandExecutor for AppListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed app ids");
     let start_instant = Instant::now();
-    let ids = context.dsh_api_client.as_ref().unwrap().list_app_ids().await?;
+    let ids = context.client_unchecked().list_app_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("app id", context);
     formatter.push_target_ids(&ids);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -125,17 +130,12 @@ impl CommandExecutor for AppShowAll {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
     let start_instant = Instant::now();
-    let app = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
-      .get_appcatalogapp_appcatalogappid_configuration(app_id.as_str())
-      .await?;
+    let app = context.client_unchecked().get_appcatalogapp_appcatalogappid_configuration(app_id.as_str()).await?;
     context.print_execution_time(start_instant);
     for (resource_name, resource) in &app.resources {
       match resource {
-        AppCatalogAppResourcesValue::Application(application) => {
-          UnitFormatter::new(resource_name, &APPLICATION_LABELS_SHOW, Some("application resource"), context).print(application)?;
+        AppCatalogAppResourcesValue::Application(service) => {
+          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, Some("service resource"), context).print(service)?;
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
           UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket)?;
@@ -158,6 +158,10 @@ impl CommandExecutor for AppShowAll {
       }
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -206,10 +210,6 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
       AppCatalogAppLabel::ManifestUrl => self.manifest_urn.clone(),
       AppCatalogAppLabel::Target => target_id.to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<AppCatalogAppLabel> {
-    Some(AppCatalogAppLabel::Target)
   }
 }
 

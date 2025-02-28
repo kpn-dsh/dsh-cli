@@ -1,6 +1,5 @@
 pub(crate) mod api;
 pub(crate) mod app;
-pub(crate) mod application;
 pub(crate) mod bucket;
 pub(crate) mod certificate;
 pub(crate) mod env;
@@ -11,6 +10,7 @@ pub(crate) mod metric;
 pub(crate) mod platform;
 pub(crate) mod proxy;
 pub(crate) mod secret;
+pub(crate) mod service;
 pub(crate) mod setting;
 pub(crate) mod target;
 pub(crate) mod token;
@@ -62,10 +62,6 @@ impl SubjectFormatter<AllocationStatusLabel> for AllocationStatus {
       AllocationStatusLabel::Target => target_id.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<AllocationStatusLabel> {
-    Some(AllocationStatusLabel::Target)
-  }
 }
 
 pub static _ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
@@ -88,7 +84,7 @@ impl Label for UsedByLabel {
       UsedByLabel::Injections => "injections",
       UsedByLabel::Instances => "instances",
       UsedByLabel::Target => "target id",
-      UsedByLabel::User => "app/application",
+      UsedByLabel::User => "app/service",
     }
   }
 
@@ -97,7 +93,7 @@ impl Label for UsedByLabel {
       UsedByLabel::Injections => "injections",
       UsedByLabel::Instances => "#",
       UsedByLabel::Target => "target id",
-      UsedByLabel::User => "app/application",
+      UsedByLabel::User => "app/service",
     }
   }
 
@@ -120,7 +116,7 @@ impl SubjectFormatter<UsedByLabel> for UsedBy {
       UsedByLabel::Target => target_id.to_string(),
       UsedByLabel::User => match self {
         UsedBy::App(app_id, _) => app_id.to_string(),
-        UsedBy::Application(application_id, _, _) => application_id.to_string(),
+        UsedBy::Application(service_id, _, _) => service_id.to_string(),
       },
     }
   }
@@ -128,12 +124,8 @@ impl SubjectFormatter<UsedByLabel> for UsedBy {
   fn target_id(&self) -> Option<String> {
     Some(match self {
       UsedBy::App(app_id, _) => app_id.to_string(),
-      UsedBy::Application(application_id, _, _) => application_id.to_string(),
+      UsedBy::Application(service_id, _, _) => service_id.to_string(),
     })
-  }
-
-  fn target_label(&self) -> Option<UsedByLabel> {
-    Some(UsedByLabel::User)
   }
 }
 

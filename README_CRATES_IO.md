@@ -8,14 +8,14 @@
 
 This project provides a tool to call functions on the DSH resource management API from the
 command line of your workstation or from a script.
-Below in an overview of the capabilities of the tool:
+Below in an overview of the capabilities of the `dsh` tool:
 
 * Calling all operations exposed in DSH resource management API
   from either the command line or from a script.
 * Many additional and easier to use functions are provided.
 * Extensive help information on each level using the `--help` and `-h` flags,
   including listings of all available operations.
-* Configuring platform and tenant credentials interactively via the tool.
+* Configuring platform and tenant credentials interactively via the `dsh` tool.
   Sensitive passwords are stored in your computer's keychain, if available.
 * Retrieving information about the available platforms.
 * Opening web applications (e.g. the console, the swagger ui or the vhost of your app or service)
@@ -26,7 +26,7 @@ Below in an overview of the capabilities of the tool:
 ## Features
 
 By enabling/disabling the features described below you have some control over what's included
-in the tool and what's not. The features are disabled by default.
+in the `dsh` tool and what's not. The features are disabled by default.
 The following features are defined:
 
 * `appcatalog` - Enables the app catalog methods.
@@ -36,7 +36,7 @@ The following features are defined:
 ## Installation
 
 The DSH Api Command Line Tool (`dsh`) can be installed on your local machine
-(assuming you have the `rust` tool chain installed),
+(assuming you have the `rust` tool-chain installed),
 by executing the following command.
 
 ```bash
@@ -47,7 +47,7 @@ by executing the following command.
 ## Run
 
 When installation completed without any errors,
-you should be able to start the tool from the command line.
+you should be able to start the `dsh` tool from the command line.
 
 ```bash
 > dsh
@@ -61,7 +61,6 @@ Usage: dsh [OPTIONS] [SUBJECT/COMMAND]
 Subjects/commands:
   api          List and call DSH resource management api.
   app          Show, manage and list apps deployed from the DSH app catalog.
-  application  Show, manage and list applications deployed on the DSH.
   bucket       Show, manage and list DSH buckets.
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
@@ -70,6 +69,7 @@ Subjects/commands:
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
   secret       Show, manage and list DSH secrets.
+  service      Show, manage and list services deployed on the DSH.
   token        Request DSH tokens.
   topic        Show, manage and list DSH topics.
   vhost        Show vhost usage.

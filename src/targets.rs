@@ -7,7 +7,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::fs;
 use std::path::PathBuf;
 
-/// # Identifies the application's target
+/// # Identifies the `dsh` tool's target
 ///
 /// * `platform` target's platform
 /// * `tenant` target's tenant name

@@ -2,7 +2,7 @@
 
 ### Prompts
 
-When the tool is installed properly, you can run it by simply typing a command and
+When the `dsh` tool is installed properly, you can run it by simply typing a command and
 the tool will prompt you for the required parameters.
 To get a list of the configured secrets for `my-tenant` on `my-platform`, just type:
 
@@ -19,13 +19,13 @@ password for tenant my-tenant@np-aws-lz-dsh: ********
 └─────────────────────────────────────────┘
 ```
 
-The password can be obtained by logging in to the DSH console application for `np-aws-lz-dsh`
+The password can be obtained by logging in to the DSH console web application for `np-aws-lz-dsh`
 and selecting `my-tenant`. Then go to the `Resources > Secrets` menu.
 The password will be listed as `system/rest-api-client`.
 
 ### Command line arguments
 
-In most cases, especially when the tool is not run from a terminal,
+In most cases, especially when the `dsh` tool is not run from a terminal,
 it is more convenient to provide the required parameters explicitly via the command line.
 For security reasons, the password cannot be provided directly from the command line,
 therefor you have to create a password file containing the password.
@@ -72,7 +72,7 @@ but you can also provide it in a file as with the command line arguments:
 If you work with more than one platform and/or tenant,
 providing the parameters and passwords via prompts, command line arguments or
 environment variables quickly becomes tedious.
-It might be easier to use the tools capabilities to manage target platforms and tenants
+It might be easier to use the `dsh` tool's capabilities to manage target platforms and tenants
 and to define default settings.
 
 To create a new target, type:

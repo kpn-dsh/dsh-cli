@@ -29,7 +29,7 @@ pub(crate) fn log_level_argument() -> Arg {
     .value_name("LEVEL")
     .help("Set log level.")
     .long_help(
-      "If this option is provided, it will set the tool's log level. \
+      "If this option is provided, it will set the dsh tool's log level. \
       The default log level is 'error'.",
     )
     .global(true)

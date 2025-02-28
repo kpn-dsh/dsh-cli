@@ -3,7 +3,6 @@ use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
 
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
-pub(crate) const APPLICATION__ID_ARGUMENT: &str = "application-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
 pub(crate) const CERTIFICATE_ID_ARGUMENT: &str = "certificate-id-argument";
 #[cfg(feature = "appcatalog")]
@@ -26,15 +25,6 @@ pub(crate) fn app_id_argument() -> Arg {
     .value_name("APP")
     .help("App identifier.")
     .long_help("Identifies an app from the app catalog.")
-}
-
-pub(crate) fn application_id_argument() -> Arg {
-  Arg::new(APPLICATION__ID_ARGUMENT)
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("APPLICATION")
-    .help("Application identifier.")
-    .long_help("Identifies an application (or service) deployed on the DSH.")
 }
 
 pub(crate) fn bucket_id_argument() -> Arg {
@@ -118,7 +108,7 @@ pub(crate) fn service_id_argument() -> Arg {
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("SERVICE")
     .help("Service identifier.")
-    .long_help("Identifies a service (or application) deployed on the DSH.")
+    .long_help("Identifies a service deployed on the DSH.")
 }
 
 pub(crate) fn tenant_name_argument() -> Arg {

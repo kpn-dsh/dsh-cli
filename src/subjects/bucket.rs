@@ -1,5 +1,5 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::formatters::notifications_to_string;
+use crate::formatters::{notifications_to_string, OutputFormat};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::types::{Bucket, BucketStatus};
@@ -9,7 +9,7 @@ use serde::Serialize;
 use std::time::Instant;
 
 use crate::arguments::bucket_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -45,10 +45,6 @@ impl Subject for BucketSubject {
     Some("b")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(BUCKET_LIST_CAPABILITY.as_ref()),
@@ -64,14 +60,14 @@ impl Subject for BucketSubject {
 
 lazy_static! {
   static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List buckets")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List buckets")
       .set_long_about("Lists all available buckets.")
       .set_default_command_executor(&BucketListAll {})
       .add_command_executor(FlagType::Ids, &BucketListIds {}, None)
       .set_run_all_executors(true)
   );
   static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show bucket configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show bucket configuration")
       .set_default_command_executor(&BucketShowAll {})
       .add_target_argument(bucket_id_argument().required(true))
   );
@@ -85,13 +81,17 @@ impl CommandExecutor for BucketListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all buckets with their parameters");
     let start_instant = Instant::now();
-    let bucket_ids = context.dsh_api_client.as_ref().unwrap().list_bucket_ids().await?;
-    let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| context.dsh_api_client.as_ref().unwrap().get_bucket(id.as_str()))).await?;
+    let bucket_ids = context.client_unchecked().list_bucket_ids().await?;
+    let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| context.client_unchecked().get_bucket(id.as_str()))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&BUCKET_STATUS_LABELS, None, context);
     formatter.push_target_ids_and_values(bucket_ids.as_slice(), bucket_statuses.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -102,12 +102,16 @@ impl CommandExecutor for BucketListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all bucket ids");
     let start_instant = Instant::now();
-    let bucket_ids = context.dsh_api_client.as_ref().unwrap().list_bucket_ids().await?;
+    let bucket_ids = context.client_unchecked().list_bucket_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("bucket id", context);
     formatter.push_target_ids(&bucket_ids);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -119,9 +123,13 @@ impl CommandExecutor for BucketShowAll {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for bucket '{}'", bucket_id));
     let start_instant = Instant::now();
-    let bucket = context.dsh_api_client.as_ref().unwrap().get_bucket(bucket_id.as_str()).await?;
+    let bucket = context.client_unchecked().get_bucket(bucket_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -169,10 +177,6 @@ impl SubjectFormatter<BucketLabel> for BucketStatus {
       BucketLabel::Versioned => self.configuration.as_ref().map(|bs| bs.versioned.to_string()).unwrap_or_default(),
     }
   }
-
-  fn target_label(&self) -> Option<BucketLabel> {
-    Some(BucketLabel::Target)
-  }
 }
 
 impl SubjectFormatter<BucketLabel> for Bucket {
@@ -183,10 +187,6 @@ impl SubjectFormatter<BucketLabel> for Bucket {
       BucketLabel::Versioned => self.versioned.to_string(),
       _ => "".to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<BucketLabel> {
-    Some(BucketLabel::Target)
   }
 }
 

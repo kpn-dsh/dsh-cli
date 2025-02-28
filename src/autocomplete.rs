@@ -43,7 +43,7 @@ pub(crate) fn generate_autocomplete_file_argument() -> Arg {
     .help("Generate autocomplete file")
     .long_help(
       "If this option is provided, \
-          the application will write an autocomplete file for the selected shell to stdout. \
+          the dsh tool will write an autocomplete file for the selected shell to stdout. \
           See the documentation for your shell on how to install the autocomplete file. \
           When this option is used, all other provided commands or options will be ignored.",
     )

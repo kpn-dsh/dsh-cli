@@ -7,7 +7,7 @@ pub(crate) mod ids_formatter;
 pub(crate) mod list_formatter;
 pub(crate) mod unit_formatter;
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub enum OutputFormat {
   /// Output will be formatted as comma separated values
   #[serde(rename = "csv")]

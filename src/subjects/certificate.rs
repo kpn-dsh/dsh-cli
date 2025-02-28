@@ -1,5 +1,5 @@
 use crate::arguments::certificate_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -7,6 +7,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
 use crate::DshCliResult;
@@ -46,10 +47,6 @@ impl Subject for CertificateSubject {
     Some("c")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(CERTIFICATE_LIST_CAPABILITY.as_ref()),
@@ -65,7 +62,7 @@ impl Subject for CertificateSubject {
 
 lazy_static! {
   static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List certificates")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List certificates")
       .set_long_about("Lists all available certificates.")
       .set_default_command_executor(&CertificateListAll {})
       .add_command_executors(vec![
@@ -77,7 +74,7 @@ lazy_static! {
       .set_run_all_executors(true)
   );
   static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show certificate configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show certificate configuration")
       .set_default_command_executor(&CertificateShowAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
@@ -95,13 +92,8 @@ impl CommandExecutor for CertificateListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their parameters");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
-    let certificate_statuses = futures::future::join_all(
-      certificate_ids
-        .iter()
-        .map(|id| context.dsh_api_client.as_ref().unwrap().get_certificate(id.as_str())),
-    )
-    .await;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
+    let certificate_statuses = futures::future::join_all(certificate_ids.iter().map(|id| context.client_unchecked().get_certificate(id.as_str()))).await;
     context.print_execution_time(start_instant);
     let certificates_statuses_unwrapped = certificate_statuses
       .iter()
@@ -112,6 +104,10 @@ impl CommandExecutor for CertificateListAll {
     formatter.print()?;
     Ok(())
   }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
+  }
 }
 
 struct CertificateListAllocationStatus {}
@@ -121,11 +117,11 @@ impl CommandExecutor for CertificateListAllocationStatus {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their allocation status");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
     let allocation_statuses = try_join_all(
       certificate_ids
         .iter()
-        .map(|certificate_id| context.dsh_api_client.as_ref().unwrap().get_certificate_status(certificate_id)),
+        .map(|certificate_id| context.client_unchecked().get_certificate_status(certificate_id)),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -133,6 +129,10 @@ impl CommandExecutor for CertificateListAllocationStatus {
     formatter.push_target_ids_and_values(certificate_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -143,11 +143,11 @@ impl CommandExecutor for CertificateListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with their configuration");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
     let certificates = try_join_all(
       certificate_ids
         .iter()
-        .map(|id| context.dsh_api_client.as_ref().unwrap().get_certificate_configuration(id.as_str())),
+        .map(|id| context.client_unchecked().get_certificate_configuration(id.as_str())),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -155,6 +155,10 @@ impl CommandExecutor for CertificateListConfiguration {
     formatter.push_target_ids_and_values(certificate_ids.as_slice(), certificates.as_slice());
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -165,12 +169,16 @@ impl CommandExecutor for CertificateListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificate ids");
     let start_instant = Instant::now();
-    let certificate_ids = context.dsh_api_client.as_ref().unwrap().get_certificate_ids().await?;
+    let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("certificate id", context);
     formatter.push_target_ids(&certificate_ids);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -179,28 +187,26 @@ struct CertificateListUsage {}
 #[async_trait]
 impl CommandExecutor for CertificateListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list all certificates with the applications where they are used");
+    context.print_explanation("list all certificates with the services where they are used");
     let start_instant = Instant::now();
-    let certificates_with_usage: Vec<(String, CertificateStatus, Vec<UsedBy>)> = context.dsh_api_client.as_ref().unwrap().list_certificates_with_usage().await?;
+    let certificates_with_usage: Vec<(String, CertificateStatus, Vec<UsedBy>)> = context.client_unchecked().list_certificates_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("certificate id"), context);
     for (certificate_id, _certificate, used_bys) in &certificates_with_usage {
-      let mut first = true;
       for used_by in used_bys {
-        if first {
-          formatter.push_target_id_value(certificate_id.clone(), used_by);
-        } else {
-          formatter.push_target_id_value("".to_string(), used_by);
-        }
-        first = false;
+        formatter.push_target_id_value(certificate_id.clone(), used_by);
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no certificate found in apps or applications");
+      context.print_outcome("no certificate found in apps or services");
     } else {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -212,12 +218,16 @@ impl CommandExecutor for CertificateShowAll {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let certificate = context.dsh_api_client.as_ref().unwrap().get_certificate(certificate_id.as_str()).await?;
+    let certificate = context.client_unchecked().get_certificate(certificate_id.as_str()).await?;
     if let Some(actual_certificate) = certificate.actual {
       context.print_execution_time(start_instant);
       UnitFormatter::new(certificate_id, &CERTIFICATE_LABELS_SHOW, None, context).print(&actual_certificate)?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -229,9 +239,13 @@ impl CommandExecutor for CertificateShowAllocationStatus {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let allocation_status = context.dsh_api_client.as_ref().unwrap().get_certificate_status(certificate_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_certificate_status(certificate_id.as_str()).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(certificate_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("certificate id"), context).print(&allocation_status)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -241,9 +255,9 @@ struct CertificateShowUsage {}
 impl CommandExecutor for CertificateShowUsage {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show all applications and apps that use certificate '{}'", certificate_id));
+    context.print_explanation(format!("show all services and apps that use certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let (_, usages) = context.dsh_api_client.as_ref().unwrap().get_certificate_with_usage(certificate_id.as_str()).await?;
+    let (_, usages) = context.client_unchecked().get_certificate_with_usage(certificate_id.as_str()).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("certificate not used")
@@ -253,6 +267,10 @@ impl CommandExecutor for CertificateShowUsage {
       formatter.print()?;
     }
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -317,10 +335,6 @@ impl SubjectFormatter<CertificateLabel> for ActualCertificate {
       CertificateLabel::Target => target_id.to_string(),
     }
   }
-
-  fn target_label(&self) -> Option<CertificateLabel> {
-    Some(CertificateLabel::Target)
-  }
 }
 
 impl SubjectFormatter<CertificateLabel> for Certificate {
@@ -332,10 +346,6 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
       CertificateLabel::Target => target_id.to_string(),
       _ => unreachable!(),
     }
-  }
-
-  fn target_label(&self) -> Option<CertificateLabel> {
-    Some(CertificateLabel::Target)
   }
 }
 

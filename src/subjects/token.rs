@@ -1,8 +1,9 @@
-use crate::capability::{Capability, CommandExecutor, FETCH_COMMAND, FETCH_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, FETCH_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 use async_trait::async_trait;
@@ -34,10 +35,6 @@ impl Subject for TokenSubject {
     "Request DSH tokens.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       FETCH_COMMAND => Some(TOKEN_FETCH_CAPABILITY.as_ref()),
@@ -53,12 +50,12 @@ impl Subject for TokenSubject {
 
 lazy_static! {
   static ref TOKEN_FETCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FETCH_COMMAND_PAIR, "Fetch token")
+    CapabilityBuilder::new(FETCH_COMMAND, None, "Fetch token")
       .set_long_about("Fetch a DSH API token.")
       .set_default_command_executor(&TokenFetch {})
   );
   static ref TOKEN_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Fetch and show token")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Fetch and show token")
       .set_long_about("Fetch a DSH API token and display its parameters.")
       .set_default_command_executor(&TokenShow {})
   );
@@ -74,9 +71,7 @@ impl CommandExecutor for TokenFetch {
     let start_instant = Instant::now();
 
     let access_token = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
+      .client_unchecked()
       .token_fetcher()
       .fetch_access_token_from_server()
       .await
@@ -84,6 +79,10 @@ impl CommandExecutor for TokenFetch {
     context.print_execution_time(start_instant);
     context.print(access_token.access_token());
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -96,15 +95,17 @@ impl CommandExecutor for TokenShow {
     let start_instant = Instant::now();
 
     let access_token = context
-      .dsh_api_client
-      .as_ref()
-      .unwrap()
+      .client_unchecked()
       .token_fetcher()
       .fetch_access_token_from_server()
       .await
       .map_err(|error| error.to_string())?;
     context.print_execution_time(start_instant);
     UnitFormatter::new("", &ACCES_TOKEN_LABELS, None, context).print_non_serializable(&access_token)
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -148,10 +149,6 @@ impl SubjectFormatter<AccessTokenLabel> for AccessToken {
       AccessTokenLabel::Scope => self.scope().to_string(),
       AccessTokenLabel::TokenType => self.token_type().to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<AccessTokenLabel> {
-    Some(AccessTokenLabel::Scope)
   }
 }
 

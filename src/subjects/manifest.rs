@@ -14,13 +14,14 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use dsh_api::types::AppCatalogManifest;
 
 use crate::arguments::manifest_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR, SHOW_COMMAND, SHOW_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 
@@ -46,10 +47,6 @@ impl Subject for ManifestSubject {
     "Show the manifest files for the apps in the DSH App Catalog.".to_string()
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(MANIFEST_LIST_CAPABILITY.as_ref()),
@@ -65,14 +62,14 @@ impl Subject for ManifestSubject {
 
 lazy_static! {
   static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List manifests")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List manifests")
       .set_long_about("Lists all manifest files from the App Catalog.")
       .set_default_command_executor(&ManifestListAll {})
       .add_command_executor(FlagType::Ids, &ManifestListIds {}, None)
       .set_run_all_executors(true)
   );
   static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show manifest configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show manifest configuration")
       .set_default_command_executor(&ManifestShowAll {})
       .add_target_argument(manifest_id_argument().required(true))
   );
@@ -86,7 +83,7 @@ impl CommandExecutor for ManifestListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifests");
     let start_instant = Instant::now();
-    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().get_appcatalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.client_unchecked().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
@@ -97,18 +94,16 @@ impl CommandExecutor for ManifestListAll {
     for manifest_id in manifest_ids {
       let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id).unwrap().clone();
       manifests.sort_by_key(|m| m.version.clone());
-      let mut first = true;
       for manifest in manifests {
-        if first {
-          formatter.push_target_id_value(manifest_id.clone(), manifest);
-          first = false;
-        } else {
-          formatter.push_target_id_value("".to_string(), manifest);
-        }
+        formatter.push_target_id_value(manifest_id.clone(), manifest);
       }
     }
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -119,12 +114,16 @@ impl CommandExecutor for ManifestListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifest ids");
     let start_instant = Instant::now();
-    let manifest_ids: Vec<String> = context.dsh_api_client.as_ref().unwrap().list_app_catalog_manifest_ids().await?;
+    let manifest_ids: Vec<String> = context.client_unchecked().list_app_catalog_manifest_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("manifest id", context);
     formatter.push_target_ids(&manifest_ids);
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Plain))
   }
 }
 
@@ -136,7 +135,7 @@ impl CommandExecutor for ManifestShowAll {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app catalog manifest '{}'", manifest_id));
     let start_instant = Instant::now();
-    let app_catalog_manifests: Vec<AppCatalogManifest> = context.dsh_api_client.as_ref().unwrap().get_appcatalog_manifests().await?;
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.client_unchecked().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
@@ -144,6 +143,10 @@ impl CommandExecutor for ManifestShowAll {
     let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id.as_str()).unwrap().clone();
     manifests.sort_by_key(|m| m.version.clone());
     UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), context).print(*manifests.last().unwrap())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -229,10 +232,6 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
       ManifestLabel::Version => self.version.clone(),
       ManifestLabel::Target => target_id.to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<ManifestLabel> {
-    Some(ManifestLabel::Target)
   }
 }
 

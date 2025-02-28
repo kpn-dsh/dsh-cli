@@ -1,4 +1,4 @@
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_PAIR};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
@@ -40,10 +40,6 @@ impl Subject for VhostSubject {
     Some("v")
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(false, false, true, None)
-  }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
@@ -58,8 +54,8 @@ impl Subject for VhostSubject {
 
 lazy_static! {
   static ref VHOST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND_PAIR, "List configured vhosts")
-      .set_long_about("List applications that have vhosts configured. Vhosts that are provisioned but are not configured in any applications will not be shown.")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List configured vhosts")
+      .set_long_about("List services that have vhosts configured. Vhosts that are provisioned but are not configured in any services will not be shown.")
       .set_default_command_executor(&VhostListUsage {})
   );
   // pub static ref VHOST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -75,24 +71,22 @@ struct VhostListUsage {}
 #[async_trait]
 impl CommandExecutor for VhostListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("list applications with a vhost configuration");
+    context.print_explanation("list services with a vhost configuration");
     let start_instant = Instant::now();
-    let vhosts_with_usage: Vec<(String, Vec<UsedBy>)> = context.dsh_api_client.as_ref().unwrap().list_vhosts_with_usage().await?;
+    let vhosts_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_vhosts_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("vhost"), context);
     for (vhost, used_bys) in &vhosts_with_usage {
-      let mut first = true;
       for used_by in used_bys {
-        if first {
-          formatter.push_target_id_value(vhost.clone(), used_by);
-        } else {
-          formatter.push_target_id_value("".to_string(), used_by);
-        }
-        first = false;
+        formatter.push_target_id_value(vhost.clone(), used_by);
       }
     }
     formatter.print()?;
     Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(None)
   }
 }
 
@@ -102,17 +96,17 @@ impl CommandExecutor for VhostListUsage {
 // impl CommandExecutor for VhostShowUsage {
 //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
 //     let vhost_target = target.unwrap_or_else(|| unreachable!());
-//     context.print_explanation(format!("show the applications that use vhost '{}'", vhost_target));
+//     context.print_explanation(format!("show the services that use vhost '{}'", vhost_target));
 //     let start_instant = Instant::now();
-//     let applications = context.dsh_api_client.as_ref().unwrap().get_applications().await?;
+//     let services = context.client_unchecked().get_applications().await?;
 //     context.print_execution_time(start_instant);
-//     let mut builder = StringTableBuilder::new(&["application", "port", "a-zone"], context);
-//     for (application_id, application) in &applications {
-//       for (port, port_mapping) in &application.exposed_ports {
+//     let mut builder = StringTableBuilder::new(&["service", "port", "a-zone"], context);
+//     for (service_id, service) in &services {
+//       for (port, port_mapping) in &service.exposed_ports {
 //         if let Some(vhost_string) = port_mapping.vhost.clone() {
 //           if let Some((vhost, a_zone)) = vhost::parse_vhost_string(&vhost_string) {
 //             if vhost_target == vhost {
-//               builder.vec(&vec![application_id.clone(), port.clone(), a_zone.unwrap_or_default()]);
+//               builder.vec(&vec![service_id.clone(), port.clone(), a_zone.unwrap_or_default()]);
 //             }
 //           }
 //         }
@@ -148,10 +142,6 @@ impl SubjectFormatter<VhostLabel> for Vhost {
       VhostLabel::Target => target_id.to_string(),
       VhostLabel::Value => self.value.to_string(),
     }
-  }
-
-  fn target_label(&self) -> Option<VhostLabel> {
-    Some(VhostLabel::Target)
   }
 }
 
