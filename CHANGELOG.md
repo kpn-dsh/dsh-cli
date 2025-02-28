@@ -16,6 +16,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Renamed subject `application` to `service`. This results in changed commands and options.
 * Simplified json output.
 * Better rendering of empty results.
+* Dependency to `dsh_api` crate to version `0.5.2`.
 
 ### Fixes
 
