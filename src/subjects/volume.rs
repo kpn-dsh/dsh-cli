@@ -136,12 +136,7 @@ impl CommandExecutor for VolumeListAll {
     context.print_explanation("list all volumes with their parameters");
     let start_instant = Instant::now();
     let volume_ids = context.client_unchecked().get_volume_ids().await?;
-    let volumes = try_join_all(
-      volume_ids
-        .iter()
-        .map(|volume_id| context.client_unchecked().get_volume_configuration(volume_id.as_str())),
-    )
-    .await?;
+    let volumes = try_join_all(volume_ids.iter().map(|volume_id| context.client_unchecked().get_volume_configuration(volume_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&VOLUME_LABELS, Some("volume id"), context);
     formatter.push_target_ids_and_values(volume_ids.as_slice(), volumes.as_slice());
@@ -162,7 +157,7 @@ impl CommandExecutor for VolumeListAllocationStatus {
     context.print_explanation("list all volumes with their allocation status");
     let start_instant = Instant::now();
     let volume_ids = context.client_unchecked().get_volume_ids().await?;
-    let allocation_statuses = try_join_all(volume_ids.iter().map(|volume_id| context.client_unchecked().get_volume_status(volume_id.as_str()))).await?;
+    let allocation_statuses = try_join_all(volume_ids.iter().map(|volume_id| context.client_unchecked().get_volume_status(volume_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context);
     formatter.push_target_ids_and_values(volume_ids.as_slice(), allocation_statuses.as_slice());
@@ -183,12 +178,7 @@ impl CommandExecutor for VolumeListConfiguration {
     context.print_explanation("list all volumes with their configurations");
     let start_instant = Instant::now();
     let volume_ids = context.client_unchecked().get_volume_ids().await?;
-    let configurations = try_join_all(
-      volume_ids
-        .iter()
-        .map(|volume_id| context.client_unchecked().get_volume_configuration(volume_id.as_str())),
-    )
-    .await?;
+    let configurations = try_join_all(volume_ids.iter().map(|volume_id| context.client_unchecked().get_volume_configuration(volume_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&VOLUME_LABELS, Some("volume id"), context);
     formatter.push_target_ids_and_values(volume_ids.as_slice(), configurations.as_slice());
@@ -284,7 +274,7 @@ impl CommandExecutor for VolumeShowAll {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for volume '{}'", volume_id));
     let start_instant = Instant::now();
-    let volume = context.client_unchecked().get_volume(volume_id.as_str()).await?;
+    let volume = context.client_unchecked().get_volume(&volume_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(volume_id, &VOLUME_STATUS_LABELS, Some("volume id"), context).print(&volume)
   }
@@ -302,7 +292,7 @@ impl CommandExecutor for VolumeShowAllocationStatus {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for volume '{}'", volume_id));
     let start_instant = Instant::now();
-    let allocation_status = context.client_unchecked().get_volume_status(volume_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_volume_status(&volume_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context).print(&allocation_status)
   }
@@ -320,7 +310,7 @@ impl CommandExecutor for VolumeShowUsage {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the apps and services that use volume '{}'", volume_id));
     let start_instant = Instant::now();
-    let (_, usages) = context.client_unchecked().get_volume_with_usage(volume_id.as_str()).await?;
+    let (_, usages) = context.client_unchecked().get_volume_with_usage(&volume_id).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("volume not used")

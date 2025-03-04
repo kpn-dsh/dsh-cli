@@ -93,7 +93,7 @@ impl CommandExecutor for ImageFind {
   async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let image_query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
-      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(image_query.as_str())? } else { &ExactMatchQueryProcessor::create(image_query.as_str())? };
+      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&image_query)? } else { &ExactMatchQueryProcessor::create(&image_query)? };
     context.print_explanation(format!("find images that {}", query_processor.describe()));
     let start_instant = Instant::now();
     let services = context.client_unchecked().get_application_configuration_map().await?;

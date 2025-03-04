@@ -107,7 +107,7 @@ impl CommandExecutor for TopicDelete {
     if context.client_unchecked().get_topic(&topic_id).await.is_err() {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }
-    if context.confirmed(format!("type 'yes' to delete scratch topic '{}': ", topic_id).as_str())? {
+    if context.confirmed(format!("type 'yes' to delete scratch topic '{}': ", topic_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, topic not deleted");
       } else {
@@ -133,7 +133,7 @@ impl CommandExecutor for TopicListAllocationStatus {
     context.print_explanation("list all scratch topics with their allocation status");
     let start_instant = Instant::now();
     let topic_ids = context.client_unchecked().get_topic_ids().await?;
-    let allocation_statuses = try_join_all(topic_ids.iter().map(|id| context.client_unchecked().get_topic_status(id.as_str()))).await?;
+    let allocation_statuses = try_join_all(topic_ids.iter().map(|topic_id| context.client_unchecked().get_topic_status(topic_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context);
     formatter.push_target_ids_and_values(topic_ids.as_slice(), allocation_statuses.as_slice());
@@ -154,7 +154,7 @@ impl CommandExecutor for TopicListConfiguration {
     context.print_explanation("list all scratch topics with their configurations");
     let start_instant = Instant::now();
     let topic_ids = context.client_unchecked().get_topic_ids().await?;
-    let configurations = try_join_all(topic_ids.iter().map(|id| context.client_unchecked().get_topic_configuration(id.as_str()))).await?;
+    let configurations = try_join_all(topic_ids.iter().map(|topic_id| context.client_unchecked().get_topic_configuration(topic_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&TOPIC_LABELS, None, context);
     formatter.push_target_ids_and_values(topic_ids.as_slice(), configurations.as_slice());
@@ -231,7 +231,7 @@ impl CommandExecutor for TopicShowAllocationStatus {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for topic '{}'", topic_id));
     let start_instant = Instant::now();
-    let allocation_status = context.client_unchecked().get_topic_status(topic_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_topic_status(&topic_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context).print(&allocation_status)
   }
@@ -249,7 +249,7 @@ impl CommandExecutor for TopicShow {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the configuration for topic '{}'", topic_id));
     let start_instant = Instant::now();
-    let topic = context.client_unchecked().get_topic_configuration(topic_id.as_str()).await?;
+    let topic = context.client_unchecked().get_topic_configuration(&topic_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, context).print(&topic)
   }
@@ -267,7 +267,7 @@ impl CommandExecutor for TopicShowProperties {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the properties for topic '{}'", topic_id));
     let start_instant = Instant::now();
-    let topic_status = context.client_unchecked().get_topic(topic_id.as_str()).await?;
+    let topic_status = context.client_unchecked().get_topic(&topic_id).await?;
     context.print_execution_time(start_instant);
     let mut pairs: Vec<(String, String)> = topic_status.actual.unwrap().kafka_properties.into_iter().collect::<Vec<_>>();
     pairs.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
@@ -293,7 +293,7 @@ impl CommandExecutor for TopicShowUsage {
     let start_instant = Instant::now();
     let services = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-    let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id.as_str(), &services);
+    let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(&topic_id, &services);
     let used_bys = usages
       .into_iter()
       .filter_map(|(service_id, service, injections)| if injections.is_empty() { None } else { Some(UsedBy::Application(service_id.clone(), service.instances, injections)) })

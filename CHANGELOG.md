@@ -4,7 +4,14 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.6.0] - yyyy-mm-dd
+## [0.6.1] - yyyy-mm-dd
+
+### Added
+
+* Capability to edit service configurations.
+* Capability to duplicate service configurations.
+
+## [0.6.0] - 2025-02-28
 
 ### Added
 

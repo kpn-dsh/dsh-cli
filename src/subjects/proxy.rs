@@ -88,7 +88,7 @@ impl CommandExecutor for ProxyDelete {
     if context.client_unchecked().get_kafkaproxy_configuration(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
-    if context.confirmed(format!("type 'yes' to delete proxy '{}': ", proxy_id).as_str())? {
+    if context.confirmed(format!("type 'yes' to delete proxy '{}': ", proxy_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, proxy not deleted");
       } else {
@@ -114,12 +114,7 @@ impl CommandExecutor for ProxyListAll {
     context.print_explanation("list all proxies with parameters");
     let start_instant = Instant::now();
     let proxy_ids = context.client_unchecked().get_kafkaproxy_ids().await?;
-    let proxys = try_join_all(
-      proxy_ids
-        .iter()
-        .map(|proxy_id| context.client_unchecked().get_kafkaproxy_configuration(proxy_id.as_str())),
-    )
-    .await?;
+    let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| context.client_unchecked().get_kafkaproxy_configuration(proxy_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&PROXY_LABELS_LIST, None, context);
     formatter.push_target_ids_and_values(proxy_ids.as_slice(), proxys.as_slice());
@@ -160,7 +155,7 @@ impl CommandExecutor for ProxyShowConfiguration {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
     let start_instant = Instant::now();
-    let proxy = context.client_unchecked().get_kafkaproxy_configuration(proxy_id.as_str()).await?;
+    let proxy = context.client_unchecked().get_kafkaproxy_configuration(&proxy_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, context).print(&proxy)
   }

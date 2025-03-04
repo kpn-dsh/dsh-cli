@@ -113,7 +113,7 @@ impl CommandExecutor for SecretDelete {
     if context.client_unchecked().get_secret_configuration(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exist", secret_id));
     }
-    if context.confirmed(format!("type 'yes' to delete secret '{}': ", secret_id).as_str())? {
+    if context.confirmed(format!("type 'yes' to delete secret '{}': ", secret_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not deleted");
       } else {
@@ -145,7 +145,12 @@ impl CommandExecutor for SecretListAllocationStatus {
       .into_iter()
       .filter(|id| !secret::is_system_secret(id))
       .collect::<Vec<_>>();
-    let allocation_statuses = try_join_all(non_system_secret_ids.iter().map(|id| context.client_unchecked().get_secret_status(id.as_str()))).await?;
+    let allocation_statuses = try_join_all(
+      non_system_secret_ids
+        .iter()
+        .map(|secret_id| context.client_unchecked().get_secret_status(secret_id)),
+    )
+    .await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context);
     formatter.push_target_ids_and_values(non_system_secret_ids.as_slice(), allocation_statuses.as_slice());
@@ -172,7 +177,7 @@ impl CommandExecutor for SecretListSystem {
       .into_iter()
       .filter(|id| secret::is_system_secret(id))
       .collect::<Vec<_>>();
-    let allocation_statuses = try_join_all(system_secret_ids.iter().map(|id| context.client_unchecked().get_secret_status(id.as_str()))).await?;
+    let allocation_statuses = try_join_all(system_secret_ids.iter().map(|secret_id| context.client_unchecked().get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("system secret id"), context);
     formatter.push_target_ids_and_values(system_secret_ids.as_slice(), allocation_statuses.as_slice());
@@ -297,7 +302,7 @@ impl CommandExecutor for SecretShowAllocationStatus {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show allocation status for secret '{}'", secret_id));
     let start_instant = Instant::now();
-    let allocation_status = context.client_unchecked().get_secret_status(secret_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_secret_status(&secret_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context).print(&allocation_status)
   }
@@ -315,7 +320,7 @@ impl CommandExecutor for SecretShowUsage {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the apps and services that use secret '{}'", secret_id));
     let start_instant = Instant::now();
-    let usages = context.client_unchecked().get_secret_with_usage(secret_id.as_str()).await?;
+    let usages = context.client_unchecked().get_secret_with_usage(&secret_id).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("secret not used")
@@ -340,7 +345,7 @@ impl CommandExecutor for SecretShowValue {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the value of secret '{}'", secret_id));
     let start_instant = Instant::now();
-    let secret = context.client_unchecked().get_secret(secret_id.as_str()).await?;
+    let secret = context.client_unchecked().get_secret(&secret_id).await?;
     context.print_execution_time(start_instant);
     context.print(secret);
     Ok(())
@@ -367,7 +372,7 @@ impl CommandExecutor for SecretUpdate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          context.client_unchecked().put_secret(secret_id.as_str(), secret).await?;
+          context.client_unchecked().put_secret(&secret_id, secret).await?;
           context.print_outcome(format!("secret '{}' updated", secret_id));
         }
       } else {
@@ -376,7 +381,7 @@ impl CommandExecutor for SecretUpdate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          context.client_unchecked().put_secret(secret_id.as_str(), secret).await?;
+          context.client_unchecked().put_secret(&secret_id, secret).await?;
           context.print_outcome(format!("secret '{}' updated", secret_id));
         }
       }
@@ -385,7 +390,7 @@ impl CommandExecutor for SecretUpdate {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not updated");
       } else {
-        context.client_unchecked().put_secret(secret_id.as_str(), secret).await?;
+        context.client_unchecked().put_secret(&secret_id, secret).await?;
         context.print_outcome(format!("secret '{}' updated", secret_id));
       }
     }

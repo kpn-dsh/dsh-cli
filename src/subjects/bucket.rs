@@ -82,7 +82,7 @@ impl CommandExecutor for BucketListAll {
     context.print_explanation("list all buckets with their parameters");
     let start_instant = Instant::now();
     let bucket_ids = context.client_unchecked().list_bucket_ids().await?;
-    let bucket_statuses = try_join_all(bucket_ids.iter().map(|id| context.client_unchecked().get_bucket(id.as_str()))).await?;
+    let bucket_statuses = try_join_all(bucket_ids.iter().map(|bucket_id| context.client_unchecked().get_bucket(bucket_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&BUCKET_STATUS_LABELS, None, context);
     formatter.push_target_ids_and_values(bucket_ids.as_slice(), bucket_statuses.as_slice());
@@ -123,7 +123,7 @@ impl CommandExecutor for BucketShowAll {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for bucket '{}'", bucket_id));
     let start_instant = Instant::now();
-    let bucket = context.client_unchecked().get_bucket(bucket_id.as_str()).await?;
+    let bucket = context.client_unchecked().get_bucket(&bucket_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket)
   }

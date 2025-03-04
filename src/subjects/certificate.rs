@@ -93,7 +93,12 @@ impl CommandExecutor for CertificateListAll {
     context.print_explanation("list all certificates with their parameters");
     let start_instant = Instant::now();
     let certificate_ids = context.client_unchecked().get_certificate_ids().await?;
-    let certificate_statuses = futures::future::join_all(certificate_ids.iter().map(|id| context.client_unchecked().get_certificate(id.as_str()))).await;
+    let certificate_statuses = futures::future::join_all(
+      certificate_ids
+        .iter()
+        .map(|certificate_id| context.client_unchecked().get_certificate(certificate_id)),
+    )
+    .await;
     context.print_execution_time(start_instant);
     let certificates_statuses_unwrapped = certificate_statuses
       .iter()
@@ -147,7 +152,7 @@ impl CommandExecutor for CertificateListConfiguration {
     let certificates = try_join_all(
       certificate_ids
         .iter()
-        .map(|id| context.client_unchecked().get_certificate_configuration(id.as_str())),
+        .map(|certificate_id| context.client_unchecked().get_certificate_configuration(certificate_id)),
     )
     .await?;
     context.print_execution_time(start_instant);
@@ -218,7 +223,7 @@ impl CommandExecutor for CertificateShowAll {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let certificate = context.client_unchecked().get_certificate(certificate_id.as_str()).await?;
+    let certificate = context.client_unchecked().get_certificate(&certificate_id).await?;
     if let Some(actual_certificate) = certificate.actual {
       context.print_execution_time(start_instant);
       UnitFormatter::new(certificate_id, &CERTIFICATE_LABELS_SHOW, None, context).print(&actual_certificate)?;
@@ -239,7 +244,7 @@ impl CommandExecutor for CertificateShowAllocationStatus {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let allocation_status = context.client_unchecked().get_certificate_status(certificate_id.as_str()).await?;
+    let allocation_status = context.client_unchecked().get_certificate_status(&certificate_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(certificate_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("certificate id"), context).print(&allocation_status)
   }
@@ -257,7 +262,7 @@ impl CommandExecutor for CertificateShowUsage {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all services and apps that use certificate '{}'", certificate_id));
     let start_instant = Instant::now();
-    let (_, usages) = context.client_unchecked().get_certificate_with_usage(certificate_id.as_str()).await?;
+    let (_, usages) = context.client_unchecked().get_certificate_with_usage(&certificate_id).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("certificate not used")

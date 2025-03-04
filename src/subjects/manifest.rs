@@ -140,7 +140,7 @@ impl CommandExecutor for ManifestShowAll {
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
     let manifests_grouped = manifests_with_id.clone().into_iter().into_group_map();
-    let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id.as_str()).unwrap().clone();
+    let mut manifests: Vec<&Manifest> = manifests_grouped.get(&manifest_id).unwrap().clone();
     manifests.sort_by_key(|m| m.version.clone());
     UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), context).print(*manifests.last().unwrap())
   }
@@ -202,7 +202,7 @@ impl TryFrom<&AppCatalogManifest> for Manifest {
   type Error = String;
 
   fn try_from(value: &AppCatalogManifest) -> Result<Self, Self::Error> {
-    match from_str::<Value>(value.payload.as_str()) {
+    match from_str::<Value>(&value.payload) {
       Ok(payload_value) => match payload_value.as_object() {
         Some(payload_object) => Ok(Manifest {
           manifest_id: payload_object.get(&ID.to_string()).unwrap().as_str().unwrap().to_string(),
