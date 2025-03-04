@@ -6,14 +6,6 @@
 )]
 extern crate core;
 
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::io::ErrorKind::NotFound;
-use std::io::{stdin, stdout, IsTerminal, Write};
-use std::path::{Path, PathBuf};
-use std::process::{ExitCode, Termination};
-use std::{env, fs, process};
-
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -41,6 +33,14 @@ use lazy_static::lazy_static;
 use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::env::temp_dir;
+use std::fmt::Debug;
+use std::io::ErrorKind::NotFound;
+use std::io::{stdin, stdout, IsTerminal, Write};
+use std::path::{Path, PathBuf};
+use std::process::{ExitCode, Termination};
+use std::{env, fs, process};
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
@@ -666,6 +666,48 @@ where
       log::error!("{}", &message);
       Err(message)
     }
+  }
+}
+
+/// Manually edit a configuration file
+///
+/// Will serialize the provided `configuration` to a temporary file
+/// and open that file in the default system editor.
+/// When the editor closes, the temporary file will be serialized again and returned.
+async fn edit_configuration<C>(configuration: &C, temporary_configuration_file_name: &str) -> Result<Option<C>, String>
+where
+  C: for<'de> Deserialize<'de> + Serialize,
+{
+  match env::var("EDITOR") {
+    Ok(editor_from_env_var) => {
+      let editor = editor_from_env_var.split(" ").collect::<Vec<_>>();
+      let editor_command = editor.first().ok_or("".to_string())?;
+      let editor_args = editor.iter().skip(1).collect::<Vec<_>>();
+      debug!("editor: {} {:?}", editor_command, editor_args);
+      let mut temporary_configuration_file_path = temp_dir();
+      temporary_configuration_file_path.push(temporary_configuration_file_name);
+      debug!("temporary configuration file: {}", temporary_configuration_file_path.to_string_lossy());
+      let original_configuration = serde_json::to_string_pretty::<C>(configuration).unwrap();
+      tokio::fs::write(&temporary_configuration_file_path, &original_configuration)
+        .await
+        .map_err(|error| format!("cannot write temporary configuration file ({})", error))?;
+      std::process::Command::new(editor_command)
+        .args(editor_args)
+        .arg(&temporary_configuration_file_path)
+        .status()
+        .map_err(|error| format!("couldn't edit temporary configuration file ({})", error))?;
+      let updated_configuration = tokio::fs::read_to_string(&temporary_configuration_file_path)
+        .await
+        .map_err(|error| format!("couldn't read temporary configuration file ({})", error))?;
+      if original_configuration == updated_configuration {
+        Ok(None)
+      } else {
+        Ok(Some(
+          serde_json::from_str::<C>(&updated_configuration).map_err(|error| format!("could not parse temporary configuration file ({})", error))?,
+        ))
+      }
+    }
+    Err(_) => Err("environment variable 'EDITOR' is not set".to_string()),
   }
 }
 
