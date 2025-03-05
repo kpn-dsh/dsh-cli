@@ -62,7 +62,7 @@ impl Subject for TargetSubject {
 
 lazy_static! {
   static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete target configuration.")
+    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete target configuration")
       .set_long_about(
         "Delete a target configuration. \
         You will be prompted for the target's platform and tenant, \
@@ -73,12 +73,12 @@ lazy_static! {
       .add_target_argument(tenant_name_argument().required(true))
   );
   static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List all target configurations.")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List all target configurations")
       .set_long_about("Lists all target configurations.")
       .set_default_command_executor(&TargetList {})
   );
   static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(NEW_COMMAND, None, "Create a new target configuration.")
+    CapabilityBuilder::new(NEW_COMMAND, None, "Create a new target configuration")
       .set_long_about(
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant and password. \
