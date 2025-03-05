@@ -402,6 +402,7 @@ impl Context {
   pub(crate) fn print_serializable<T: Serialize>(&self, output: T) {
     if !self.quiet {
       match self.output_format {
+        OutputFormat::Csv => self.print_warning("csv output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Json => match serde_json::to_string_pretty(&output) {
           Ok(json) => println!("{}", json),
           Err(_) => self.print_error("serializing to json failed"),
@@ -410,6 +411,9 @@ impl Context {
           Ok(json) => println!("{}", json),
           Err(_) => self.print_error("serializing to json failed"),
         },
+        OutputFormat::Plain => self.print_warning("plain output is not supported here, use --output-format json|toml|yaml"),
+        OutputFormat::Quiet => (),
+        OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Toml => match toml::to_string_pretty(&output) {
           Ok(json) => println!("{}", json),
           Err(_) => self.print_error("serializing to toml failed"),
@@ -422,10 +426,6 @@ impl Context {
           Ok(json) => println!("{}", json),
           Err(_) => self.print_error("serializing to yaml failed"),
         },
-        OutputFormat::Csv => self.print_warning("csv output is not supported here, use flag --output-format json|toml|yaml"),
-        OutputFormat::Plain => self.print_warning("plain output is not supported here, use flag --output-format json|toml|yaml"),
-        OutputFormat::Quiet => (),
-        OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use flag --output-format json|toml|yaml"),
       }
     }
   }
