@@ -302,10 +302,10 @@ impl CommandExecutor for TopicListUsage {
 
 struct TopicNew {}
 
-const CLEANUP_POLICY_PROPERTY: &str = CLEANUP_POLICY_PROPERTY;
-const MAX_MESSAGE_BYTES_PROPERTY: &str = MAX_MESSAGE_BYTES_PROPERTY;
-const SEGMENT_BYTES_PROPERTY: &str = SEGMENT_BYTES_PROPERTY;
-const MESSAGE_TIMESTAMP_PROPERTY: &str = MESSAGE_TIMESTAMP_PROPERTY;
+const CLEANUP_POLICY_PROPERTY: &str = "cleanup.policy";
+const MAX_MESSAGE_BYTES_PROPERTY: &str = "max.message.bytes";
+const SEGMENT_BYTES_PROPERTY: &str = "segment.bytes";
+const MESSAGE_TIMESTAMP_PROPERTY: &str = "message.timestamp.type";
 
 #[async_trait]
 impl CommandExecutor for TopicNew {
