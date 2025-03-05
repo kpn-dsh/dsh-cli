@@ -45,15 +45,15 @@ impl FlagType {
 
 pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option<&str>) -> Arg {
   match flag_type {
-    FlagType::_Actual => create_clap_flag(FlagType::_Actual, format!("Use the 'actual' {} configuration.", subject), long_help),
-    FlagType::AllocationStatus => create_clap_flag(FlagType::AllocationStatus, format!("Include the {}'s allocation status.", subject), long_help),
-    FlagType::Configuration => create_clap_flag(FlagType::Configuration, format!("Include the {}'s initial configuration.", subject), long_help),
-    FlagType::Ids => create_clap_flag(FlagType::Ids, format!("Include the {}'s ids.", subject), long_help),
-    FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties.", subject), long_help),
-    FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s.", subject), long_help),
-    FlagType::Tasks => create_clap_flag(FlagType::Tasks, format!("Include the {}'s tasks.", subject), long_help),
-    FlagType::Usage => create_clap_flag(FlagType::Usage, format!("Include the {}'s usages.", subject), long_help),
-    FlagType::Value => create_clap_flag(FlagType::Value, format!("Include the {}'s value.", subject), long_help),
+    FlagType::_Actual => create_clap_flag(FlagType::_Actual, format!("Use the 'actual' {} configuration", subject), long_help),
+    FlagType::AllocationStatus => create_clap_flag(FlagType::AllocationStatus, format!("Include the {}'s allocation status", subject), long_help),
+    FlagType::Configuration => create_clap_flag(FlagType::Configuration, format!("Include the {}'s initial configuration", subject), long_help),
+    FlagType::Ids => create_clap_flag(FlagType::Ids, format!("Include the {}'s ids", subject), long_help),
+    FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties", subject), long_help),
+    FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s", subject), long_help),
+    FlagType::Tasks => create_clap_flag(FlagType::Tasks, format!("Include the {}'s tasks", subject), long_help),
+    FlagType::Usage => create_clap_flag(FlagType::Usage, format!("Include the {}'s usages", subject), long_help),
+    FlagType::Value => create_clap_flag(FlagType::Value, format!("Include the {}'s value", subject), long_help),
   }
 }
 

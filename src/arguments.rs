@@ -23,7 +23,7 @@ pub(crate) fn app_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("APP")
-    .help("App identifier.")
+    .help("App identifier")
     .long_help("Identifies an app from the app catalog.")
 }
 
@@ -32,7 +32,7 @@ pub(crate) fn bucket_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("BUCKET")
-    .help("Bucket identifier.")
+    .help("Bucket identifier")
     .long_help("Identifies an S3 bucket on the DSH.")
 }
 
@@ -41,7 +41,7 @@ pub(crate) fn certificate_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("CERT")
-    .help("Certificate identifier.")
+    .help("Certificate identifier")
     .long_help("Identifies a certificate on the DSH.")
 }
 
@@ -51,7 +51,7 @@ pub(crate) fn manifest_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("MANIFEST")
-    .help("Manifest identifier.")
+    .help("Manifest identifier")
     .long_help("Identifies a manifest from the app catalog.")
 }
 
@@ -68,7 +68,7 @@ pub(crate) fn platform_name_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(possible_values)
     .value_name("PLATFORM")
-    .help("Platform.")
+    .help("Platform")
     .long_help("The name or alias of the platform.")
 }
 
@@ -89,7 +89,7 @@ pub(crate) fn proxy_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("PROXY")
-    .help("Proxy identifier.")
+    .help("Proxy identifier")
     .long_help("Identifies a proxy configured on the DSH.")
 }
 
@@ -98,7 +98,7 @@ pub(crate) fn secret_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("SECRET")
-    .help("Secret identifier.")
+    .help("Secret identifier")
     .long_help("Identifies a secret configured on the DSH.")
 }
 
@@ -107,7 +107,7 @@ pub(crate) fn service_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("SERVICE")
-    .help("Service identifier.")
+    .help("Service identifier")
     .long_help("Identifies a service deployed on the DSH.")
 }
 
@@ -116,7 +116,7 @@ pub(crate) fn tenant_name_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("TENANT")
-    .help("Tenant name.")
+    .help("Tenant name")
     .long_help("The name of the tenant.")
 }
 
@@ -125,7 +125,7 @@ pub(crate) fn topic_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("TOPIC")
-    .help("Topic identifier.")
+    .help("Topic identifier")
     .long_help("Identifies a topic deployed on the DSH.")
 }
 
@@ -134,7 +134,7 @@ pub(crate) fn vendor_name_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("VENDOR")
-    .help("Provide app vendor.")
+    .help("Provide app vendor")
     .long_help("This option specifies the name of an app vendor. Allowed values are \"kpn\".")
 }
 
@@ -143,7 +143,7 @@ pub(crate) fn vhost_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("VHOST")
-    .help("Vhost identifier.")
+    .help("Vhost identifier")
     .long_help("Identifies a vhost configured on the DSH.")
 }
 
@@ -152,6 +152,6 @@ pub(crate) fn volume_id_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("VOLUME")
-    .help("Volume identifier.")
+    .help("Volume identifier")
     .long_help("Identifies a volume configured on the DSH.")
 }

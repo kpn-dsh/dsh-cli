@@ -29,35 +29,34 @@ impl ModifierFlagType {
   }
 }
 
-pub(crate) fn create_modifier_flag(flag_type: &ModifierFlagType, subject: &str, long_help: Option<&str>) -> Arg {
+pub(crate) fn create_modifier_flag(flag_type: &ModifierFlagType, subject: &str) -> Arg {
   match flag_type {
     ModifierFlagType::MultiLine => create_clap_modifier_flag(
       ModifierFlagType::MultiLine,
-      subject,
-      format!("Enter the {} as multi-line string.", subject),
-      long_help,
+      format!("Enter {} as multi-line string", subject),
+      format!("Enter the {} as a multi-line string. Terminate the input with ctrl-d after last line.", subject),
     ),
     ModifierFlagType::Regex => create_clap_modifier_flag(
       ModifierFlagType::Regex,
-      subject,
+      format!("Query string is regular expression matching {} value", subject),
       format!(
         "Interpret the query string as a regular expression instead of an exact matching {} value. \
          The regular expression syntax is described on \
          the following web-page: https://docs.rs/regex/latest/regex/#syntax.",
         subject
       ),
-      long_help,
     ),
   }
 }
 
-fn create_clap_modifier_flag(flag_type: ModifierFlagType, _subject: &str, help: String, long_help: Option<&str>) -> Arg {
-  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help.to_string());
+fn create_clap_modifier_flag(flag_type: ModifierFlagType, help: String, long_help: String) -> Arg {
+  let mut flag_arg = Arg::new(flag_type.id())
+    .long(flag_type.option())
+    .action(ArgAction::SetTrue)
+    .help(help)
+    .long_help(long_help);
   if let Some(shortcut) = flag_type.shortcut() {
     flag_arg = flag_arg.short(shortcut)
-  }
-  if let Some(long_help) = long_help {
-    flag_arg = flag_arg.long_help(long_help.to_string());
   }
   flag_arg
 }

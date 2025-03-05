@@ -101,7 +101,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 const USAGE: &str = "dsh [OPTIONS] [SUBJECT/COMMAND]\n       dsh --help\n       dsh secret --help\n       dsh secret list --help";
 
-const VERSION: &str = "0.6.0";
+const VERSION: &str = "0.6.1";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
@@ -239,7 +239,7 @@ async fn inner_main() -> DshCliResult {
       },
     },
     None => return Err("unexpected error, no command provided".to_string()),
-  };
+  }
   Ok(())
 }
 
@@ -254,22 +254,22 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .long_about(long_about)
     .override_usage(USAGE)
     .disable_help_subcommand(true)
-    .after_help(AFTER_HELP)
+    .after_long_help(AFTER_HELP)
     .args(vec![
       target_platform_argument(),
       target_tenant_argument(),
       target_password_file_argument(),
-      output_format_argument(),
-      set_verbosity_argument(),
       dry_run_argument(),
       force_argument(),
-      matching_style_argument(),
-      no_escape_argument(),
-      no_headers_argument(),
-      quiet_argument(),
       log_level_argument(),
       log_level_api_argument(),
       log_level_sdk_argument(),
+      matching_style_argument(),
+      no_escape_argument(),
+      no_headers_argument(),
+      output_format_argument(),
+      quiet_argument(),
+      set_verbosity_argument(),
       show_execution_time_argument(),
       terminal_width_argument(),
       generate_autocomplete_file_argument(),

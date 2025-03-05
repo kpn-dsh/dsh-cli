@@ -146,7 +146,7 @@ impl Capability for CapabilityBuilder<'_> {
       .args(&self.target_arguments)
       .args(self.clap_flags(subject_command))
       .args(&self.extra_arguments)
-      .subcommand_required(!self.subcommands.is_empty());
+      .arg_required_else_help(!self.subcommands.is_empty());
     if let Some(ref alias) = self.capability_command_alias {
       capability_command = capability_command.alias(alias)
     }
@@ -166,12 +166,12 @@ impl Capability for CapabilityBuilder<'_> {
       self
         .filter_flags
         .iter()
-        .map(|(flag_type, long_help)| create_filter_flag(flag_type, subject, long_help.as_deref()))
+        .map(|(flag_type, long_help)| create_filter_flag(flag_type, long_help.as_deref()))
         .collect::<Vec<_>>(),
       self
         .modifier_flags
         .iter()
-        .map(|(flag_type, long_help)| create_modifier_flag(flag_type, subject, long_help.as_deref()))
+        .map(|(flag_type, _)| create_modifier_flag(flag_type, subject))
         .collect::<Vec<_>>(),
     ]
     .concat()
@@ -186,6 +186,7 @@ impl Capability for CapabilityBuilder<'_> {
   }
 
   fn requirements(&self, matches: &ArgMatches) -> Requirements {
+    // TODO This is not correct
     let mut match_found = false;
     let mut composite_requirements = Requirements::new(false, false, false, None);
     if self.run_all_executors {

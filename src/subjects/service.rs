@@ -169,6 +169,8 @@ lazy_static! {
   ];
 }
 
+const HELP_HEADING: &str = "Service options";
+
 const CPUS_FLAG: &str = "cpus";
 
 fn cpus_flag() -> Arg {
@@ -177,8 +179,9 @@ fn cpus_flag() -> Arg {
     .action(ArgAction::Set)
     .value_parser(clap::value_parser!(f64))
     .value_name("CPUS")
-    .help("Number of cpus.")
+    .help("Number of cpus")
     .long_help("Number of cpus that will be started.")
+    .help_heading(HELP_HEADING)
 }
 
 const INSTANCES_FLAG: &str = "instances";
@@ -189,8 +192,9 @@ fn instances_flag() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
     .value_name("INSTANCES")
-    .help("Number of instances.")
+    .help("Number of instances")
     .long_help("Number of service instances that will be started.")
+    .help_heading(HELP_HEADING)
 }
 
 const MEM_FLAG: &str = "mem";
@@ -201,8 +205,9 @@ fn mem_flag() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
     .value_name("MEM")
-    .help("Amount of memory.")
+    .help("Amount of memory")
     .long_help("Amount of memory your application needs in MB.")
+    .help_heading(HELP_HEADING)
 }
 
 struct ServiceDelete {}
