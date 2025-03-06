@@ -23,10 +23,11 @@ Then you can for example install the `dsh` tool on your local machine using:
 ...
 ```
 
-When developing, it is convenient to set an alias:
+When developing, it is convenient to set some aliases:
 
 ```bash
 > alias dsh-dev="cargo run --package dsh --bin dsh --"
+> alias dsh-deva="cargo run --all-features --package dsh --bin dsh --"
 ````
 
 You can then easily run the `dsh` tool without installing it:
