@@ -7,7 +7,6 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use serde_json::de::from_str;
 use serde_json::Value;
-use std::time::Instant;
 
 use crate::formatters::formatter::{Label, SubjectFormatter};
 
@@ -82,7 +81,7 @@ struct ManifestListAll {}
 impl CommandExecutor for ManifestListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifests");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let app_catalog_manifests: Vec<AppCatalogManifest> = context.client_unchecked().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
@@ -113,7 +112,7 @@ struct ManifestListIds {}
 impl CommandExecutor for ManifestListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifest ids");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let manifest_ids: Vec<String> = context.client_unchecked().list_app_catalog_manifest_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("manifest id", context);
@@ -134,13 +133,13 @@ impl CommandExecutor for ManifestShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app catalog manifest '{}'", manifest_id));
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let app_catalog_manifests: Vec<AppCatalogManifest> = context.client_unchecked().get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
     let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
     let manifests_with_id = manifests.iter().map(|manifest| (manifest.manifest_id.clone(), manifest)).collect::<Vec<_>>();
     let manifests_grouped = manifests_with_id.clone().into_iter().into_group_map();
-    let mut manifests: Vec<&Manifest> = manifests_grouped.get(manifest_id.as_str()).unwrap().clone();
+    let mut manifests: Vec<&Manifest> = manifests_grouped.get(&manifest_id).unwrap().clone();
     manifests.sort_by_key(|m| m.version.clone());
     UnitFormatter::new(manifest_id, &MANIFEST_LABELS_SHOW, Some("manifest id"), context).print(*manifests.last().unwrap())
   }
@@ -202,7 +201,7 @@ impl TryFrom<&AppCatalogManifest> for Manifest {
   type Error = String;
 
   fn try_from(value: &AppCatalogManifest) -> Result<Self, Self::Error> {
-    match from_str::<Value>(value.payload.as_str()) {
+    match from_str::<Value>(&value.payload) {
       Ok(payload_value) => match payload_value.as_object() {
         Some(payload_object) => Ok(Manifest {
           manifest_id: payload_object.get(&ID.to_string()).unwrap().as_str().unwrap().to_string(),

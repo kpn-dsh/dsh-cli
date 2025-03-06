@@ -12,7 +12,6 @@ use dsh_api::types::Application;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::time::Instant;
 
 pub(crate) struct MetricSubject {}
 
@@ -69,7 +68,7 @@ impl CommandExecutor for MetricList {
   async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation("find exported metrics in services");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let services = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let metrics_usage = metrics_usage_from_services(&services, include_started, include_stopped);

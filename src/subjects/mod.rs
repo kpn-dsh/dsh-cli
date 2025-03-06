@@ -4,7 +4,6 @@ pub(crate) mod bucket;
 pub(crate) mod certificate;
 pub(crate) mod env;
 pub(crate) mod image;
-#[cfg(feature = "appcatalog")]
 pub(crate) mod manifest;
 pub(crate) mod metric;
 pub(crate) mod platform;

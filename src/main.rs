@@ -6,14 +6,6 @@
 )]
 extern crate core;
 
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::io::ErrorKind::NotFound;
-use std::io::{stdin, stdout, IsTerminal, Write};
-use std::path::{Path, PathBuf};
-use std::process::{ExitCode, Termination};
-use std::{env, fs, process};
-
 use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -41,12 +33,19 @@ use lazy_static::lazy_static;
 use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::env::temp_dir;
+use std::fmt::Debug;
+use std::io::ErrorKind::NotFound;
+use std::io::{stdin, stdout, IsTerminal, Write};
+use std::path::{Path, PathBuf};
+use std::process::{ExitCode, Termination};
+use std::{env, fs, process};
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
 use subjects::env::ENV_SUBJECT;
 use subjects::image::IMAGE_SUBJECT;
-#[cfg(feature = "appcatalog")]
 use subjects::manifest::MANIFEST_SUBJECT;
 use subjects::metric::METRIC_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
@@ -101,7 +100,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 const USAGE: &str = "dsh [OPTIONS] [SUBJECT/COMMAND]\n       dsh --help\n       dsh secret --help\n       dsh secret list --help";
 
-const VERSION: &str = "0.6.0";
+const VERSION: &str = "0.7.0";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
@@ -175,7 +174,6 @@ async fn inner_main() -> DshCliResult {
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),
-    #[cfg(feature = "appcatalog")]
     MANIFEST_SUBJECT.as_ref(),
     METRIC_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),
@@ -239,7 +237,7 @@ async fn inner_main() -> DshCliResult {
       },
     },
     None => return Err("unexpected error, no command provided".to_string()),
-  };
+  }
   Ok(())
 }
 
@@ -254,22 +252,22 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
     .long_about(long_about)
     .override_usage(USAGE)
     .disable_help_subcommand(true)
-    .after_help(AFTER_HELP)
+    .after_long_help(AFTER_HELP)
     .args(vec![
       target_platform_argument(),
       target_tenant_argument(),
       target_password_file_argument(),
-      output_format_argument(),
-      set_verbosity_argument(),
       dry_run_argument(),
       force_argument(),
-      matching_style_argument(),
-      no_escape_argument(),
-      no_headers_argument(),
-      quiet_argument(),
       log_level_argument(),
       log_level_api_argument(),
       log_level_sdk_argument(),
+      matching_style_argument(),
+      no_escape_argument(),
+      no_headers_argument(),
+      output_format_argument(),
+      quiet_argument(),
+      set_verbosity_argument(),
       show_execution_time_argument(),
       terminal_width_argument(),
       generate_autocomplete_file_argument(),
@@ -669,11 +667,51 @@ where
   }
 }
 
+/// Manually edit a configuration file
+///
+/// Will serialize the provided `configuration` to a temporary file
+/// and open that file in the default system editor.
+/// When the editor closes, the temporary file will be serialized again and returned.
+async fn edit_configuration<C>(configuration: &C, temporary_configuration_file_name: &str) -> Result<Option<C>, String>
+where
+  C: for<'de> Deserialize<'de> + Serialize,
+{
+  match env::var("EDITOR") {
+    Ok(editor_from_env_var) => {
+      let editor = editor_from_env_var.split(" ").collect::<Vec<_>>();
+      let editor_command = editor.first().ok_or("".to_string())?;
+      let editor_args = editor.iter().skip(1).collect::<Vec<_>>();
+      debug!("editor: {} {:?}", editor_command, editor_args);
+      let mut temporary_configuration_file_path = temp_dir();
+      temporary_configuration_file_path.push(temporary_configuration_file_name);
+      debug!("temporary configuration file: {}", temporary_configuration_file_path.to_string_lossy());
+      let original_configuration = serde_json::to_string_pretty::<C>(configuration).unwrap();
+      tokio::fs::write(&temporary_configuration_file_path, &original_configuration)
+        .await
+        .map_err(|error| format!("cannot write temporary configuration file ({})", error))?;
+      std::process::Command::new(editor_command)
+        .args(editor_args)
+        .arg(&temporary_configuration_file_path)
+        .status()
+        .map_err(|error| format!("couldn't edit temporary configuration file ({})", error))?;
+      let updated_configuration = tokio::fs::read_to_string(&temporary_configuration_file_path)
+        .await
+        .map_err(|error| format!("couldn't read temporary configuration file ({})", error))?;
+      if original_configuration == updated_configuration {
+        Ok(None)
+      } else {
+        Ok(Some(
+          serde_json::from_str::<C>(&updated_configuration).map_err(|error| format!("could not parse temporary configuration file ({})", error))?,
+        ))
+      }
+    }
+    Err(_) => Err("environment variable 'EDITOR' is not set".to_string()),
+  }
+}
+
 fn enabled_features() -> Option<Vec<&'static str>> {
   #[allow(unused_mut)]
   let mut enabled_features = vec![];
-  #[cfg(feature = "appcatalog")]
-  enabled_features.push("appcatalog");
   #[cfg(feature = "manage")]
   enabled_features.push("manage");
   #[cfg(feature = "robot")]
@@ -692,5 +730,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.5.2");
+  assert_eq!(crate_version(), "0.6.0");
 }

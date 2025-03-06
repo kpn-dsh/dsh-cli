@@ -22,11 +22,13 @@ pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 // pub(crate) const TO_CLIPBOARD_ARGUMENT: &str = "to-clipboard-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
 
+pub(crate) const OUTPUT_OPTIONS_HEADING: &str = "Output options";
+
 pub(crate) fn dry_run_argument() -> Arg {
   Arg::new(DRY_RUN_ARGUMENT)
     .long("dry-run")
     .action(ArgAction::SetTrue)
-    .help("Execute in dry-run mode.")
+    .help("Execute in dry-run mode")
     .long_help(
       "When this option is provided the dsh tool will run in dry-run mode, \
           meaning that no changes will be made to the \
@@ -41,7 +43,7 @@ pub(crate) fn force_argument() -> Arg {
   Arg::new(FORCE_ARGUMENT)
     .long("force")
     .action(ArgAction::SetTrue)
-    .help("Force changes without confirmation.")
+    .help("Force changes without confirmation")
     .long_help(
       "When this option is provided all change, update and delete actions \
           will be executed without asking for confirmation. \
@@ -54,7 +56,7 @@ pub(crate) fn force_argument() -> Arg {
 //   Arg::new(FROM_CLIPBOARD_ARGUMENT)
 //     .long("from-clipboard")
 //     .action(ArgAction::SetTrue)
-//     .help("Read input from clipboard.")
+//     .help("Read input from clipboard")
 //     .long_help(
 //       "When this option is provided the input for methods that require it \
 //           will be read from the clipboard, \
@@ -69,7 +71,7 @@ pub(crate) fn matching_style_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<MatchingStyle>::new())
     .value_name("STYLE")
-    .help("Set styling for matches.")
+    .help("Set styling for matches")
     .long_help(
       "This option specifies the styling to be used when printing matching results \
           for the find functions, e.q. when matching regular expressions. \
@@ -78,6 +80,7 @@ pub(crate) fn matching_style_argument() -> Arg {
           The default style is 'bold'.",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 pub(crate) fn no_escape_argument() -> Arg {
@@ -85,7 +88,7 @@ pub(crate) fn no_escape_argument() -> Arg {
     .long("no-color")
     .alias("no-ansi")
     .action(ArgAction::SetTrue)
-    .help("No color.")
+    .help("No color")
     .long_help(
       "When this option is provided the output will not contain \
           any color or other ansi escape sequences. \
@@ -94,13 +97,14 @@ pub(crate) fn no_escape_argument() -> Arg {
           The default behavior is to use ansi escape styling where applicable.",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 pub(crate) fn no_headers_argument() -> Arg {
   Arg::new(NO_HEADERS_ARGUMENT)
     .long("no-headers")
     .action(ArgAction::SetTrue)
-    .help("No headers.")
+    .help("No headers")
     .long_help(
       "When this option is provided the output will not contain headers. \
           If this argument is not provided, the environment variable \
@@ -108,6 +112,7 @@ pub(crate) fn no_headers_argument() -> Arg {
           The default behavior is to use headers where applicable.",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 pub(crate) fn output_format_argument() -> Arg {
@@ -117,7 +122,7 @@ pub(crate) fn output_format_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<OutputFormat>::new())
     .value_name("FORMAT")
-    .help("Set output format.")
+    .help("Set output format")
     .long_help(
       "This option specifies the format used when printing the output. \
           If this argument is not provided, the value from the environment variable \
@@ -126,6 +131,7 @@ pub(crate) fn output_format_argument() -> Arg {
           while if stdout is not a terminal 'json' will be used.",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 pub(crate) fn quiet_argument() -> Arg {
@@ -133,12 +139,13 @@ pub(crate) fn quiet_argument() -> Arg {
     .long("quiet")
     .short('q')
     .action(ArgAction::SetTrue)
-    .help("Run in quiet mode.")
+    .help("Run in quiet mode")
     .long_help(
       "When this option is provided the dsh tool will run in quiet mode, \
           meaning that no output will be produced to the terminal (stdout and stderr).",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 pub(crate) fn set_verbosity_argument() -> Arg {
@@ -148,25 +155,27 @@ pub(crate) fn set_verbosity_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<Verbosity>::new())
     .value_name("VERBOSITY")
-    .help("Set verbosity level.")
+    .help("Set verbosity level")
     .long_help(
       "If this option is provided, \
     it will set the verbosity level. \
     The default verbosity setting is 'low'.",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 pub(crate) fn show_execution_time_argument() -> Arg {
   Arg::new(SHOW_EXECUTION_TIME_ARGUMENT)
     .long("show-execution-time")
     .action(ArgAction::SetTrue)
-    .help("Show execution time.")
+    .help("Show execution time")
     .long_help(
       "When this option is provided the execution time of the executed function \
           will be shown, in milliseconds.",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 pub(crate) fn target_password_file_argument() -> Arg {
@@ -175,7 +184,7 @@ pub(crate) fn target_password_file_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(ValueParser::path_buf())
     .value_name("FILE")
-    .help("Provide target password file name.")
+    .help("Provide target password file name")
     .long_help(
       "This option specifies the name of a file that contains the target password. \
           If this flag is not provided, the environment variable \
@@ -201,7 +210,7 @@ pub(crate) fn target_platform_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(possible_values)
     .value_name("PLATFORM")
-    .help("Provide target platform.")
+    .help("Provide target platform")
     .long_help(
       "This option specifies the name of the target platform. \
           If this argument is not provided, \
@@ -219,7 +228,7 @@ pub(crate) fn target_tenant_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("TENANT")
-    .help("Provide target tenant.")
+    .help("Provide target tenant")
     .long_help(
       "This option specifies the name of the target tenant. \
           If this argument is not provided, \
@@ -235,20 +244,21 @@ pub(crate) fn terminal_width_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<usize>::from(40..))
     .value_name("WIDTH")
-    .help("Set terminal width.")
+    .help("Set terminal width")
     .long_help(
       "With this option the maximum terminal width can be set. \
           If not set, the environment variable DSH_CLI_TERMINAL_WIDTH will be used \
           or else no terminal width value will be used.",
     )
     .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
 // pub(crate) fn to_clipboard_argument() -> Arg {
 //   Arg::new(TO_CLIPBOARD_ARGUMENT)
 //     .long("to-clipboard")
 //     .action(ArgAction::SetTrue)
-//     .help("Copy output to clipboard.")
+//     .help("Copy output to clipboard")
 //     .long_help(
 //       "When this option is provided the output will be copied to the clipboard, \
 //           instead of being printed to the terminal.",

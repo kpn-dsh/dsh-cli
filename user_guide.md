@@ -1,5 +1,7 @@
 # User guide
 
+[&#x2190; Quick start](quick_start.md)
+
 When installation is complete you should be able to start the `dsh` tool from the command line.
 
 ```bash
@@ -18,6 +20,7 @@ Subjects/commands:
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
   image        Show image usage.
+  manifest     Show App Catalog manifests.
   metric       Show metric exports.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
@@ -31,30 +34,29 @@ Subjects/commands:
   target       Show, manage and list dsh target configurations.
 
 Options:
-  -p, --platform <PLATFORM>     Provide target platform. [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,
-                                prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
-  -t, --tenant <TENANT>         Provide target tenant.
-      --password-file <FILE>    Provide target password file name.
-  -o, --output-format <FORMAT>  Set output format. [possible values: csv, json, json-compact, plain, quiet, table,
-                                table-no-border, toml, toml-compact, yaml]
-  -v, --verbosity <VERBOSITY>   Set verbosity level. [possible values: off, low, medium, high]
-      --dry-run                 Execute in dry-run mode.
-      --force                   Force changes without confirmation.
-      --matching-style <STYLE>  Set styling for matches. [possible values: normal, bold, dim, italic, underlined,
-                                reverse]
-      --no-color                No color.
-      --no-headers              No headers.
-  -q, --quiet                   Run in quiet mode.
-      --log-level <LEVEL>       Set log level. [possible values: off, error, warn, info, debug, trace]
-      --log-level-api <LEVEL>   Set log level for the dsh api crate.
-      --log-level-sdk <LEVEL>   Set log level for the dsh sdk crate.
-      --show-execution-time     Show execution time.
-      --terminal-width <WIDTH>  Set terminal width.
-  -h, --help                    Print help (see more with '--help')
-  -V, --version                 Print version
+  -p, --platform <PLATFORM>   Provide target platform [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,
+                              prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
+  -t, --tenant <TENANT>       Provide target tenant
+      --password-file <FILE>  Provide target password file name
+      --dry-run               Execute in dry-run mode
+      --force                 Force changes without confirmation
+  -h, --help                  Print help (see more with '--help')
+  -V, --version               Print version
 
-For most commands adding an 's' as a postfix will yield the same result as using the 'list' subcommand, e.g. using 'dsh
-apps' will be the same as using 'dsh app list'.
+Output options:
+      --log-level <LEVEL>       Set log level [possible values: off, error, warn, info, debug, trace]
+      --log-level-api <LEVEL>   Set log level for the dsh api crate
+      --log-level-sdk <LEVEL>   Set log level for the dsh sdk crate
+      --matching-style <STYLE>  Set styling for matches [possible values: normal, bold, dim, italic, underlined,
+                                reverse]
+      --no-color                No color
+      --no-headers              No headers
+  -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,
+                                table-no-border, toml, toml-compact, yaml]
+  -q, --quiet                   Run in quiet mode
+  -v, --verbosity <VERBOSITY>   Set verbosity level [possible values: off, low, medium, high]
+      --show-execution-time     Show execution time
+      --terminal-width <WIDTH>  Set terminal width
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.
@@ -174,3 +176,5 @@ password for tenant my-tenant@np-aws-lz-dsh: ********
 
 In non-interactive use, e.g. in a script, a terminal is not available and an error message
 will be shown.
+
+[Environment variables &#x2192;](environment_variables.md)

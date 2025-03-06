@@ -1,10 +1,8 @@
 use clap::{Arg, ArgAction};
 
-use crate::flags::FlagType::*;
-
 #[derive(Debug)]
 pub(crate) enum FlagType {
-  All,
+  _Actual,
   AllocationStatus,
   Configuration,
   Ids,
@@ -18,81 +16,45 @@ pub(crate) enum FlagType {
 impl FlagType {
   pub(crate) fn id(&self) -> &'static str {
     match &self {
-      All => "all-flag",
-      AllocationStatus => "status-flag",
-      Configuration => "configuration-flag",
-      Ids => "ids-flag",
-      Properties => "properties-flag",
-      System => "system-flag",
-      Tasks => "tasks-flag",
-      Usage => "usage-flag",
-      Value => "value-flag",
+      Self::_Actual => "actual-flag",
+      Self::AllocationStatus => "status-flag",
+      Self::Configuration => "configuration-flag",
+      Self::Ids => "ids-flag",
+      Self::Properties => "properties-flag",
+      Self::System => "system-flag",
+      Self::Tasks => "tasks-flag",
+      Self::Usage => "usage-flag",
+      Self::Value => "value-flag",
     }
   }
 
   pub(crate) fn option(&self) -> &'static str {
     match &self {
-      All => "all",
-      AllocationStatus => "status",
-      Configuration => "configuration",
-      Ids => "ids",
-      Properties => "properties",
-      System => "system",
-      Tasks => "tasks",
-      Usage => "usage",
-      Value => "value",
+      Self::_Actual => "actual",
+      Self::AllocationStatus => "status",
+      Self::Configuration => "configuration",
+      Self::Ids => "ids",
+      Self::Properties => "properties",
+      Self::System => "system",
+      Self::Tasks => "tasks",
+      Self::Usage => "usage",
+      Self::Value => "value",
     }
   }
 }
 
 pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option<&str>) -> Arg {
   match flag_type {
-    All => all_flag(subject, long_help),
-    AllocationStatus => allocation_status_flag(subject, long_help),
-    Configuration => configuration_flag(subject, long_help),
-    Ids => ids_flag(subject, long_help),
-    Properties => properties_flag(subject, long_help),
-    System => system_flag(subject, long_help),
-    Tasks => tasks_flag(subject, long_help),
-    Usage => usage_flag(subject, long_help),
-    Value => value_flag(subject, long_help),
+    FlagType::_Actual => create_clap_flag(FlagType::_Actual, format!("Use the 'actual' {} configuration", subject), long_help),
+    FlagType::AllocationStatus => create_clap_flag(FlagType::AllocationStatus, format!("Include the {}'s allocation status", subject), long_help),
+    FlagType::Configuration => create_clap_flag(FlagType::Configuration, format!("Include the {}'s initial configuration", subject), long_help),
+    FlagType::Ids => create_clap_flag(FlagType::Ids, format!("Include the {}'s ids", subject), long_help),
+    FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties", subject), long_help),
+    FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s", subject), long_help),
+    FlagType::Tasks => create_clap_flag(FlagType::Tasks, format!("Include the {}'s tasks", subject), long_help),
+    FlagType::Usage => create_clap_flag(FlagType::Usage, format!("Include the {}'s usages", subject), long_help),
+    FlagType::Value => create_clap_flag(FlagType::Value, format!("Include the {}'s value", subject), long_help),
   }
-}
-
-fn all_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(All, format!("Include all {} parameters.", subject), long_help)
-}
-
-fn allocation_status_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(AllocationStatus, format!("Include the {}'s allocation status.", subject), long_help)
-}
-
-fn configuration_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(Configuration, format!("Include the {}'s initial configuration.", subject), long_help)
-}
-
-fn ids_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(Ids, format!("Include the {}'s ids.", subject), long_help)
-}
-
-fn properties_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(Properties, format!("Include the {}'s properties.", subject), long_help)
-}
-
-fn system_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(System, format!("Include the system {}'s.", subject), long_help)
-}
-
-fn tasks_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(Tasks, format!("Include the {}'s tasks.", subject), long_help)
-}
-
-fn usage_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(Usage, format!("Include the {}'s usages.", subject), long_help)
-}
-
-fn value_flag(subject: &str, long_help: Option<&str>) -> Arg {
-  create_clap_flag(Value, format!("Include the {}'s value.", subject), long_help)
 }
 
 fn create_clap_flag(flag_type: FlagType, help: String, long_help: Option<&str>) -> Arg {

@@ -19,6 +19,7 @@ set -f
 for COMMAND in "${SAFE_COMMANDS[@]}"
 do
   CMD=`echo "dsh $COMMAND" | envsubst`
+  echo "$CMD" > /dev/stderr
   echo "-------------------------------"
   echo "$CMD"
   echo "-------------------------------"

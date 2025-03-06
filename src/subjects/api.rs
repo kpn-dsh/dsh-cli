@@ -12,7 +12,6 @@ use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, POST_METHO
 use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use std::time::Instant;
 
 pub(crate) struct ApiSubject {}
 
@@ -60,14 +59,14 @@ impl Subject for ApiSubject {
 
 #[cfg(feature = "manage")]
 lazy_static! {
-  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, &ApiDelete {});
-  static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, &ApiGet {});
-  static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, &ApiHead {});
-  static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, &ApiPatch {});
-  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiPost {});
-  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiPut {});
+  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
+  static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
+  static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, HEAD_ABOUT, HEAD_LONG_ABOUT, &ApiHead {});
+  static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, PATCH_ABOUT, PATCH_LONG_ABOUT, &ApiPatch {});
+  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
+  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
   static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification.").set_default_command_executor(&ApiShow {}));
+    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification").set_default_command_executor(&ApiShow {}));
   static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     API_DELETE_CAPABILITY.as_ref(),
     API_GET_CAPABILITY.as_ref(),
@@ -81,12 +80,12 @@ lazy_static! {
 
 #[cfg(not(feature = "manage"))]
 lazy_static! {
-  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, &ApiDelete {});
-  static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, &ApiGet {});
-  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, &ApiPost {});
-  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, &ApiPut {});
+  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
+  static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
+  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
+  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
   static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification.").set_default_command_executor(&ApiShow {}));
+    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification").set_default_command_executor(&ApiShow {}));
   static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![API_DELETE_CAPABILITY.as_ref(), API_GET_CAPABILITY.as_ref(), API_POST_CAPABILITY.as_ref(), API_PUT_CAPABILITY.as_ref(), API_SHOW_CAPABILITY.as_ref(),];
 }
@@ -100,38 +99,40 @@ const PATCH_COMMAND: &str = "patch";
 const POST_COMMAND: &str = "post";
 const PUT_COMMAND: &str = "put";
 
-fn method_descriptors(method: &str) -> Option<&'static [(&str, MethodDescriptor)]> {
+fn method_descriptors(method: &str) -> &'static [(&str, MethodDescriptor)] {
   match method {
-    DELETE_COMMAND => Some(&DELETE_METHODS),
-    GET_COMMAND => Some(&GET_METHODS),
+    DELETE_COMMAND => &DELETE_METHODS,
+    GET_COMMAND => &GET_METHODS,
     #[cfg(feature = "manage")]
-    HEAD_COMMAND => Some(&HEAD_METHODS),
+    HEAD_COMMAND => &HEAD_METHODS,
     #[cfg(feature = "manage")]
-    PATCH_COMMAND => Some(&PATCH_METHODS),
-    POST_COMMAND => Some(&POST_METHODS),
-    PUT_COMMAND => Some(&PUT_METHODS),
-    _ => None,
+    PATCH_COMMAND => &PATCH_METHODS,
+    POST_COMMAND => &POST_METHODS,
+    PUT_COMMAND => &PUT_METHODS,
+    _ => unreachable!(),
   }
 }
 
-fn method_descriptor(method: &'static str, query_selector: &str) -> Option<&'static MethodDescriptor> {
-  match method_descriptors(method) {
-    Some(method_descriptors) => method_descriptors
-      .iter()
-      .find_or_first(|(selector, _)| selector == &query_selector)
-      .map(|(_, method_descriptor)| method_descriptor),
-    None => None,
-  }
+fn find_method_descriptor(method: &'static str, query_selector: &str) -> Option<&'static MethodDescriptor> {
+  method_descriptors(method)
+    .iter()
+    .find_or_first(|(selector, _)| selector == &query_selector)
+    .map(|(_, method_descriptor)| method_descriptor)
 }
 
-fn create_generic_capability<'a>(method: &'static str, command_executor: &'a (dyn CommandExecutor + Send + Sync)) -> Box<(dyn Capability + Send + Sync + 'a)> {
+fn create_generic_capability<'a>(
+  method: &'static str,
+  about: &str,
+  long_about: &str,
+  command_executor: &'a (dyn CommandExecutor + Send + Sync),
+) -> Box<(dyn Capability + Send + Sync + 'a)> {
   let subcommands = method_descriptors(method)
-    .unwrap_or_else(|| unreachable!())
     .iter()
     .map(|(selector, method_descriptor)| create_generic_capability_selector_command(method, selector, method_descriptor))
     .collect::<Vec<_>>();
   Box::new(
-    CapabilityBuilder::new(method, None, format!("{} methods ", method))
+    CapabilityBuilder::new(method, None, about)
+      .set_long_about(long_about)
       .add_subcommands(subcommands)
       .set_default_command_executor(command_executor),
   )
@@ -140,7 +141,8 @@ fn create_generic_capability<'a>(method: &'static str, command_executor: &'a (dy
 fn create_generic_capability_selector_command(method_command: &str, selector: &str, method_descriptor: &MethodDescriptor) -> Command {
   let mut command = Command::new(selector.to_string()).alias(method_descriptor.path);
   if let Some(description) = method_descriptor.description {
-    command = command.about(create_about(method_command, method_descriptor, description));
+    command = command.about(create_about(description));
+    command = command.long_about(create_long_about(method_command, method_descriptor, description));
   }
   if !method_descriptor.parameters.is_empty() {
     command = command.args(
@@ -164,14 +166,39 @@ fn create_generic_capability_selector_command(method_command: &str, selector: &s
   command
 }
 
-fn create_about(method_command: &str, method_descriptor: &MethodDescriptor, description: &str) -> String {
+fn create_about(description: &str) -> String {
+  let first = match description.split(". ").collect::<Vec<&str>>().first() {
+    Some(first) => first.to_string(),
+    None => description.trim_end_matches('.').to_string(),
+  };
+  first.trim_end_matches('.').to_string()
+}
+
+fn create_long_about(method_command: &str, method_descriptor: &MethodDescriptor, description: &str) -> String {
+  let response_string = method_descriptor
+    .response_type
+    .map(|response_type| {
+      if method_command == "get" {
+        if response_type == "String" {
+          "Returns a string.".to_string()
+        } else if response_type == "Vec<String>" {
+          "Returns a list of identifiers.".to_string()
+        } else {
+          format!("Returns a formatted {}.", response_type)
+        }
+      } else {
+        format!("Returns ok when {}.", response_type)
+      }
+    })
+    .unwrap_or_default();
   [
-    Some(description.to_string()),
     Some(format!("{} {}", method_command.to_ascii_uppercase(), method_descriptor.path)),
+    Some(description.to_string()),
     if method_descriptor.parameters.is_empty() {
       None
     } else {
-      Some(
+      Some(format!(
+        "Parameters:\n{}",
         method_descriptor
           .parameters
           .iter()
@@ -180,14 +207,31 @@ fn create_about(method_command: &str, method_descriptor: &MethodDescriptor, desc
               "- {}: {}{}",
               parameter_name,
               parameter_description.unwrap_or_default(),
-              if parameter_type == &"str" { "".to_string() } else { format!(" ({})", parameter_type) }
+              if parameter_type == &"&str" { "".to_string() } else { format!(" (string representing a {})", parameter_type.trim_start_matches('&')) }
             )
           })
           .collect::<Vec<_>>()
           .join("\n"),
-      )
+      ))
     },
-    method_descriptor.body_type.map(|body_type| format!("body type: {}", body_type)),
+    Some(
+      method_descriptor
+        .body_type
+        .map(|body_type| {
+          if body_type == "String" {
+            format!(
+              "Requires a string. This string can either be piped from another application, redirected from a file or provided by the user interactively. {}",
+              response_string
+            )
+          } else {
+            format!(
+          "Requires string data representing a {}. This string data can either be piped from another application, redirected from a file or provided by the user interactively. {}",
+          body_type, response_string
+        )
+          }
+        })
+        .unwrap_or(response_string),
+    ),
   ]
   .iter()
   .flatten()
@@ -200,7 +244,7 @@ struct ApiDelete {}
 impl CommandExecutor for ApiDelete {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("DELETE {}", method_descriptor.path));
     if context.confirmed("type 'yes' to delete: ")? {
       if context.dry_run {
@@ -211,7 +255,7 @@ impl CommandExecutor for ApiDelete {
           .iter()
           .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
           .collect::<Vec<_>>();
-        let start_instant = Instant::now();
+        let start_instant = context.now();
         context.client_unchecked().delete(selector, &parameters).await?;
         context.print_execution_time(start_instant);
         context.print_outcome("deleted");
@@ -233,14 +277,14 @@ struct ApiGet {}
 impl CommandExecutor for ApiGet {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("get", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("get", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("GET {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let response = context.client_unchecked().get(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_serializable(response);
@@ -260,14 +304,14 @@ struct ApiHead {}
 impl CommandExecutor for ApiHead {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("HEAD {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     context.client_unchecked().head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_outcome("ok");
@@ -287,7 +331,7 @@ struct ApiPatch {}
 impl CommandExecutor for ApiPatch {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("patch", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("patch", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("PATCH {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
@@ -299,7 +343,7 @@ impl CommandExecutor for ApiPatch {
       context.print_warning("dry-run mode, nothing patched");
       Ok(())
     } else {
-      let start_instant = Instant::now();
+      let start_instant = context.now();
       context.client_unchecked().patch(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("patched");
@@ -318,7 +362,7 @@ struct ApiPost {}
 impl CommandExecutor for ApiPost {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("post", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("post", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("POST {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
@@ -330,7 +374,7 @@ impl CommandExecutor for ApiPost {
       context.print_warning("dry-run mode, nothing posted");
       Ok(())
     } else {
-      let start_instant = Instant::now();
+      let start_instant = context.now();
       context.client_unchecked().post(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("posted");
@@ -349,7 +393,7 @@ struct ApiPut {}
 impl CommandExecutor for ApiPut {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("put", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("put", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("PUT {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
@@ -361,7 +405,7 @@ impl CommandExecutor for ApiPut {
       context.print_warning("dry-run mode, nothing put");
       Ok(())
     } else {
-      let start_instant = Instant::now();
+      let start_instant = context.now();
       context.client_unchecked().put(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("put");
@@ -388,3 +432,100 @@ impl CommandExecutor for ApiShow {
     Requirements::standard_without_api(Some(OutputFormat::Json))
   }
 }
+
+const DELETE_ABOUT: &str = "Call delete operation";
+const DELETE_LONG_ABOUT: &str = "Call a delete operation on the DSH resource management api. \
+   Delete operations are typically used to delete resources on the platform. \
+   The type of the resource that needs to be deleted is specified by the required selector command, \
+   which must directly follow the 'delete' command. \
+   The resource instance that will be deleted must be specified by one or more required identifiers, \
+   which must follow the selector command. \
+   Delete operations do not require any further data or values, \
+   but the user will be asked to confirm the action (unless the --force option was used). \
+   A delete operation will only give a confirmation that the server accepted the request, \
+   but this does not necessarily mean that the resource will be successfully deleted. \
+   The method will return an error message when the server did not accept the request, \
+   for example if the resource specified by the identifier does not exist.";
+
+const GET_ABOUT: &str = "Call get operation";
+const GET_LONG_ABOUT: &str = "Call a get operation on the DSH resource management api. \
+   Get operations are typically used to request configuration or other data \
+   from resources on the platform. \
+   The type of the requested data needs to be specified by the required selector command, \
+   which must directly follow the 'get' command. \
+   The resource instance for which the request is done must be specified by one or more \
+   required identifiers, which must follow the selector command. \
+   Get operations do not require any further data or values. \
+   A get operation will normally print the requested data to the stdout device. \
+   The format of the printed data can be controlled by the --output-format option, \
+   or else a default format will be used which can depend on the resource type \
+   and the configured output. \
+   The method will return an error message when the server did not accept the request, \
+   for example if the resource specified by the identifier does not exist.";
+
+#[cfg(feature = "manage")]
+const HEAD_ABOUT: &str = "Call head operation";
+#[cfg(feature = "manage")]
+const HEAD_LONG_ABOUT: &str = "Call a head operation on the DSH resource management api. \
+   Head operations are typically used to check whether a resource on the platform exists, \
+   or if a user is entitled to use it. \
+   The type of the resource that needs to be checked is specified by the required selector command, \
+   which must directly follow the 'head' command. \
+   The resource instance that will be checked must be specified by one or more required identifiers, \
+   which must follow the selector command. \
+   Head operations do not require any further data or values. \
+   A head operation will return a positive confirmation if the resource exists \
+   or if the user is entitled to use it. \
+   It will return an error message when the resource specified by the identifier \
+   does not exist or cannot be used by the user.";
+
+#[cfg(feature = "manage")]
+const PATCH_ABOUT: &str = "Call patch operation";
+#[cfg(feature = "manage")]
+const PATCH_LONG_ABOUT: &str = "Call a patch operation on the DSH resource management api. \
+   Patch operations are typically used to update an already existing resources on the platform. \
+   The type of the resource that needs to be updated is specified by the required selector command, \
+   which must directly follow the 'patch' command. \
+   The resource instance that will be patched must be specified by one or more required identifiers, \
+   which must follow the selector command. \
+   Patch operations sometimes require extra data or values, \
+   which cannot be provided directly via the command line. \
+   It can either be piped or redirected via the shell command, \
+   or the user will be asked to provide it interactively. \
+   A patch operation will only give a confirmation that the server accepted the request, \
+   but this does not necessarily mean that the resource will be successfully patched. \
+   The method will return an error message when the server did not accept the request, \
+   for example if the resource specified by the identifier does not exist.";
+
+const POST_ABOUT: &str = "Call post operation";
+const POST_LONG_ABOUT: &str = "Call a post operation on the DSH resource management api. \
+   Post operations are typically used to create new resources on the platform. \
+   The type of the resource that needs to be posted is specified by the required selector command, \
+   which must directly follow the 'post' command. \
+   The resource instance that will be created must be identified by one or more required identifiers, \
+   which must follow the selector command. \
+   Post operations usually require extra data or values, \
+   which cannot be provided directly via the command line. \
+   It can either be piped from another application or redirected from a file via the shell command, \
+   or the user will be asked to provide it interactively. \
+   A post operation will only give a confirmation that the server accepted the request, \
+   but this does not necessarily mean that the resource will be successfully created. \
+   The method will return an error message when the server did not accept the request, \
+   for example if the resource specified by the identifier already exists.";
+
+const PUT_ABOUT: &str = "Call put operation";
+const PUT_LONG_ABOUT: &str = "Call a put operation on the DSH resource management api. \
+   Put operations are typically used to update existing resources on the platform, \
+   but are sometimes also used to create new resources. \
+   The type of the resource that needs to be put is specified by the required selector command, \
+   which must directly follow the 'put' command. \
+   The resource instance that will be updated/created must be identified \
+   by one or more required identifiers, which must follow the selector command. \
+   Put operations usually require extra data or values, \
+   which cannot be provided directly via the command line. \
+   It can either be piped from another application or redirected from a file via the shell command, \
+   or the user will be asked to provide it interactively. \
+   A put operation will only give a confirmation that the server accepted the request, \
+   but this does not necessarily mean that the resource will be successfully updated. \
+   The method will return an error message when the server did not accept the request, \
+   for example if the resource specified by the identifier does not exist.";

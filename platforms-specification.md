@@ -1,5 +1,7 @@
 ## Platforms specification
 
+[&#x2190; Settings and targets](settings_targets.md)
+
 If you need a different set of platform configurations,
 you can use the `DSH_API_PLATFORMS_FILE` environment variable to provide
 the name of a file with an alternative list of platform specifications.
@@ -26,3 +28,5 @@ Then set the environment variable to point to the file and see the new platform 
 
 See the github for the [`dsh_api`](https://github.com/kpn-dsh/dsh-api) for more information
 about the platforms specifications.
+
+[Set up autocompletion &#x2192;](autocompletion.md)

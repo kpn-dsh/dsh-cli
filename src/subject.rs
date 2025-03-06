@@ -38,6 +38,7 @@ impl Requirements {
       needs_platform: self.needs_platform | other.needs_platform,
       needs_tenant_name: self.needs_tenant_name | other.needs_tenant_name,
       needs_dsh_api_client: self.needs_dsh_api_client | other.needs_dsh_api_client,
+      // TODO This is not correct
       default_output_format: if self.default_output_format == other.default_output_format { self.default_output_format.clone() } else { None },
     }
   }
@@ -92,7 +93,7 @@ pub trait Subject {
     let mut subject_command = Command::new(self.subject().to_string())
       .about(self.subject_command_about())
       .long_about(self.subject_command_long_about())
-      .subcommand_required(true)
+      .arg_required_else_help(true)
       .subcommands(capability_subcommands);
     if let Some(alias) = self.subject_command_alias() {
       subject_command = subject_command.alias(alias.to_string())

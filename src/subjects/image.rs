@@ -16,7 +16,6 @@ use dsh_api::types::Application;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::time::Instant;
 
 pub(crate) struct ImageSubject {}
 
@@ -93,9 +92,9 @@ impl CommandExecutor for ImageFind {
   async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let image_query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
-      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(image_query.as_str())? } else { &ExactMatchQueryProcessor::create(image_query.as_str())? };
+      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&image_query)? } else { &ExactMatchQueryProcessor::create(&image_query)? };
     context.print_explanation(format!("find images that {}", query_processor.describe()));
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let services = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(services, query_processor, matches, context)?;
@@ -113,7 +112,7 @@ struct ImageListAll {}
 impl CommandExecutor for ImageListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all images used in services");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let services = context.client_unchecked().get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(services, &DummyQueryProcessor::create()?, matches, context)?;

@@ -188,7 +188,7 @@ impl PlatformOpen {
     let tenant_name = context.target_tenant_name.clone().unwrap();
     let app = get_app_argument_or_prompt(matches)?;
     Self::open_url(
-      platform.tenant_app_console_url(tenant_name.as_str(), app.as_str()),
+      platform.tenant_app_console_url(&tenant_name, &app),
       format!("console for tenant '{}@{}' and app '{}'", tenant_name, platform, app),
       context,
     )
@@ -203,7 +203,7 @@ impl PlatformOpen {
     let platform = context.target_platform.clone().unwrap();
     let tenant_name = context.target_tenant_name.clone().unwrap();
     Self::open_url(
-      format!("{}/dashboards", platform.tenant_monitoring_url(tenant_name.as_str())),
+      format!("{}/dashboards", platform.tenant_monitoring_url(&tenant_name)),
       format!("monitoring application for tenant '{}@{}'", tenant_name, platform),
       context,
     )
@@ -214,7 +214,7 @@ impl PlatformOpen {
     let tenant_name = context.target_tenant_name.clone().unwrap();
     let service = get_service_argument_or_prompt(matches)?;
     Self::open_url(
-      platform.tenant_service_console_url(tenant_name.as_str(), service.as_str()),
+      platform.tenant_service_console_url(&tenant_name, &service),
       format!("console for tenant '{}@{}' and service '{}'", tenant_name, platform, service),
       context,
     )
@@ -224,7 +224,7 @@ impl PlatformOpen {
     let platform = context.target_platform.clone().unwrap();
     let tenant_name = context.target_tenant_name.clone().unwrap();
     Self::open_url(
-      platform.tenant_console_url(tenant_name.as_str()),
+      platform.tenant_console_url(&tenant_name),
       format!("console for tenant '{}@{}'", tenant_name, platform),
       context,
     )
