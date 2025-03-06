@@ -4,12 +4,21 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.6.1] - yyyy-mm-dd
+## [0.7.0] - 2025-03-06
 
 ### Added
 
 * Capability to edit service configurations.
 * Capability to duplicate service configurations.
+* Capability to create topics.
+
+### Changed
+
+* Renamed new and deploy subcommands to create.
+* Display help when no commands or arguments are provided.
+* Api selector commands sorted alphabetically.
+* Improved help text for api commands.
+* Dependency to `dsh_api` crate to version `0.6.0`.
 
 ## [0.6.0] - 2025-02-28
 
