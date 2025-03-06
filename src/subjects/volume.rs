@@ -123,7 +123,7 @@ impl CommandExecutor for VolumeCreate {
       return Err(format!("volume '{}' already exists", volume_id));
     }
     let size_gi_b: i64 = match matches.get_one::<i64>(SIZE_FLAG) {
-      Some(size) => size.clone(),
+      Some(size) => *size,
       None => {
         let line = context.read_single_line("enter size in gigabytes: ")?;
         line.parse::<i64>().map_err(|_| format!("could not parse '{}' as a valid integer", line))?
