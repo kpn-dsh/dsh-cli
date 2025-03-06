@@ -29,7 +29,6 @@ By enabling/disabling the features described below you have some control over wh
 in the `dsh` tool and what's not. The features are disabled by default.
 The following features are defined:
 
-* `appcatalog` - Enables the app catalog methods.
 * `manage` - Enables the manage methods.
 * `robot` - Enables the robot operation.
 

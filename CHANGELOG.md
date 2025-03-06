@@ -19,6 +19,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Api selector commands sorted alphabetically.
 * Improved help text for api commands.
 * Dependency to `dsh_api` crate to version `0.6.0`.
+* Deleted feature `appcatalog`, which is now always enabled.
 
 ## [0.6.0] - 2025-02-28
 

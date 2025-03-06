@@ -46,7 +46,6 @@ use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
 use subjects::env::ENV_SUBJECT;
 use subjects::image::IMAGE_SUBJECT;
-#[cfg(feature = "appcatalog")]
 use subjects::manifest::MANIFEST_SUBJECT;
 use subjects::metric::METRIC_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
@@ -175,7 +174,6 @@ async fn inner_main() -> DshCliResult {
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),
-    #[cfg(feature = "appcatalog")]
     MANIFEST_SUBJECT.as_ref(),
     METRIC_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),
@@ -714,8 +712,6 @@ where
 fn enabled_features() -> Option<Vec<&'static str>> {
   #[allow(unused_mut)]
   let mut enabled_features = vec![];
-  #[cfg(feature = "appcatalog")]
-  enabled_features.push("appcatalog");
   #[cfg(feature = "manage")]
   enabled_features.push("manage");
   #[cfg(feature = "robot")]
@@ -734,5 +730,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.5.2");
+  assert_eq!(crate_version(), "0.6.0");
 }

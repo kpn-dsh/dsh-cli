@@ -56,7 +56,6 @@ which correspond to features of the `dsh_api` crate with the same name:
 
 ```toml
 [features]
-appcatalog = ["dsh_api/appcatalog"]
 manage = ["dsh_api/manage"]
 robot = ["dsh_api/robot"]
 ```
