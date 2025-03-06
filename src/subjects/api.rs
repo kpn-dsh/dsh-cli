@@ -100,28 +100,25 @@ const PATCH_COMMAND: &str = "patch";
 const POST_COMMAND: &str = "post";
 const PUT_COMMAND: &str = "put";
 
-fn method_descriptors(method: &str) -> Option<&'static [(&str, MethodDescriptor)]> {
+fn method_descriptors(method: &str) -> &'static [(&str, MethodDescriptor)] {
   match method {
-    DELETE_COMMAND => Some(&DELETE_METHODS),
-    GET_COMMAND => Some(&GET_METHODS),
+    DELETE_COMMAND => &DELETE_METHODS,
+    GET_COMMAND => &GET_METHODS,
     #[cfg(feature = "manage")]
-    HEAD_COMMAND => Some(&HEAD_METHODS),
+    HEAD_COMMAND => &HEAD_METHODS,
     #[cfg(feature = "manage")]
-    PATCH_COMMAND => Some(&PATCH_METHODS),
-    POST_COMMAND => Some(&POST_METHODS),
-    PUT_COMMAND => Some(&PUT_METHODS),
-    _ => None,
+    PATCH_COMMAND => &PATCH_METHODS,
+    POST_COMMAND => &POST_METHODS,
+    PUT_COMMAND => &PUT_METHODS,
+    _ => unreachable!(),
   }
 }
 
-fn method_descriptor(method: &'static str, query_selector: &str) -> Option<&'static MethodDescriptor> {
-  match method_descriptors(method) {
-    Some(method_descriptors) => method_descriptors
-      .iter()
-      .find_or_first(|(selector, _)| selector == &query_selector)
-      .map(|(_, method_descriptor)| method_descriptor),
-    None => None,
-  }
+fn find_method_descriptor(method: &'static str, query_selector: &str) -> Option<&'static MethodDescriptor> {
+  method_descriptors(method)
+    .iter()
+    .find_or_first(|(selector, _)| selector == &query_selector)
+    .map(|(_, method_descriptor)| method_descriptor)
 }
 
 fn create_generic_capability<'a>(
@@ -131,7 +128,6 @@ fn create_generic_capability<'a>(
   command_executor: &'a (dyn CommandExecutor + Send + Sync),
 ) -> Box<(dyn Capability + Send + Sync + 'a)> {
   let subcommands = method_descriptors(method)
-    .unwrap_or_else(|| unreachable!())
     .iter()
     .map(|(selector, method_descriptor)| create_generic_capability_selector_command(method, selector, method_descriptor))
     .collect::<Vec<_>>();
@@ -249,7 +245,7 @@ struct ApiDelete {}
 impl CommandExecutor for ApiDelete {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("DELETE {}", method_descriptor.path));
     if context.confirmed("type 'yes' to delete: ")? {
       if context.dry_run {
@@ -282,7 +278,7 @@ struct ApiGet {}
 impl CommandExecutor for ApiGet {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("get", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("get", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("GET {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
@@ -309,7 +305,7 @@ struct ApiHead {}
 impl CommandExecutor for ApiHead {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("HEAD {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
@@ -336,7 +332,7 @@ struct ApiPatch {}
 impl CommandExecutor for ApiPatch {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("patch", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("patch", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("PATCH {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
@@ -367,7 +363,7 @@ struct ApiPost {}
 impl CommandExecutor for ApiPost {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("post", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("post", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("POST {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
@@ -398,7 +394,7 @@ struct ApiPut {}
 impl CommandExecutor for ApiPut {
   async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
-    let method_descriptor = method_descriptor("put", selector).unwrap_or_else(|| unreachable!());
+    let method_descriptor = find_method_descriptor("put", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("PUT {}", method_descriptor.path));
     let parameters = method_descriptor
       .parameters
