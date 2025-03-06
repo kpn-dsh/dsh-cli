@@ -130,7 +130,7 @@ impl CommandExecutor for AppShowAll {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
     let start_instant = Instant::now();
-    let app = context.client_unchecked().get_appcatalogapp_appcatalogappid_configuration(&app_id).await?;
+    let app = context.client_unchecked().get_appcatalogapp_configuration(&app_id).await?;
     context.print_execution_time(start_instant);
     for (resource_name, resource) in &app.resources {
       match resource {
