@@ -24,8 +24,8 @@ export VOLUME_UNDER_TEST=github-action-runner-home
 export SAFE_COMMANDS=(
   "api delete secret-configuration $SECRET_UNDER_TEST --force --dry-run"
   "api get secret $SECRET_UNDER_TEST"
-  "api post secret-configuration --dry-run < /dev/null"
-  "api put secret-configuration $SECRET_UNDER_TEST --dry-run < /dev/null"
+  "api post secret --dry-run < /dev/null"
+  "api put secret $SECRET_UNDER_TEST --dry-run < /dev/null"
   "api show > /dev/null"
 
   "app list --ids"
@@ -97,6 +97,7 @@ export SAFE_COMMANDS=(
   "proxy list"
   "proxy show $PROXY_UNDER_TEST"
 
+  "secret create $SECRET_NON_EXISTING --dry-run < /dev/null"
   "secret delete $SECRET_UNDER_TEST --force --dry-run"
   "secret list --app"
   "secret list --service"
@@ -104,13 +105,11 @@ export SAFE_COMMANDS=(
   "secret list --system"
   "secret list --usage"
   "secret list"
-  "secret new $SECRET_SECRET_NON_EXISTING --dry-run"
   "secret show $SECRET_UNDER_TEST --usage"
   "secret show $SECRET_UNDER_TEST --value"
   "secret show $SECRET_UNDER_TEST"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
-  "service deploy $SERVICE_SERVICE_NON_EXISTING --dry-run"
   "service list --ids"
   "service list --started"
   "service list --status"
@@ -130,15 +129,15 @@ export SAFE_COMMANDS=(
 
   "target list"
 
+  "topic create $TOPIC_NON_EXISTING --dry-run"
+  "topic create $TOPIC_NON_EXISTING --cleanup-policy compact --dry-run"
+  "topic create $TOPIC_NON_EXISTING --max-message-size 2048 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --partitions 2 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --segment-size 52428801 --dry-run"
   "topic list --ids"
   "topic list --status"
   "topic list --usage"
   "topic list"
-  "topic new $TOPIC_NON_EXISTING --dry-run"
-  "topic new $TOPIC_NON_EXISTING --cleanup-policy compact --dry-run"
-  "topic new $TOPIC_NON_EXISTING --max-message-size 2048 --dry-run"
-  "topic new $TOPIC_NON_EXISTING --partitions 2 --dry-run"
-  "topic new $TOPIC_NON_EXISTING --segment-size 52428801 --dry-run"
   "topic show $TOPIC_UNDER_TEST --properties"
   "topic show $TOPIC_UNDER_TEST --status"
   "topic show $TOPIC_UNDER_TEST --usage"
@@ -146,7 +145,8 @@ export SAFE_COMMANDS=(
 
   "vhost list"
 
-  "volume delete $VOLUME_VOLUME_UNDER_TEST --dry-run"
+  "volume create $VOLUME_NON_EXISTING --size 2 --dry-run"
+  "volume delete $VOLUME_UNDER_TEST --force --dry-run"
   "volume list --app"
   "volume list --service"
   "volume list --configuration"
@@ -154,7 +154,6 @@ export SAFE_COMMANDS=(
   "volume list --status"
   "volume list --usage"
   "volume list"
-  "volume new $VOLUME_NON_EXISTING --dry-run"
   "volume show $VOLUME_UNDER_TEST --status"
   "volume show $VOLUME_UNDER_TEST --usage"
   "volume show $VOLUME_UNDER_TEST"
