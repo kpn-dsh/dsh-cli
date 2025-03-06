@@ -101,7 +101,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 const USAGE: &str = "dsh [OPTIONS] [SUBJECT/COMMAND]\n       dsh --help\n       dsh secret --help\n       dsh secret list --help";
 
-const VERSION: &str = "0.6.1";
+const VERSION: &str = "0.7.0";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
