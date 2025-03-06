@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::arguments::{platform_name_argument, tenant_name_argument, PLATFORM_NAME_ARGUMENT, TENANT_NAME_ARGUMENT};
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, NEW_COMMAND};
+use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
@@ -36,7 +36,7 @@ impl Subject for TargetSubject {
 
   /// Help text printed for --help flag
   fn subject_command_long_about(&self) -> String {
-    "Show, manage and list dsh target configurations. \
+    "Create, list and show dsh target configurations. \
     A target configuration consists of a platform name, a tenant name \
     and the tenant's api password for the platform. \
     The target command can be used to create, list and delete target configurations. \
@@ -48,9 +48,9 @@ impl Subject for TargetSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      CREATE_COMMAND => Some(TARGET_CREATE_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(TARGET_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(TARGET_LIST_CAPABILITY.as_ref()),
-      NEW_COMMAND => Some(TARGET_NEW_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -61,6 +61,18 @@ impl Subject for TargetSubject {
 }
 
 lazy_static! {
+  static ref TARGET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), "Create a new target configuration")
+      .set_long_about(
+        "Create a new target configuration. \
+        You will be prompted for the target's platform, tenant and password. \
+        The platform and tenant will be stored in an unencrypted configuration file. \
+        The password will be stored in your computer's keyring, which is more secure.",
+      )
+      .set_default_command_executor(&TargetCreate {})
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true))
+  );
   static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, None, "Delete target configuration")
       .set_long_about(
@@ -77,20 +89,38 @@ lazy_static! {
       .set_long_about("Lists all target configurations.")
       .set_default_command_executor(&TargetList {})
   );
-  static ref TARGET_NEW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(NEW_COMMAND, None, "Create a new target configuration")
-      .set_long_about(
-        "Create a new target configuration. \
-        You will be prompted for the target's platform, tenant and password. \
-        The platform and tenant will be stored in an unencrypted configuration file. \
-        The password will be stored in your computer's keyring, which is more secure.",
-      )
-      .set_default_command_executor(&TargetNew {})
-      .add_target_argument(platform_name_argument().required(true))
-      .add_target_argument(tenant_name_argument().required(true))
-  );
   static ref TARGET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref(), TARGET_NEW_CAPABILITY.as_ref(),];
+    vec![TARGET_CREATE_CAPABILITY.as_ref(), TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref()];
+}
+
+struct TargetCreate {}
+
+#[async_trait]
+impl CommandExecutor for TargetCreate {
+  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    context.print_explanation("create new target configuration");
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
+    if let Some(existing_target) = read_target(&platform, &tenant)? {
+      return Err(format!(
+        "target configuration '{}' already exists (first delete the existing target configuration)",
+        existing_target
+      ));
+    };
+    let password = context.read_single_line_password("enter password: ")?;
+    let target = Target::new(platform, tenant, Some(password))?;
+    if context.dry_run {
+      context.print_warning(format!("dry-run mode, target '{}' not created", target));
+    } else {
+      upsert_target(&target)?;
+      context.print_outcome(format!("target '{}' created", target));
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api(None)
+  }
 }
 
 struct TargetDelete {}
@@ -165,36 +195,6 @@ impl CommandExecutor for TargetList {
       let mut formatter = ListFormatter::new(&TARGET_LABELS, None, context);
       formatter.push_values(&target_formatters);
       formatter.print()?;
-    }
-    Ok(())
-  }
-
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
-  }
-}
-
-struct TargetNew {}
-
-#[async_trait]
-impl CommandExecutor for TargetNew {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    context.print_explanation("create new target configuration");
-    let platform = get_platform_argument_or_prompt(matches)?;
-    let tenant = get_tenant_argument_or_prompt(matches)?;
-    if let Some(existing_target) = read_target(&platform, &tenant)? {
-      return Err(format!(
-        "target configuration '{}' already exists (first delete the existing target configuration)",
-        existing_target
-      ));
-    };
-    let password = context.read_single_line_password("enter password: ")?;
-    let target = Target::new(platform, tenant, Some(password))?;
-    if context.dry_run {
-      context.print_warning(format!("dry-run mode, target '{}' not created", target));
-    } else {
-      upsert_target(&target)?;
-      context.print_outcome(format!("target '{}' created", target));
     }
     Ok(())
   }
