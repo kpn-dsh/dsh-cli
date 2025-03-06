@@ -3,7 +3,6 @@ use clap::ArgMatches;
 use lazy_static::lazy_static;
 use serde_json::de::from_str;
 use std::collections::HashMap;
-use std::time::Instant;
 
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use dsh_api::types::AppCatalogApp;
@@ -83,7 +82,7 @@ struct AppListConfiguration {}
 impl CommandExecutor for AppListConfiguration {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed apps and their configurations");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let apps = context.client_unchecked().get_appcatalogapp_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
@@ -108,7 +107,7 @@ struct AppListIds {}
 impl CommandExecutor for AppListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed app ids");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let ids = context.client_unchecked().list_app_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("app id", context);
@@ -129,7 +128,7 @@ impl CommandExecutor for AppShowAll {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let app = context.client_unchecked().get_appcatalogapp_configuration(&app_id).await?;
     context.print_execution_time(start_instant);
     for (resource_name, resource) in &app.resources {

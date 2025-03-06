@@ -11,7 +11,6 @@ use clap::ArgMatches;
 use dsh_sdk::management_api::AccessToken;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::time::Instant;
 
 pub(crate) struct TokenSubject {}
 
@@ -68,7 +67,7 @@ struct TokenFetch {}
 impl CommandExecutor for TokenFetch {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("fetch dsh api token");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
 
     let access_token = context
       .client_unchecked()
@@ -92,7 +91,7 @@ struct TokenShow {}
 impl CommandExecutor for TokenShow {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("fetch dsh api token");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
 
     let access_token = context
       .client_unchecked()

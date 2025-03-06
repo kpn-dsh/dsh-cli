@@ -380,6 +380,11 @@ impl Context {
     }
   }
 
+  /// # Returns current time `Instant`
+  pub(crate) fn now(&self) -> Instant {
+    Instant::now()
+  }
+
   /// # Prints the output to stdout
   ///
   /// This method is used to print the output of the `dsh` tool to the standard output device.

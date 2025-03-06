@@ -12,7 +12,6 @@ use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, POST_METHO
 use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use std::time::Instant;
 
 pub(crate) struct ApiSubject {}
 
@@ -256,7 +255,7 @@ impl CommandExecutor for ApiDelete {
           .iter()
           .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
           .collect::<Vec<_>>();
-        let start_instant = Instant::now();
+        let start_instant = context.now();
         context.client_unchecked().delete(selector, &parameters).await?;
         context.print_execution_time(start_instant);
         context.print_outcome("deleted");
@@ -285,7 +284,7 @@ impl CommandExecutor for ApiGet {
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let response = context.client_unchecked().get(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_serializable(response);
@@ -312,7 +311,7 @@ impl CommandExecutor for ApiHead {
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     context.client_unchecked().head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_outcome("ok");
@@ -344,7 +343,7 @@ impl CommandExecutor for ApiPatch {
       context.print_warning("dry-run mode, nothing patched");
       Ok(())
     } else {
-      let start_instant = Instant::now();
+      let start_instant = context.now();
       context.client_unchecked().patch(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("patched");
@@ -375,7 +374,7 @@ impl CommandExecutor for ApiPost {
       context.print_warning("dry-run mode, nothing posted");
       Ok(())
     } else {
-      let start_instant = Instant::now();
+      let start_instant = context.now();
       context.client_unchecked().post(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("posted");
@@ -406,7 +405,7 @@ impl CommandExecutor for ApiPut {
       context.print_warning("dry-run mode, nothing put");
       Ok(())
     } else {
-      let start_instant = Instant::now();
+      let start_instant = context.now();
       context.client_unchecked().put(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("put");

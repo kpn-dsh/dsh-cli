@@ -12,7 +12,6 @@ use dsh_api::types::Vhost;
 use dsh_api::UsedBy;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::time::Instant;
 
 pub(crate) struct VhostSubject {}
 
@@ -72,7 +71,7 @@ struct VhostListUsage {}
 impl CommandExecutor for VhostListUsage {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list services with a vhost configuration");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let vhosts_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_vhosts_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("vhost"), context);
@@ -97,7 +96,7 @@ impl CommandExecutor for VhostListUsage {
 //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
 //     let vhost_target = target.unwrap_or_else(|| unreachable!());
 //     context.print_explanation(format!("show the services that use vhost '{}'", vhost_target));
-//     let start_instant = Instant::now();
+//     let start_instant = context.now();
 //     let services = context.client_unchecked().get_applications().await?;
 //     context.print_execution_time(start_instant);
 //     let mut builder = StringTableBuilder::new(&["service", "port", "a-zone"], context);

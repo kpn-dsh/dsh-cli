@@ -5,7 +5,6 @@ use dsh_api::types::KafkaProxy;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::time::Instant;
 
 use crate::arguments::proxy_id_argument;
 use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, SHOW_COMMAND};
@@ -112,7 +111,7 @@ struct ProxyListAll {}
 impl CommandExecutor for ProxyListAll {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all proxies with parameters");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let proxy_ids = context.client_unchecked().get_kafkaproxy_ids().await?;
     let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| context.client_unchecked().get_kafkaproxy_configuration(proxy_id))).await?;
     context.print_execution_time(start_instant);
@@ -133,7 +132,7 @@ struct ProxyListIds {}
 impl CommandExecutor for ProxyListIds {
   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all proxy ids");
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let proxy_ids = context.client_unchecked().get_kafkaproxy_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("proxy id", context);
@@ -154,7 +153,7 @@ impl CommandExecutor for ProxyShowConfiguration {
   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
-    let start_instant = Instant::now();
+    let start_instant = context.now();
     let proxy = context.client_unchecked().get_kafkaproxy_configuration(&proxy_id).await?;
     context.print_execution_time(start_instant);
     UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, context).print(&proxy)
