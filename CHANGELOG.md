@@ -4,6 +4,18 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.1] - yyyy-mm-dd
+
+### Changed
+
+* Allows one or more targets platforms.
+* Allows one or more targets tenants.
+* Ask for confirmation on service duplicate and edit capabilities.
+
+### Fixes
+
+* Fixed bug with default output format.
+
 ## [0.7.0] - 2025-03-06
 
 ### Added
