@@ -119,7 +119,7 @@ impl CommandExecutor for EnvFind {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 

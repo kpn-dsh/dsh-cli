@@ -87,7 +87,7 @@ impl CommandExecutor for ProxyDelete {
     if context.client_unchecked().get_kafkaproxy_configuration(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
-    if context.confirmed(format!("type 'yes' to delete proxy '{}': ", proxy_id))? {
+    if context.confirmed(format!("delete proxy '{}'?", proxy_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, proxy not deleted");
       } else {
@@ -101,7 +101,7 @@ impl CommandExecutor for ProxyDelete {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -122,7 +122,7 @@ impl CommandExecutor for ProxyListAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -142,7 +142,7 @@ impl CommandExecutor for ProxyListIds {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
   }
 }
 
@@ -160,7 +160,7 @@ impl CommandExecutor for ProxyShowConfiguration {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 

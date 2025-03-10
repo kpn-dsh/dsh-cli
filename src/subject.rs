@@ -11,33 +11,56 @@ pub struct Requirements {
   needs_platform: bool,
   needs_tenant_name: bool,
   needs_dsh_api_client: bool,
+  allows_multiple_target_platforms: bool,
+  allows_multiple_target_tenants: bool,
   default_output_format: Option<OutputFormat>,
 }
 
 impl Requirements {
-  pub fn new(needs_platform: bool, needs_tenant_name: bool, needs_dsh_api_client: bool, default_output_format: Option<OutputFormat>) -> Self {
-    Self { needs_platform, needs_tenant_name, needs_dsh_api_client, default_output_format }
+  pub fn new(
+    needs_platform: bool,
+    needs_tenant_name: bool,
+    needs_dsh_api_client: bool,
+    allows_multiple_target_platforms: bool,
+    allows_multiple_target_tenants: bool,
+    default_output_format: Option<OutputFormat>,
+  ) -> Self {
+    Self { needs_platform, needs_tenant_name, needs_dsh_api_client, allows_multiple_target_platforms, allows_multiple_target_tenants, default_output_format }
   }
 
   pub fn standard_with_api(default_output_format: Option<OutputFormat>) -> Self {
-    Self::new(false, false, true, default_output_format)
+    Self::new(false, false, true, false, false, default_output_format)
+  }
+
+  pub fn standard_with_api_multiple(allows_multiple_target_platforms: bool, allows_multiple_target_tenants: bool, default_output_format: Option<OutputFormat>) -> Self {
+    Self::new(
+      false,
+      false,
+      true,
+      allows_multiple_target_platforms,
+      allows_multiple_target_tenants,
+      default_output_format,
+    )
   }
 
   pub fn standard_without_api(default_output_format: Option<OutputFormat>) -> Self {
-    Self::new(false, false, false, default_output_format)
+    Self::new(false, false, false, false, false, default_output_format)
   }
 
-  /// Returns logical or
+  /// Combine requirements
   ///
-  /// The logical or of the returned `Requirements` struct contains the pairwise logical or
-  /// of the three `bool` fields.
-  /// If the `default_output_format`s of the two instances are equal, that value is returned.
-  /// Else `None` will be returned.
-  pub fn or(&self, other: &Self) -> Self {
+  /// The combination of two `Requirements` structs:
+  /// * The pairwise logical OR of the `needs` fields.
+  /// * The pairwise logical AND of the `allows` fields.
+  /// * If the `default_output_format` values of the two instances are equal,
+  ///   that value is returned. Else `None` will be returned.
+  pub fn combine(&self, other: &Self) -> Self {
     Self {
       needs_platform: self.needs_platform | other.needs_platform,
       needs_tenant_name: self.needs_tenant_name | other.needs_tenant_name,
       needs_dsh_api_client: self.needs_dsh_api_client | other.needs_dsh_api_client,
+      allows_multiple_target_platforms: self.allows_multiple_target_platforms & other.allows_multiple_target_platforms,
+      allows_multiple_target_tenants: self.allows_multiple_target_tenants & other.allows_multiple_target_tenants,
       // TODO This is not correct
       default_output_format: if self.default_output_format == other.default_output_format { self.default_output_format.clone() } else { None },
     }
@@ -57,6 +80,14 @@ impl Requirements {
 
   pub fn needs_tenant_name(&self) -> bool {
     self.needs_tenant_name || self.needs_dsh_api_client
+  }
+
+  pub fn allows_multiple_target_platforms(&self) -> bool {
+    self.allows_multiple_target_platforms
+  }
+
+  pub fn allows_multiple_target_tenants(&self) -> bool {
+    self.allows_multiple_target_tenants
   }
 }
 
@@ -154,33 +185,33 @@ pub trait Subject {
 fn test_requirements_or_1() {
   let first = Requirements::new(false, false, false, None);
   let second = Requirements::new(false, false, false, None);
-  assert_eq!(first.or(&second), Requirements::new(false, false, false, None))
+  assert_eq!(first.combine(&second), Requirements::new(false, false, false, None))
 }
 
 #[test]
 fn test_requirements_or_2() {
   let first = Requirements::new(false, false, false, None);
   let second = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, None))
+  assert_eq!(first.combine(&second), Requirements::new(true, true, true, None))
 }
 
 #[test]
 fn test_requirements_or_3() {
   let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
   let second = Requirements::new(false, false, false, None);
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, None))
+  assert_eq!(first.combine(&second), Requirements::new(true, true, true, None))
 }
 
 #[test]
 fn test_requirements_or_4() {
   let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
   let second = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, Some(OutputFormat::Json)))
+  assert_eq!(first.combine(&second), Requirements::new(true, true, true, Some(OutputFormat::Json)))
 }
 
 #[test]
 fn test_requirements_or_5() {
   let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
   let second = Requirements::new(true, true, true, Some(OutputFormat::Toml));
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, None))
+  assert_eq!(first.combine(&second), Requirements::new(true, true, true, None))
 }

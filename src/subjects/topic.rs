@@ -225,7 +225,7 @@ impl CommandExecutor for TopicCreate {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -239,7 +239,7 @@ impl CommandExecutor for TopicDelete {
     if context.client_unchecked().get_topic(&topic_id).await.is_err() {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }
-    if context.confirmed(format!("type 'yes' to delete scratch topic '{}': ", topic_id))? {
+    if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, topic not deleted");
       } else {
@@ -253,7 +253,7 @@ impl CommandExecutor for TopicDelete {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -274,7 +274,7 @@ impl CommandExecutor for TopicListAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -295,7 +295,7 @@ impl CommandExecutor for TopicListConfiguration {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -315,7 +315,7 @@ impl CommandExecutor for TopicListIds {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
   }
 }
 
@@ -351,7 +351,7 @@ impl CommandExecutor for TopicListUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -369,7 +369,7 @@ impl CommandExecutor for TopicShow {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -387,7 +387,7 @@ impl CommandExecutor for TopicShowAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -411,7 +411,7 @@ impl CommandExecutor for TopicShowProperties {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -441,7 +441,7 @@ impl CommandExecutor for TopicShowUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 

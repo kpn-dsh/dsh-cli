@@ -140,7 +140,7 @@ impl CommandExecutor for VolumeCreate {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -154,7 +154,7 @@ impl CommandExecutor for VolumeDelete {
     if context.client_unchecked().get_volume(&volume_id).await.is_err() {
       return Err(format!("volume '{}' does not exists", volume_id));
     }
-    if context.confirmed(format!("type 'yes' to delete volume '{}': ", volume_id))? {
+    if context.confirmed(format!("delete volume '{}'?", volume_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, volume not deleted");
       } else {
@@ -168,7 +168,7 @@ impl CommandExecutor for VolumeDelete {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -189,7 +189,7 @@ impl CommandExecutor for VolumeListAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -210,7 +210,7 @@ impl CommandExecutor for VolumeListAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -231,7 +231,7 @@ impl CommandExecutor for VolumeListConfiguration {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -251,7 +251,7 @@ impl CommandExecutor for VolumeListIds {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
   }
 }
 
@@ -279,7 +279,7 @@ impl CommandExecutor for VolumeListUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -297,7 +297,7 @@ impl CommandExecutor for VolumeShowAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -315,7 +315,7 @@ impl CommandExecutor for VolumeShowAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -340,7 +340,7 @@ impl CommandExecutor for VolumeShowUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 

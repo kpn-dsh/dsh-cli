@@ -110,7 +110,7 @@ impl CommandExecutor for CertificateListAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -136,7 +136,7 @@ impl CommandExecutor for CertificateListAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -162,7 +162,7 @@ impl CommandExecutor for CertificateListConfiguration {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -182,7 +182,7 @@ impl CommandExecutor for CertificateListIds {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
   }
 }
 
@@ -210,7 +210,7 @@ impl CommandExecutor for CertificateListUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -231,7 +231,7 @@ impl CommandExecutor for CertificateShowAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -249,7 +249,7 @@ impl CommandExecutor for CertificateShowAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -274,7 +274,7 @@ impl CommandExecutor for CertificateShowUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 

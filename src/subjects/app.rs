@@ -97,7 +97,7 @@ impl CommandExecutor for AppListConfiguration {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -117,7 +117,7 @@ impl CommandExecutor for AppListIds {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
   }
 }
 
@@ -160,7 +160,7 @@ impl CommandExecutor for AppShowAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 

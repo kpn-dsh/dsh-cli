@@ -246,7 +246,7 @@ impl CommandExecutor for ApiDelete {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("DELETE {}", method_descriptor.path));
-    if context.confirmed("type 'yes' to delete: ")? {
+    if context.confirmed("delete?")? {
       if context.dry_run {
         context.print_warning("dry-run mode, nothing deleted");
       } else {
@@ -292,7 +292,7 @@ impl CommandExecutor for ApiGet {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Json))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Json))
   }
 }
 

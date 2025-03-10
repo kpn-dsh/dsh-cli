@@ -177,6 +177,8 @@ impl CommandExecutor for PlatformOpen {
         (OPEN_APP, _) | (OPEN_MONITORING, _) | (OPEN_SERVICE, _) | (OPEN_TENANT, _)
       ),
       matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER),
+      true,
+      true,
       None,
     )
   }
@@ -319,7 +321,7 @@ impl CommandExecutor for PlatformShow {
   }
 
   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(sub_matches.get_one::<String>(PLATFORM_NAME_ARGUMENT).is_none(), false, false, None)
+    Requirements::new(sub_matches.get_one::<String>(PLATFORM_NAME_ARGUMENT).is_none(), false, false, true, true, None)
   }
 }
 

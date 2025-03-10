@@ -5,11 +5,12 @@ use crate::global_arguments::{
 };
 use crate::settings::Settings;
 use crate::subject::Requirements;
+use crate::targets::read_target;
 use crate::verbosity::Verbosity;
 use crate::{
-  get_target_password, get_target_platform, get_target_platform_non_interactive, get_target_tenant, get_target_tenant_non_interactive, ENV_VAR_CSV_QUOTE, ENV_VAR_CSV_SEPARATOR,
-  ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME,
-  ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
+  get_target_password, get_target_platforms, get_target_platforms_non_interactive, get_target_tenants, get_target_tenants_non_interactive, ENV_VAR_CSV_QUOTE,
+  ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET,
+  ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
 };
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -18,6 +19,7 @@ use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
+use futures::future::join_all;
 use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
@@ -50,7 +52,64 @@ pub(crate) struct Context {
 }
 
 impl Context {
-  pub(crate) async fn create(matches: &ArgMatches, requirements: &Requirements, settings: &Settings) -> Result<Context, String> {
+  pub(crate) async fn create_multiple(matches: &ArgMatches, requirements: &Requirements, settings: &Settings) -> Result<Vec<Context>, String> {
+    let target_platforms = if requirements.needs_platform() { Some(get_target_platforms(matches, settings)?) } else { get_target_platforms_non_interactive(matches, settings)? };
+    if let Some(ref platforms) = target_platforms {
+      if platforms.len() > 1 && !requirements.allows_multiple_target_platforms() {
+        return Err("multiple target platforms not allowed".to_string());
+      }
+    }
+    let target_tenant_names = if requirements.needs_tenant_name() { Some(get_target_tenants(matches, settings)?) } else { get_target_tenants_non_interactive(matches, settings) };
+    if let Some(ref tenants) = target_tenant_names {
+      if tenants.len() > 1 && !requirements.allows_multiple_target_tenants() {
+        return Err("multiple target tenants not allowed".to_string());
+      }
+    }
+    match (target_platforms, target_tenant_names) {
+      (Some(target_platforms), Some(target_tenants)) => {
+        let multiple_targets = target_platforms.len() * target_tenants.len() > 1;
+        let mut contexts = vec![];
+        for target_platform in target_platforms {
+          for target_tenant in &target_tenants {
+            if !multiple_targets || read_target(&target_platform, target_tenant)?.is_some() {
+              debug!("create context for {}@{}", target_tenant, target_platform);
+              let context = Self::create(matches, requirements, settings, Some(target_platform.clone()), Some(target_tenant.to_string())).await?;
+              contexts.push(context);
+            } else {
+              debug!("target {}@{} is not configured and will be skipped", target_tenant, target_platform);
+            }
+          }
+        }
+        Ok(contexts)
+      }
+      (Some(target_platforms), None) => join_all(target_platforms.into_iter().map(|target_platform| {
+        debug!("create context for platform {}", target_platform);
+        Self::create(matches, requirements, settings, Some(target_platform.clone()), None)
+      }))
+      .await
+      .into_iter()
+      .collect::<Result<Vec<Context>, _>>(),
+      (None, Some(target_tenants)) => join_all(target_tenants.into_iter().map(|target_tenant| {
+        debug!("create context for tenant {}", target_tenant);
+        Self::create(matches, requirements, settings, None, Some(target_tenant.clone()))
+      }))
+      .await
+      .into_iter()
+      .collect::<Result<Vec<Context>, _>>(),
+      (None, None) => {
+        debug!("create context");
+        Ok(vec![Self::create(matches, requirements, settings, None, None).await?])
+      }
+    }
+  }
+
+  async fn create(
+    matches: &ArgMatches,
+    requirements: &Requirements,
+    settings: &Settings,
+    target_platform: Option<DshPlatform>,
+    target_tenant_name: Option<String>,
+  ) -> Result<Context, String> {
     let stdin_is_terminal = stdin().is_terminal();
     let csv_quote = Self::csv_quote(settings)?;
     let csv_separator = Self::csv_separator(settings)?;
@@ -60,8 +119,6 @@ impl Context {
       }
     }
     let dry_run = Self::dry_run(matches, settings);
-    let target_platform = if requirements.needs_platform() { Some(get_target_platform(matches, settings)?) } else { get_target_platform_non_interactive(matches, settings)? };
-    let target_tenant_name = if requirements.needs_tenant_name() { Some(get_target_tenant(matches, settings)?) } else { get_target_tenant_non_interactive(matches, settings) };
     let dsh_api_client = if requirements.needs_dsh_api_client() {
       let dsh_api_tenant = DshApiTenant::new(target_tenant_name.clone().unwrap(), target_platform.clone().unwrap());
       let password = get_target_password(matches, &dsh_api_tenant)?;
@@ -136,11 +193,11 @@ impl Context {
     if self.force {
       Ok(true)
     } else if stdin().is_terminal() {
-      eprint!("{}", prompt.as_ref());
+      eprint!("{} [y/N]", prompt.as_ref());
       let _ = stdout().lock().flush();
       let mut line = String::new();
       stdin().read_line(&mut line).expect("could not read line");
-      Ok(line.trim() == "yes")
+      Ok(line.trim().to_lowercase() == "y")
     } else {
       Ok(false)
     }

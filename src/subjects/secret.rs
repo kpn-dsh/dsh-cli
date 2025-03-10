@@ -163,7 +163,7 @@ impl CommandExecutor for SecretDelete {
     if context.client_unchecked().get_secret_configuration(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exist", secret_id));
     }
-    if context.confirmed(format!("type 'yes' to delete secret '{}': ", secret_id))? {
+    if context.confirmed(format!("delete secret '{}'?", secret_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not deleted");
       } else {
@@ -177,7 +177,7 @@ impl CommandExecutor for SecretDelete {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -209,7 +209,7 @@ impl CommandExecutor for SecretListAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -236,7 +236,7 @@ impl CommandExecutor for SecretListSystem {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -263,7 +263,7 @@ impl CommandExecutor for SecretListIds {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
   }
 }
 
@@ -291,7 +291,7 @@ impl CommandExecutor for SecretListUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -309,7 +309,7 @@ impl CommandExecutor for SecretShowAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -334,7 +334,7 @@ impl CommandExecutor for SecretShowUsage {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 

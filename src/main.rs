@@ -29,6 +29,7 @@ use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::{crate_version, openapi_version};
 use homedir::my_home;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::debug;
 use rpassword::prompt_password;
@@ -100,7 +101,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 const USAGE: &str = "dsh [OPTIONS] [SUBJECT/COMMAND]\n       dsh --help\n       dsh secret --help\n       dsh secret list --help";
 
-const VERSION: &str = "0.7.0";
+const VERSION: &str = "0.7.1";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
@@ -223,15 +224,19 @@ async fn inner_main() -> DshCliResult {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
         debug!("{:?}", requirements);
-        let context = Context::create(&matches, &requirements, &settings).await?;
-        subject.execute_subject_command(sub_matches, &context).await?;
+        let contexts = Context::create_multiple(&matches, &requirements, &settings).await?;
+        for context in contexts {
+          subject.execute_subject_command(sub_matches, &context).await?;
+        }
       }
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject_list_shortcut) => {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
           debug!("{:?}", requirements);
-          let context = Context::create(&matches, &requirements, &settings).await?;
-          subject_list_shortcut.execute_subject_list_shortcut(sub_matches, &context).await?;
+          let contexts = Context::create_multiple(&matches, &requirements, &settings).await?;
+          for context in contexts {
+            subject_list_shortcut.execute_subject_list_shortcut(sub_matches, &context).await?;
+          }
         }
         None => return Err("unexpected error, list shortcut not found".to_string()),
       },
@@ -353,16 +358,16 @@ pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
 /// `Ok(Option<Platform>)` - containing the [`DshPlatform`]
 /// `Ok(None)` - when no implicit source is available
 /// `Err<String>` - when an invalid platform name was found
-fn get_target_platform_implicit(settings: &Settings) -> Result<Option<DshPlatform>, String> {
+fn get_target_platforms_implicit(settings: &Settings) -> Result<Option<Vec<DshPlatform>>, String> {
   match env::var(ENV_VAR_PLATFORM) {
-    Ok(platform_name_from_env_var) => {
-      debug!("target platform '{}' (environment variable '{}')", platform_name_from_env_var, ENV_VAR_PASSWORD);
-      DshPlatform::try_from(platform_name_from_env_var.as_str()).map(Some)
+    Ok(platform_names_from_env_var) => {
+      debug!("target platform {} (environment variable '{}')", platform_names_from_env_var, ENV_VAR_PASSWORD);
+      into_platforms(platform_names_from_env_var.as_str()).map(Some)
     }
     Err(_) => match settings.default_platform.clone() {
       Some(default_platform_name_from_settings) => {
         debug!("default target platform '{}' (settings)", default_platform_name_from_settings);
-        DshPlatform::try_from(default_platform_name_from_settings.as_str()).map(Some)
+        DshPlatform::try_from(default_platform_name_from_settings.as_str()).map(|platform_name| Some(vec![platform_name]))
       }
       None => Ok(None),
     },
@@ -386,13 +391,18 @@ fn get_target_platform_implicit(settings: &Settings) -> Result<Option<DshPlatfor
 /// `Ok(Option<Platform>)` - containing the [`DshPlatform`]
 /// `Ok(None)` - when no implicit source is available
 /// `Err<String>` - when an invalid platform name was found
-fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> Result<Option<DshPlatform>, String> {
-  match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
-    Some(platform_from_argument) => {
-      debug!("target platform '{}' (argument)", platform_from_argument);
-      DshPlatform::try_from(platform_from_argument.as_str()).map(Some)
+fn get_target_platforms_non_interactive(matches: &ArgMatches, settings: &Settings) -> Result<Option<Vec<DshPlatform>>, String> {
+  match matches.get_many(TARGET_PLATFORM_ARGUMENT) {
+    Some(target_platform_names_from_argument) => {
+      let platform_names: Vec<&String> = target_platform_names_from_argument.collect();
+      debug!("target platform {} (argument)", platform_names.iter().join(", "));
+      platform_names
+        .into_iter()
+        .map(|platform_name| DshPlatform::try_from(platform_name.as_str()))
+        .collect::<Result<Vec<DshPlatform>, String>>()
+        .map(Some)
     }
-    None => get_target_platform_implicit(settings),
+    None => get_target_platforms_implicit(settings),
   }
 }
 
@@ -412,17 +422,21 @@ fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings
 ///
 /// ## Returns
 /// An `Ok<Platform>` containing the [`DshPlatform`], or an `Err<String>`.
-fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshPlatform, String> {
-  match get_target_platform_non_interactive(matches, settings)? {
-    Some(platform_non_interactive) => Ok(platform_non_interactive),
+fn get_target_platforms(matches: &ArgMatches, settings: &Settings) -> Result<Vec<DshPlatform>, String> {
+  match get_target_platforms_non_interactive(matches, settings)? {
+    Some(platforms_non_interactive) => Ok(platforms_non_interactive),
     None => {
       if stdin().is_terminal() {
-        DshPlatform::try_from(read_single_line("target platform: ")?.as_str())
+        into_platforms(read_single_line("target platform: ")?.as_str())
       } else {
         Err("could not determine target platform, please check configuration".to_string())
       }
     }
   }
+}
+
+fn into_platforms(platform_names: &str) -> Result<Vec<DshPlatform>, String> {
+  platform_names.split(",").map(DshPlatform::try_from).collect::<Result<Vec<DshPlatform>, _>>()
 }
 
 /// # Get the target tenant from implicit sources
@@ -439,16 +453,16 @@ fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshP
 /// ## Returns
 /// `Some<String>` - containing the tenant name
 /// `None` - when no implicit tenant name is available
-fn get_target_tenant_implicit(settings: &Settings) -> Option<String> {
+fn get_target_tenants_implicit(settings: &Settings) -> Option<Vec<String>> {
   match env::var(ENV_VAR_TENANT) {
-    Ok(tenant_name_from_env_var) => {
-      debug!("target tenant '{}' (environment variable '{}')", tenant_name_from_env_var, ENV_VAR_TENANT);
-      Some(tenant_name_from_env_var)
+    Ok(tenant_names_from_env_var) => {
+      debug!("target tenant {} (environment variable '{}')", tenant_names_from_env_var, ENV_VAR_TENANT);
+      Some(tenant_names_from_env_var.split(",").map(|tenant_name| tenant_name.to_string()).collect())
     }
     Err(_) => match settings.default_tenant.clone() {
       Some(default_tenant_name_from_settings) => {
         debug!("default target tenant '{}' (settings)", default_tenant_name_from_settings);
-        Some(default_tenant_name_from_settings)
+        Some(vec![default_tenant_name_from_settings])
       }
       None => None,
     },
@@ -471,13 +485,14 @@ fn get_target_tenant_implicit(settings: &Settings) -> Option<String> {
 /// ## Returns
 /// `Some<String>` - containing the tenant name
 /// `None` - when no tenant name is available without asking the user
-fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) -> Option<String> {
-  match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
-    Some(tenant_name_from_argument) => {
-      debug!("target tenant '{}' (argument)", tenant_name_from_argument);
-      Some(tenant_name_from_argument.to_string())
+fn get_target_tenants_non_interactive(matches: &ArgMatches, settings: &Settings) -> Option<Vec<String>> {
+  match matches.get_many(TARGET_TENANT_ARGUMENT) {
+    Some(target_tenant_names_from_argument) => {
+      let tenant_names: Vec<&String> = target_tenant_names_from_argument.collect();
+      debug!("target tenant {} (argument)", tenant_names.iter().join(", "));
+      Some(tenant_names.iter().map(|tenant_name| tenant_name.to_string()).collect())
     }
-    None => get_target_tenant_implicit(settings),
+    None => get_target_tenants_implicit(settings),
   }
 }
 
@@ -497,16 +512,16 @@ fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) 
 ///
 /// ## Returns
 /// An `Ok<String>` containing the tenant name, or an `Err<String>`.
-fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> Result<String, String> {
-  match get_target_tenant_non_interactive(matches, settings) {
-    Some(tenant_name_non_interactive) => Ok(tenant_name_non_interactive),
+fn get_target_tenants(matches: &ArgMatches, settings: &Settings) -> Result<Vec<String>, String> {
+  match get_target_tenants_non_interactive(matches, settings) {
+    Some(tenant_names_non_interactive) => Ok(tenant_names_non_interactive),
     None => {
       if stdin().is_terminal() {
-        let tenant_name = read_single_line("target tenant: ")?;
-        if tenant_name.is_empty() {
+        let tenant_names_from_console = read_single_line("target tenant: ")?;
+        if tenant_names_from_console.is_empty() {
           Err("target tenant name cannot be empty".to_string())
         } else {
-          Ok(tenant_name)
+          Ok(tenant_names_from_console.split(",").map(|tenant_name| tenant_name.to_string()).collect())
         }
       } else {
         Err("could not determine target tenant, please check configuration".to_string())
