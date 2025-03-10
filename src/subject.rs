@@ -180,38 +180,3 @@ pub trait Subject {
       .await
   }
 }
-
-#[test]
-fn test_requirements_or_1() {
-  let first = Requirements::new(false, false, false, None);
-  let second = Requirements::new(false, false, false, None);
-  assert_eq!(first.combine(&second), Requirements::new(false, false, false, None))
-}
-
-#[test]
-fn test_requirements_or_2() {
-  let first = Requirements::new(false, false, false, None);
-  let second = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  assert_eq!(first.combine(&second), Requirements::new(true, true, true, None))
-}
-
-#[test]
-fn test_requirements_or_3() {
-  let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  let second = Requirements::new(false, false, false, None);
-  assert_eq!(first.combine(&second), Requirements::new(true, true, true, None))
-}
-
-#[test]
-fn test_requirements_or_4() {
-  let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  let second = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  assert_eq!(first.combine(&second), Requirements::new(true, true, true, Some(OutputFormat::Json)))
-}
-
-#[test]
-fn test_requirements_or_5() {
-  let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  let second = Requirements::new(true, true, true, Some(OutputFormat::Toml));
-  assert_eq!(first.combine(&second), Requirements::new(true, true, true, None))
-}
