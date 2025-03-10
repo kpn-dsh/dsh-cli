@@ -186,27 +186,21 @@ impl Capability for CapabilityBuilder<'_> {
   }
 
   fn requirements(&self, matches: &ArgMatches) -> Requirements {
-    // TODO This is not correct
-    let mut match_found = false;
-    let mut composite_requirements = Requirements::new(false, false, false, None);
+    let mut composite_requirements =
+      if let Some(default_executor) = self.default_executor { default_executor.requirements(matches) } else { Requirements::new(false, false, false, true, true, None) };
     if self.run_all_executors {
       for (flag_type, executor, _) in &self.executors {
         if matches.get_flag(flag_type.id()) {
-          composite_requirements = composite_requirements.or(&executor.requirements(matches));
-          match_found = true;
+          composite_requirements = composite_requirements.combine(&executor.requirements(matches));
         }
       }
     } else {
+      let mut match_found = false;
       for (flag_type, executor, _) in &self.executors {
         if matches.get_flag(flag_type.id()) && !match_found {
-          composite_requirements = composite_requirements.or(&executor.requirements(matches));
+          composite_requirements = composite_requirements.combine(&executor.requirements(matches));
           match_found = true;
         }
-      }
-    }
-    if !match_found {
-      if let Some(default_executor) = self.default_executor {
-        composite_requirements = composite_requirements.or(&default_executor.requirements(matches));
       }
     }
     composite_requirements
