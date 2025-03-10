@@ -133,11 +133,7 @@ impl CommandExecutor for TargetDelete {
     let tenant = get_tenant_argument_or_prompt(matches)?;
     match read_target(&platform, &tenant)? {
       Some(target) => {
-        let prompt = if target.password.is_some() {
-          format!("type 'yes' to delete target '{}' and password from the keyring: ", target)
-        } else {
-          format!("type 'yes' to delete target '{}': ", target)
-        };
+        let prompt = if target.password.is_some() { format!("delete target '{}' and password from the keyring?", target) } else { format!("delete target '{}'?", target) };
         if context.confirmed(prompt)? {
           if context.dry_run {
             context.print_warning(format!("dry-run mode, target '{}' not deleted", target));
