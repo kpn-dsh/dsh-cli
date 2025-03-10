@@ -80,7 +80,7 @@ and to define default settings.
 To create a new target, type:
 
 ```bash
-> dsh target new np-aws-lz-dsh my-tenant
+> dsh target create np-aws-lz-dsh my-tenant
 create new target configuration
 enter password:
 target my-tenant@np-aws-lz-dsh created
