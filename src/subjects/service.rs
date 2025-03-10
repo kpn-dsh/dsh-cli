@@ -236,7 +236,7 @@ impl CommandExecutor for ServiceCreate {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -250,7 +250,7 @@ impl CommandExecutor for ServiceDelete {
     if context.client_unchecked().get_application_configuration(&service_id).await.is_err() {
       return Err(format!("service '{}' does not exist", service_id));
     }
-    if context.confirmed(format!("type 'yes' to delete service '{}': ", service_id))? {
+    if context.confirmed(format!("delete service '{}'?", service_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, service not deleted");
       } else {
@@ -264,7 +264,7 @@ impl CommandExecutor for ServiceDelete {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -299,14 +299,16 @@ impl CommandExecutor for ServiceDuplicate {
             None => context.print_warning("configuration file hasn't changed, verbatim duplicate created"),
           }
         }
-        if context.dry_run {
-          context.print_warning("dry-run mode, duplicate service not created");
-        } else {
-          context
-            .client_unchecked()
-            .put_application_configuration(&duplicate_service_id, &application)
-            .await?;
-          context.print_outcome(format!("new service '{}' created from service '{}'", duplicate_service_id, service_id));
+        if context.confirmed(format!("create duplicate service '{}'?", duplicate_service_id))? {
+          if context.dry_run {
+            context.print_warning("dry-run mode, duplicate service not created");
+          } else {
+            context
+              .client_unchecked()
+              .put_application_configuration(&duplicate_service_id, &application)
+              .await?;
+            context.print_outcome(format!("new service '{}' created from service '{}'", duplicate_service_id, service_id));
+          }
         }
         Ok(())
       }
@@ -346,11 +348,13 @@ impl CommandExecutor for ServiceEdit {
         .await?
         {
           Some(updated_application) => {
-            if context.dry_run {
-              context.print_warning("dry-run mode, service configuration not updated");
-            } else {
-              context.client_unchecked().put_application_configuration(&service_id, &updated_application).await?;
-              context.print_outcome(format!("service '{}' configuration updated", service_id));
+            if context.confirmed(format!("update service '{}'?", service_id))? {
+              if context.dry_run {
+                context.print_warning("dry-run mode, service configuration not updated");
+              } else {
+                context.client_unchecked().put_application_configuration(&service_id, &updated_application).await?;
+                context.print_outcome(format!("service '{}' configuration updated", service_id));
+              }
             }
           }
           None => context.print_warning("configuration file hasn't changed, service configuration not updated"),
@@ -397,7 +401,7 @@ impl CommandExecutor for ServiceListAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -418,7 +422,7 @@ impl CommandExecutor for ServiceListAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -438,7 +442,7 @@ impl CommandExecutor for ServiceListIds {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
   }
 }
 
@@ -480,7 +484,7 @@ impl CommandExecutor for ServiceListTasks {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, true, None)
   }
 }
 
@@ -574,7 +578,7 @@ impl CommandExecutor for ServiceShowAll {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -592,7 +596,7 @@ impl CommandExecutor for ServiceShowAllocationStatus {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
@@ -616,7 +620,7 @@ impl CommandExecutor for ServiceShowTasks {
   }
 
   fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+    Requirements::standard_with_api_multiple(true, false, None)
   }
 }
 
