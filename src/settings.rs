@@ -49,8 +49,8 @@ pub(crate) struct Settings {
 pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> Result<(Settings, String), String> {
   match explicit_settings_filename {
     Some(explicit_name) => match read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(explicit_name))? {
-      Some(settings) => Ok((
-        Settings { file_name: Some(explicit_name.to_string()), ..settings },
+      Some(settings_from_explicit_file) => Ok((
+        Settings { file_name: Some(explicit_name.to_string()), ..settings_from_explicit_file },
         format!("read settings (explicit file '{}')", explicit_name),
       )),
       None => Err(format!("explicit settings file '{}' does not exist", explicit_name)),
@@ -58,8 +58,8 @@ pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> Result<(
     None => {
       let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
       match read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))? {
-        Some(settings) => Ok((
-          Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings },
+        Some(settings_from_default_file) => Ok((
+          Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings_from_default_file },
           format!("read settings (default file '{}')", default_settings_file.to_string_lossy()),
         )),
         None => Ok((Settings::default(), "default settings".to_string())),
