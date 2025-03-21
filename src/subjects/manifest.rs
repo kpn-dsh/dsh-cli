@@ -12,8 +12,8 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 
 use dsh_api::types::AppCatalogManifest;
 
-use crate::arguments::manifest_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::arguments::{manifest_id_argument, version_argument, VERSION_ARGUMENT};
+use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -48,6 +48,7 @@ impl Subject for ManifestSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      EXPORT_COMMAND => Some(MANIFEST_EXPORT_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(MANIFEST_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(MANIFEST_SHOW_CAPABILITY.as_ref()),
       _ => None,
@@ -60,6 +61,13 @@ impl Subject for ManifestSubject {
 }
 
 lazy_static! {
+  static ref MANIFEST_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(EXPORT_COMMAND, None, "Export manifest")
+      .set_long_about("Export a manifest file from the App Catalog.")
+      .set_default_command_executor(&ManifestExport {})
+      .add_target_argument(manifest_id_argument().required(true))
+      .add_target_argument(version_argument())
+  );
   static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List manifests")
       .set_long_about("Lists all manifest files from the App Catalog.")
@@ -72,7 +80,47 @@ lazy_static! {
       .set_default_command_executor(&ManifestShowAll {})
       .add_target_argument(manifest_id_argument().required(true))
   );
-  static ref MANIFEST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];
+  static ref MANIFEST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![MANIFEST_EXPORT_CAPABILITY.as_ref(), MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];
+}
+
+struct ManifestExport {}
+
+#[async_trait]
+impl CommandExecutor for ManifestExport {
+  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let manifest_id = target.unwrap_or_else(|| unreachable!());
+    let version_argument = matches.get_one::<String>(VERSION_ARGUMENT);
+    if let Some(version) = version_argument {
+      context.print_explanation(format!("show app catalog manifest '{}' version {}", manifest_id, version));
+    } else {
+      context.print_explanation(format!("show app catalog manifests '{}'", manifest_id));
+    }
+    let start_instant = context.now();
+    let app_catalog_manifests: Vec<AppCatalogManifest> = context.client_unchecked().get_appcatalog_manifests().await?;
+    context.print_execution_time(start_instant);
+    let manifests = app_catalog_manifests
+      .iter()
+      .map(|acm| Manifest::try_from(acm).unwrap())
+      .filter(|manifest| manifest.manifest_id == manifest_id)
+      .collect::<Vec<_>>();
+    if manifests.is_empty() {
+      context.print_outcome(format!("manifest '{}' not found", manifest_id));
+    } else {
+      match version_argument {
+        Some(version) => match manifests.iter().find(|manifest| manifest.version == *version) {
+          Some(manifest) => context.print_serializable(manifest.clone().json),
+          None => context.print_outcome(format!("manifest '{}' has no version {}", manifest_id, version)),
+        },
+        None => context.print_serializable(manifests),
+      }
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api(Some(OutputFormat::Json))
+  }
 }
 
 struct ManifestListAll {}
@@ -186,7 +234,7 @@ impl Label for ManifestLabel {
   }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Manifest {
   pub manifest_id: String,
   pub contact: String,
@@ -195,6 +243,7 @@ pub struct Manifest {
   pub name: String,
   pub vendor: String,
   pub version: String,
+  pub json: Value,
 }
 
 impl TryFrom<&AppCatalogManifest> for Manifest {
@@ -211,6 +260,7 @@ impl TryFrom<&AppCatalogManifest> for Manifest {
           name: payload_object.get(&NAME.to_string()).unwrap().as_str().unwrap().to_string(),
           vendor: payload_object.get(&VENDOR.to_string()).unwrap().as_str().unwrap().to_string(),
           version: payload_object.get(&VERSION.to_string()).unwrap().as_str().unwrap().to_string(),
+          json: payload_value,
         }),
         None => Err("".to_string()),
       },
