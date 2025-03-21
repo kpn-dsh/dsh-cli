@@ -1,4 +1,4 @@
-use crate::context::MatchingStyle;
+use crate::context::{MatchingColor, MatchingStyle};
 use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::verbosity::Verbosity;
@@ -26,6 +26,8 @@ pub(crate) struct Settings {
   pub(crate) log_level_api: Option<LogLevel>,
   #[serde(rename = "log-level-sdk", skip_serializing_if = "Option::is_none")]
   pub(crate) log_level_sdk: Option<LogLevel>,
+  #[serde(rename = "matching-color", skip_serializing_if = "Option::is_none")]
+  pub(crate) matching_color: Option<MatchingColor>,
   #[serde(rename = "matching-style", skip_serializing_if = "Option::is_none")]
   pub(crate) matching_style: Option<MatchingStyle>,
   #[serde(rename = "no-escape", skip_serializing_if = "Option::is_none")]

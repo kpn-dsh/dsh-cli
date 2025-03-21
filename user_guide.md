@@ -9,9 +9,10 @@ When installation is complete you should be able to start the `dsh` tool from th
 DSH resource management api command line interface.
 
 Usage: dsh [OPTIONS] [SUBJECT/COMMAND]
+       dsh [SUBJECT/COMMAND] [SUBCOMMAND] [OPTIONS]
        dsh --help
-       dsh secret --help
-       dsh secret list --help
+       dsh [SUBJECT/COMMAND] --help
+       dsh [SUBJECT/COMMAND] [SUBCOMMAND] --help
 
 Subjects/commands:
   api          List and call DSH resource management api.
@@ -34,19 +35,20 @@ Subjects/commands:
   target       Show, manage and list dsh target configurations.
 
 Options:
-  -p, --platform <PLATFORM>   Provide target platform [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,
-                              prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
-  -t, --tenant <TENANT>       Provide target tenant
-      --password-file <FILE>  Provide target password file name
-      --dry-run               Execute in dry-run mode
-      --force                 Force changes without confirmation
-  -h, --help                  Print help (see more with '--help')
-  -V, --version               Print version
+  -p, --platform <PLATFORM>...  Provide target platform [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,
+                                prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
+  -t, --tenant <TENANT>...      Provide target tenant
+      --password-file <FILE>    Provide target password file name
+      --dry-run                 Execute in dry-run mode
+      --force                   Force changes without confirmation
+  -h, --help                    Print help (see more with '--help')
+  -V, --version                 Print version
 
 Output options:
       --log-level <LEVEL>       Set log level [possible values: off, error, warn, info, debug, trace]
       --log-level-api <LEVEL>   Set log level for the dsh api crate
       --log-level-sdk <LEVEL>   Set log level for the dsh sdk crate
+      --matching-color <COLOR>  Set color for matches [possible values: normal, red, green, blue]
       --matching-style <STYLE>  Set styling for matches [possible values: normal, bold, dim, italic, underlined,
                                 reverse]
       --no-color                No color

@@ -1,4 +1,4 @@
-use crate::context::MatchingStyle;
+use crate::context::{MatchingColor, MatchingStyle};
 use crate::formatters::OutputFormat;
 use crate::verbosity::Verbosity;
 use builder::EnumValueParser;
@@ -9,6 +9,7 @@ use dsh_api::platform::DshPlatform;
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
 // pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
+pub(crate) const MATCHING_COLOR_ARGUMENT: &str = "matching-color-argument";
 pub(crate) const MATCHING_STYLE_ARGUMENT: &str = "matching-style-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
 pub(crate) const NO_HEADERS_ARGUMENT: &str = "no-headers-argument";
@@ -64,6 +65,24 @@ pub(crate) fn force_argument() -> Arg {
 //     )
 //     .global(true)
 // }
+
+pub(crate) fn matching_color_argument() -> Arg {
+  Arg::new(MATCHING_COLOR_ARGUMENT)
+    .long("matching-color")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<MatchingColor>::new())
+    .value_name("COLOR")
+    .help("Set color for matches")
+    .long_help(
+      "This option specifies the color to be used when printing matching results \
+          for the find functions, e.q. when matching regular expressions. \
+          If this argument is not provided, the value from environment variable \
+          DSH_CLI_MATCHING_COLOR or the value from the settings file will be used. \
+          The default style is 'black'.",
+    )
+    .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
+}
 
 pub(crate) fn matching_style_argument() -> Arg {
   Arg::new(MATCHING_STYLE_ARGUMENT)

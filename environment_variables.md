@@ -111,6 +111,23 @@ it is much more convenient to make some settings persistent via environment vari
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_MATCHING_COLOR</code></td>
+        <td>
+            This environment variable specifies the color to be used when printing matching 
+            results for the find functions, e.q. when matching regular expressions. 
+            If this argument is not provided, the value from the settings file will be used.
+            Else the default color will be used.
+            <ul>
+              <li><code>normal</code> - Matches will be displayed in black</li>
+              <li><code>red</code> - Matches will be displayed in red</li>
+              <li><code>green</code> - Matches will be displayed in green</li>
+              <li><code>blue</code> - Matches will be displayed in blue</li>
+            </ul>
+            This environment variable can be overridden via the 
+            <code>--matching-color</code> command line argument.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_MATCHING_STYLE</code></td>
         <td>
             This environment variable specifies the styling to be used when printing matching 

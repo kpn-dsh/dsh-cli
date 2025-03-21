@@ -1,7 +1,7 @@
 use crate::formatters::OutputFormat;
 use crate::global_arguments::{
-  DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT,
-  TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
+  DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_COLOR_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
+  SHOW_EXECUTION_TIME_ARGUMENT, TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::settings::Settings;
 use crate::subject::Requirements;
@@ -9,9 +9,10 @@ use crate::targets::read_target;
 use crate::verbosity::Verbosity;
 use crate::{
   get_target_password, get_target_platforms, get_target_platforms_non_interactive, get_target_tenants, get_target_tenants_non_interactive, ENV_VAR_CSV_QUOTE,
-  ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET,
-  ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
+  ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_COLOR, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT,
+  ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
 };
+use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
@@ -36,7 +37,8 @@ pub(crate) struct Context {
   pub(crate) dry_run: bool,
   dsh_api_client: Option<DshApiClient>,
   pub(crate) force: bool,
-  pub(crate) matching_style: Option<MatchingStyle>,
+  pub(crate) matching_color: MatchingColor,
+  pub(crate) matching_style: MatchingStyle,
   pub(crate) no_escape: bool,
   pub(crate) output_format: OutputFormat,
   pub(crate) target_platform: Option<DshPlatform>,
@@ -131,8 +133,16 @@ impl Context {
       None
     };
     let no_escape = Self::no_escape(matches, settings);
-    let (matching_style, stderr_escape, stdout_escape) =
-      if no_escape { (None, false, false) } else { (Self::matching_style(matches, settings)?, stderr().is_terminal(), stdout().is_terminal()) };
+    let (matching_color, matching_style, stderr_escape, stdout_escape) = if no_escape {
+      (MatchingColor::Normal, MatchingStyle::Normal, false, false)
+    } else {
+      (
+        Self::matching_color(matches, settings)?,
+        Self::matching_style(matches, settings)?,
+        stderr().is_terminal(),
+        stdout().is_terminal(),
+      )
+    };
     let quiet = Self::quiet(matches, settings);
     let force = Self::force(matches, settings);
     let (output_format, show_execution_time, verbosity) = if quiet {
@@ -155,6 +165,7 @@ impl Context {
       dry_run,
       dsh_api_client,
       force,
+      matching_color,
       matching_style,
       no_escape,
       output_format,
@@ -294,18 +305,40 @@ impl Context {
     }
   }
 
+  /// Gets matching_color context value
+  ///
+  /// 1. Try flag `--matching-color`
+  /// 1. Try environment variable `DSH_CLI_MATCHING_COLOR`
+  /// 1. Try settings file
+  /// 1. Default to `MatchingColor::Normal`
+  fn matching_color(matches: &ArgMatches, settings: &Settings) -> Result<MatchingColor, String> {
+    match matches.get_one::<MatchingColor>(MATCHING_COLOR_ARGUMENT) {
+      Some(matching_color_from_argument) => Ok(matching_color_from_argument.to_owned()),
+      None => match std::env::var(ENV_VAR_MATCHING_COLOR) {
+        Ok(matching_color_from_env_var) => MatchingColor::try_from(matching_color_from_env_var.as_str()),
+        Err(_) => match settings.matching_color {
+          Some(ref matching_color_from_settings) => Ok(matching_color_from_settings.clone()),
+          None => Ok(MatchingColor::Normal),
+        },
+      },
+    }
+  }
+
   /// Gets matching_style context value
   ///
   /// 1. Try flag `--matching-style`
   /// 1. Try environment variable `DSH_CLI_MATCHING_STYLE`
   /// 1. Try settings file
-  /// 1. Default to `None`
-  fn matching_style(matches: &ArgMatches, settings: &Settings) -> Result<Option<MatchingStyle>, String> {
+  /// 1. Default to `MatchingStyle::Normal`
+  fn matching_style(matches: &ArgMatches, settings: &Settings) -> Result<MatchingStyle, String> {
     match matches.get_one::<MatchingStyle>(MATCHING_STYLE_ARGUMENT) {
-      Some(matching_style_argument) => Ok(Some(matching_style_argument.to_owned())),
+      Some(matching_style_from_argument) => Ok(matching_style_from_argument.to_owned()),
       None => match std::env::var(ENV_VAR_MATCHING_STYLE) {
-        Ok(matching_style_env_var) => MatchingStyle::try_from(matching_style_env_var.as_str()).map(Some),
-        Err(_) => Ok(settings.matching_style.clone()),
+        Ok(matching_style_from_env_var) => MatchingStyle::try_from(matching_style_from_env_var.as_str()),
+        Err(_) => match settings.matching_style {
+          Some(ref matching_style_from_settings) => Ok(matching_style_from_settings.clone()),
+          None => Ok(MatchingStyle::Normal),
+        },
       },
     }
   }
@@ -660,27 +693,28 @@ impl Context {
   ///
   /// This method converts a `Part` slice to a `String`, formatted to be printed to
   /// stderr or stdout. Ansi escape characters will be used only when
-  /// `self.matching_parts_style` has a value, the `escape` parameter is `true`
+  /// `self.matching_style` has a value, the `escape` parameter is `true`
   /// and `no_escape` is `false`.
   /// Else the result will be a plain `String`.
   fn parts_to_string(&self, parts: &[Part], escape: bool) -> String {
-    match (&self.matching_style, escape, self.no_escape) {
-      (Some(style), true, false) => parts
+    if escape && !self.no_escape {
+      parts
         .iter()
         .map(|part| match part {
-          Matching(p) => wrap_style(style.clone(), p.as_str()),
+          Matching(p) => wrap_style(&self.matching_style, &self.matching_color, p.as_str()),
           NonMatching(p) => p.to_string(),
         })
         .collect::<Vec<_>>()
-        .join(""),
-      _ => parts
+        .join("")
+    } else {
+      parts
         .iter()
         .map(|part| match part {
           Matching(p) => p.to_string(),
           NonMatching(p) => p.to_string(),
         })
         .collect::<Vec<_>>()
-        .join(""),
+        .join("")
     }
   }
 
@@ -713,25 +747,66 @@ impl Context {
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum MatchingColor {
+  /// Matches will be displayed in the normal color
+  #[serde(rename = "normal")]
+  Normal,
+  /// Matches will be displayed in red
+  #[serde(rename = "red")]
+  Red,
+  /// Matches will be displayed in green
+  #[serde(rename = "green")]
+  Green,
+  /// Matches will be displayed in blue
+  #[serde(rename = "blue")]
+  Blue,
+}
+
+impl Display for MatchingColor {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      MatchingColor::Normal => write!(f, "normal"),
+      MatchingColor::Red => write!(f, "red"),
+      MatchingColor::Green => write!(f, "green"),
+      MatchingColor::Blue => write!(f, "blue"),
+    }
+  }
+}
+
+impl TryFrom<&str> for MatchingColor {
+  type Error = String;
+
+  fn try_from(value: &str) -> Result<Self, Self::Error> {
+    match value {
+      "normal" => Ok(Self::Normal),
+      "red" => Ok(Self::Red),
+      "green" => Ok(Self::Green),
+      "blue" => Ok(Self::Blue),
+      _ => Err(format!("invalid matching color '{}'", value)),
+    }
+  }
+}
+
+#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum MatchingStyle {
   /// Matches will be displayed in normal font
   #[serde(rename = "normal")]
-  Normal = 0,
+  Normal,
   /// Matches will be displayed bold
   #[serde(rename = "bold")]
-  Bold = 1,
+  Bold,
   /// Matches will be displayed dimmed
   #[serde(rename = "dim")]
-  Dim = 2,
+  Dim,
   /// Matches will be displayed in italics
   #[serde(rename = "italic")]
-  Italic = 3,
+  Italic,
   /// Matches will be displayed underlined
   #[serde(rename = "underlined")]
-  Underlined = 4,
+  Underlined,
   /// Matches will be displayed reversed
   #[serde(rename = "reverse")]
-  Reverse = 7,
+  Reverse,
 }
 
 impl Display for MatchingStyle {
@@ -763,10 +838,28 @@ impl TryFrom<&str> for MatchingStyle {
   }
 }
 
-pub fn wrap_style(style: MatchingStyle, string: &str) -> String {
-  if style == MatchingStyle::Normal {
+fn style_from(style: &MatchingStyle, color: &MatchingColor) -> Style {
+  let style = match style {
+    MatchingStyle::Normal => Style::new(),
+    MatchingStyle::Bold => Style::new().bold(),
+    MatchingStyle::Dim => Style::new().dimmed(),
+    MatchingStyle::Italic => Style::new().italic(),
+    MatchingStyle::Underlined => Style::new().underline(),
+    MatchingStyle::Reverse => Style::new().invert(),
+  };
+  match color {
+    MatchingColor::Normal => style,
+    MatchingColor::Red => style.fg_color(Some(Color::Ansi(AnsiColor::Red))),
+    MatchingColor::Green => style.fg_color(Some(Color::Ansi(AnsiColor::Green))),
+    MatchingColor::Blue => style.fg_color(Some(Color::Ansi(AnsiColor::Blue))),
+  }
+}
+
+pub fn wrap_style(style: &MatchingStyle, color: &MatchingColor, string: &str) -> String {
+  if style == &MatchingStyle::Normal && color == &MatchingColor::Normal {
     string.to_string()
   } else {
-    format!("\x1b[{}m{}\x1b[0m", style as usize, string)
+    let style_color = style_from(style, color);
+    format!("{style_color}{}{style_color:#}", string)
   }
 }

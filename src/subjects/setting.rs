@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::arguments::{platform_name_argument, tenant_name_argument};
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
-use crate::context::{Context, MatchingStyle};
+use crate::context::{Context, MatchingColor, MatchingStyle};
 use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -64,6 +64,7 @@ const SETTING_DRY_RUN: &str = "dry-run";
 const SETTING_LOG_LEVEL: &str = "log-level";
 const SETTING_LOG_LEVEL_API: &str = "log-level-api";
 const SETTING_LOG_LEVEL_SDK: &str = "log-level-sdk";
+const SETTING_MATCHING_COLOR: &str = "matching-color";
 const SETTING_MATCHING_STYLE: &str = "matching-style";
 const SETTING_NO_ESCAPE: &str = "no-escape";
 const SETTING_NO_HEADERS: &str = "no-headers";
@@ -132,6 +133,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Log level for the 'dsh_sdk' library functions"),
+    Command::new(SETTING_MATCHING_COLOR)
+      .arg(
+        Arg::new(SETTING_MATCHING_COLOR)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<MatchingColor>::new())
+          .required(required),
+      )
+      .about("Color to be used when printing matching results for the find functions"),
     Command::new(SETTING_MATCHING_STYLE)
       .arg(
         Arg::new(SETTING_MATCHING_STYLE)
@@ -320,6 +329,11 @@ impl CommandExecutor for SettingSet {
         upsert_settings(None, |settings| Ok(Settings { log_level_sdk: Some(log_level_sdk.clone()), ..settings }))?;
         context.print_outcome(format!("log level for sdk set to {}", log_level_sdk));
       }
+      SETTING_MATCHING_COLOR => {
+        let matching_color = matches.get_one::<MatchingColor>(SETTING_MATCHING_COLOR).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { matching_color: Some(matching_color.clone()), ..settings }))?;
+        context.print_outcome(format!("matching color set to {}", matching_color));
+      }
       SETTING_MATCHING_STYLE => {
         let matching_style = matches.get_one::<MatchingStyle>(SETTING_MATCHING_STYLE).unwrap();
         upsert_settings(None, |settings| Ok(Settings { matching_style: Some(matching_style.clone()), ..settings }))?;
@@ -409,6 +423,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(None, |settings| Ok(Settings { log_level_sdk: None, ..settings }))?;
         context.print_outcome("log level for sdk unset");
       }
+      SETTING_MATCHING_COLOR => {
+        upsert_settings(None, |settings| Ok(Settings { matching_color: None, ..settings }))?;
+        context.print_outcome("matching color unset");
+      }
       SETTING_MATCHING_STYLE => {
         upsert_settings(None, |settings| Ok(Settings { matching_style: None, ..settings }))?;
         context.print_outcome("matching style unset");
@@ -462,6 +480,7 @@ pub(crate) enum SettingLabel {
   LogLevel,
   LogLevelApi,
   LogLevelSdk,
+  MatchingColor,
   MatchingStyle,
   NoEscape,
   NoHeaders,
@@ -485,6 +504,7 @@ impl Label for SettingLabel {
       Self::LogLevel => SETTING_LOG_LEVEL,
       Self::LogLevelApi => SETTING_LOG_LEVEL_API,
       Self::LogLevelSdk => SETTING_LOG_LEVEL_SDK,
+      Self::MatchingColor => SETTING_MATCHING_COLOR,
       Self::MatchingStyle => SETTING_MATCHING_STYLE,
       Self::NoEscape => SETTING_NO_ESCAPE,
       Self::NoHeaders => SETTING_NO_HEADERS,
@@ -514,6 +534,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::DefaultTenant => self.default_tenant.clone().unwrap_or_default(),
       SettingLabel::DryRun => self.dry_run.map(|dry_run| dry_run.to_string()).unwrap_or_default(),
       SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
+      SettingLabel::MatchingColor => self.matching_color.clone().map(|color| color.to_string()).unwrap_or_default(),
       SettingLabel::MatchingStyle => self.matching_style.clone().map(|style| style.to_string()).unwrap_or_default(),
       SettingLabel::LogLevel => self.log_level.clone().map(|log_level| log_level.to_string()).unwrap_or_default(),
       SettingLabel::LogLevelApi => self.log_level_api.clone().map(|log_level_api| log_level_api.to_string()).unwrap_or_default(),
@@ -533,12 +554,13 @@ impl SubjectFormatter<SettingLabel> for Settings {
   }
 }
 
-pub static SETTING_LABELS: [SettingLabel; 18] = [
+pub static SETTING_LABELS: [SettingLabel; 19] = [
   SettingLabel::CsvQuote,
   SettingLabel::CsvSeparator,
   SettingLabel::DefaultPlatform,
   SettingLabel::DefaultTenant,
   SettingLabel::DryRun,
+  SettingLabel::MatchingColor,
   SettingLabel::MatchingStyle,
   SettingLabel::LogLevel,
   SettingLabel::LogLevelApi,
