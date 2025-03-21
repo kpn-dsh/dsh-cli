@@ -10,9 +10,9 @@ use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::global_arguments::{
-  dry_run_argument, force_argument, matching_style_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument,
-  show_execution_time_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, TARGET_PASSWORD_FILE_ARGUMENT,
-  TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT,
+  dry_run_argument, force_argument, matching_color_argument, matching_style_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument,
+  set_verbosity_argument, show_execution_time_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument,
+  TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT,
 };
 use crate::log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
 use crate::log_level::initialize_logger;
@@ -23,6 +23,7 @@ use crate::subjects::platform::PLATFORM_SUBJECT;
 use crate::subjects::service::SERVICE_SUBJECT;
 use crate::subjects::token::TOKEN_SUBJECT;
 use crate::targets::{get_target_password_from_keyring, read_target};
+use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_tenant::DshApiTenant;
@@ -77,10 +78,10 @@ mod verbosity;
 
 lazy_static! {
   static ref STYLES: Styles = Styles::styled()
-    .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
-    .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
-    .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
-    .placeholder(styling::AnsiColor::Cyan.on_default());
+    .header(AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    .usage(AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    .literal(AnsiColor::Blue.on_default() | styling::Effects::BOLD)
+    .placeholder(AnsiColor::Cyan.on_default());
 }
 
 pub(crate) const APPLICATION_NAME: &str = "dsh";
@@ -99,7 +100,19 @@ const LONG_ABOUT: &str = "DSH resource management api command line interface\n\n
 const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
-const USAGE: &str = "dsh [OPTIONS] [SUBJECT/COMMAND]\n       dsh --help\n       dsh secret --help\n       dsh secret list --help";
+
+fn usage() -> String {
+  let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
+  let green = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+  [
+    format!("{bold_blue}dsh{bold_blue:#} {green}[OPTIONS] [SUBJECT/COMMAND]{green:#}"),
+    format!("       {bold_blue}dsh{bold_blue:#} {green}[SUBJECT/COMMAND] [SUBCOMMAND] [OPTIONS]{green:#}"),
+    format!("       {bold_blue}dsh{bold_blue:#} --help"),
+    format!("       {bold_blue}dsh{bold_blue:#} {green}[SUBJECT/COMMAND]{green:#} --help"),
+    format!("       {bold_blue}dsh{bold_blue:#} {green}[SUBJECT/COMMAND] [SUBCOMMAND]{green:#} --help"),
+  ]
+  .join("\n")
+}
 
 const VERSION: &str = "0.7.1";
 
@@ -115,6 +128,7 @@ const ENV_VAR_HOME_DIRECTORY: &str = "DSH_CLI_HOME";
 const ENV_VAR_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
 const ENV_VAR_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
 const ENV_VAR_LOG_LEVEL_SDK: &str = "DSH_CLI_LOG_LEVEL_SDK";
+const ENV_VAR_MATCHING_COLOR: &str = "DSH_CLI_MATCHING_COLOR";
 const ENV_VAR_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
 const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 const ENV_VAR_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
@@ -204,7 +218,9 @@ async fn inner_main() -> DshCliResult {
     }
   }
 
-  let mut command = create_command(&subject_commands);
+  let (settings, settings_log) = get_settings(None)?;
+
+  let mut command = create_command(&subject_commands, &settings);
 
   let matches = command.clone().get_matches();
 
@@ -213,10 +229,7 @@ async fn inner_main() -> DshCliResult {
     return Ok(());
   }
 
-  let (settings, settings_log) = get_settings(None)?;
-
   initialize_logger(&matches, &settings)?;
-
   debug!("{}", settings_log);
 
   match matches.subcommand() {
@@ -246,18 +259,17 @@ async fn inner_main() -> DshCliResult {
   Ok(())
 }
 
-fn create_command(clap_commands: &Vec<Command>) -> Command {
+fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
   let long_about = match enabled_features() {
     Some(enabled_features) => format!("{} Enabled features: {}.", LONG_ABOUT, enabled_features.join(", ")),
     None => LONG_ABOUT.to_string(),
   };
-  Command::new(APPLICATION_NAME)
+  let mut command = Command::new(APPLICATION_NAME)
     .about(ABOUT)
     .author(AUTHOR)
     .long_about(long_about)
-    .override_usage(USAGE)
+    .override_usage(usage())
     .disable_help_subcommand(true)
-    .after_long_help(AFTER_HELP)
     .args(vec![
       target_platform_argument(),
       target_tenant_argument(),
@@ -267,6 +279,7 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
       log_level_argument(),
       log_level_api_argument(),
       log_level_sdk_argument(),
+      matching_color_argument(),
       matching_style_argument(),
       no_escape_argument(),
       no_headers_argument(),
@@ -290,7 +303,53 @@ fn create_command(clap_commands: &Vec<Command>) -> Command {
       VERSION,
       crate_version(),
       openapi_version()
-    ))
+    ));
+  let mut default_settings: Vec<(&str, String)> = vec![];
+  match (&settings.default_platform, &settings.default_tenant) {
+    (None, None) => (),
+    (None, Some(default_tenant)) => default_settings.push(("default tenant", default_tenant.to_string())),
+    (Some(default_platform), None) => default_settings.push(("default platform", default_platform.to_string())),
+    (Some(default_platform), Some(default_tenant)) => default_settings.push(("default target", format!("{}@{}", default_platform, default_tenant))),
+  };
+  if let Some(ref file_name) = settings.file_name {
+    default_settings.push(("settings file", file_name.to_string()));
+  }
+  if let Some(dry_run) = settings.dry_run {
+    default_settings.push(("dry run mode", if dry_run { "enabled".to_string() } else { "disabled".to_string() }));
+  }
+
+  let mut environment_variables: Vec<(&str, String)> = vec![];
+  let env_vars = get_environment_variables();
+  if !env_vars.is_empty() {
+    for (env_var, value) in &env_vars {
+      if env_var == ENV_VAR_PASSWORD {
+        environment_variables.push((env_var, "********".to_string()));
+      } else {
+        environment_variables.push((env_var, value.to_string()));
+      }
+    }
+  }
+
+  if default_settings.is_empty() {
+    if environment_variables.is_empty() {
+      command = command.after_long_help(AFTER_HELP);
+    } else {
+      let environment_variables_table = to_table("Environment variables:", environment_variables);
+      command = command.after_help(&environment_variables_table);
+      command = command.after_long_help(format!("{}\n\n{}", environment_variables_table, AFTER_HELP));
+    }
+  } else {
+    let settings_table = to_table("Settings:", default_settings);
+    if environment_variables.is_empty() {
+      command = command.after_help(&settings_table);
+      command = command.after_long_help(format!("{}\n\n{}", settings_table, AFTER_HELP));
+    } else {
+      let environment_variables_table = to_table("Environment variables:", environment_variables);
+      command = command.after_help(format!("{}\n\n{}", settings_table, environment_variables_table));
+      command = command.after_long_help(format!("{}\n\n{}\n\n{}", settings_table, environment_variables_table, AFTER_HELP));
+    }
+  }
+  command
 }
 
 pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String> {
@@ -722,6 +781,23 @@ where
     }
     Err(_) => Err("environment variable 'EDITOR' is not set".to_string()),
   }
+}
+
+// Method will panic if rows vector is empty
+fn to_table(header: &str, rows: Vec<(&str, String)>) -> String {
+  let bold_green = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+  let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
+  let key_value_length_pairs: Vec<(&str, &str, usize)> = rows.iter().map(|(key, value)| (*key, value.as_ref(), key.len())).collect::<Vec<_>>();
+  let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap().clone();
+  format!(
+    "{bold_green}{}{bold_green:#}\n{}",
+    header,
+    key_value_length_pairs
+      .into_iter()
+      .map(|(key, value, len)| format!("  {bold_blue}{}{bold_blue:#}{}  {}", key, " ".repeat(first_column_width - len), value))
+      .collect::<Vec<_>>()
+      .join("\n")
+  )
 }
 
 fn enabled_features() -> Option<Vec<&'static str>> {
