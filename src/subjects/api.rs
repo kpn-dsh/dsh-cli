@@ -65,8 +65,12 @@ lazy_static! {
   static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, PATCH_ABOUT, PATCH_LONG_ABOUT, &ApiPatch {});
   static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
   static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
-  static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification").set_default_command_executor(&ApiShow {}));
+  static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(CapabilityBuilder::new(
+    SHOW_COMMAND,
+    Some(SHOW_COMMAND_ALIAS),
+    &ApiShow {},
+    "Print the open api specification"
+  ));
   static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     API_DELETE_CAPABILITY.as_ref(),
     API_GET_CAPABILITY.as_ref(),
@@ -84,8 +88,12 @@ lazy_static! {
   static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
   static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
   static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
-  static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Print the open api specification").set_default_command_executor(&ApiShow {}));
+  static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(CapabilityBuilder::new(
+    SHOW_COMMAND,
+    Some(SHOW_COMMAND_ALIAS),
+    &ApiShow {},
+    "Print the open api specification"
+  ));
   static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![API_DELETE_CAPABILITY.as_ref(), API_GET_CAPABILITY.as_ref(), API_POST_CAPABILITY.as_ref(), API_PUT_CAPABILITY.as_ref(), API_SHOW_CAPABILITY.as_ref(),];
 }
@@ -131,10 +139,9 @@ fn create_generic_capability<'a>(
     .map(|(selector, method_descriptor)| create_generic_capability_selector_command(method, selector, method_descriptor))
     .collect::<Vec<_>>();
   Box::new(
-    CapabilityBuilder::new(method, None, about)
+    CapabilityBuilder::new(method, None, command_executor, about)
       .set_long_about(long_about)
-      .add_subcommands(subcommands)
-      .set_default_command_executor(command_executor),
+      .add_subcommands(subcommands),
   )
 }
 

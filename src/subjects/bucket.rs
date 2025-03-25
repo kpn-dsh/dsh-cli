@@ -59,16 +59,12 @@ impl Subject for BucketSubject {
 
 lazy_static! {
   static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List buckets")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &BucketListAll {}, "List buckets")
       .set_long_about("Lists all available buckets.")
-      .set_default_command_executor(&BucketListAll {})
       .add_command_executor(FlagType::Ids, &BucketListIds {}, None)
-      .set_run_all_executors(true)
   );
   static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show bucket configuration")
-      .set_default_command_executor(&BucketShowAll {})
-      .add_target_argument(bucket_id_argument().required(true))
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &BucketShowAll {}, "Show bucket configuration").add_target_argument(bucket_id_argument().required(true))
   );
   static ref BUCKET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![BUCKET_LIST_CAPABILITY.as_ref(), BUCKET_SHOW_CAPABILITY.as_ref()];
 }

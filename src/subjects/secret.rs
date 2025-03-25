@@ -61,22 +61,19 @@ impl Subject for SecretSubject {
 
 lazy_static! {
   static ref SECRET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), "Create new secret")
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &SecretCreate {}, "Create new secret")
       .set_long_about("Create a new secret.")
-      .set_default_command_executor(&SecretCreate {})
       .add_target_argument(secret_id_argument().required(true))
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );
   static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete secret")
+    CapabilityBuilder::new(DELETE_COMMAND, None, &SecretDelete {}, "Delete secret")
       .set_long_about("Delete a secret.")
-      .set_default_command_executor(&SecretDelete {})
       .add_target_argument(secret_id_argument().required(true))
   );
   static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List secrets")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &SecretListIds {}, "List secrets")
       .set_long_about("Lists all secrets used by the services and apps on the DSH.")
-      .set_default_command_executor(&SecretListIds {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
         (FlagType::System, &SecretListSystem {}, None),
@@ -88,15 +85,18 @@ lazy_static! {
       ])
   );
   static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show secret configuration or value")
-      .set_default_command_executor(&SecretShowAllocationStatus {})
-      .add_command_executors(vec![(FlagType::Usage, &SecretShowUsage {}, None), (FlagType::Value, &SecretShowValue {}, None),])
-      .add_target_argument(secret_id_argument().required(true))
+    CapabilityBuilder::new(
+      SHOW_COMMAND,
+      Some(SHOW_COMMAND_ALIAS),
+      &SecretShowAllocationStatus {},
+      "Show secret configuration or value"
+    )
+    .add_command_executors(vec![(FlagType::Usage, &SecretShowUsage {}, None), (FlagType::Value, &SecretShowValue {}, None),])
+    .add_target_argument(secret_id_argument().required(true))
   );
   static ref SECRET_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(UPDATE_COMMAND, None, "Update secret")
+    CapabilityBuilder::new(UPDATE_COMMAND, None, &SecretUpdate {}, "Update secret")
       .set_long_about("Update a secret.")
-      .set_default_command_executor(&SecretUpdate {})
       .add_target_argument(secret_id_argument().required(true))
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );

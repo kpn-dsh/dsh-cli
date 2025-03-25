@@ -6,11 +6,18 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [0.7.1] - yyyy-mm-dd
 
+### Added
+
+* Export app catalog manifest.
+* Show settings and environment variables in help text.
+* Matching color setting.
+
 ### Changed
 
 * Allows one or more targets platforms.
 * Allows one or more targets tenants.
 * Ask for confirmation on service duplicate and edit capabilities.
+* Code simplifications.
 
 ### Fixes
 

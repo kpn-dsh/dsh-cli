@@ -58,9 +58,8 @@ impl Subject for ImageSubject {
 
 lazy_static! {
   static ref IMAGE_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), "Find used images")
+    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), &ImageFind {}, "Find used images")
       .set_long_about("Find all services and/or apps that use a given Harbor image.")
-      .set_default_command_executor(&ImageFind {})
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("Search in all started services.".to_string())),
         (FilterFlagType::Stopped, Some("Search in all stopped services.".to_string()))
@@ -69,14 +68,12 @@ lazy_static! {
       .add_modifier_flag(ModifierFlagType::Regex, None)
   );
   static ref IMAGE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List images")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ImageListAll {}, "List images")
       .set_long_about(
         "Lists all images that are deployed in at least one service. \
         This will also include services that are stopped \
         (deployed with 0 instances)."
       )
-      .set_default_command_executor(&ImageListAll {})
-      .set_run_all_executors(true)
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("Search all started services.".to_string())),
         (FilterFlagType::Stopped, Some("Search all stopped services.".to_string()))

@@ -61,20 +61,17 @@ impl Subject for CertificateSubject {
 
 lazy_static! {
   static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List certificates")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &CertificateListAll {}, "List certificates")
       .set_long_about("Lists all available certificates.")
-      .set_default_command_executor(&CertificateListAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
         (FlagType::Configuration, &CertificateListConfiguration {}, None),
         (FlagType::Ids, &CertificateListIds {}, None),
         (FlagType::Usage, &CertificateListUsage {}, None),
       ])
-      .set_run_all_executors(true)
   );
   static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show certificate configuration")
-      .set_default_command_executor(&CertificateShowAll {})
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &CertificateShowAll {}, "Show certificate configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
         (FlagType::Usage, &CertificateShowUsage {}, None)

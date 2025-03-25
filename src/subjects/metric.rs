@@ -53,9 +53,8 @@ impl Subject for MetricSubject {
 
 lazy_static! {
   static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List exported metrics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &MetricList {}, "List exported metrics")
       .set_long_about("List all services/apps that have metrics export configured.")
-      .set_default_command_executor(&MetricList {})
       .add_filter_flags(vec![(FilterFlagType::Started, None), (FilterFlagType::Stopped, None)])
   );
   static ref METRIC_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![METRIC_LIST_CAPABILITY.as_ref()];

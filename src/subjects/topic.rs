@@ -68,8 +68,7 @@ impl Subject for TopicSubject {
 
 lazy_static! {
   static ref TOPIC_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), "Create new topic")
-      .set_default_command_executor(&TopicCreate {})
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TopicCreate {}, "Create new topic")
       .add_target_argument(topic_id_argument().required(true))
       .add_extra_arguments(vec![
         cleanup_policy_flag(),
@@ -80,25 +79,21 @@ lazy_static! {
       ])
   );
   static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete scratch topic")
+    CapabilityBuilder::new(DELETE_COMMAND, None, &TopicDelete {}, "Delete scratch topic")
       .set_long_about("Delete a scratch topic.")
-      .set_default_command_executor(&TopicDelete {})
       .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List topics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TopicListConfiguration {}, "List topics")
       .set_long_about("Lists all available scratch topics.")
-      .set_default_command_executor(&TopicListConfiguration {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
         (FlagType::Ids, &TopicListIds {}, None),
         (FlagType::Usage, &TopicListUsage {}, None),
       ])
-      .set_run_all_executors(true)
   );
   static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show topic configuration")
-      .set_default_command_executor(&TopicShow {})
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TopicShow {}, "Show topic configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
         (FlagType::Properties, &TopicShowProperties {}, None),

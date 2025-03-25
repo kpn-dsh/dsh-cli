@@ -48,15 +48,10 @@ impl Subject for TokenSubject {
 }
 
 lazy_static! {
-  static ref TOKEN_FETCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FETCH_COMMAND, None, "Fetch token")
-      .set_long_about("Fetch a DSH API token.")
-      .set_default_command_executor(&TokenFetch {})
-  );
+  static ref TOKEN_FETCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(FETCH_COMMAND, None, &TokenFetch {}, "Fetch token").set_long_about("Fetch a DSH API token."));
   static ref TOKEN_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Fetch and show token")
-      .set_long_about("Fetch a DSH API token and display its parameters.")
-      .set_default_command_executor(&TokenShow {})
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TokenShow {}, "Fetch and show token").set_long_about("Fetch a DSH API token and display its parameters.")
   );
   static ref TOKEN_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![TOKEN_FETCH_CAPABILITY.as_ref(), TOKEN_SHOW_CAPABILITY.as_ref()];
 }

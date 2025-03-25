@@ -188,28 +188,22 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
 
 lazy_static! {
   static ref SETTING_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DEFAULT_COMMAND, Some(DEFAULT_COMMAND_ALIAS), "Set default platform and tenant")
+    CapabilityBuilder::new(DEFAULT_COMMAND, Some(DEFAULT_COMMAND_ALIAS), &SettingDefault {}, "Set default platform and tenant")
       .set_long_about("Sets the default target platform and target tenant.")
       .add_target_argument(platform_name_argument())
       .add_target_argument(tenant_name_argument())
-      .set_default_command_executor(&SettingDefault {})
   );
-  static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List settings")
-      .set_long_about("Lists all dsh settings.")
-      .set_default_command_executor(&SettingList {})
-  );
+  static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &SettingList {}, "List settings").set_long_about("Lists all dsh settings."));
   static ref SETTING_SETTING_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SET_COMMAND, None, "Set setting")
+    CapabilityBuilder::new(SET_COMMAND, None, &SettingSet {}, "Set setting")
       .set_long_about("Set value to persistent storage.")
       .add_subcommands(set_unset_commands(true))
-      .set_default_command_executor(&SettingSet {})
   );
   static ref SETTING_UNSETTING_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(UNSET_COMMAND, None, "Unset setting")
+    CapabilityBuilder::new(UNSET_COMMAND, None, &SettingUnset {}, "Unset setting")
       .set_long_about("Unset value from persistent storage.")
       .add_subcommands(set_unset_commands(false))
-      .set_default_command_executor(&SettingUnset {})
   );
   static ref SETTING_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![SETTING_DEFAULT_CAPABILITY.as_ref(), SETTING_LIST_CAPABILITY.as_ref(), SETTING_SETTING_CAPABILITY.as_ref(), SETTING_UNSETTING_CAPABILITY.as_ref()];

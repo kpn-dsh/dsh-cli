@@ -56,9 +56,8 @@ impl Subject for EnvSubject {
 
 lazy_static! {
   static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), "Find environment variable values")
+    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), &EnvFind {}, "Find environment variable values")
       .set_long_about("Find values in environment variables in the configurations of services and apps deployed on the DSH.")
-      .set_default_command_executor(&EnvFind {})
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("Search in all started services.".to_string())),
         (FilterFlagType::Stopped, Some("Search in all stopped services.".to_string()))

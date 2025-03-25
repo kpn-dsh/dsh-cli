@@ -15,8 +15,7 @@ pub struct CapabilityBuilder<'a> {
   long_about: Option<String>,
   subcommands: Vec<Command>,
   executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<String>)>,
-  default_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
-  run_all_executors: bool,
+  default_executor: &'a (dyn CommandExecutor + Send + Sync),
   target_arguments: Vec<Arg>,
   extra_arguments: Vec<Arg>,
   filter_flags: Vec<(FilterFlagType, Option<String>)>,
@@ -29,7 +28,7 @@ impl<'a> CapabilityBuilder<'a> {
   /// ## Parameters
   /// * `capability_type` -
   /// * `about` - help text printed when -h flag is provided
-  pub fn new(command: &str, alias: Option<&str>, about: impl Into<String>) -> Self {
+  pub fn new(command: &str, alias: Option<&str>, default_executor: &'a (dyn CommandExecutor + Send + Sync), about: impl Into<String>) -> Self {
     Self {
       capability_command_name: command.to_string(),
       capability_command_alias: alias.map(|alias| alias.to_string()),
@@ -37,8 +36,7 @@ impl<'a> CapabilityBuilder<'a> {
       long_about: None,
       subcommands: vec![],
       executors: vec![],
-      default_executor: None,
-      run_all_executors: false,
+      default_executor,
       target_arguments: vec![],
       extra_arguments: vec![],
       filter_flags: vec![],
@@ -78,16 +76,6 @@ impl<'a> CapabilityBuilder<'a> {
     for (flag_type, executor, long_help) in executors {
       self.executors.push((flag_type, executor, long_help))
     }
-    self
-  }
-
-  pub fn set_default_command_executor(mut self, executor: &'a (dyn CommandExecutor + Send + Sync)) -> Self {
-    self.default_executor = Some(executor);
-    self
-  }
-
-  pub fn set_run_all_executors(mut self, value: bool) -> Self {
-    self.run_all_executors = value;
     self
   }
 
@@ -186,59 +174,20 @@ impl Capability for CapabilityBuilder<'_> {
   }
 
   fn requirements(&self, matches: &ArgMatches) -> Requirements {
-    let mut composite_requirements =
-      if let Some(default_executor) = self.default_executor { default_executor.requirements(matches) } else { Requirements::new(false, false, false, true, true, None) };
-    if self.run_all_executors {
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) {
-          composite_requirements = composite_requirements.combine(&executor.requirements(matches));
-        }
-      }
-    } else {
-      let mut match_found = false;
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) && !match_found {
-          composite_requirements = composite_requirements.combine(&executor.requirements(matches));
-          match_found = true;
-        }
+    for (flag_type, executor, _) in &self.executors {
+      if matches.get_flag(flag_type.id()) {
+        return executor.requirements(matches);
       }
     }
-    composite_requirements
+    return self.default_executor.requirements(matches);
   }
 
   async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let mut last_dsh_result: Option<DshCliResult> = None;
-    let mut number_of_executed_capabilities = 0;
-    if self.run_all_executors {
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) {
-          last_dsh_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
-          number_of_executed_capabilities += 1;
-        }
-      }
-    } else {
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) && last_dsh_result.is_none() {
-          last_dsh_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
-          number_of_executed_capabilities += 1;
-        }
+    for (flag_type, executor, _) in &self.executors {
+      if matches.get_flag(flag_type.id()) {
+        return executor.execute(argument.clone(), sub_argument.clone(), matches, context).await;
       }
     }
-    match last_dsh_result {
-      Some(dsh_result) => {
-        if number_of_executed_capabilities > 1 {
-          Ok(())
-        } else {
-          dsh_result
-        }
-      }
-      None => {
-        if let Some(default_executor) = self.default_executor {
-          default_executor.execute(argument.clone(), sub_argument.clone(), matches, context).await
-        } else {
-          Ok(())
-        }
-      }
-    }
+    self.default_executor.execute(argument.clone(), sub_argument.clone(), matches, context).await
   }
 }

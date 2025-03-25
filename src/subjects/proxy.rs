@@ -56,23 +56,17 @@ impl Subject for ProxySubject {
 
 lazy_static! {
   static ref PROXY_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete proxy")
+    CapabilityBuilder::new(DELETE_COMMAND, None, &ProxyDelete {}, "Delete proxy")
       .set_long_about("Delete a Kafka proxy.")
-      .set_default_command_executor(&ProxyDelete {})
       .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, None, "List proxies")
+    CapabilityBuilder::new(LIST_COMMAND, None, &ProxyListAll {}, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
-      .set_default_command_executor(&ProxyListAll {})
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
-      .set_run_all_executors(true)
   );
-  static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, None, "Show Kafka proxy configuration")
-      .set_default_command_executor(&ProxyShowConfiguration {})
-      .add_target_argument(proxy_id_argument().required(true))
-  );
+  static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(SHOW_COMMAND, None, &ProxyShowConfiguration {}, "Show Kafka proxy configuration").add_target_argument(proxy_id_argument().required(true)));
   static ref PROXY_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref()];
 }

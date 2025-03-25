@@ -62,23 +62,18 @@ impl Subject for ManifestSubject {
 
 lazy_static! {
   static ref MANIFEST_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(EXPORT_COMMAND, None, "Export manifest")
+    CapabilityBuilder::new(EXPORT_COMMAND, None, &ManifestExport {}, "Export manifest")
       .set_long_about("Export a manifest file from the App Catalog.")
-      .set_default_command_executor(&ManifestExport {})
       .add_target_argument(manifest_id_argument().required(true))
       .add_target_argument(version_argument())
   );
   static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List manifests")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ManifestListAll {}, "List manifests")
       .set_long_about("Lists all manifest files from the App Catalog.")
-      .set_default_command_executor(&ManifestListAll {})
       .add_command_executor(FlagType::Ids, &ManifestListIds {}, None)
-      .set_run_all_executors(true)
   );
   static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show manifest configuration")
-      .set_default_command_executor(&ManifestShowAll {})
-      .add_target_argument(manifest_id_argument().required(true))
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ManifestShowAll {}, "Show manifest configuration").add_target_argument(manifest_id_argument().required(true))
   );
   static ref MANIFEST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![MANIFEST_EXPORT_CAPABILITY.as_ref(), MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];

@@ -61,16 +61,13 @@ impl Subject for AppSubject {
 
 lazy_static! {
   static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List deployed apps")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &AppListConfiguration {}, "List deployed apps")
       .set_long_about("Lists all apps deployed from the DSH app catalog.")
-      .set_default_command_executor(&AppListConfiguration {})
       .add_command_executor(FlagType::Ids, &AppListIds {}, None)
-      .set_run_all_executors(true)
   );
   static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show app configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &AppShowAll {}, "Show app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
-      .set_default_command_executor(&AppShowAll {})
       .add_target_argument(app_id_argument().required(true))
   );
   static ref APP_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![APP_LIST_CAPABILITY.as_ref(), APP_SHOW_CAPABILITY.as_ref()];

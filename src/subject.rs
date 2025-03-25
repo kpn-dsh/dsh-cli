@@ -47,25 +47,6 @@ impl Requirements {
     Self::new(false, false, false, false, false, default_output_format)
   }
 
-  /// Combine requirements
-  ///
-  /// The combination of two `Requirements` structs:
-  /// * The pairwise logical OR of the `needs` fields.
-  /// * The pairwise logical AND of the `allows` fields.
-  /// * If the `default_output_format` values of the two instances are equal,
-  ///   that value is returned. Else `None` will be returned.
-  pub fn combine(&self, other: &Self) -> Self {
-    Self {
-      needs_platform: self.needs_platform | other.needs_platform,
-      needs_tenant_name: self.needs_tenant_name | other.needs_tenant_name,
-      needs_dsh_api_client: self.needs_dsh_api_client | other.needs_dsh_api_client,
-      allows_multiple_target_platforms: self.allows_multiple_target_platforms & other.allows_multiple_target_platforms,
-      allows_multiple_target_tenants: self.allows_multiple_target_tenants & other.allows_multiple_target_tenants,
-      // TODO This is not correct
-      default_output_format: if self.default_output_format == other.default_output_format { self.default_output_format.clone() } else { None },
-    }
-  }
-
   pub fn default_output_format(&self) -> Option<OutputFormat> {
     self.default_output_format.clone()
   }
