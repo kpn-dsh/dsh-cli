@@ -75,6 +75,7 @@ mod subject;
 mod subjects;
 mod targets;
 mod verbosity;
+mod version;
 
 lazy_static! {
   static ref STYLES: Styles = Styles::styled()
@@ -100,19 +101,6 @@ const LONG_ABOUT: &str = "DSH resource management api command line interface\n\n
 const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yield the same result \
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
-
-fn usage() -> String {
-  let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
-  let green = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-  [
-    format!("{bold_blue}dsh{bold_blue:#} {green}[OPTIONS] [SUBJECT/COMMAND]{green:#}"),
-    format!("       {bold_blue}dsh{bold_blue:#} {green}[SUBJECT/COMMAND] [SUBCOMMAND] [OPTIONS]{green:#}"),
-    format!("       {bold_blue}dsh{bold_blue:#} --help"),
-    format!("       {bold_blue}dsh{bold_blue:#} {green}[SUBJECT/COMMAND]{green:#} --help"),
-    format!("       {bold_blue}dsh{bold_blue:#} {green}[SUBJECT/COMMAND] [SUBCOMMAND]{green:#} --help"),
-  ]
-  .join("\n")
-}
 
 const VERSION: &str = "0.7.1";
 
@@ -268,7 +256,6 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
     .about(ABOUT)
     .author(AUTHOR)
     .long_about(long_about)
-    .override_usage(usage())
     .disable_help_subcommand(true)
     .args(vec![
       target_platform_argument(),
@@ -305,12 +292,13 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       openapi_version()
     ));
   let mut default_settings: Vec<(&str, String)> = vec![];
-  match (&settings.default_platform, &settings.default_tenant) {
-    (None, None) => (),
-    (None, Some(default_tenant)) => default_settings.push(("default tenant", default_tenant.to_string())),
-    (Some(default_platform), None) => default_settings.push(("default platform", default_platform.to_string())),
-    (Some(default_platform), Some(default_tenant)) => default_settings.push(("default target", format!("{}@{}", default_platform, default_tenant))),
-  };
+  if let Some(default_platform) = &settings.default_platform {
+    let platform = DshPlatform::try_from(default_platform.as_str()).unwrap();
+    default_settings.push(("default platform", format!("{} / {}", platform.name(), platform.alias())));
+  }
+  if let Some(default_tenant) = &settings.default_tenant {
+    default_settings.push(("default tenant", default_tenant.to_string()));
+  }
   if let Some(ref file_name) = settings.file_name {
     default_settings.push(("settings file", file_name.to_string()));
   }
@@ -821,5 +809,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.6.0");
+  assert_eq!(crate_version(), "0.6.1");
 }
