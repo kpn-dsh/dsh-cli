@@ -179,7 +179,7 @@ impl Capability for CapabilityBuilder<'_> {
         return executor.requirements(matches);
       }
     }
-    return self.default_executor.requirements(matches);
+    self.default_executor.requirements(matches)
   }
 
   async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
