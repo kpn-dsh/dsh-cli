@@ -80,6 +80,7 @@ pub(crate) fn matching_color_argument() -> Arg {
           DSH_CLI_MATCHING_COLOR or the value from the settings file will be used. \
           The default style is 'black'.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -98,6 +99,7 @@ pub(crate) fn matching_style_argument() -> Arg {
           DSH_CLI_MATCHING_STYLE or the value from the settings file will be used. \
           The default style is 'bold'.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -115,6 +117,7 @@ pub(crate) fn no_escape_argument() -> Arg {
           DSH_CLI_NO_ESCAPE or the value from the settings file will be used. \
           The default behavior is to use ansi escape styling where applicable.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -130,6 +133,7 @@ pub(crate) fn no_headers_argument() -> Arg {
           DSH_CLI_NO_HEADERS or the value from the settings file will be used. \
           The default behavior is to use headers where applicable.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -193,6 +197,7 @@ pub(crate) fn show_execution_time_argument() -> Arg {
       "When this option is provided the execution time of the executed function \
           will be shown, in milliseconds.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -277,6 +282,7 @@ pub(crate) fn terminal_width_argument() -> Arg {
           If not set, the environment variable DSH_CLI_TERMINAL_WIDTH will be used \
           or else no terminal width value will be used.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
