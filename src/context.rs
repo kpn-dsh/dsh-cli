@@ -1,18 +1,20 @@
 use crate::formatters::OutputFormat;
 use crate::global_arguments::{
-  DRY_RUN_ARGUMENT, FORCE_ARGUMENT, MATCHING_COLOR_ARGUMENT, MATCHING_STYLE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
-  SHOW_EXECUTION_TIME_ARGUMENT, TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
+  DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT, SUPPRESS_EXIT_STATUS_ARGUMENT,
+  TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::settings::Settings;
+use crate::style::{style_from, wrap_style, DshColor, DshStyle};
 use crate::subject::Requirements;
 use crate::targets::read_target;
 use crate::verbosity::Verbosity;
 use crate::{
   get_target_password, get_target_platforms, get_target_platforms_non_interactive, get_target_tenants, get_target_tenants_non_interactive, ENV_VAR_CSV_QUOTE,
-  ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_MATCHING_COLOR, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT,
-  ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY,
+  ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_ERROR_COLOR, ENV_VAR_ERROR_STYLE, ENV_VAR_MATCHING_COLOR, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE,
+  ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_STDERR_COLOR, ENV_VAR_STDERR_STYLE, ENV_VAR_STDOUT_COLOR, ENV_VAR_STDOUT_STYLE,
+  ENV_VAR_SUPPRESS_EXIT_STATUS, ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY, ENV_VAR_WARNING_COLOR, ENV_VAR_WARNING_STYLE,
 };
-use clap::builder::styling::{AnsiColor, Color, Style};
+use clap::builder::styling::Style;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
@@ -23,9 +25,7 @@ use dsh_api::query_processor::Part::{Matching, NonMatching};
 use futures::future::join_all;
 use log::debug;
 use rpassword::prompt_password;
-use serde::{Deserialize, Serialize};
-use std::cmp::PartialEq;
-use std::fmt::{Display, Formatter};
+use serde::Serialize;
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
 use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
@@ -36,21 +36,30 @@ pub(crate) struct Context {
   pub(crate) csv_separator: String,
   pub(crate) dry_run: bool,
   dsh_api_client: Option<DshApiClient>,
+  pub(crate) error_color: DshColor,
+  pub(crate) error_style: DshStyle,
   pub(crate) force: bool,
-  pub(crate) matching_color: MatchingColor,
-  pub(crate) matching_style: MatchingStyle,
+  pub(crate) matching_color: DshColor,
+  pub(crate) matching_style: DshStyle,
   pub(crate) no_escape: bool,
   pub(crate) output_format: OutputFormat,
-  pub(crate) target_platform: Option<DshPlatform>,
   pub(crate) quiet: bool,
-  pub(crate) target_tenant_name: Option<String>,
-  pub(crate) terminal_width: Option<usize>,
   pub(crate) show_execution_time: bool,
   pub(crate) show_headers: bool,
+  pub(crate) stderr_color: DshColor,
   pub(crate) _stderr_escape: bool,
+  pub(crate) stderr_style: DshStyle,
   pub(crate) stdin_is_terminal: bool,
+  pub(crate) stdout_color: DshColor,
   pub(crate) _stdout_escape: bool,
+  pub(crate) stdout_style: DshStyle,
+  pub(crate) target_platform: Option<DshPlatform>,
+  pub(crate) target_tenant_name: Option<String>,
+  pub(crate) terminal_width: Option<usize>,
   pub(crate) verbosity: Verbosity,
+  pub(crate) warning_color: DshColor,
+  pub(crate) warning_style: DshStyle,
+  pub(crate) suppress_exit_status: bool,
 }
 
 impl Context {
@@ -133,18 +142,22 @@ impl Context {
       None
     };
     let no_escape = Self::no_escape(matches, settings);
-    let (matching_color, matching_style, stderr_escape, stdout_escape) = if no_escape {
-      (MatchingColor::Normal, MatchingStyle::Normal, false, false)
-    } else {
-      (
-        Self::matching_color(matches, settings)?,
-        Self::matching_style(matches, settings)?,
-        stderr().is_terminal(),
-        stdout().is_terminal(),
-      )
-    };
+    let (stderr_escape, stdout_escape) = if no_escape { (false, false) } else { (stderr().is_terminal(), stdout().is_terminal()) };
+
+    let error_color = Self::dsh_color(no_escape, ENV_VAR_ERROR_COLOR, &settings.error_color, DshColor::Red)?;
+    let error_style = Self::dsh_style(no_escape, ENV_VAR_ERROR_STYLE, &settings.error_style, DshStyle::Bold)?;
+    let matching_color = Self::dsh_color(no_escape, ENV_VAR_MATCHING_COLOR, &settings.matching_color, DshColor::Green)?;
+    let matching_style = Self::dsh_style(no_escape, ENV_VAR_MATCHING_STYLE, &settings.matching_style, DshStyle::Bold)?;
+    let stderr_color = Self::dsh_color(no_escape, ENV_VAR_STDERR_COLOR, &settings.stderr_color, DshColor::Normal)?;
+    let stderr_style = Self::dsh_style(no_escape, ENV_VAR_STDERR_STYLE, &settings.stderr_style, DshStyle::Dim)?;
+    let stdout_color = Self::dsh_color(no_escape, ENV_VAR_STDOUT_COLOR, &settings.stdout_color, DshColor::Normal)?;
+    let stdout_style = Self::dsh_style(no_escape, ENV_VAR_STDOUT_STYLE, &settings.stdout_style, DshStyle::Normal)?;
+    let warning_color = Self::dsh_color(no_escape, ENV_VAR_WARNING_COLOR, &settings.warning_color, DshColor::Blue)?;
+    let warning_style = Self::dsh_style(no_escape, ENV_VAR_WARNING_STYLE, &settings.warning_style, DshStyle::Bold)?;
+
     let quiet = Self::quiet(matches, settings);
     let force = Self::force(matches, settings);
+    let suppress_exit_status = Self::suppress_exit_status(matches, settings);
     let (output_format, show_execution_time, verbosity) = if quiet {
       (OutputFormat::Quiet, false, Verbosity::Off)
     } else {
@@ -164,21 +177,30 @@ impl Context {
       csv_separator,
       dry_run,
       dsh_api_client,
+      error_color,
+      error_style,
       force,
       matching_color,
       matching_style,
       no_escape,
       output_format,
-      target_platform,
       quiet,
       show_execution_time,
       show_headers,
+      stderr_color,
+      _stderr_escape: stderr_escape,
+      stderr_style,
+      stdin_is_terminal,
+      stdout_color,
+      _stdout_escape: stdout_escape,
+      stdout_style,
+      suppress_exit_status,
+      target_platform,
       target_tenant_name,
       terminal_width,
-      _stderr_escape: stderr_escape,
-      stdin_is_terminal,
-      _stdout_escape: stdout_escape,
       verbosity,
+      warning_color,
+      warning_style,
     })
   }
 
@@ -305,41 +327,64 @@ impl Context {
     }
   }
 
-  /// Gets matching_color context value
+  /// Gets suppress_status context value
   ///
-  /// 1. Try flag `--matching-color`
-  /// 1. Try environment variable `DSH_CLI_MATCHING_COLOR`
+  /// 1. Try flag `--suppress-exit-status`
+  /// 1. Try if environment variable `DSH_CLI_SUPPRESS_STATUS` exists
   /// 1. Try settings file
-  /// 1. Default to `MatchingColor::Normal`
-  fn matching_color(matches: &ArgMatches, settings: &Settings) -> Result<MatchingColor, String> {
-    match matches.get_one::<MatchingColor>(MATCHING_COLOR_ARGUMENT) {
-      Some(matching_color_from_argument) => Ok(matching_color_from_argument.to_owned()),
-      None => match std::env::var(ENV_VAR_MATCHING_COLOR) {
-        Ok(matching_color_from_env_var) => MatchingColor::try_from(matching_color_from_env_var.as_str()),
-        Err(_) => match settings.matching_color {
-          Some(ref matching_color_from_settings) => Ok(matching_color_from_settings.clone()),
-          None => Ok(MatchingColor::Normal),
-        },
-      },
+  /// 1. Default to `false`
+  fn suppress_exit_status(matches: &ArgMatches, settings: &Settings) -> bool {
+    if matches.get_flag(SUPPRESS_EXIT_STATUS_ARGUMENT) {
+      debug!("suppress exit status enabled (argument)");
+      true
+    } else if std::env::var(ENV_VAR_SUPPRESS_EXIT_STATUS).is_ok() {
+      debug!("suppress exit status enabled (environment variable '{}')", ENV_VAR_SUPPRESS_EXIT_STATUS);
+      true
+    } else if let Some(suppress_exit_status) = settings.suppress_exit_status {
+      if suppress_exit_status {
+        debug!("suppress exit status enabled (settings)");
+      }
+      suppress_exit_status
+    } else {
+      false
     }
   }
 
-  /// Gets matching_style context value
+  /// Gets dsh color context value
   ///
-  /// 1. Try flag `--matching-style`
-  /// 1. Try environment variable `DSH_CLI_MATCHING_STYLE`
-  /// 1. Try settings file
-  /// 1. Default to `MatchingStyle::Normal`
-  fn matching_style(matches: &ArgMatches, settings: &Settings) -> Result<MatchingStyle, String> {
-    match matches.get_one::<MatchingStyle>(MATCHING_STYLE_ARGUMENT) {
-      Some(matching_style_from_argument) => Ok(matching_style_from_argument.to_owned()),
-      None => match std::env::var(ENV_VAR_MATCHING_STYLE) {
-        Ok(matching_style_from_env_var) => MatchingStyle::try_from(matching_style_from_env_var.as_str()),
-        Err(_) => match settings.matching_style {
-          Some(ref matching_style_from_settings) => Ok(matching_style_from_settings.clone()),
-          None => Ok(MatchingStyle::Normal),
+  /// 1. Try environment variable `env_var`
+  /// 1. Try settings file value
+  /// 1. Default to `default_color`
+  fn dsh_color(no_escape: bool, env_var: &str, settings_color: &Option<DshColor>, default_color: DshColor) -> Result<DshColor, String> {
+    if no_escape {
+      Ok(DshColor::Normal)
+    } else {
+      match std::env::var(env_var) {
+        Ok(color_from_env_var) => DshColor::try_from(color_from_env_var.as_str()),
+        Err(_) => match settings_color {
+          Some(ref color_from_settings) => Ok(color_from_settings.clone()),
+          None => Ok(default_color),
         },
-      },
+      }
+    }
+  }
+
+  /// Gets dsh style context value
+  ///
+  /// 1. Try environment variable `env_var`
+  /// 1. Try settings file value
+  /// 1. Default to `default_style`
+  fn dsh_style(no_escape: bool, env_var: &str, settings_style: &Option<DshStyle>, default_style: DshStyle) -> Result<DshStyle, String> {
+    if no_escape {
+      Ok(DshStyle::Normal)
+    } else {
+      match std::env::var(env_var) {
+        Ok(style_from_env_var) => DshStyle::try_from(style_from_env_var.as_str()),
+        Err(_) => match settings_style {
+          Some(ref style_from_settings) => Ok(style_from_settings.clone()),
+          None => Ok(default_style),
+        },
+      }
     }
   }
 
@@ -483,7 +528,7 @@ impl Context {
   /// depending on how the `dsh` tool was run from a shell or script.
   pub(crate) fn print<T: AsRef<str>>(&self, output: T) {
     if !self.quiet {
-      println!("{}", output.as_ref());
+      println!("{}", wrap_style(self.stdout_style(), output));
     }
   }
 
@@ -499,26 +544,26 @@ impl Context {
       match self.output_format {
         OutputFormat::Csv => self.print_warning("csv output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Json => match serde_json::to_string_pretty(&output) {
-          Ok(json) => println!("{}", json),
+          Ok(json) => println!("{}", wrap_style(self.stdout_style(), json)),
           Err(_) => self.print_error("serializing to json failed"),
         },
         OutputFormat::JsonCompact => match serde_json::to_string(&output) {
-          Ok(json) => println!("{}", json),
+          Ok(json) => println!("{}", wrap_style(self.stdout_style(), json)),
           Err(_) => self.print_error("serializing to json failed"),
         },
         OutputFormat::Plain => self.print_warning("plain output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Quiet => (),
         OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Toml => match toml::to_string_pretty(&output) {
-          Ok(json) => println!("{}", json),
+          Ok(json) => println!("{}", wrap_style(self.stdout_style(), json)),
           Err(_) => self.print_error("serializing to toml failed"),
         },
         OutputFormat::TomlCompact => match toml::to_string(&output) {
-          Ok(json) => println!("{}", json),
+          Ok(json) => println!("{}", wrap_style(self.stdout_style(), json)),
           Err(_) => self.print_error("serializing to toml failed"),
         },
         OutputFormat::Yaml => match serde_yaml::to_string(&output) {
-          Ok(json) => println!("{}", json),
+          Ok(json) => println!("{}", wrap_style(self.stdout_style(), json)),
           Err(_) => self.print_error("serializing to yaml failed"),
         },
       }
@@ -531,7 +576,7 @@ impl Context {
   /// The prompt is only printed when stderr is a terminal.
   pub(crate) fn print_progress_step(&self) {
     if !self.quiet && stderr().is_terminal() {
-      eprint!(".");
+      eprintln!("{}", wrap_style(self.stderr_style(), "."));
     }
   }
 
@@ -544,7 +589,7 @@ impl Context {
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: AsRef<str>>(&self, prompt: T) {
     if !self.quiet && stderr().is_terminal() {
-      eprintln!("{}", prompt.as_ref());
+      eprintln!("{}", wrap_style(self.stderr_style(), prompt));
     }
   }
 
@@ -562,7 +607,7 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => eprintln!("{}", outcome.as_ref()),
+        Verbosity::Medium | Verbosity::High => eprintln!("{}", wrap_style(self.stderr_style(), outcome)),
       }
     }
   }
@@ -580,7 +625,7 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off => (),
-        Verbosity::Low | Verbosity::Medium | Verbosity::High => eprintln!("{}", warning.as_ref()),
+        Verbosity::Low | Verbosity::Medium | Verbosity::High => eprintln!("{}", wrap_style(self.warning_style(), warning)),
       }
     }
   }
@@ -593,7 +638,7 @@ impl Context {
   /// a pipe or an output file.
   pub(crate) fn print_error<T: AsRef<str>>(&self, error: T) {
     if !self.quiet {
-      eprintln!("{}", error.as_ref());
+      eprintln!("{}", wrap_style(self.error_style(), error));
     }
   }
 
@@ -609,12 +654,12 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium => eprintln!("{}", explanation.as_ref()),
+        Verbosity::Medium => eprintln!("{}", wrap_style(self.stderr_style(), explanation)),
         Verbosity::High => {
           if let Some(ref client) = self.dsh_api_client {
-            eprintln!("target {}", client.tenant());
+            eprintln!("{}", wrap_style(self.stderr_style(), format!("{}", client.tenant())));
           }
-          eprintln!("{}", explanation.as_ref())
+          eprintln!("{}", wrap_style(self.stderr_style(), explanation));
         }
       }
     }
@@ -630,7 +675,13 @@ impl Context {
   /// a pipe or an output file.
   pub(crate) fn print_execution_time(&self, start_instant: Instant) {
     if !self.quiet && (self.show_execution_time || self.verbosity == Verbosity::High) {
-      eprintln!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis());
+      eprintln!(
+        "{}",
+        wrap_style(
+          self.stderr_style(),
+          format!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis())
+        )
+      );
     }
   }
 
@@ -701,7 +752,11 @@ impl Context {
       parts
         .iter()
         .map(|part| match part {
-          Matching(p) => wrap_style(&self.matching_style, &self.matching_color, p.as_str()),
+          Matching(p) => {
+            let style = self.matching_style();
+            format!("{style}{p}{style:#}")
+          }
+          // wrap_style_color(&self.matching_style, &self.matching_color, p.as_str()),
           NonMatching(p) => p.to_string(),
         })
         .collect::<Vec<_>>()
@@ -744,122 +799,24 @@ impl Context {
       Ok(value.to_string())
     }
   }
-}
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum MatchingColor {
-  /// Matches will be displayed in the normal color
-  #[serde(rename = "normal")]
-  Normal,
-  /// Matches will be displayed in red
-  #[serde(rename = "red")]
-  Red,
-  /// Matches will be displayed in green
-  #[serde(rename = "green")]
-  Green,
-  /// Matches will be displayed in blue
-  #[serde(rename = "blue")]
-  Blue,
-}
-
-impl Display for MatchingColor {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
-      MatchingColor::Normal => write!(f, "normal"),
-      MatchingColor::Red => write!(f, "red"),
-      MatchingColor::Green => write!(f, "green"),
-      MatchingColor::Blue => write!(f, "blue"),
-    }
+  fn error_style(&self) -> Style {
+    style_from(&self.error_style, &self.error_color)
   }
-}
 
-impl TryFrom<&str> for MatchingColor {
-  type Error = String;
-
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
-    match value {
-      "normal" => Ok(Self::Normal),
-      "red" => Ok(Self::Red),
-      "green" => Ok(Self::Green),
-      "blue" => Ok(Self::Blue),
-      _ => Err(format!("invalid matching color '{}'", value)),
-    }
+  fn matching_style(&self) -> Style {
+    style_from(&self.matching_style, &self.matching_color)
   }
-}
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum MatchingStyle {
-  /// Matches will be displayed in normal font
-  #[serde(rename = "normal")]
-  Normal,
-  /// Matches will be displayed bold
-  #[serde(rename = "bold")]
-  Bold,
-  /// Matches will be displayed dimmed
-  #[serde(rename = "dim")]
-  Dim,
-  /// Matches will be displayed in italics
-  #[serde(rename = "italic")]
-  Italic,
-  /// Matches will be displayed underlined
-  #[serde(rename = "underlined")]
-  Underlined,
-  /// Matches will be displayed reversed
-  #[serde(rename = "reverse")]
-  Reverse,
-}
-
-impl Display for MatchingStyle {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
-      MatchingStyle::Normal => write!(f, "normal"),
-      MatchingStyle::Bold => write!(f, "bold"),
-      MatchingStyle::Dim => write!(f, "dim"),
-      MatchingStyle::Italic => write!(f, "italic"),
-      MatchingStyle::Underlined => write!(f, "underlined"),
-      MatchingStyle::Reverse => write!(f, "reverse"),
-    }
+  fn stderr_style(&self) -> Style {
+    style_from(&self.stderr_style, &self.stderr_color)
   }
-}
 
-impl TryFrom<&str> for MatchingStyle {
-  type Error = String;
-
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
-    match value {
-      "normal" => Ok(Self::Normal),
-      "bold" => Ok(Self::Bold),
-      "dim" => Ok(Self::Dim),
-      "italic" => Ok(Self::Italic),
-      "underlined" => Ok(Self::Underlined),
-      "reverse" => Ok(Self::Reverse),
-      _ => Err(format!("invalid matching style '{}'", value)),
-    }
+  fn stdout_style(&self) -> Style {
+    style_from(&self.stdout_style, &self.stdout_color)
   }
-}
 
-fn style_from(style: &MatchingStyle, color: &MatchingColor) -> Style {
-  let style = match style {
-    MatchingStyle::Normal => Style::new(),
-    MatchingStyle::Bold => Style::new().bold(),
-    MatchingStyle::Dim => Style::new().dimmed(),
-    MatchingStyle::Italic => Style::new().italic(),
-    MatchingStyle::Underlined => Style::new().underline(),
-    MatchingStyle::Reverse => Style::new().invert(),
-  };
-  match color {
-    MatchingColor::Normal => style,
-    MatchingColor::Red => style.fg_color(Some(Color::Ansi(AnsiColor::Red))),
-    MatchingColor::Green => style.fg_color(Some(Color::Ansi(AnsiColor::Green))),
-    MatchingColor::Blue => style.fg_color(Some(Color::Ansi(AnsiColor::Blue))),
-  }
-}
-
-pub fn wrap_style(style: &MatchingStyle, color: &MatchingColor, string: &str) -> String {
-  if style == &MatchingStyle::Normal && color == &MatchingColor::Normal {
-    string.to_string()
-  } else {
-    let style_color = style_from(style, color);
-    format!("{style_color}{}{style_color:#}", string)
+  fn warning_style(&self) -> Style {
+    style_from(&self.warning_style, &self.warning_color)
   }
 }

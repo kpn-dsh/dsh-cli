@@ -10,13 +10,14 @@ use serde::Serialize;
 use crate::arguments::{platform_name_argument, tenant_name_argument};
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
-use crate::context::{Context, MatchingColor, MatchingStyle};
+use crate::context::Context;
 use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::settings::get_settings;
+use crate::style::{DshColor, DshStyle};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::{get_target_password_from_keyring, read_target};
@@ -61,6 +62,8 @@ const SETTING_CSV_SEPARATOR: &str = "csv-separator";
 const SETTING_DEFAULT_PLATFORM: &str = "default-platform";
 const SETTING_DEFAULT_TENANT: &str = "default-tenant";
 const SETTING_DRY_RUN: &str = "dry-run";
+const SETTING_ERROR_COLOR: &str = "error-color";
+const SETTING_ERROR_STYLE: &str = "error-style";
 const SETTING_LOG_LEVEL: &str = "log-level";
 const SETTING_LOG_LEVEL_API: &str = "log-level-api";
 const SETTING_LOG_LEVEL_SDK: &str = "log-level-sdk";
@@ -71,8 +74,15 @@ const SETTING_NO_HEADERS: &str = "no-headers";
 const SETTING_OUTPUT_FORMAT: &str = "output-format";
 const SETTING_QUIET: &str = "quiet";
 const SETTING_SHOW_EXECUTION_TIME: &str = "show-execution-time";
+const SETTING_STDERR_COLOR: &str = "stderr-color";
+const SETTING_STDERR_STYLE: &str = "stderr-style";
+const SETTING_STDOUT_COLOR: &str = "stdout-color";
+const SETTING_STDOUT_STYLE: &str = "stdout-style";
+const SETTING_SUPPRESS_EXIT_STATUS: &str = "suppress-exit-status";
 const SETTING_TERMINAL_WIDTH: &str = "terminal-width";
 const SETTING_VERBOSITY: &str = "verbosity";
+const SETTING_WARNING_COLOR: &str = "warning-color";
+const SETTING_WARNING_STYLE: &str = "warning-style";
 
 fn set_unset_commands(required: bool) -> Vec<Command> {
   vec![
@@ -109,6 +119,22 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
       )
       .about("Default target tenant, used for authentication and authorization"),
     Command::new(SETTING_DRY_RUN).about("Inhibits any changes to the platform"),
+    Command::new(SETTING_ERROR_COLOR)
+      .arg(
+        Arg::new(SETTING_ERROR_COLOR)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshColor>::new())
+          .required(required),
+      )
+      .about("Color to be used when printing error messages"),
+    Command::new(SETTING_ERROR_STYLE)
+      .arg(
+        Arg::new(SETTING_ERROR_STYLE)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshStyle>::new())
+          .required(required),
+      )
+      .about("Styling to be used when printing error messages"),
     Command::new(SETTING_LOG_LEVEL)
       .arg(
         Arg::new(SETTING_LOG_LEVEL)
@@ -137,7 +163,7 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
       .arg(
         Arg::new(SETTING_MATCHING_COLOR)
           .action(ArgAction::Set)
-          .value_parser(EnumValueParser::<MatchingColor>::new())
+          .value_parser(EnumValueParser::<DshColor>::new())
           .required(required),
       )
       .about("Color to be used when printing matching results for the find functions"),
@@ -145,7 +171,7 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
       .arg(
         Arg::new(SETTING_MATCHING_STYLE)
           .action(ArgAction::Set)
-          .value_parser(EnumValueParser::<MatchingStyle>::new())
+          .value_parser(EnumValueParser::<DshStyle>::new())
           .required(required),
       )
       .about("Styling to be used when printing matching results for the find functions"),
@@ -167,6 +193,39 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .value_parser(builder::BoolValueParser::new()),
       )
       .about("Enables display of the execution time of the executed DSH api functions in milliseconds"),
+    Command::new(SETTING_STDERR_COLOR)
+      .arg(
+        Arg::new(SETTING_STDERR_COLOR)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshColor>::new())
+          .required(required),
+      )
+      .about("Color to be used when printing explanations and metadata to stderr"),
+    Command::new(SETTING_STDERR_STYLE)
+      .arg(
+        Arg::new(SETTING_STDERR_STYLE)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshStyle>::new())
+          .required(required),
+      )
+      .about("Styling to be used when printing explanations and metadata to stderr"),
+    Command::new(SETTING_STDOUT_COLOR)
+      .arg(
+        Arg::new(SETTING_STDOUT_COLOR)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshColor>::new())
+          .required(required),
+      )
+      .about("Color to be used when printing results"),
+    Command::new(SETTING_STDOUT_STYLE)
+      .arg(
+        Arg::new(SETTING_STDOUT_STYLE)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshStyle>::new())
+          .required(required),
+      )
+      .about("Styling to be used when printing results"),
+    Command::new(SETTING_SUPPRESS_EXIT_STATUS).about("Suppress exit status"),
     Command::new(SETTING_TERMINAL_WIDTH)
       .arg(
         Arg::new(SETTING_TERMINAL_WIDTH)
@@ -183,6 +242,22 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Default verbosity level"),
+    Command::new(SETTING_WARNING_COLOR)
+      .arg(
+        Arg::new(SETTING_WARNING_COLOR)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshColor>::new())
+          .required(required),
+      )
+      .about("Color to be used when printing warning messages"),
+    Command::new(SETTING_WARNING_STYLE)
+      .arg(
+        Arg::new(SETTING_WARNING_STYLE)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshStyle>::new())
+          .required(required),
+      )
+      .about("Styling to be used when printing warning messages"),
   ]
 }
 
@@ -308,6 +383,16 @@ impl CommandExecutor for SettingSet {
         upsert_settings(None, |settings| Ok(Settings { dry_run: Some(true), ..settings }))?;
         context.print_outcome("dry run mode enabled");
       }
+      SETTING_ERROR_COLOR => {
+        let color = matches.get_one::<DshColor>(SETTING_ERROR_COLOR).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { error_color: Some(color.clone()), ..settings }))?;
+        context.print_outcome(format!("error color set to {}", color));
+      }
+      SETTING_ERROR_STYLE => {
+        let style = matches.get_one::<DshStyle>(SETTING_ERROR_STYLE).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { error_style: Some(style.clone()), ..settings }))?;
+        context.print_outcome(format!("error style set to {}", style));
+      }
       SETTING_LOG_LEVEL => {
         let log_level = matches.get_one::<LogLevel>(SETTING_LOG_LEVEL).unwrap();
         upsert_settings(None, |settings| Ok(Settings { log_level: Some(log_level.clone()), ..settings }))?;
@@ -324,14 +409,14 @@ impl CommandExecutor for SettingSet {
         context.print_outcome(format!("log level for sdk set to {}", log_level_sdk));
       }
       SETTING_MATCHING_COLOR => {
-        let matching_color = matches.get_one::<MatchingColor>(SETTING_MATCHING_COLOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { matching_color: Some(matching_color.clone()), ..settings }))?;
-        context.print_outcome(format!("matching color set to {}", matching_color));
+        let color = matches.get_one::<DshColor>(SETTING_MATCHING_COLOR).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { matching_color: Some(color.clone()), ..settings }))?;
+        context.print_outcome(format!("matching color set to {}", color));
       }
       SETTING_MATCHING_STYLE => {
-        let matching_style = matches.get_one::<MatchingStyle>(SETTING_MATCHING_STYLE).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { matching_style: Some(matching_style.clone()), ..settings }))?;
-        context.print_outcome(format!("matching style set to {}", matching_style));
+        let style = matches.get_one::<DshStyle>(SETTING_MATCHING_STYLE).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { matching_style: Some(style.clone()), ..settings }))?;
+        context.print_outcome(format!("matching style set to {}", style));
       }
       SETTING_NO_ESCAPE => {
         upsert_settings(None, |settings| Ok(Settings { no_escape: Some(true), ..settings }))?;
@@ -354,6 +439,30 @@ impl CommandExecutor for SettingSet {
         upsert_settings(None, |settings| Ok(Settings { show_execution_time: Some(true), ..settings }))?;
         context.print_outcome("show execution time enabled");
       }
+      SETTING_STDERR_COLOR => {
+        let color = matches.get_one::<DshColor>(SETTING_STDERR_COLOR).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { stderr_color: Some(color.clone()), ..settings }))?;
+        context.print_outcome(format!("stderr color set to {}", color));
+      }
+      SETTING_STDERR_STYLE => {
+        let style = matches.get_one::<DshStyle>(SETTING_STDERR_STYLE).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { stderr_style: Some(style.clone()), ..settings }))?;
+        context.print_outcome(format!("stderr style set to {}", style));
+      }
+      SETTING_STDOUT_COLOR => {
+        let color = matches.get_one::<DshColor>(SETTING_STDOUT_COLOR).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { stdout_color: Some(color.clone()), ..settings }))?;
+        context.print_outcome(format!("stdout color set to {}", color));
+      }
+      SETTING_STDOUT_STYLE => {
+        let style = matches.get_one::<DshStyle>(SETTING_STDOUT_STYLE).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { stdout_style: Some(style.clone()), ..settings }))?;
+        context.print_outcome(format!("stdout style set to {}", style));
+      }
+      SETTING_SUPPRESS_EXIT_STATUS => {
+        upsert_settings(None, |settings| Ok(Settings { suppress_exit_status: Some(true), ..settings }))?;
+        context.print_outcome("suppress exit status enabled");
+      }
       SETTING_TERMINAL_WIDTH => {
         let terminal_width = matches.get_one::<usize>(SETTING_TERMINAL_WIDTH).unwrap();
         if *terminal_width < 40 {
@@ -367,6 +476,16 @@ impl CommandExecutor for SettingSet {
         let verbosity = matches.get_one::<Verbosity>(SETTING_VERBOSITY).unwrap();
         upsert_settings(None, |settings| Ok(Settings { verbosity: Some(verbosity.clone()), ..settings }))?;
         context.print_outcome(format!("verbosity level set to {}", verbosity));
+      }
+      SETTING_WARNING_COLOR => {
+        let color = matches.get_one::<DshColor>(SETTING_WARNING_COLOR).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { warning_color: Some(color.clone()), ..settings }))?;
+        context.print_outcome(format!("warning color set to {}", color));
+      }
+      SETTING_WARNING_STYLE => {
+        let style = matches.get_one::<DshStyle>(SETTING_WARNING_STYLE).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { warning_style: Some(style.clone()), ..settings }))?;
+        context.print_outcome(format!("warning style set to {}", style));
       }
       _ => unreachable!(),
     }
@@ -404,6 +523,14 @@ impl CommandExecutor for SettingUnset {
       SETTING_DRY_RUN => {
         upsert_settings(None, |settings| Ok(Settings { dry_run: None, ..settings }))?;
         context.print_outcome("dry run mode disabled");
+      }
+      SETTING_ERROR_COLOR => {
+        upsert_settings(None, |settings| Ok(Settings { error_color: None, ..settings }))?;
+        context.print_outcome("error color unset");
+      }
+      SETTING_ERROR_STYLE => {
+        upsert_settings(None, |settings| Ok(Settings { error_style: None, ..settings }))?;
+        context.print_outcome("error style unset");
       }
       SETTING_LOG_LEVEL => {
         upsert_settings(None, |settings| Ok(Settings { log_level: None, ..settings }))?;
@@ -445,6 +572,26 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(None, |settings| Ok(Settings { show_execution_time: None, ..settings }))?;
         context.print_outcome("show execution mode unset");
       }
+      SETTING_STDERR_COLOR => {
+        upsert_settings(None, |settings| Ok(Settings { stderr_color: None, ..settings }))?;
+        context.print_outcome("stderr color unset");
+      }
+      SETTING_STDERR_STYLE => {
+        upsert_settings(None, |settings| Ok(Settings { stderr_style: None, ..settings }))?;
+        context.print_outcome("stderr style unset");
+      }
+      SETTING_STDOUT_COLOR => {
+        upsert_settings(None, |settings| Ok(Settings { stdout_color: None, ..settings }))?;
+        context.print_outcome("stdout color unset");
+      }
+      SETTING_STDOUT_STYLE => {
+        upsert_settings(None, |settings| Ok(Settings { stdout_style: None, ..settings }))?;
+        context.print_outcome("stdout style unset");
+      }
+      SETTING_SUPPRESS_EXIT_STATUS => {
+        upsert_settings(None, |settings| Ok(Settings { suppress_exit_status: None, ..settings }))?;
+        context.print_outcome("suppress exit status disabled");
+      }
       SETTING_TERMINAL_WIDTH => {
         upsert_settings(None, |settings| Ok(Settings { terminal_width: None, ..settings }))?;
         context.print_outcome("terminal width unset");
@@ -452,6 +599,14 @@ impl CommandExecutor for SettingUnset {
       SETTING_VERBOSITY => {
         upsert_settings(None, |settings| Ok(Settings { verbosity: None, ..settings }))?;
         context.print_outcome("verbosity level unset");
+      }
+      SETTING_WARNING_COLOR => {
+        upsert_settings(None, |settings| Ok(Settings { warning_color: None, ..settings }))?;
+        context.print_outcome("warning color unset");
+      }
+      SETTING_WARNING_STYLE => {
+        upsert_settings(None, |settings| Ok(Settings { warning_style: None, ..settings }))?;
+        context.print_outcome("warning style unset");
       }
       _ => unreachable!(),
     }
@@ -470,6 +625,8 @@ pub(crate) enum SettingLabel {
   DefaultPlatform,
   DefaultTenant,
   DryRun,
+  ErrorColor,
+  ErrorStyle,
   FileName,
   LogLevel,
   LogLevelApi,
@@ -481,9 +638,16 @@ pub(crate) enum SettingLabel {
   OutputFormat,
   Quiet,
   ShowExecutionTime,
+  StderrColor,
+  StderrStyle,
+  StdoutColor,
+  StdoutStyle,
+  SuppressExitStatus,
   Target,
   TerminalWidth,
   Verbosity,
+  WarningColor,
+  WarningStyle,
 }
 
 impl Label for SettingLabel {
@@ -494,6 +658,8 @@ impl Label for SettingLabel {
       Self::DefaultPlatform => SETTING_DEFAULT_PLATFORM,
       Self::DefaultTenant => SETTING_DEFAULT_TENANT,
       Self::DryRun => SETTING_DRY_RUN,
+      Self::ErrorColor => SETTING_ERROR_COLOR,
+      Self::ErrorStyle => SETTING_ERROR_COLOR,
       Self::FileName => "settings file name",
       Self::LogLevel => SETTING_LOG_LEVEL,
       Self::LogLevelApi => SETTING_LOG_LEVEL_API,
@@ -505,9 +671,16 @@ impl Label for SettingLabel {
       Self::OutputFormat => SETTING_OUTPUT_FORMAT,
       Self::Quiet => SETTING_QUIET,
       Self::ShowExecutionTime => SETTING_SHOW_EXECUTION_TIME,
+      Self::StderrColor => SETTING_STDERR_COLOR,
+      Self::StderrStyle => SETTING_STDERR_STYLE,
+      Self::StdoutColor => SETTING_STDOUT_COLOR,
+      Self::StdoutStyle => SETTING_STDOUT_STYLE,
+      Self::SuppressExitStatus => SETTING_SUPPRESS_EXIT_STATUS,
       Self::Target => "setting",
       Self::TerminalWidth => SETTING_TERMINAL_WIDTH,
       Self::Verbosity => SETTING_VERBOSITY,
+      Self::WarningColor => SETTING_WARNING_COLOR,
+      Self::WarningStyle => SETTING_WARNING_STYLE,
     }
   }
 
@@ -527,6 +700,8 @@ impl SubjectFormatter<SettingLabel> for Settings {
       },
       SettingLabel::DefaultTenant => self.default_tenant.clone().unwrap_or_default(),
       SettingLabel::DryRun => self.dry_run.map(|dry_run| dry_run.to_string()).unwrap_or_default(),
+      SettingLabel::ErrorColor => self.error_color.clone().map(|color| color.to_string()).unwrap_or_default(),
+      SettingLabel::ErrorStyle => self.error_style.clone().map(|style| style.to_string()).unwrap_or_default(),
       SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
       SettingLabel::MatchingColor => self.matching_color.clone().map(|color| color.to_string()).unwrap_or_default(),
       SettingLabel::MatchingStyle => self.matching_style.clone().map(|style| style.to_string()).unwrap_or_default(),
@@ -541,31 +716,47 @@ impl SubjectFormatter<SettingLabel> for Settings {
         .show_execution_time
         .map(|show_execution_time| show_execution_time.to_string())
         .unwrap_or_default(),
+      SettingLabel::StderrColor => self.stderr_color.clone().map(|color| color.to_string()).unwrap_or_default(),
+      SettingLabel::StderrStyle => self.stderr_style.clone().map(|style| style.to_string()).unwrap_or_default(),
+      SettingLabel::StdoutColor => self.stdout_color.clone().map(|color| color.to_string()).unwrap_or_default(),
+      SettingLabel::StdoutStyle => self.stdout_style.clone().map(|style| style.to_string()).unwrap_or_default(),
+      SettingLabel::SuppressExitStatus => self.suppress_exit_status.map(|status| status.to_string()).unwrap_or_default(),
       SettingLabel::Target => target_id.to_string(),
       SettingLabel::TerminalWidth => self.terminal_width.map(|width| width.to_string()).unwrap_or_default(),
       SettingLabel::Verbosity => self.verbosity.clone().map(|verbosity| verbosity.to_string()).unwrap_or_default(),
+      SettingLabel::WarningColor => self.warning_color.clone().map(|color| color.to_string()).unwrap_or_default(),
+      SettingLabel::WarningStyle => self.warning_style.clone().map(|style| style.to_string()).unwrap_or_default(),
     }
   }
 }
 
-pub static SETTING_LABELS: [SettingLabel; 19] = [
+pub static SETTING_LABELS: [SettingLabel; 28] = [
   SettingLabel::CsvQuote,
   SettingLabel::CsvSeparator,
   SettingLabel::DefaultPlatform,
   SettingLabel::DefaultTenant,
   SettingLabel::DryRun,
-  SettingLabel::MatchingColor,
-  SettingLabel::MatchingStyle,
+  SettingLabel::ErrorColor,
+  SettingLabel::ErrorStyle,
+  SettingLabel::FileName,
   SettingLabel::LogLevel,
   SettingLabel::LogLevelApi,
   SettingLabel::LogLevelSdk,
+  SettingLabel::MatchingColor,
+  SettingLabel::MatchingStyle,
   SettingLabel::NoEscape,
   SettingLabel::NoHeaders,
   SettingLabel::OutputFormat,
   SettingLabel::Quiet,
   SettingLabel::ShowExecutionTime,
+  SettingLabel::StderrColor,
+  SettingLabel::StderrStyle,
+  SettingLabel::StdoutColor,
+  SettingLabel::StdoutStyle,
+  SettingLabel::SuppressExitStatus,
   SettingLabel::Target,
   SettingLabel::TerminalWidth,
   SettingLabel::Verbosity,
-  SettingLabel::FileName,
+  SettingLabel::WarningColor,
+  SettingLabel::WarningStyle,
 ];
