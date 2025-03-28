@@ -10,9 +10,9 @@ use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::global_arguments::{
-  dry_run_argument, force_argument, matching_color_argument, matching_style_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument,
-  set_verbosity_argument, show_execution_time_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument,
-  TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT,
+  dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
+  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, TARGET_PASSWORD_FILE_ARGUMENT,
+  TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT,
 };
 use crate::log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
 use crate::log_level::initialize_logger;
@@ -71,6 +71,7 @@ mod log_arguments;
 mod log_level;
 mod modifier_flags;
 mod settings;
+mod style;
 mod subject;
 mod subjects;
 mod targets;
@@ -112,6 +113,8 @@ const ENV_VAR_PLATFORMS_FILE_NAME: &str = "DSH_API_PLATFORMS_FILE";
 const ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
 const ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
 const ENV_VAR_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
+const ENV_VAR_ERROR_COLOR: &str = "DSH_CLI_ERR_COLOR";
+const ENV_VAR_ERROR_STYLE: &str = "DSH_CLI_ERROR_STYLE";
 const ENV_VAR_HOME_DIRECTORY: &str = "DSH_CLI_HOME";
 const ENV_VAR_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
 const ENV_VAR_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
@@ -127,9 +130,16 @@ const ENV_VAR_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
 const ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
 const ENV_VAR_QUIET: &str = "DSH_CLI_QUIET";
 const ENV_VAR_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
+const ENV_VAR_STDERR_COLOR: &str = "DSH_CLI_STDERR_COLOR";
+const ENV_VAR_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
+const ENV_VAR_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
+const ENV_VAR_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
+const ENV_VAR_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
 const ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
 const ENV_VAR_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
 const ENV_VAR_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
+const ENV_VAR_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
+const ENV_VAR_WARNING_STYLE: &str = "DSH_CLI_WARNING_STYLE";
 
 const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const TARGETS_SUBDIRECTORY: &str = "targets";
@@ -140,17 +150,27 @@ type DshCliResult = Result<(), String>;
 
 #[derive(Debug)]
 enum DshCliExit {
-  Success,
-  Error(String),
+  Ok,
+  Err(String),
+  ErrContext(String, Context),
 }
 
 impl Termination for DshCliExit {
   fn report(self) -> ExitCode {
     match self {
-      DshCliExit::Success => ExitCode::SUCCESS,
-      DshCliExit::Error(msg) => {
+      DshCliExit::Ok => ExitCode::SUCCESS,
+      DshCliExit::Err(msg) => {
         eprintln!("{}", msg);
         ExitCode::FAILURE
+      }
+      DshCliExit::ErrContext(msg, context) => {
+        eprintln!("{}", msg);
+        if context.suppress_exit_status {
+          eprintln!("exit status suppressed");
+          ExitCode::SUCCESS
+        } else {
+          ExitCode::FAILURE
+        }
       }
     }
   }
@@ -158,13 +178,10 @@ impl Termination for DshCliExit {
 
 #[tokio::main]
 async fn main() -> DshCliExit {
-  match inner_main().await {
-    Ok(_) => DshCliExit::Success,
-    Err(msg) => DshCliExit::Error(msg),
-  }
+  inner_main().await
 }
 
-async fn inner_main() -> DshCliResult {
+async fn inner_main() -> DshCliExit {
   let _ = ctrlc::set_handler(move || {
     eprintln!("interrupted");
     process::exit(0);
@@ -206,7 +223,10 @@ async fn inner_main() -> DshCliResult {
     }
   }
 
-  let (settings, settings_log) = get_settings(None)?;
+  let (settings, settings_log) = match get_settings(None) {
+    Ok((setting, settings_log)) => (setting, settings_log),
+    Err(msg) => return DshCliExit::Err(msg),
+  };
 
   let mut command = create_command(&subject_commands, &settings);
 
@@ -214,37 +234,55 @@ async fn inner_main() -> DshCliResult {
 
   if let Some(shell) = matches.get_one::<AutocompleteShell>(AUTOCOMPLETE_ARGUMENT) {
     generate_autocomplete_file(&mut command, shell);
-    return Ok(());
+    return DshCliExit::Ok;
   }
 
-  initialize_logger(&matches, &settings)?;
-  debug!("{}", settings_log);
+  match initialize_logger(&matches, &settings) {
+    Ok(_) => debug!("{}", settings_log),
+    Err(msg) => return DshCliExit::Err(msg),
+  }
 
   match matches.subcommand() {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
         debug!("{:?}", requirements);
-        let contexts = Context::create_multiple(&matches, &requirements, &settings).await?;
+        let contexts = match Context::create_multiple(&matches, &requirements, &settings).await {
+          Ok(contexts) => contexts,
+          Err(msg) => return DshCliExit::Err(msg),
+        };
         for context in contexts {
-          subject.execute_subject_command(sub_matches, &context).await?;
+          match subject.execute_subject_command(sub_matches, &context).await {
+            Ok(_) => {}
+            Err(msg) => {
+              return DshCliExit::ErrContext(msg, context);
+            }
+          }
         }
       }
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject_list_shortcut) => {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
           debug!("{:?}", requirements);
-          let contexts = Context::create_multiple(&matches, &requirements, &settings).await?;
+          let contexts = match Context::create_multiple(&matches, &requirements, &settings).await {
+            Ok(contexts) => contexts,
+            Err(msg) => return DshCliExit::Err(msg),
+          };
           for context in contexts {
-            subject_list_shortcut.execute_subject_list_shortcut(sub_matches, &context).await?;
+            match subject_list_shortcut.execute_subject_list_shortcut(sub_matches, &context).await {
+              Ok(_) => {}
+              Err(msg) => {
+                return DshCliExit::ErrContext(msg, context);
+              }
+            }
           }
         }
-        None => return Err("unexpected error, list shortcut not found".to_string()),
+        None => return DshCliExit::Err("unexpected error, list shortcut not found".to_string()),
       },
     },
-    None => return Err("unexpected error, no command provided".to_string()),
+    None => return DshCliExit::Err("unexpected error, no command provided".to_string()),
   }
-  Ok(())
+  DshCliExit::Ok
 }
 
 fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
@@ -266,14 +304,13 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       log_level_argument(),
       log_level_api_argument(),
       log_level_sdk_argument(),
-      matching_color_argument(),
-      matching_style_argument(),
       no_escape_argument(),
       no_headers_argument(),
       output_format_argument(),
       quiet_argument(),
       set_verbosity_argument(),
       show_execution_time_argument(),
+      suppress_exit_status_argument(),
       terminal_width_argument(),
       generate_autocomplete_file_argument(),
     ])
