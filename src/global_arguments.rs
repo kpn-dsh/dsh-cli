@@ -171,6 +171,7 @@ pub(crate) fn suppress_exit_status_argument() -> Arg {
       "When this option is provided the dsh tool will always return exit status 0, \
             even when an error has occurred. This can be useful in scripting environments.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -206,8 +207,6 @@ pub(crate) fn target_platform_argument() -> Arg {
     .short('p')
     .action(ArgAction::Append)
     .value_parser(possible_values)
-    .num_args(1..)
-    .value_delimiter(',')
     .value_name("PLATFORM")
     .help("Provide target platform")
     .long_help(
@@ -215,9 +214,7 @@ pub(crate) fn target_platform_argument() -> Arg {
           If this argument is not provided, \
           the platform must be specified via the environment variable DSH_CLI_PLATFORM, \
           as a default setting in the settings file, or else the user will be prompted. \
-          The value between parentheses can be used as an alias for the platform name. \
-          Some functions allow multiple target platforms to be specified at once. \
-          In this case the platform names must be separated by ',', without any spaces",
+          The value between parentheses can be used as an alias for the platform name.",
     )
     .global(true)
 }
@@ -228,17 +225,13 @@ pub(crate) fn target_tenant_argument() -> Arg {
     .short('t')
     .action(ArgAction::Append)
     .value_parser(builder::NonEmptyStringValueParser::new())
-    .num_args(1..)
-    .value_delimiter(',')
     .value_name("TENANT")
     .help("Provide target tenant")
     .long_help(
       "This option specifies the name of the target tenant. \
           If this argument is not provided, \
           the tenant should be specified via the environment variable DSH_CLI_TENANT, \
-          as a default setting in the settings file, or else the user will be prompted. \
-          Some functions allow multiple target tenants to be specified at once. \
-          In this case the platform names must be separated by ',', without any spaces",
+          as a default setting in the settings file, or else the user will be prompted.",
     )
     .global(true)
 }
