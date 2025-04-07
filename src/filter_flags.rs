@@ -3,6 +3,7 @@ use clap::{Arg, ArgAction};
 #[derive(Debug)]
 pub(crate) enum FilterFlagType {
   App,
+  Complete,
   Service,
   Started,
   Stopped,
@@ -12,6 +13,7 @@ impl FilterFlagType {
   pub(crate) fn id(&self) -> &'static str {
     match &self {
       Self::App => "app-flag",
+      Self::Complete => "complete-flag",
       Self::Service => "service-flag",
       Self::Started => "started-flag",
       Self::Stopped => "stopped-flag",
@@ -21,6 +23,7 @@ impl FilterFlagType {
   fn option(&self) -> &'static str {
     match &self {
       Self::App => "app",
+      Self::Complete => "complete",
       Self::Service => "service",
       Self::Started => "started",
       Self::Stopped => "stopped",
@@ -30,6 +33,7 @@ impl FilterFlagType {
   fn help(&self) -> &'static str {
     match &self {
       Self::App => "Include apps",
+      Self::Complete => "Include all parameters",
       Self::Service => "Include services",
       Self::Started => "Include only started apps/services",
       Self::Stopped => "Include only stopped apps/services",

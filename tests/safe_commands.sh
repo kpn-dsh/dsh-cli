@@ -7,7 +7,9 @@ export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="^info$"
 export IMAGE_UNDER_TEST=registry:eavesdropper:0.9.2
 export IMAGE_UNDER_TEST_REGEX=registry
-export PLATFORM_UNDER_TEST=prodlz
+export MANIFEST_UNDER_TEST=dsh-ollama
+export MANIFEST_UNDER_TEST_VERSION=0.5.0-all
+export PLATFORM_UNDER_TEST=nplz
 export PROXY_UNDER_TEST=broker
 export SECRET_NON_EXISTING=non-existing-secret
 export SECRET_UNDER_TEST=boss-account-ids
@@ -61,6 +63,14 @@ export SAFE_COMMANDS=(
   "image list --started"
   "image list --stopped"
   "image list"
+
+  "manifest export $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
+  "manifest list"
+  "manifest list --ids"
+  "manifest show $MANIFEST_UNDER_TEST"
+  "manifest show $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
+  "manifest show $MANIFEST_UNDER_TEST --complete"
+  "manifest show $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION --complete"
 
   "metric list --started"
   "metric list --stopped"
