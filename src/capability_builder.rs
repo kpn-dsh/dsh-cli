@@ -7,6 +7,7 @@ use crate::subject::Requirements;
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
+use dsh_api::dsh_api_client::DshApiClient;
 
 pub struct CapabilityBuilder<'a> {
   capability_command_name: String,
@@ -15,8 +16,7 @@ pub struct CapabilityBuilder<'a> {
   long_about: Option<String>,
   subcommands: Vec<Command>,
   executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<String>)>,
-  default_executor: Option<&'a (dyn CommandExecutor + Send + Sync)>,
-  run_all_executors: bool,
+  default_executor: &'a (dyn CommandExecutor + Send + Sync),
   target_arguments: Vec<Arg>,
   extra_arguments: Vec<Arg>,
   filter_flags: Vec<(FilterFlagType, Option<String>)>,
@@ -29,7 +29,7 @@ impl<'a> CapabilityBuilder<'a> {
   /// ## Parameters
   /// * `capability_type` -
   /// * `about` - help text printed when -h flag is provided
-  pub fn new(command: &str, alias: Option<&str>, about: impl Into<String>) -> Self {
+  pub fn new(command: &str, alias: Option<&str>, default_executor: &'a (dyn CommandExecutor + Send + Sync), about: impl Into<String>) -> Self {
     Self {
       capability_command_name: command.to_string(),
       capability_command_alias: alias.map(|alias| alias.to_string()),
@@ -37,8 +37,7 @@ impl<'a> CapabilityBuilder<'a> {
       long_about: None,
       subcommands: vec![],
       executors: vec![],
-      default_executor: None,
-      run_all_executors: false,
+      default_executor,
       target_arguments: vec![],
       extra_arguments: vec![],
       filter_flags: vec![],
@@ -81,16 +80,6 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn set_default_command_executor(mut self, executor: &'a (dyn CommandExecutor + Send + Sync)) -> Self {
-    self.default_executor = Some(executor);
-    self
-  }
-
-  pub fn set_run_all_executors(mut self, value: bool) -> Self {
-    self.run_all_executors = value;
-    self
-  }
-
   pub fn add_target_argument(mut self, argument: Arg) -> Self {
     self.target_arguments.push(argument);
     self
@@ -111,7 +100,7 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn _add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
+  pub fn add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
     self.filter_flags.push((flag_type, long_help));
     self
   }
@@ -186,65 +175,44 @@ impl Capability for CapabilityBuilder<'_> {
   }
 
   fn requirements(&self, matches: &ArgMatches) -> Requirements {
-    // TODO This is not correct
-    let mut match_found = false;
-    let mut composite_requirements = Requirements::new(false, false, false, None);
-    if self.run_all_executors {
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) {
-          composite_requirements = composite_requirements.or(&executor.requirements(matches));
-          match_found = true;
-        }
-      }
-    } else {
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) && !match_found {
-          composite_requirements = composite_requirements.or(&executor.requirements(matches));
-          match_found = true;
-        }
+    for (flag_type, executor, _) in &self.executors {
+      if matches.get_flag(flag_type.id()) {
+        return executor.requirements(matches);
       }
     }
-    if !match_found {
-      if let Some(default_executor) = self.default_executor {
-        composite_requirements = composite_requirements.or(&default_executor.requirements(matches));
-      }
-    }
-    composite_requirements
+    self.default_executor.requirements(matches)
   }
 
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let mut last_dsh_result: Option<DshCliResult> = None;
-    let mut number_of_executed_capabilities = 0;
-    if self.run_all_executors {
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) {
-          last_dsh_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
-          number_of_executed_capabilities += 1;
-        }
-      }
-    } else {
-      for (flag_type, executor, _) in &self.executors {
-        if matches.get_flag(flag_type.id()) && last_dsh_result.is_none() {
-          last_dsh_result = Some(executor.execute(argument.clone(), sub_argument.clone(), matches, context).await);
-          number_of_executed_capabilities += 1;
-        }
+  async fn execute_capability_with_client(
+    &self,
+    argument: Option<String>,
+    sub_argument: Option<String>,
+    matches: &ArgMatches,
+    dsh_api_client: &DshApiClient,
+    context: &Context,
+  ) -> DshCliResult {
+    for (flag_type, executor, _) in &self.executors {
+      if matches.get_flag(flag_type.id()) {
+        return executor
+          .execute_with_client(argument.clone(), sub_argument.clone(), matches, dsh_api_client, context)
+          .await;
       }
     }
-    match last_dsh_result {
-      Some(dsh_result) => {
-        if number_of_executed_capabilities > 1 {
-          Ok(())
-        } else {
-          dsh_result
-        }
-      }
-      None => {
-        if let Some(default_executor) = self.default_executor {
-          default_executor.execute(argument.clone(), sub_argument.clone(), matches, context).await
-        } else {
-          Ok(())
-        }
+    self
+      .default_executor
+      .execute_with_client(argument.clone(), sub_argument.clone(), matches, dsh_api_client, context)
+      .await
+  }
+
+  async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    for (flag_type, executor, _) in &self.executors {
+      if matches.get_flag(flag_type.id()) {
+        return executor.execute_without_client(argument.clone(), sub_argument.clone(), matches, context).await;
       }
     }
+    self
+      .default_executor
+      .execute_without_client(argument.clone(), sub_argument.clone(), matches, context)
+      .await
   }
 }

@@ -19,6 +19,7 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::application::parse_image_string;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Application, TaskState};
 use dsh_api::types::{Task, TaskStatus};
 use dsh_api::DshApiError;
@@ -38,60 +39,52 @@ lazy_static! {
 
 lazy_static! {
   static ref SERVICE_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), "Create service")
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &ServiceCreate {}, "Create service")
       .set_long_about("Create a new service.")
-      .set_default_command_executor(&ServiceCreate {})
       .add_target_argument(service_id_argument().required(true))
       .add_extra_argument(instances_flag())
   );
   static ref SERVICE_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete service")
+    CapabilityBuilder::new(DELETE_COMMAND, None, &ServiceDelete {}, "Delete service")
       .set_long_about("Deletes a service from the DSH platform.")
-      .set_default_command_executor(&ServiceDelete {})
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_DUPLICATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DUPLICATE_COMMAND, None, "Duplicate service configuration")
+    CapabilityBuilder::new(DUPLICATE_COMMAND, None, &ServiceDuplicate {}, "Duplicate service configuration")
       .set_long_about("Duplicate a service configuration and update it using your default editor.")
-      .set_default_command_executor(&ServiceDuplicate {})
       .add_target_argument(service_id_argument().required(true))
       .add_extra_argument(Arg::new("verbatim-flag").long("verbatim").action(ArgAction::SetTrue).help("Verbatim duplicate"))
   );
   static ref SERVICE_EDIT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(EDIT_COMMAND, None, "Edit service configuration")
+    CapabilityBuilder::new(EDIT_COMMAND, None, &ServiceEdit {}, "Edit service configuration")
       .set_long_about("Edit the service configuration using your default editor.")
-      .set_default_command_executor(&ServiceEdit {})
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List services")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ServiceListAll {}, "List services")
       .set_long_about(
         "Lists all DSH services. \
         This will also include services that are stopped \
         (deployed with 0 instances)."
       )
-      .set_default_command_executor(&ServiceListAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &ServiceListAllocationStatus {}, None),
         (FlagType::Ids, &ServiceListIds {}, None),
         (FlagType::Tasks, &ServiceListTasks {}, None),
       ])
-      .set_run_all_executors(true)
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("List all started services.".to_string())),
         (FilterFlagType::Stopped, Some("List all stopped services.".to_string()))
       ])
   );
   static ref SERVICE_RESTART_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(RESTART_COMMAND, None, "Restart service")
+    CapabilityBuilder::new(RESTART_COMMAND, None, &ServiceRestart {}, "Restart service")
       .set_long_about("Restarts an already running service.")
-      .set_default_command_executor(&ServiceRestart {})
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show service configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ServiceShowAll {}, "Show service configuration")
       .set_long_about("Show the configuration of a DSH service.")
-      .set_default_command_executor(&ServiceShowAll {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &ServiceShowAllocationStatus {}, None),
         (FlagType::Tasks, &ServiceShowTasks {}, None),
@@ -99,22 +92,19 @@ lazy_static! {
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_START_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(START_COMMAND, None, "Start service")
+    CapabilityBuilder::new(START_COMMAND, None, &ServiceStart {}, "Start service")
       .set_long_about("Start a DSH service.")
-      .set_default_command_executor(&ServiceStart {})
       .add_target_argument(service_id_argument().required(true))
       .add_extra_argument(instances_flag())
   );
   static ref SERVICE_STOP_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(STOP_COMMAND, None, "Stop service")
+    CapabilityBuilder::new(STOP_COMMAND, None, &ServiceStop {}, "Stop service")
       .set_long_about("Stop a running DSH service, by setting the number of instances to 0.")
-      .set_default_command_executor(&ServiceStop {})
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(UPDATE_COMMAND, None, "Update service")
+    CapabilityBuilder::new(UPDATE_COMMAND, None, &ServiceUpdate {}, "Update service")
       .set_long_about("Update a DSH service.")
-      .set_default_command_executor(&ServiceUpdate {})
       .add_target_argument(service_id_argument().required(true))
       .add_extra_argument(cpus_flag())
       .add_extra_argument(instances_flag())
@@ -214,9 +204,9 @@ struct ServiceCreate {}
 
 #[async_trait]
 impl CommandExecutor for ServiceCreate {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    if context.client_unchecked().get_application_configuration(&service_id).await.is_ok() {
+    if client.get_application_configuration(&service_id).await.is_ok() {
       return Err(format!("service '{}' already exists", service_id));
     }
     context.print_explanation(format!("create new service '{}'", service_id));
@@ -226,7 +216,7 @@ impl CommandExecutor for ServiceCreate {
         if context.dry_run {
           context.print_warning("dry-run mode, service not created");
         } else {
-          context.client_unchecked().put_application_configuration(&service_id, &service).await?;
+          client.put_application_configuration(&service_id, &service).await?;
           context.print_outcome(format!("service '{}' created", service_id));
         }
         Ok(())
@@ -235,8 +225,8 @@ impl CommandExecutor for ServiceCreate {
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -244,17 +234,17 @@ struct ServiceDelete {}
 
 #[async_trait]
 impl CommandExecutor for ServiceDelete {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("delete service '{}'", service_id));
-    if context.client_unchecked().get_application_configuration(&service_id).await.is_err() {
+    if client.get_application_configuration(&service_id).await.is_err() {
       return Err(format!("service '{}' does not exist", service_id));
     }
-    if context.confirmed(format!("type 'yes' to delete service '{}': ", service_id))? {
+    if context.confirmed(format!("delete service '{}'?", service_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, service not deleted");
       } else {
-        context.client_unchecked().delete_application_configuration(&service_id).await?;
+        client.delete_application_configuration(&service_id).await?;
         context.print_outcome(format!("service '{}' deleted", service_id));
       }
     } else {
@@ -263,8 +253,8 @@ impl CommandExecutor for ServiceDelete {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -272,26 +262,21 @@ struct ServiceDuplicate {}
 
 #[async_trait]
 impl CommandExecutor for ServiceDuplicate {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("create new service from service '{}'", service_id));
     let verbatim = matches.get_flag("verbatim-flag");
     let duplicate_service_id = read_single_line("service name for new service: ")?;
-    if context.client_unchecked().get_application_configuration(&duplicate_service_id).await.is_ok() {
+    if client.get_application_configuration(&duplicate_service_id).await.is_ok() {
       context.print_error(format!("service '{}' already exists", duplicate_service_id));
       return Ok(());
     }
-    match context.client_unchecked().get_application_configuration(&service_id).await {
+    match client.get_application_configuration(&service_id).await {
       Ok(mut application) => {
         if !verbatim {
           match edit_configuration(
             &application,
-            &format!(
-              "{}.{}.{}.configuration.json",
-              &context.client_unchecked().platform().name(),
-              context.client_unchecked().tenant().name(),
-              &service_id,
-            ),
+            &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
           )
           .await?
           {
@@ -299,14 +284,13 @@ impl CommandExecutor for ServiceDuplicate {
             None => context.print_warning("configuration file hasn't changed, verbatim duplicate created"),
           }
         }
-        if context.dry_run {
-          context.print_warning("dry-run mode, duplicate service not created");
-        } else {
-          context
-            .client_unchecked()
-            .put_application_configuration(&duplicate_service_id, &application)
-            .await?;
-          context.print_outcome(format!("new service '{}' created from service '{}'", duplicate_service_id, service_id));
+        if context.confirmed(format!("create duplicate service '{}'?", duplicate_service_id))? {
+          if context.dry_run {
+            context.print_warning("dry-run mode, duplicate service not created");
+          } else {
+            client.put_application_configuration(&duplicate_service_id, &application).await?;
+            context.print_outcome(format!("new service '{}' created from service '{}'", duplicate_service_id, service_id));
+          }
         }
         Ok(())
       }
@@ -320,8 +304,8 @@ impl CommandExecutor for ServiceDuplicate {
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -329,28 +313,25 @@ struct ServiceEdit {}
 
 #[async_trait]
 impl CommandExecutor for ServiceEdit {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("edit service '{}' configuration", service_id));
-    match context.client_unchecked().get_application_configuration(&service_id).await {
+    match client.get_application_configuration(&service_id).await {
       Ok(application) => {
         match edit_configuration(
           &application,
-          &format!(
-            "{}.{}.{}.configuration.json",
-            &context.client_unchecked().platform().name(),
-            context.client_unchecked().tenant().name(),
-            &service_id,
-          ),
+          &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
         )
         .await?
         {
           Some(updated_application) => {
-            if context.dry_run {
-              context.print_warning("dry-run mode, service configuration not updated");
-            } else {
-              context.client_unchecked().put_application_configuration(&service_id, &updated_application).await?;
-              context.print_outcome(format!("service '{}' configuration updated", service_id));
+            if context.confirmed(format!("update service '{}'?", service_id))? {
+              if context.dry_run {
+                context.print_warning("dry-run mode, service configuration not updated");
+              } else {
+                client.put_application_configuration(&service_id, &updated_application).await?;
+                context.print_outcome(format!("service '{}' configuration updated", service_id));
+              }
             }
           }
           None => context.print_warning("configuration file hasn't changed, service configuration not updated"),
@@ -367,8 +348,8 @@ impl CommandExecutor for ServiceEdit {
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -376,10 +357,10 @@ struct ServiceListAll {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all services with their parameters");
     let start_instant = context.now();
-    let services = context.client_unchecked().get_application_configuration_map().await?;
+    let services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut service_ids = services.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     service_ids.sort();
@@ -392,12 +373,12 @@ impl CommandExecutor for ServiceListAll {
         }
       };
     }
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -405,20 +386,20 @@ struct ServiceListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListAllocationStatus {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all services with their allocation status");
     let start_instant = context.now();
-    let service_ids = context.client_unchecked().list_application_ids().await?;
-    let allocation_statuses = try_join_all(service_ids.iter().map(|service_id| context.client_unchecked().get_application_status(service_id))).await?;
+    let service_ids = client.list_application_ids().await?;
+    let allocation_statuses = try_join_all(service_ids.iter().map(|service_id| client.get_application_status(service_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("service id"), context);
     formatter.push_target_ids_and_values(service_ids.as_slice(), allocation_statuses.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -426,19 +407,19 @@ struct ServiceListIds {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all service ids");
     let start_instant = context.now();
-    let ids = context.client_unchecked().list_application_ids().await?;
+    let ids = client.list_application_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("service id", context);
     formatter.push_target_ids(ids.as_slice());
-    formatter.print()?;
+    formatter.print(Some(OutputFormat::Plain))?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -446,7 +427,7 @@ struct ServiceListTasks {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListTasks {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     fn tasks_to_string(tasks: Vec<String>) -> String {
       if tasks.len() <= 4 {
         tasks.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")
@@ -460,13 +441,8 @@ impl CommandExecutor for ServiceListTasks {
     }
     context.print_explanation("list all services with their tasks");
     let start_instant = context.now();
-    let services_with_tasks = context.client_unchecked().get_task_ids().await?;
-    let tasks: Vec<Vec<String>> = try_join_all(
-      services_with_tasks
-        .iter()
-        .map(|service_id| context.client_unchecked().get_task_appid_ids(service_id)),
-    )
-    .await?;
+    let services_with_tasks = client.get_task_ids().await?;
+    let tasks: Vec<Vec<String>> = try_join_all(services_with_tasks.iter().map(|service_id| client.get_task_appid_ids(service_id))).await?;
     context.print_execution_time(start_instant);
     let service_id_tasks_pairs: Vec<(String, String)> = services_with_tasks
       .iter()
@@ -475,12 +451,12 @@ impl CommandExecutor for ServiceListTasks {
       .collect::<Vec<_>>();
     let mut formatter: ListFormatter<ServiceLabel, (String, String)> = ListFormatter::new(&[ServiceLabel::Target, ServiceLabel::Tasks], None, context);
     formatter.push_values(&service_id_tasks_pairs);
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -488,10 +464,10 @@ struct ServiceRestart {}
 
 #[async_trait]
 impl CommandExecutor for ServiceRestart {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("restart service '{}'", service_id));
-    match context.client_unchecked().get_application_configuration(&service_id).await {
+    match client.get_application_configuration(&service_id).await {
       Ok(mut configuration) => {
         let instances = configuration.instances;
         if instances == 0 {
@@ -499,8 +475,8 @@ impl CommandExecutor for ServiceRestart {
         } else if context.dry_run {
           context.print_warning("dry-run mode, service not restarted");
         } else {
-          let task_ids = context.client_unchecked().get_task_appid_ids(&service_id).await?;
-          let task_statuses = try_join_all(task_ids.iter().map(|task_id| context.client_unchecked().get_task(&service_id, task_id))).await?;
+          let task_ids = client.get_task_appid_ids(&service_id).await?;
+          let task_statuses = try_join_all(task_ids.iter().map(|task_id| client.get_task(&service_id, task_id))).await?;
           let running_task_ids = task_ids
             .into_iter()
             .zip(task_statuses)
@@ -513,16 +489,11 @@ impl CommandExecutor for ServiceRestart {
           } else {
             context.print_outcome(format!("stop service '{}' ({} instances)", service_id, running_task_ids.len()));
           }
-          context.client_unchecked().put_application_configuration(&service_id, &configuration).await?;
+          client.put_application_configuration(&service_id, &configuration).await?;
           loop {
             context.print_progress_step();
             sleep(Duration::from_millis(1000));
-            let poll_tasks = try_join_all(
-              running_task_ids
-                .iter()
-                .map(|running_task_id| context.client_unchecked().get_task(&service_id, running_task_id)),
-            )
-            .await?;
+            let poll_tasks = try_join_all(running_task_ids.iter().map(|running_task_id| client.get_task(&service_id, running_task_id))).await?;
             if poll_tasks
               .iter()
               .all(|task_status| task_status.actual.clone().is_some_and(|task| task.state == TaskState::Killed))
@@ -536,7 +507,7 @@ impl CommandExecutor for ServiceRestart {
             context.print_outcome(format!("\nservice '{}' stopped ({} instances)", service_id, running_task_ids.len()));
           }
           configuration.instances = instances;
-          context.client_unchecked().put_application_configuration(&service_id, &configuration).await?;
+          client.put_application_configuration(&service_id, &configuration).await?;
           if instances == 1 {
             context.print_outcome(format!("service '{}' started", service_id));
           } else {
@@ -555,8 +526,8 @@ impl CommandExecutor for ServiceRestart {
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -564,17 +535,17 @@ struct ServiceShowAll {}
 
 #[async_trait]
 impl CommandExecutor for ServiceShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for service '{}'", service_id));
     let start_instant = context.now();
-    let service = context.client_unchecked().get_application_configuration(&service_id).await?;
+    let service = client.get_application_configuration(&service_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(service_id, &SERVICE_LABELS_SHOW, Some("service id"), context).print(&service)
+    UnitFormatter::new(service_id, &SERVICE_LABELS_SHOW, Some("service id"), context).print(&service, None)
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -582,17 +553,17 @@ struct ServiceShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for ServiceShowAllocationStatus {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show allocation status for service '{}'", service_id));
     let start_instant = context.now();
-    let allocation_status = context.client_unchecked().get_application_status(&service_id).await?;
+    let allocation_status = client.get_application_status(&service_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(service_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("service id"), context).print(&allocation_status)
+    UnitFormatter::new(service_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("service id"), context).print(&allocation_status, None)
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -600,23 +571,23 @@ struct ServiceShowTasks {}
 
 #[async_trait]
 impl CommandExecutor for ServiceShowTasks {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all tasks for service '{}'", service_id));
     let start_instant = context.now();
-    let task_ids = context.client_unchecked().get_task_appid_ids(&service_id).await?;
-    let task_statuses = try_join_all(task_ids.iter().map(|task_id| context.client_unchecked().get_task(&service_id, task_id))).await?;
+    let task_ids = client.get_task_appid_ids(&service_id).await?;
+    let task_statuses = try_join_all(task_ids.iter().map(|task_id| client.get_task(&service_id, task_id))).await?;
     context.print_execution_time(start_instant);
     let mut tasks: Vec<(String, TaskStatus)> = task_ids.into_iter().zip(task_statuses).collect();
     tasks.sort_by(|first, second| second.1.actual.clone().unwrap().staged_at.cmp(&first.1.actual.clone().unwrap().staged_at));
     let mut formatter = ListFormatter::new(&TASK_LABELS_LIST, None, context);
     formatter.push_target_id_value_pairs(tasks.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -624,7 +595,7 @@ struct ServiceStart {}
 
 #[async_trait]
 impl CommandExecutor for ServiceStart {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     let instances: u64 = matches.get_one::<u64>(INSTANCES_FLAG).cloned().unwrap_or(1);
     if instances == 1 {
@@ -632,7 +603,7 @@ impl CommandExecutor for ServiceStart {
     } else {
       context.print_explanation(format!("start {} instances of service '{}'", instances, service_id));
     }
-    match context.client_unchecked().get_application_configuration(&service_id).await {
+    match client.get_application_configuration(&service_id).await {
       Ok(mut configuration) => {
         if configuration.instances > 0 {
           context.print_warning(format!("service '{}' already started", service_id));
@@ -640,7 +611,7 @@ impl CommandExecutor for ServiceStart {
           context.print_warning("dry-run mode, service not started");
         } else {
           configuration.instances = instances;
-          context.client_unchecked().put_application_configuration(&service_id, &configuration).await?;
+          client.put_application_configuration(&service_id, &configuration).await?;
           if instances == 1 {
             context.print_outcome(format!("service '{}' started", service_id));
           } else {
@@ -659,8 +630,8 @@ impl CommandExecutor for ServiceStart {
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -668,10 +639,10 @@ struct ServiceStop {}
 
 #[async_trait]
 impl CommandExecutor for ServiceStop {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("stop service '{}'", service_id));
-    match context.client_unchecked().get_application_configuration(&service_id).await {
+    match client.get_application_configuration(&service_id).await {
       Ok(mut configuration) => {
         let running_instances = configuration.instances;
         if running_instances == 0 {
@@ -680,7 +651,7 @@ impl CommandExecutor for ServiceStop {
           context.print_warning("dry-run mode, service not stopped");
         } else {
           configuration.instances = 0;
-          context.client_unchecked().put_application_configuration(&service_id, &configuration).await?;
+          client.put_application_configuration(&service_id, &configuration).await?;
           if running_instances == 1 {
             context.print_outcome(format!("service '{}' stopped", service_id));
           } else {
@@ -699,8 +670,8 @@ impl CommandExecutor for ServiceStop {
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -708,7 +679,7 @@ struct ServiceUpdate {}
 
 #[async_trait]
 impl CommandExecutor for ServiceUpdate {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     let cpus: Option<f64> = match matches.get_one::<f64>(CPUS_FLAG).cloned() {
       Some(cpus) => {
@@ -726,7 +697,7 @@ impl CommandExecutor for ServiceUpdate {
       return Err("at least one update argument must be provided".to_string());
     }
     context.print_explanation(format!("update service '{}'", service_id));
-    match context.client_unchecked().get_application_configuration(&service_id).await {
+    match client.get_application_configuration(&service_id).await {
       Ok(mut configuration) => {
         if cpus.iter().any(|cpus| *cpus != configuration.cpus)
           | instances.iter().any(|instances| *instances != configuration.instances)
@@ -744,7 +715,7 @@ impl CommandExecutor for ServiceUpdate {
             if let Some(mem) = mem {
               configuration.mem = mem
             }
-            context.client_unchecked().put_application_configuration(&service_id, &configuration).await?;
+            client.put_application_configuration(&service_id, &configuration).await?;
             context.print_outcome(format!("service '{}' updated", service_id));
           }
           Ok(())
@@ -763,8 +734,8 @@ impl CommandExecutor for ServiceUpdate {
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

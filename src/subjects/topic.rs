@@ -16,6 +16,7 @@ use async_trait::async_trait;
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::application::find_applications_that_use_topic;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Application;
 use dsh_api::types::{Topic, TopicStatus};
 use dsh_api::{Injection, UsedBy};
@@ -68,8 +69,7 @@ impl Subject for TopicSubject {
 
 lazy_static! {
   static ref TOPIC_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), "Create new topic")
-      .set_default_command_executor(&TopicCreate {})
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TopicCreate {}, "Create new topic")
       .add_target_argument(topic_id_argument().required(true))
       .add_extra_arguments(vec![
         cleanup_policy_flag(),
@@ -80,25 +80,21 @@ lazy_static! {
       ])
   );
   static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete scratch topic")
+    CapabilityBuilder::new(DELETE_COMMAND, None, &TopicDelete {}, "Delete scratch topic")
       .set_long_about("Delete a scratch topic.")
-      .set_default_command_executor(&TopicDelete {})
       .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List topics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TopicListConfiguration {}, "List topics")
       .set_long_about("Lists all available scratch topics.")
-      .set_default_command_executor(&TopicListConfiguration {})
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
         (FlagType::Ids, &TopicListIds {}, None),
         (FlagType::Usage, &TopicListUsage {}, None),
       ])
-      .set_run_all_executors(true)
   );
   static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show topic configuration")
-      .set_default_command_executor(&TopicShow {})
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TopicShow {}, "Show topic configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
         (FlagType::Properties, &TopicShowProperties {}, None),
@@ -182,10 +178,10 @@ const MESSAGE_TIMESTAMP_PROPERTY: &str = "message.timestamp.type";
 
 #[async_trait]
 impl CommandExecutor for TopicCreate {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     const REPLICATION_FACTOR: u32 = 3;
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    if context.client_unchecked().get_topic_configuration(&topic_id).await.is_ok() {
+    if client.get_topic_configuration(&topic_id).await.is_ok() {
       return Err(format!("topic '{}' already exists", topic_id));
     }
     let partitions = matches.get_one::<u32>(PARTITIONS_FLAG).cloned().unwrap_or(1);
@@ -218,14 +214,14 @@ impl CommandExecutor for TopicCreate {
     if context.dry_run {
       context.print_warning("dry-run mode, topic not created");
     } else {
-      context.client_unchecked().put_topic_configuration(&topic_id, &topic).await?;
+      client.put_topic_configuration(&topic_id, &topic).await?;
       context.print_outcome(format!("topic '{}' created", topic_id));
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -233,17 +229,17 @@ struct TopicDelete {}
 
 #[async_trait]
 impl CommandExecutor for TopicDelete {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("delete topic '{}'", topic_id));
-    if context.client_unchecked().get_topic(&topic_id).await.is_err() {
+    if client.get_topic(&topic_id).await.is_err() {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }
-    if context.confirmed(format!("type 'yes' to delete scratch topic '{}': ", topic_id))? {
+    if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, topic not deleted");
       } else {
-        context.client_unchecked().delete_topic_configuration(&topic_id).await?;
+        client.delete_topic_configuration(&topic_id).await?;
         context.print_outcome(format!("topic '{}' deleted", topic_id));
       }
     } else {
@@ -252,8 +248,8 @@ impl CommandExecutor for TopicDelete {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -261,20 +257,20 @@ struct TopicListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for TopicListAllocationStatus {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topics with their allocation status");
     let start_instant = context.now();
-    let topic_ids = context.client_unchecked().get_topic_ids().await?;
-    let allocation_statuses = try_join_all(topic_ids.iter().map(|topic_id| context.client_unchecked().get_topic_status(topic_id))).await?;
+    let topic_ids = client.get_topic_ids().await?;
+    let allocation_statuses = try_join_all(topic_ids.iter().map(|topic_id| client.get_topic_status(topic_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context);
     formatter.push_target_ids_and_values(topic_ids.as_slice(), allocation_statuses.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -282,20 +278,20 @@ struct TopicListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for TopicListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topics with their configurations");
     let start_instant = context.now();
-    let topic_ids = context.client_unchecked().get_topic_ids().await?;
-    let configurations = try_join_all(topic_ids.iter().map(|topic_id| context.client_unchecked().get_topic_configuration(topic_id))).await?;
+    let topic_ids = client.get_topic_ids().await?;
+    let configurations = try_join_all(topic_ids.iter().map(|topic_id| client.get_topic_configuration(topic_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&TOPIC_LABELS, None, context);
     formatter.push_target_ids_and_values(topic_ids.as_slice(), configurations.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -303,19 +299,19 @@ struct TopicListIds {}
 
 #[async_trait]
 impl CommandExecutor for TopicListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topic ids");
     let start_instant = context.now();
-    let topic_ids = context.client_unchecked().get_topic_ids().await?;
+    let topic_ids = client.get_topic_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("topic id", context);
     formatter.push_target_ids(&topic_ids);
-    formatter.print()?;
+    formatter.print(Some(OutputFormat::Plain))?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -323,13 +319,10 @@ struct TopicListUsage {}
 
 #[async_trait]
 impl CommandExecutor for TopicListUsage {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topics with the services that use them");
     let start_instant = context.now();
-    let (topic_ids, services) = try_join!(
-      context.client_unchecked().get_topic_ids(),
-      context.client_unchecked().get_application_configuration_map(),
-    )?;
+    let (topic_ids, services) = try_join!(client.get_topic_ids(), client.get_application_configuration_map(),)?;
     context.print_execution_time(start_instant);
     let mut tuples: Vec<(String, UsedBy)> = vec![];
     for topic_id in &topic_ids {
@@ -345,13 +338,13 @@ impl CommandExecutor for TopicListUsage {
     } else {
       let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);
       formatter.push_target_id_value_pairs(&tuples);
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -359,17 +352,17 @@ struct TopicShow {}
 
 #[async_trait]
 impl CommandExecutor for TopicShow {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the configuration for topic '{}'", topic_id));
     let start_instant = context.now();
-    let topic = context.client_unchecked().get_topic_configuration(&topic_id).await?;
+    let topic = client.get_topic_configuration(&topic_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, context).print(&topic)
+    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, context).print(&topic, None)
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -377,17 +370,17 @@ struct TopicShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowAllocationStatus {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for topic '{}'", topic_id));
     let start_instant = context.now();
-    let allocation_status = context.client_unchecked().get_topic_status(&topic_id).await?;
+    let allocation_status = client.get_topic_status(&topic_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context).print(&allocation_status)
+    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context).print(&allocation_status, None)
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -395,23 +388,23 @@ struct TopicShowProperties {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowProperties {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the properties for topic '{}'", topic_id));
     let start_instant = context.now();
-    let topic_status = context.client_unchecked().get_topic(&topic_id).await?;
+    let topic_status = client.get_topic(&topic_id).await?;
     context.print_execution_time(start_instant);
     let mut pairs: Vec<(String, String)> = topic_status.actual.unwrap().kafka_properties.into_iter().collect::<Vec<_>>();
     pairs.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
     let (properties, values): (Vec<String>, Vec<String>) = pairs.into_iter().unzip();
     let mut formatter = ListFormatter::new(&PROPERTY_LABELS, Some("property"), context);
     formatter.push_target_ids_and_values(&properties, &values);
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -419,11 +412,11 @@ struct TopicShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowUsage {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the services that use topic '{}'", topic_id));
     let start_instant = context.now();
-    let services = context.client_unchecked().get_application_configuration_map().await?;
+    let services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(&topic_id, &services);
     let used_bys = usages
@@ -433,15 +426,15 @@ impl CommandExecutor for TopicShowUsage {
     if !used_bys.is_empty() {
       let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);
       formatter.push_values(&used_bys);
-      formatter.print()?;
+      formatter.print(None)?;
     } else {
       context.print_outcome("topic not used");
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

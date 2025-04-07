@@ -8,6 +8,7 @@ use crate::subjects::USED_BY_LABELS_LIST;
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Vhost;
 use dsh_api::UsedBy;
 use lazy_static::lazy_static;
@@ -53,9 +54,8 @@ impl Subject for VhostSubject {
 
 lazy_static! {
   static ref VHOST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List configured vhosts")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS),&VhostListUsage {}, "List configured vhosts")
       .set_long_about("List services that have vhosts configured. Vhosts that are provisioned but are not configured in any services will not be shown.")
-      .set_default_command_executor(&VhostListUsage {})
   );
   // pub static ref VHOST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
   //   CapabilityBuilder::new(SHOW_COMMAND_PAIR, "Show vhost usage")
@@ -69,10 +69,10 @@ struct VhostListUsage {}
 
 #[async_trait]
 impl CommandExecutor for VhostListUsage {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list services with a vhost configuration");
     let start_instant = context.now();
-    let vhosts_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_vhosts_with_usage().await?;
+    let vhosts_with_usage: Vec<(String, Vec<UsedBy>)> = client.list_vhosts_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("vhost"), context);
     for (vhost, used_bys) in &vhosts_with_usage {
@@ -80,12 +80,12 @@ impl CommandExecutor for VhostListUsage {
         formatter.push_target_id_value(vhost.clone(), used_by);
       }
     }
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

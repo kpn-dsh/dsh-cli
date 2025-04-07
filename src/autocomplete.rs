@@ -48,7 +48,7 @@ pub(crate) fn generate_autocomplete_file_argument() -> Arg {
           When this option is used, all other provided commands or options will be ignored.",
     )
     .exclusive(true)
-    .hide(true)
+    .hide_short_help(true)
 }
 
 pub(crate) fn generate_autocomplete_file(command: &mut Command, shell: &AutocompleteShell) {

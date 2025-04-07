@@ -1,6 +1,7 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::KafkaProxy;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
@@ -56,23 +57,17 @@ impl Subject for ProxySubject {
 
 lazy_static! {
   static ref PROXY_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete proxy")
+    CapabilityBuilder::new(DELETE_COMMAND, None, &ProxyDelete {}, "Delete proxy")
       .set_long_about("Delete a Kafka proxy.")
-      .set_default_command_executor(&ProxyDelete {})
       .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, None, "List proxies")
+    CapabilityBuilder::new(LIST_COMMAND, None, &ProxyListAll {}, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
-      .set_default_command_executor(&ProxyListAll {})
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
-      .set_run_all_executors(true)
   );
-  static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, None, "Show Kafka proxy configuration")
-      .set_default_command_executor(&ProxyShowConfiguration {})
-      .add_target_argument(proxy_id_argument().required(true))
-  );
+  static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(SHOW_COMMAND, None, &ProxyShowConfiguration {}, "Show Kafka proxy configuration").add_target_argument(proxy_id_argument().required(true)));
   static ref PROXY_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref()];
 }
@@ -81,17 +76,17 @@ struct ProxyDelete {}
 
 #[async_trait]
 impl CommandExecutor for ProxyDelete {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("delete proxy '{}'", proxy_id));
-    if context.client_unchecked().get_kafkaproxy_configuration(&proxy_id).await.is_err() {
+    if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
-    if context.confirmed(format!("type 'yes' to delete proxy '{}': ", proxy_id))? {
+    if context.confirmed(format!("delete proxy '{}'?", proxy_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, proxy not deleted");
       } else {
-        context.client_unchecked().delete_kafkaproxy_configuration(&proxy_id).await?;
+        client.delete_kafkaproxy_configuration(&proxy_id).await?;
         context.print_outcome(format!("proxy '{}' deleted", proxy_id));
       }
     } else {
@@ -100,8 +95,8 @@ impl CommandExecutor for ProxyDelete {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -109,20 +104,20 @@ struct ProxyListAll {}
 
 #[async_trait]
 impl CommandExecutor for ProxyListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all proxies with parameters");
     let start_instant = context.now();
-    let proxy_ids = context.client_unchecked().get_kafkaproxy_ids().await?;
-    let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| context.client_unchecked().get_kafkaproxy_configuration(proxy_id))).await?;
+    let proxy_ids = client.get_kafkaproxy_ids().await?;
+    let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| client.get_kafkaproxy_configuration(proxy_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&PROXY_LABELS_LIST, None, context);
     formatter.push_target_ids_and_values(proxy_ids.as_slice(), proxys.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -130,19 +125,19 @@ struct ProxyListIds {}
 
 #[async_trait]
 impl CommandExecutor for ProxyListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all proxy ids");
     let start_instant = context.now();
-    let proxy_ids = context.client_unchecked().get_kafkaproxy_ids().await?;
+    let proxy_ids = client.get_kafkaproxy_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("proxy id", context);
     formatter.push_target_ids(&proxy_ids);
-    formatter.print()?;
+    formatter.print(Some(OutputFormat::Plain))?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -150,17 +145,17 @@ struct ProxyShowConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for ProxyShowConfiguration {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
     let start_instant = context.now();
-    let proxy = context.client_unchecked().get_kafkaproxy_configuration(&proxy_id).await?;
+    let proxy = client.get_kafkaproxy_configuration(&proxy_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, context).print(&proxy)
+    UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, context).print(&proxy, None)
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

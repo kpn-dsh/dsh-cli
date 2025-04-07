@@ -8,6 +8,7 @@ use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Application;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -53,9 +54,8 @@ impl Subject for MetricSubject {
 
 lazy_static! {
   static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List exported metrics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &MetricList {}, "List exported metrics")
       .set_long_about("List all services/apps that have metrics export configured.")
-      .set_default_command_executor(&MetricList {})
       .add_filter_flags(vec![(FilterFlagType::Started, None), (FilterFlagType::Stopped, None)])
   );
   static ref METRIC_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![METRIC_LIST_CAPABILITY.as_ref()];
@@ -65,11 +65,11 @@ struct MetricList {}
 
 #[async_trait]
 impl CommandExecutor for MetricList {
-  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation("find exported metrics in services");
     let start_instant = context.now();
-    let services = context.client_unchecked().get_application_configuration_map().await?;
+    let services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let metrics_usage = metrics_usage_from_services(&services, include_started, include_stopped);
     if metrics_usage.is_empty() {
@@ -77,13 +77,13 @@ impl CommandExecutor for MetricList {
     } else {
       let mut formatter = ListFormatter::new(&METRIC_USAGE_LABELS, None, context);
       formatter.push_values(&metrics_usage);
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

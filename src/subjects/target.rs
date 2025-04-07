@@ -62,33 +62,28 @@ impl Subject for TargetSubject {
 
 lazy_static! {
   static ref TARGET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), "Create a new target configuration")
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TargetCreate {}, "Create a new target configuration")
       .set_long_about(
         "Create a new target configuration. \
         You will be prompted for the target's platform, tenant and password. \
         The platform and tenant will be stored in an unencrypted configuration file. \
         The password will be stored in your computer's keyring, which is more secure.",
       )
-      .set_default_command_executor(&TargetCreate {})
       .add_target_argument(platform_name_argument().required(true))
       .add_target_argument(tenant_name_argument().required(true))
   );
   static ref TARGET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, "Delete target configuration")
+    CapabilityBuilder::new(DELETE_COMMAND, None, &TargetDelete {}, "Delete target configuration")
       .set_long_about(
         "Delete a target configuration. \
         You will be prompted for the target's platform and tenant, \
         and you need to explicitly confirm the action.",
       )
-      .set_default_command_executor(&TargetDelete {})
       .add_target_argument(platform_name_argument().required(true))
       .add_target_argument(tenant_name_argument().required(true))
   );
-  static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List all target configurations")
-      .set_long_about("Lists all target configurations.")
-      .set_default_command_executor(&TargetList {})
-  );
+  static ref TARGET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TargetList {}, "List all target configurations").set_long_about("Lists all target configurations."));
   static ref TARGET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![TARGET_CREATE_CAPABILITY.as_ref(), TARGET_DELETE_CAPABILITY.as_ref(), TARGET_LIST_CAPABILITY.as_ref()];
 }
@@ -97,7 +92,7 @@ struct TargetCreate {}
 
 #[async_trait]
 impl CommandExecutor for TargetCreate {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("create new target configuration");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
@@ -118,8 +113,8 @@ impl CommandExecutor for TargetCreate {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -127,17 +122,13 @@ struct TargetDelete {}
 
 #[async_trait]
 impl CommandExecutor for TargetDelete {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("delete existing target");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
     match read_target(&platform, &tenant)? {
       Some(target) => {
-        let prompt = if target.password.is_some() {
-          format!("type 'yes' to delete target '{}' and password from the keyring: ", target)
-        } else {
-          format!("type 'yes' to delete target '{}': ", target)
-        };
+        let prompt = if target.password.is_some() { format!("delete target '{}' and password from the keyring?", target) } else { format!("delete target '{}'?", target) };
         if context.confirmed(prompt)? {
           if context.dry_run {
             context.print_warning(format!("dry-run mode, target '{}' not deleted", target));
@@ -166,8 +157,8 @@ impl CommandExecutor for TargetDelete {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -175,7 +166,7 @@ struct TargetList {}
 
 #[async_trait]
 impl CommandExecutor for TargetList {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all target configurations");
     let (settings, _) = get_settings(None)?;
     let targets = all_targets()?;
@@ -194,13 +185,13 @@ impl CommandExecutor for TargetList {
     } else {
       let mut formatter = ListFormatter::new(&TARGET_LABELS, None, context);
       formatter.push_values(&target_formatters);
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 

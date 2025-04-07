@@ -14,6 +14,7 @@ pub(crate) const SERVICE_ID_ARGUMENT: &str = "service-id-argument";
 pub(crate) const TENANT_NAME_ARGUMENT: &str = "tenant-name-argument";
 pub(crate) const TOPIC_ID_ARGUMENT: &str = "topic-id-argument";
 pub(crate) const VENDOR_NAME_ARGUMENT: &str = "vendor-name-argument";
+pub(crate) const VERSION_ARGUMENT: &str = "version-argument";
 pub(crate) const VHOST_ID_ARGUMENT: &str = "vhost-id-argument";
 pub(crate) const VOLUME_ID_ARGUMENT: &str = "volume-id-argument";
 
@@ -134,6 +135,15 @@ pub(crate) fn vendor_name_argument() -> Arg {
     .value_name("VENDOR")
     .help("Provide app vendor")
     .long_help("This option specifies the name of an app vendor. Allowed values are \"kpn\".")
+}
+
+pub(crate) fn version_argument() -> Arg {
+  Arg::new(VERSION_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("VERSION")
+    .help("Version string")
+    .long_help("Identifies a version.")
 }
 
 pub(crate) fn vhost_id_argument() -> Arg {

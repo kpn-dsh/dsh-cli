@@ -111,10 +111,10 @@ use clap::ArgMatches;
 //
 // // #[async_trait]
 // // impl CommandExecutor for StreamCreate {
-// //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
+// //   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, client: &DshApiClient<'_>) -> DshCliResult {
 // //     let stream_id = target.unwrap_or_else(|| unreachable!());
 // //     context.print_capability_explanation(format!("create new internal stream '{}'", stream_id));
-// //     if dsh_api_client.get_internal_stream(&stream_id).await.is_ok() {
+// //     if client.get_internal_stream(&stream_id).await.is_ok() {
 // //       return Err(format!("internal stream '{}' already exists", stream_id));
 // //     }
 // //     // let mut line = String::new();
@@ -122,7 +122,7 @@ use clap::ArgMatches;
 // //     // stdin.lock().read_line(&mut line).expect("could not read line");
 // //     // println!("{}", line);
 // //     let internal_stream = InternalManagedStream { kafka_properties: Default::default(), kind: InternalManagedStreamKind::Internal, partitions: 1, replication_factor: 1 };
-// //     dsh_api_client.create_internal_stream(&stream_id, &internal_stream).await?;
+// //     client.create_internal_stream(&stream_id, &internal_stream).await?;
 // //     println!("ok");
 // //     Ok(true)
 // //   }
@@ -132,12 +132,12 @@ use clap::ArgMatches;
 //
 // #[async_trait]
 // impl CommandExecutor for StreamListConfiguration {
-//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
+//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, client: &DshApiClient<'_>) -> DshCliResult {
 //     context.print_explanation("list all internal and public streams");
 //     let (stream_ids, internal_streams, public_streams) = try_join!(
-//       dsh_api_client.get_stream_ids(),
-//       dsh_api_client.get_internal_streams(),
-//       dsh_api_client.get_public_streams()
+//       client.get_stream_ids(),
+//       client.get_internal_streams(),
+//       client.get_public_streams()
 //     )?;
 //     let mut builder = TableBuilder::list(&STREAM_LABELS, context);
 //     for stream_id in stream_ids {
@@ -157,9 +157,9 @@ use clap::ArgMatches;
 //
 // #[async_trait]
 // impl CommandExecutor for StreamListIds {
-//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
+//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, client: &DshApiClient<'_>) -> DshCliResult {
 //     context.print_explanation("list all internal and public stream ids");
-//     print_vec("stream ids".to_string(), dsh_api_client.get_stream_ids().await?, context);
+//     print_vec("stream ids".to_string(), client.get_stream_ids().await?, context);
 //     Ok(false)
 //   }
 // }
@@ -168,9 +168,9 @@ use clap::ArgMatches;
 //
 // #[async_trait]
 // impl CommandExecutor for StreamListUsage {
-//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
+//   async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, client: &DshApiClient<'_>) -> DshCliResult {
 //     context.print_explanation("list all internal and public streams with the services that use them");
-//     let (stream_ids, services) = try_join!(dsh_api_client.get_stream_ids(), dsh_api_client.get_application_configurations())?;
+//     let (stream_ids, services) = try_join!(dsh_api_client.get_stream_ids(), client.get_application_configurations())?;
 //     let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::list(&USAGE_LABELS_LIST, context);
 //     for stream_id in &stream_ids {
 //       let mut first = true;
@@ -195,11 +195,11 @@ use clap::ArgMatches;
 //
 // #[async_trait]
 // impl CommandExecutor for StreamShowAll {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
+//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, client: &DshApiClient<'_>) -> DshCliResult {
 //     let stream_id = target.unwrap_or_else(|| unreachable!());
 //     let (internal_stream, public_stream) = join!(
-//       dsh_api_client.get_internal_stream(stream_id.as_str()),
-//       dsh_api_client.get_public_stream(stream_id.as_str())
+//       client.get_internal_stream(stream_id.as_str()),
+//       client.get_public_stream(stream_id.as_str())
 //     );
 //     if let Ok(internal_stream) = internal_stream {
 //       let mut builder = TableBuilder::show(&INTERNAL_STREAM_LABELS, context);
@@ -219,10 +219,10 @@ use clap::ArgMatches;
 //
 // #[async_trait]
 // impl CommandExecutor for StreamShowConfiguration {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
+//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, client: &DshApiClient<'_>) -> DshCliResult {
 //     let topic_id = target.unwrap_or_else(|| unreachable!());
 //     context.print_explanation(format!("show the configuration for topic '{}'", topic_id));
-//     let topic = dsh_api_client.get_topic_configuration(topic_id.as_str()).await?;
+//     let topic = client.get_topic_configuration(topic_id.as_str()).await?;
 //     println!("{:#?}", topic);
 //     Ok(false)
 //   }
@@ -232,10 +232,10 @@ use clap::ArgMatches;
 //
 // #[async_trait]
 // impl CommandExecutor for StreamShowUsage {
-//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, dsh_api_client: &DshApiClient<'_>) -> DshCliResult {
+//   async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context, client: &DshApiClient<'_>) -> DshCliResult {
 //     let topic_id = target.unwrap_or_else(|| unreachable!());
 //     context.print_explanation(format!("show the services that use topic '{}'", topic_id));
-//     let services = dsh_api_client.get_application_configurations().await?;
+//     let services = client.get_application_configurations().await?;
 //     let usages: Vec<(String, Vec<String>)> = services_that_use_topic(topic_id.as_str(), &services);
 //     if !usages.is_empty() {
 //       let mut builder: TableBuilder<UsageLabel, Usage> = TableBuilder::show(&USAGE_LABELS_SHOW, context);

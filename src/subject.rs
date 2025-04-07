@@ -1,62 +1,30 @@
-use async_trait::async_trait;
-use clap::{ArgMatches, Command};
-
 use crate::capability::{Capability, LIST_COMMAND};
 use crate::context::Context;
-use crate::formatters::OutputFormat;
 use crate::DshCliResult;
+use async_trait::async_trait;
+use clap::{ArgMatches, Command};
+use dsh_api::dsh_api_client::DshApiClient;
 
 #[derive(Debug, PartialEq)]
 pub struct Requirements {
-  needs_platform: bool,
-  needs_tenant_name: bool,
   needs_dsh_api_client: bool,
-  default_output_format: Option<OutputFormat>,
 }
 
 impl Requirements {
-  pub fn new(needs_platform: bool, needs_tenant_name: bool, needs_dsh_api_client: bool, default_output_format: Option<OutputFormat>) -> Self {
-    Self { needs_platform, needs_tenant_name, needs_dsh_api_client, default_output_format }
+  pub fn new(needs_dsh_api_client: bool) -> Self {
+    Self { needs_dsh_api_client }
   }
 
-  pub fn standard_with_api(default_output_format: Option<OutputFormat>) -> Self {
-    Self::new(false, false, true, default_output_format)
+  pub fn standard_with_api() -> Self {
+    Self::new(true)
   }
 
-  pub fn standard_without_api(default_output_format: Option<OutputFormat>) -> Self {
-    Self::new(false, false, false, default_output_format)
-  }
-
-  /// Returns logical or
-  ///
-  /// The logical or of the returned `Requirements` struct contains the pairwise logical or
-  /// of the three `bool` fields.
-  /// If the `default_output_format`s of the two instances are equal, that value is returned.
-  /// Else `None` will be returned.
-  pub fn or(&self, other: &Self) -> Self {
-    Self {
-      needs_platform: self.needs_platform | other.needs_platform,
-      needs_tenant_name: self.needs_tenant_name | other.needs_tenant_name,
-      needs_dsh_api_client: self.needs_dsh_api_client | other.needs_dsh_api_client,
-      // TODO This is not correct
-      default_output_format: if self.default_output_format == other.default_output_format { self.default_output_format.clone() } else { None },
-    }
-  }
-
-  pub fn default_output_format(&self) -> Option<OutputFormat> {
-    self.default_output_format.clone()
+  pub fn standard_without_api() -> Self {
+    Self::new(false)
   }
 
   pub fn needs_dsh_api_client(&self) -> bool {
     self.needs_dsh_api_client
-  }
-
-  pub fn needs_platform(&self) -> bool {
-    self.needs_platform || self.needs_dsh_api_client
-  }
-
-  pub fn needs_tenant_name(&self) -> bool {
-    self.needs_tenant_name || self.needs_dsh_api_client
   }
 }
 
@@ -132,55 +100,41 @@ pub trait Subject {
     self.capability(LIST_COMMAND).unwrap_or_else(|| unreachable!()).requirements(matches)
   }
 
-  async fn execute_subject_command<'a>(&self, subject_matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_subject_command_with_client<'a>(&self, subject_matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult {
     let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!());
     let capability = self.capability(capability_command_id).unwrap_or_else(|| unreachable!());
     let arguments = capability.command_target_argument_ids();
     let argument = arguments.first().and_then(|argument| capability_matches.get_one::<String>(argument)).cloned();
     let sub_argument = arguments.get(1).and_then(|argument| capability_matches.get_one::<String>(argument)).cloned();
-    capability.execute_capability(argument, sub_argument, capability_matches, context).await
+    capability
+      .execute_capability_with_client(argument, sub_argument, capability_matches, dsh_api_client, context)
+      .await
   }
 
-  async fn execute_subject_list_shortcut<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_subject_command_without_client<'a>(&self, subject_matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+    let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!());
+    let capability = self.capability(capability_command_id).unwrap_or_else(|| unreachable!());
+    let arguments = capability.command_target_argument_ids();
+    let argument = arguments.first().and_then(|argument| capability_matches.get_one::<String>(argument)).cloned();
+    let sub_argument = arguments.get(1).and_then(|argument| capability_matches.get_one::<String>(argument)).cloned();
+    capability
+      .execute_capability_without_client(argument, sub_argument, capability_matches, context)
+      .await
+  }
+
+  async fn execute_subject_list_shortcut_with_client<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult {
     self
       .capability(LIST_COMMAND)
       .unwrap_or_else(|| unreachable!())
-      .execute_capability(None, None, matches, context)
+      .execute_capability_with_client(None, None, matches, dsh_api_client, context)
       .await
   }
-}
 
-#[test]
-fn test_requirements_or_1() {
-  let first = Requirements::new(false, false, false, None);
-  let second = Requirements::new(false, false, false, None);
-  assert_eq!(first.or(&second), Requirements::new(false, false, false, None))
-}
-
-#[test]
-fn test_requirements_or_2() {
-  let first = Requirements::new(false, false, false, None);
-  let second = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, None))
-}
-
-#[test]
-fn test_requirements_or_3() {
-  let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  let second = Requirements::new(false, false, false, None);
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, None))
-}
-
-#[test]
-fn test_requirements_or_4() {
-  let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  let second = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, Some(OutputFormat::Json)))
-}
-
-#[test]
-fn test_requirements_or_5() {
-  let first = Requirements::new(true, true, true, Some(OutputFormat::Json));
-  let second = Requirements::new(true, true, true, Some(OutputFormat::Toml));
-  assert_eq!(first.or(&second), Requirements::new(true, true, true, None))
+  async fn execute_subject_list_shortcut_without_client<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+    self
+      .capability(LIST_COMMAND)
+      .unwrap_or_else(|| unreachable!())
+      .execute_capability_without_client(None, None, matches, context)
+      .await
+  }
 }

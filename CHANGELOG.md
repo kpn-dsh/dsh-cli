@@ -4,6 +4,24 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.1] - 2025-04-07
+
+### Added
+
+* Export app catalog manifest.
+* Show settings and environment variables in help text.
+* Configurable coloring and styling.
+* Flag to suppress exit status for subject functions.
+
+### Changed
+
+* Ask for confirmation on service duplicate and edit capabilities.
+* Code simplifications.
+
+### Fixes
+
+* Fixed bug with default output format.
+
 ## [0.7.0] - 2025-03-06
 
 ### Added

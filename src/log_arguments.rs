@@ -18,6 +18,7 @@ pub(crate) fn log_level_api_argument() -> Arg {
       "If this option is provided, it will set the log level for the 'dsh_api' crate. \
       The default log level is 'error'. See option --log-level for the possible values.",
     )
+    .hide_short_help(true)
     .hide_possible_values(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
@@ -34,6 +35,7 @@ pub(crate) fn log_level_argument() -> Arg {
       "If this option is provided, it will set the dsh tool's log level. \
       The default log level is 'error'.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -49,6 +51,7 @@ pub(crate) fn log_level_sdk_argument() -> Arg {
       "If this option is provided, it will set the log level for the 'dsh_sdk' crate. \
       The default log level is 'error'. See option --log-level for the possible values.",
     )
+    .hide_short_help(true)
     .hide_possible_values(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)

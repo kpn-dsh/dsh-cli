@@ -9,10 +9,11 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::{Requirements, Subject};
-use crate::{read_single_line, DshCliResult};
+use crate::{get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::DshPlatform;
 use dsh_api::DEFAULT_PLATFORMS;
 use lazy_static::lazy_static;
@@ -66,22 +67,16 @@ impl Subject for PlatformSubject {
 
 lazy_static! {
   static ref PLATFORM_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(EXPORT_COMMAND, None, "Export default platform configuration")
-      .set_long_about(
-        "Export the default platform configuration json file from the dsh-api library. \
+    CapabilityBuilder::new(EXPORT_COMMAND, None, &PlatformExport {}, "Export default platform configuration").set_long_about(
+      "Export the default platform configuration json file from the dsh-api library. \
         This file can be used as a starting point when platform customization is required."
-      )
-      .set_default_command_executor(&PlatformExport {})
+    )
   );
-  static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), "List platforms")
-      .set_long_about("Lists all dsh platforms.")
-      .set_default_command_executor(&PLatformList {}),
-  );
+  static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &PLatformList {}, "List platforms").set_long_about("Lists all dsh platforms."));
   static ref PLATFORM_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), "Open console or web application")
+    CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), &PlatformOpen {}, "Open console or web application")
       .set_long_about("Open the DSH console, monitoring page or the web application for the tenant or a service.")
-      .set_default_command_executor(&PlatformOpen {})
       .add_subcommands(vec![
         Command::new(OPEN_APP)
           .about("Open the console for the target platform/tenant and the provided app")
@@ -101,9 +96,8 @@ lazy_static! {
       ])
   );
   static ref PLATFORM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), "Show platform data")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &PlatformShow {}, "Show platform data")
       .set_long_about("Show platform data.")
-      .set_default_command_executor(&PlatformShow {})
       .add_target_argument(platform_name_argument())
       .add_extra_arguments(vec![
         app_id_argument().long("app"),
@@ -120,14 +114,14 @@ struct PlatformExport {}
 
 #[async_trait]
 impl CommandExecutor for PlatformExport {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("export the default platforms specification");
     context.print(DEFAULT_PLATFORMS);
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -135,17 +129,17 @@ struct PLatformList {}
 
 #[async_trait]
 impl CommandExecutor for PLatformList {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list platforms");
     let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, None, context);
     let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect::<Vec<_>>();
     formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -153,16 +147,25 @@ struct PlatformOpen {}
 
 #[async_trait]
 impl CommandExecutor for PlatformOpen {
-  async fn execute(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     match matches.subcommand() {
       Some((target, arg_matches)) => match target {
         OPEN_APP => Self::open_app(arg_matches, context),
-        OPEN_CONSOLE => Self::open_console(context),
-        OPEN_MONITORING => Self::open_monitoring(context),
+        OPEN_CONSOLE => Self::open_console(arg_matches, context),
+        OPEN_MONITORING => Self::open_monitoring(arg_matches, context),
         OPEN_SERVICE => Self::open_service(arg_matches, context),
-        OPEN_SWAGGER => Self::open_swagger(context).await,
-        OPEN_TENANT => Self::open_tenant(context),
-        OPEN_TRACING => Self::open_tracing(context),
+        OPEN_TENANT => Self::open_tenant(arg_matches, context),
+        OPEN_TRACING => Self::open_tracing(arg_matches, context),
+        _ => unreachable!(),
+      },
+      None => Err("missing target argument".to_string()),
+    }
+  }
+
+  async fn execute_with_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    match matches.subcommand() {
+      Some((target, arg_matches)) => match target {
+        OPEN_SWAGGER => Self::open_swagger(arg_matches, client, context).await,
         _ => unreachable!(),
       },
       None => Err("missing target argument".to_string()),
@@ -170,22 +173,14 @@ impl CommandExecutor for PlatformOpen {
   }
 
   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(
-      true,
-      matches!(
-        sub_matches.subcommand().unwrap_or_else(|| unreachable!()),
-        (OPEN_APP, _) | (OPEN_MONITORING, _) | (OPEN_SERVICE, _) | (OPEN_TENANT, _)
-      ),
-      matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER),
-      None,
-    )
+    Requirements::new(matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER))
   }
 }
 
 impl PlatformOpen {
   fn open_app(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = context.target_platform.clone().unwrap();
-    let tenant_name = context.target_tenant_name.clone().unwrap();
+    let platform = get_target_platform(matches, &context.settings)?;
+    let tenant_name = get_target_tenant(matches, &context.settings)?;
     let app = get_app_argument_or_prompt(matches)?;
     Self::open_url(
       platform.tenant_app_console_url(&tenant_name, &app),
@@ -194,14 +189,14 @@ impl PlatformOpen {
     )
   }
 
-  fn open_console(context: &Context) -> DshCliResult {
-    let platform = context.target_platform.clone().unwrap();
+  fn open_console(matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let platform = get_target_platform(matches, &context.settings)?;
     Self::open_url(platform.console_url(), format!("console for platform '{}'", platform), context)
   }
 
-  fn open_monitoring(context: &Context) -> DshCliResult {
-    let platform = context.target_platform.clone().unwrap();
-    let tenant_name = context.target_tenant_name.clone().unwrap();
+  fn open_monitoring(matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let platform = get_target_platform(matches, &context.settings)?;
+    let tenant_name = get_target_tenant(matches, &context.settings)?;
     Self::open_url(
       format!("{}/dashboards", platform.tenant_monitoring_url(&tenant_name)),
       format!("monitoring application for tenant '{}@{}'", tenant_name, platform),
@@ -210,8 +205,8 @@ impl PlatformOpen {
   }
 
   fn open_service(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = context.target_platform.clone().unwrap();
-    let tenant_name = context.target_tenant_name.clone().unwrap();
+    let platform = get_target_platform(matches, &context.settings)?;
+    let tenant_name = get_target_tenant(matches, &context.settings)?;
     let service = get_service_argument_or_prompt(matches)?;
     Self::open_url(
       platform.tenant_service_console_url(&tenant_name, &service),
@@ -220,9 +215,9 @@ impl PlatformOpen {
     )
   }
 
-  fn open_tenant(context: &Context) -> DshCliResult {
-    let platform = context.target_platform.clone().unwrap();
-    let tenant_name = context.target_tenant_name.clone().unwrap();
+  fn open_tenant(matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let platform = get_target_platform(matches, &context.settings)?;
+    let tenant_name = get_target_tenant(matches, &context.settings)?;
     Self::open_url(
       platform.tenant_console_url(&tenant_name),
       format!("console for tenant '{}@{}'", tenant_name, platform),
@@ -230,20 +225,17 @@ impl PlatformOpen {
     )
   }
 
-  async fn open_swagger(context: &Context) -> DshCliResult {
-    let platform = context.target_platform.clone().unwrap();
-    let token = match context.client() {
-      Some(client) => match client.token().await {
-        Ok(token) => {
-          debug!("token fetched");
-          Some(token)
-        }
-        Err(_) => {
-          context.print_warning("token could not be fetched");
-          None
-        }
-      },
-      None => None,
+  async fn open_swagger(matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let platform = get_target_platform(matches, &context.settings)?;
+    let token = match client.token().await {
+      Ok(token) => {
+        debug!("token fetched");
+        Some(token)
+      }
+      Err(_) => {
+        context.print_warning("token could not be fetched");
+        None
+      }
     };
     let opening_target = match token {
       Some(token) => match token.strip_prefix("Bearer ") {
@@ -264,8 +256,8 @@ impl PlatformOpen {
     Self::open_url(platform.swagger_url(), opening_target, context)
   }
 
-  fn open_tracing(context: &Context) -> DshCliResult {
-    let platform = context.target_platform.clone().unwrap();
+  fn open_tracing(matches: &ArgMatches, context: &Context) -> DshCliResult {
+    let platform = get_target_platform(matches, &context.settings)?;
     Self::open_url(platform.tracing_url(), format!("tracing application for platform '{}'", platform), context)
   }
 
@@ -286,12 +278,12 @@ struct PlatformShow {}
 
 #[async_trait]
 impl CommandExecutor for PlatformShow {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let platform = match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
       Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
-      None => context.target_platform.clone().unwrap(),
+      None => get_target_platform(matches, &context.settings)?,
     };
-    let tenant = context.target_tenant_name.clone();
+    let tenant = get_target_tenant_non_interactive(matches, &context.settings);
     let app = matches.get_one::<String>(APP_ID_ARGUMENT).cloned();
     let service = matches.get_one::<String>(SERVICE_ID_ARGUMENT).cloned();
     let vendor = matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned();
@@ -308,18 +300,21 @@ impl CommandExecutor for PlatformShow {
       })
       .map(|label| label.to_owned())
       .collect::<Vec<_>>();
-    UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print(&(
-      platform.clone(),
-      app.unwrap_or_default(),
-      service.unwrap_or_default(),
-      tenant.unwrap_or_default(),
-      vendor.unwrap_or_default(),
-      vhost.unwrap_or_default(),
-    ))
+    UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print(
+      &(
+        platform.clone(),
+        app.unwrap_or_default(),
+        service.unwrap_or_default(),
+        tenant.unwrap_or_default(),
+        vendor.unwrap_or_default(),
+        vhost.unwrap_or_default(),
+      ),
+      None,
+    )
   }
 
-  fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(sub_matches.get_one::<String>(PLATFORM_NAME_ARGUMENT).is_none(), false, false, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 

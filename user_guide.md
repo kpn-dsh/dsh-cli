@@ -9,9 +9,6 @@ When installation is complete you should be able to start the `dsh` tool from th
 DSH resource management api command line interface.
 
 Usage: dsh [OPTIONS] [SUBJECT/COMMAND]
-       dsh --help
-       dsh secret --help
-       dsh secret list --help
 
 Subjects/commands:
   api          List and call DSH resource management api.
@@ -44,19 +41,19 @@ Options:
   -V, --version               Print version
 
 Output options:
-      --log-level <LEVEL>       Set log level [possible values: off, error, warn, info, debug, trace]
-      --log-level-api <LEVEL>   Set log level for the dsh api crate
-      --log-level-sdk <LEVEL>   Set log level for the dsh sdk crate
-      --matching-style <STYLE>  Set styling for matches [possible values: normal, bold, dim, italic, underlined,
-                                reverse]
-      --no-color                No color
-      --no-headers              No headers
   -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,
                                 table-no-border, toml, toml-compact, yaml]
   -q, --quiet                   Run in quiet mode
   -v, --verbosity <VERBOSITY>   Set verbosity level [possible values: off, low, medium, high]
-      --show-execution-time     Show execution time
-      --terminal-width <WIDTH>  Set terminal width
+
+Settings:
+  default platform  np-aws-lz-dsh / nplz
+  default tenant    greenbox
+  settings file     /Users/wilbert/Workspaces/dsh/dcli/.dsh_cli/settings.toml
+
+Environment variables:
+  DSH_CLI_HOME           /Users/wilbert/Workspaces/dsh/dcli/.dsh_cli
+  DSH_CLI_PASSWORD_FILE  /Users/wilbert/Workspaces/dsh/dcli/np-aws-lz-dsh.greenbox.pwd
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.

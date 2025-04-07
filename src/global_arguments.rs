@@ -1,4 +1,3 @@
-use crate::context::MatchingStyle;
 use crate::formatters::OutputFormat;
 use crate::verbosity::Verbosity;
 use builder::EnumValueParser;
@@ -9,12 +8,12 @@ use dsh_api::platform::DshPlatform;
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
 // pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
-pub(crate) const MATCHING_STYLE_ARGUMENT: &str = "matching-style-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
 pub(crate) const NO_HEADERS_ARGUMENT: &str = "no-headers-argument";
 pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
 pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
 pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
+pub(crate) const SUPPRESS_EXIT_STATUS_ARGUMENT: &str = "suppress-exit-status-argument";
 pub(crate) const TARGET_PASSWORD_FILE_ARGUMENT: &str = "target-password-file-argument";
 pub(crate) const TARGET_PLATFORM_ARGUMENT: &str = "target-platform-argument";
 pub(crate) const TARGET_TENANT_ARGUMENT: &str = "target-tenant-argument";
@@ -65,24 +64,6 @@ pub(crate) fn force_argument() -> Arg {
 //     .global(true)
 // }
 
-pub(crate) fn matching_style_argument() -> Arg {
-  Arg::new(MATCHING_STYLE_ARGUMENT)
-    .long("matching-style")
-    .action(ArgAction::Set)
-    .value_parser(EnumValueParser::<MatchingStyle>::new())
-    .value_name("STYLE")
-    .help("Set styling for matches")
-    .long_help(
-      "This option specifies the styling to be used when printing matching results \
-          for the find functions, e.q. when matching regular expressions. \
-          If this argument is not provided, the value from environment variable \
-          DSH_CLI_MATCHING_STYLE or the value from the settings file will be used. \
-          The default style is 'bold'.",
-    )
-    .global(true)
-    .help_heading(OUTPUT_OPTIONS_HEADING)
-}
-
 pub(crate) fn no_escape_argument() -> Arg {
   Arg::new(NO_ESCAPE_ARGUMENT)
     .long("no-color")
@@ -96,6 +77,7 @@ pub(crate) fn no_escape_argument() -> Arg {
           DSH_CLI_NO_ESCAPE or the value from the settings file will be used. \
           The default behavior is to use ansi escape styling where applicable.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -111,6 +93,7 @@ pub(crate) fn no_headers_argument() -> Arg {
           DSH_CLI_NO_HEADERS or the value from the settings file will be used. \
           The default behavior is to use headers where applicable.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -174,6 +157,21 @@ pub(crate) fn show_execution_time_argument() -> Arg {
       "When this option is provided the execution time of the executed function \
           will be shown, in milliseconds.",
     )
+    .hide_short_help(true)
+    .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
+}
+
+pub(crate) fn suppress_exit_status_argument() -> Arg {
+  Arg::new(SUPPRESS_EXIT_STATUS_ARGUMENT)
+    .long("suppress-exit-status")
+    .action(ArgAction::SetTrue)
+    .help("Suppress exit status")
+    .long_help(
+      "When this option is provided the dsh tool will always return exit status 0, \
+            even when an error has occurred. This can be useful in scripting environments.",
+    )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
@@ -207,7 +205,7 @@ pub(crate) fn target_platform_argument() -> Arg {
   Arg::new(TARGET_PLATFORM_ARGUMENT)
     .long("platform")
     .short('p')
-    .action(ArgAction::Set)
+    .action(ArgAction::Append)
     .value_parser(possible_values)
     .value_name("PLATFORM")
     .help("Provide target platform")
@@ -225,7 +223,7 @@ pub(crate) fn target_tenant_argument() -> Arg {
   Arg::new(TARGET_TENANT_ARGUMENT)
     .long("tenant")
     .short('t')
-    .action(ArgAction::Set)
+    .action(ArgAction::Append)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("TENANT")
     .help("Provide target tenant")
@@ -250,6 +248,7 @@ pub(crate) fn terminal_width_argument() -> Arg {
           If not set, the environment variable DSH_CLI_TERMINAL_WIDTH will be used \
           or else no terminal width value will be used.",
     )
+    .hide_short_help(true)
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }

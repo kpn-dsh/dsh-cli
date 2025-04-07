@@ -10,6 +10,7 @@ use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -56,9 +57,8 @@ impl Subject for EnvSubject {
 
 lazy_static! {
   static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), "Find environment variable values")
+    CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), &EnvFind {}, "Find environment variable values")
       .set_long_about("Find values in environment variables in the configurations of services and apps deployed on the DSH.")
-      .set_default_command_executor(&EnvFind {})
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("Search in all started services.".to_string())),
         (FilterFlagType::Stopped, Some("Search in all stopped services.".to_string()))
@@ -73,14 +73,14 @@ struct EnvFind {}
 
 #[async_trait]
 impl CommandExecutor for EnvFind {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&query)? } else { &ExactMatchQueryProcessor::create(&query)? };
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation(format!("find environment variables in services that {}", query_processor.describe()));
     let start_instant = context.now();
-    let services = &context.client_unchecked().get_application_configuration_map().await?;
+    let services = &client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
 
     let mut service_pairs = services.iter().collect::<Vec<_>>();
@@ -113,13 +113,13 @@ impl CommandExecutor for EnvFind {
     } else {
       let mut formatter = ListFormatter::new(&SERVICE_ENV_LABELS, None, context);
       formatter.push_target_id_value_pairs(&matching_services);
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

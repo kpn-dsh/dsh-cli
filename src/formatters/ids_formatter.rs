@@ -36,8 +36,8 @@ impl<'a> IdsFormatter<'a> {
     self.ids.is_empty()
   }
 
-  pub fn print(&self) -> Result<(), String> {
-    match self.context.output_format {
+  pub fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+    match self.context.output_format(default_output_format) {
       OutputFormat::Csv => {
         self.context.print(self.ids.join(","));
         Ok(())
