@@ -414,6 +414,7 @@ dependencies = [
  "lazy_static",
  "log",
  "open",
+ "regex",
  "rpassword",
  "serde",
  "serde_json",
@@ -426,9 +427,9 @@ dependencies = [
 
 [[package]]
 name = "dsh_api"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43bc121c6e2018a6ba3f458412a8d6ee239945d48a0fd1ed23398812d4323722"
+checksum = "8c6fa3a23f99d198b3efe94d841a6548635ff11fe816f9aef04ec193f76d4506"
 dependencies = [
  "bytes",
  "chrono",
@@ -450,9 +451,9 @@ dependencies = [
 
 [[package]]
 name = "dsh_api_build_helpers"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7fa37d6ef3bb0925e1188a93456b0bd1341bbc1f21bdeda6a78db67a542286a"
+checksum = "65e218cb6f3ef87d62fb34eafa8eb69539fc30f2cd5dcb28f6513bddacf1f866"
 dependencies = [
  "indoc",
  "itertools 0.14.0",
