@@ -11,6 +11,7 @@ use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::application::parse_image_string;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::query_processor::{DummyQueryProcessor, ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::Application;
 use lazy_static::lazy_static;
@@ -86,20 +87,20 @@ struct ImageFind {}
 
 #[async_trait]
 impl CommandExecutor for ImageFind {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let image_query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&image_query)? } else { &ExactMatchQueryProcessor::create(&image_query)? };
     context.print_explanation(format!("find images that {}", query_processor.describe()));
     let start_instant = context.now();
-    let services = context.client_unchecked().get_application_configuration_map().await?;
+    let services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(services, query_processor, matches, context)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -107,17 +108,17 @@ struct ImageListAll {}
 
 #[async_trait]
 impl CommandExecutor for ImageListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all images used in services");
     let start_instant = context.now();
-    let services = context.client_unchecked().get_application_configuration_map().await?;
+    let services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     list_images(services, &DummyQueryProcessor::create()?, matches, context)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -149,7 +150,7 @@ fn list_images(services: HashMap<String, Application>, query_processor: &dyn Que
   if formatter.is_empty() {
     context.print_outcome("no matches found in services");
   } else {
-    formatter.print()?;
+    formatter.print(None)?;
   }
   Ok(())
 }

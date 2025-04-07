@@ -249,7 +249,7 @@ struct ApiDelete {}
 
 #[async_trait]
 impl CommandExecutor for ApiDelete {
-  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("DELETE {}", method_descriptor.path));
@@ -263,7 +263,7 @@ impl CommandExecutor for ApiDelete {
           .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
           .collect::<Vec<_>>();
         let start_instant = context.now();
-        context.client_unchecked().delete(selector, &parameters).await?;
+        client.delete(selector, &parameters).await?;
         context.print_execution_time(start_instant);
         context.print_outcome("deleted");
       }
@@ -273,8 +273,8 @@ impl CommandExecutor for ApiDelete {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -282,7 +282,7 @@ struct ApiGet {}
 
 #[async_trait]
 impl CommandExecutor for ApiGet {
-  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("get", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("GET {}", method_descriptor.path));
@@ -292,14 +292,14 @@ impl CommandExecutor for ApiGet {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let start_instant = context.now();
-    let response = context.client_unchecked().get(selector, &parameters).await?;
+    let response = client.get(selector, &parameters).await?;
     context.print_execution_time(start_instant);
-    context.print_serializable(response);
+    context.print_serializable(response, Some(OutputFormat::Json));
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Json))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -309,7 +309,7 @@ struct ApiHead {}
 #[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiHead {
-  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("HEAD {}", method_descriptor.path));
@@ -319,14 +319,14 @@ impl CommandExecutor for ApiHead {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let start_instant = context.now();
-    context.client_unchecked().head(selector, &parameters).await?;
+    client.head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
     context.print_outcome("ok");
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -336,7 +336,7 @@ struct ApiPatch {}
 #[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiPatch {
-  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("patch", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("PATCH {}", method_descriptor.path));
@@ -351,15 +351,15 @@ impl CommandExecutor for ApiPatch {
       Ok(())
     } else {
       let start_instant = context.now();
-      context.client_unchecked().patch(selector, &parameters, body).await?;
+      client.patch(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("patched");
       Ok(())
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -367,7 +367,7 @@ struct ApiPost {}
 
 #[async_trait]
 impl CommandExecutor for ApiPost {
-  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("post", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("POST {}", method_descriptor.path));
@@ -382,15 +382,15 @@ impl CommandExecutor for ApiPost {
       Ok(())
     } else {
       let start_instant = context.now();
-      context.client_unchecked().post(selector, &parameters, body).await?;
+      client.post(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("posted");
       Ok(())
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -398,7 +398,7 @@ struct ApiPut {}
 
 #[async_trait]
 impl CommandExecutor for ApiPut {
-  async fn execute(&self, _target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("put", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("PUT {}", method_descriptor.path));
@@ -413,15 +413,15 @@ impl CommandExecutor for ApiPut {
       Ok(())
     } else {
       let start_instant = context.now();
-      context.client_unchecked().put(selector, &parameters, body).await?;
+      client.put(selector, &parameters, body).await?;
       context.print_execution_time(start_instant);
       context.print_outcome("put");
       Ok(())
     }
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -429,14 +429,14 @@ struct ApiShow {}
 
 #[async_trait]
 impl CommandExecutor for ApiShow {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("print the open api specification");
     context.print(DshApiClient::openapi_spec());
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(Some(OutputFormat::Json))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 

@@ -92,7 +92,7 @@ struct TargetCreate {}
 
 #[async_trait]
 impl CommandExecutor for TargetCreate {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("create new target configuration");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
@@ -113,8 +113,8 @@ impl CommandExecutor for TargetCreate {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -122,7 +122,7 @@ struct TargetDelete {}
 
 #[async_trait]
 impl CommandExecutor for TargetDelete {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("delete existing target");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
@@ -157,8 +157,8 @@ impl CommandExecutor for TargetDelete {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -166,7 +166,7 @@ struct TargetList {}
 
 #[async_trait]
 impl CommandExecutor for TargetList {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list all target configurations");
     let (settings, _) = get_settings(None)?;
     let targets = all_targets()?;
@@ -185,13 +185,13 @@ impl CommandExecutor for TargetList {
     } else {
       let mut formatter = ListFormatter::new(&TARGET_LABELS, None, context);
       formatter.push_values(&target_formatters);
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 

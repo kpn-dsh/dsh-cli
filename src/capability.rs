@@ -3,6 +3,7 @@ use crate::subject::Requirements;
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
+use dsh_api::dsh_api_client::DshApiClient;
 
 pub(crate) const CREATE_COMMAND: &str = "create";
 pub(crate) const CREATE_COMMAND_ALIAS: &str = "c";
@@ -40,12 +41,36 @@ pub trait Capability {
 
   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements;
 
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult;
+  async fn execute_capability_with_client(
+    &self,
+    argument: Option<String>,
+    sub_argument: Option<String>,
+    matches: &ArgMatches,
+    dsh_api_client: &DshApiClient,
+    context: &Context,
+  ) -> DshCliResult;
+
+  async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult;
 }
 
 #[async_trait]
 pub(crate) trait CommandExecutor {
-  async fn execute(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult;
+  #[allow(unused_variables)]
+  async fn execute_with_client(
+    &self,
+    argument: Option<String>,
+    sub_argument: Option<String>,
+    matches: &ArgMatches,
+    dsh_api_client: &DshApiClient,
+    context: &Context,
+  ) -> DshCliResult {
+    unreachable!()
+  }
+
+  #[allow(unused_variables)]
+  async fn execute_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    unreachable!()
+  }
 
   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements;
 }

@@ -16,6 +16,7 @@ use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Secret;
 use dsh_api::{secret, UsedBy};
 use futures::future::try_join_all;
@@ -108,9 +109,9 @@ struct SecretCreate {}
 
 #[async_trait]
 impl CommandExecutor for SecretCreate {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.client_unchecked().get_secret(&secret_id).await.is_ok() {
+    if client.get_secret(&secret_id).await.is_ok() {
       return Err(format!("secret '{}' already exists", secret_id));
     }
     if context.stdin_is_terminal {
@@ -121,7 +122,7 @@ impl CommandExecutor for SecretCreate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not created");
         } else {
-          context.client_unchecked().post_secret(&secret).await?;
+          client.post_secret(&secret).await?;
           context.print_outcome(format!("secret '{}' created", secret_id));
         }
       } else {
@@ -131,7 +132,7 @@ impl CommandExecutor for SecretCreate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not created");
         } else {
-          context.client_unchecked().post_secret(&secret).await?;
+          client.post_secret(&secret).await?;
           context.print_outcome(format!("secret '{}' created", secret_id));
         }
       }
@@ -141,15 +142,15 @@ impl CommandExecutor for SecretCreate {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not created");
       } else {
-        context.client_unchecked().post_secret(&secret).await?;
+        client.post_secret(&secret).await?;
         context.print_outcome(format!("secret '{}' created", secret_id));
       }
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -157,17 +158,17 @@ struct SecretDelete {}
 
 #[async_trait]
 impl CommandExecutor for SecretDelete {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("delete secret '{}'", secret_id));
-    if context.client_unchecked().get_secret_configuration(&secret_id).await.is_err() {
+    if client.get_secret_configuration(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exist", secret_id));
     }
     if context.confirmed(format!("delete secret '{}'?", secret_id))? {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not deleted");
       } else {
-        context.client_unchecked().delete_secret_configuration(&secret_id).await?;
+        client.delete_secret_configuration(&secret_id).await?;
         context.print_outcome(format!("secret '{}' deleted", secret_id));
       }
     } else {
@@ -176,8 +177,8 @@ impl CommandExecutor for SecretDelete {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, false, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -185,31 +186,25 @@ struct SecretListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for SecretListAllocationStatus {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secrets with their allocation status");
     let start_instant = context.now();
-    let non_system_secret_ids = context
-      .client_unchecked()
+    let non_system_secret_ids = client
       .get_secret_ids()
       .await?
       .into_iter()
       .filter(|id| !secret::is_system_secret(id))
       .collect::<Vec<_>>();
-    let allocation_statuses = try_join_all(
-      non_system_secret_ids
-        .iter()
-        .map(|secret_id| context.client_unchecked().get_secret_status(secret_id)),
-    )
-    .await?;
+    let allocation_statuses = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context);
     formatter.push_target_ids_and_values(non_system_secret_ids.as_slice(), allocation_statuses.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -217,26 +212,25 @@ struct SecretListSystem {}
 
 #[async_trait]
 impl CommandExecutor for SecretListSystem {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all system secret ids");
     let start_instant = context.now();
-    let system_secret_ids = context
-      .client_unchecked()
+    let system_secret_ids = client
       .get_secret_ids()
       .await?
       .into_iter()
       .filter(|id| secret::is_system_secret(id))
       .collect::<Vec<_>>();
-    let allocation_statuses = try_join_all(system_secret_ids.iter().map(|secret_id| context.client_unchecked().get_secret_status(secret_id))).await?;
+    let allocation_statuses = try_join_all(system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("system secret id"), context);
     formatter.push_target_ids_and_values(system_secret_ids.as_slice(), allocation_statuses.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -244,11 +238,10 @@ struct SecretListIds {}
 
 #[async_trait]
 impl CommandExecutor for SecretListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secret ids");
     let start_instant = context.now();
-    let non_system_secrets = context
-      .client_unchecked()
+    let non_system_secrets = client
       .get_secret_ids()
       .await?
       .into_iter()
@@ -258,12 +251,12 @@ impl CommandExecutor for SecretListIds {
     let header = format!("secret ids ({})", non_system_secrets.len());
     let mut formatter = IdsFormatter::new(&header, context);
     formatter.push_target_ids(non_system_secrets.as_slice());
-    formatter.print()?;
+    formatter.print(Some(OutputFormat::Plain))?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -271,10 +264,10 @@ struct SecretListUsage {}
 
 #[async_trait]
 impl CommandExecutor for SecretListUsage {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secrets that are used in apps or services");
     let start_instant = context.now();
-    let secrets_with_usage: Vec<(String, Vec<UsedBy>)> = context.client_unchecked().list_secrets_with_usage().await?;
+    let secrets_with_usage: Vec<(String, Vec<UsedBy>)> = client.list_secrets_with_usage().await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("secret id"), context);
     for (secret_id, used_bys) in &secrets_with_usage {
@@ -285,13 +278,13 @@ impl CommandExecutor for SecretListUsage {
     if formatter.is_empty() {
       context.print_outcome("no secrets found in apps or services");
     } else {
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -299,17 +292,17 @@ struct SecretShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for SecretShowAllocationStatus {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show allocation status for secret '{}'", secret_id));
     let start_instant = context.now();
-    let allocation_status = context.client_unchecked().get_secret_status(&secret_id).await?;
+    let allocation_status = client.get_secret_status(&secret_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context).print(&allocation_status)
+    UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context).print(&allocation_status, None)
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -317,24 +310,24 @@ struct SecretShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for SecretShowUsage {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the apps and services that use secret '{}'", secret_id));
     let start_instant = context.now();
-    let usages = context.client_unchecked().get_secret_with_usage(&secret_id).await?;
+    let usages = client.get_secret_with_usage(&secret_id).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("secret not used")
     } else {
       let mut formatter = ListFormatter::new(&USED_BY_LABELS, Some("secret id"), context);
       formatter.push_values(&usages);
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -342,18 +335,18 @@ struct SecretShowValue {}
 
 #[async_trait]
 impl CommandExecutor for SecretShowValue {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the value of secret '{}'", secret_id));
     let start_instant = context.now();
-    let secret = context.client_unchecked().get_secret(&secret_id).await?;
+    let secret = client.get_secret(&secret_id).await?;
     context.print_execution_time(start_instant);
     context.print(secret);
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(Some(OutputFormat::Plain))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -361,9 +354,9 @@ struct SecretUpdate {}
 
 #[async_trait]
 impl CommandExecutor for SecretUpdate {
-  async fn execute(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    if context.client_unchecked().get_secret(&secret_id).await.is_err() {
+    if client.get_secret(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exist", secret_id));
     }
     if context.stdin_is_terminal {
@@ -373,7 +366,7 @@ impl CommandExecutor for SecretUpdate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          context.client_unchecked().put_secret(&secret_id, secret).await?;
+          client.put_secret(&secret_id, secret).await?;
           context.print_outcome(format!("secret '{}' updated", secret_id));
         }
       } else {
@@ -382,7 +375,7 @@ impl CommandExecutor for SecretUpdate {
         if context.dry_run {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          context.client_unchecked().put_secret(&secret_id, secret).await?;
+          client.put_secret(&secret_id, secret).await?;
           context.print_outcome(format!("secret '{}' updated", secret_id));
         }
       }
@@ -391,14 +384,14 @@ impl CommandExecutor for SecretUpdate {
       if context.dry_run {
         context.print_warning("dry-run mode, secret not updated");
       } else {
-        context.client_unchecked().put_secret(&secret_id, secret).await?;
+        client.put_secret(&secret_id, secret).await?;
         context.print_outcome(format!("secret '{}' updated", secret_id));
       }
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }

@@ -7,6 +7,7 @@ use crate::subject::Requirements;
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
+use dsh_api::dsh_api_client::DshApiClient;
 
 pub struct CapabilityBuilder<'a> {
   capability_command_name: String,
@@ -99,7 +100,7 @@ impl<'a> CapabilityBuilder<'a> {
     self
   }
 
-  pub fn _add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
+  pub fn add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
     self.filter_flags.push((flag_type, long_help));
     self
   }
@@ -182,12 +183,36 @@ impl Capability for CapabilityBuilder<'_> {
     self.default_executor.requirements(matches)
   }
 
-  async fn execute_capability(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_capability_with_client(
+    &self,
+    argument: Option<String>,
+    sub_argument: Option<String>,
+    matches: &ArgMatches,
+    dsh_api_client: &DshApiClient,
+    context: &Context,
+  ) -> DshCliResult {
     for (flag_type, executor, _) in &self.executors {
       if matches.get_flag(flag_type.id()) {
-        return executor.execute(argument.clone(), sub_argument.clone(), matches, context).await;
+        return executor
+          .execute_with_client(argument.clone(), sub_argument.clone(), matches, dsh_api_client, context)
+          .await;
       }
     }
-    self.default_executor.execute(argument.clone(), sub_argument.clone(), matches, context).await
+    self
+      .default_executor
+      .execute_with_client(argument.clone(), sub_argument.clone(), matches, dsh_api_client, context)
+      .await
+  }
+
+  async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+    for (flag_type, executor, _) in &self.executors {
+      if matches.get_flag(flag_type.id()) {
+        return executor.execute_without_client(argument.clone(), sub_argument.clone(), matches, context).await;
+      }
+    }
+    self
+      .default_executor
+      .execute_without_client(argument.clone(), sub_argument.clone(), matches, context)
+      .await
   }
 }

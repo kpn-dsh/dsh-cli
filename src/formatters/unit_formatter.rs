@@ -21,8 +21,8 @@ where
     Self { target_id: target_id.into(), labels, target_label, context }
   }
 
-  pub fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
-    match self.context.output_format {
+  pub fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+    match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => self.print_json(value),
       OutputFormat::JsonCompact => self.print_json_compact(value),
@@ -36,8 +36,8 @@ where
     }
   }
 
-  pub fn print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
-    match self.context.output_format {
+  pub fn print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+    match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => Err("serialization to json is not supported for this type".to_string()),
       OutputFormat::JsonCompact => Err("serialization to compact json is not supported for this type".to_string()),
@@ -79,7 +79,15 @@ where
       tabled_builder.push_record([target_label, self.target_id.as_str()]);
       for label in self.labels {
         if !label.is_target_label() && label.as_str_for_unit() != target_label {
-          tabled_builder.push_record([label.as_str_for_unit(), value.value(label, self.target_id.as_str()).as_str()]);
+          let value = value.value(label, self.target_id.as_str());
+          let split_value = value.split("\n").collect::<Vec<_>>();
+          let mut value_iterator = split_value.iter();
+          if let Some(first_line) = value_iterator.next() {
+            tabled_builder.push_record([label.as_str_for_unit(), first_line]);
+          }
+          for next_line in value_iterator {
+            tabled_builder.push_record(["", next_line]);
+          }
         }
       }
     } else {

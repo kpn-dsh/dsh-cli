@@ -196,19 +196,55 @@ pub static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [Environ
 
 /// Converts hashmap to a sorted table string
 pub fn hashmap_to_table<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -> String {
-  let mut key_value_length_pairs: Vec<(&str, &str, usize)> = hashmap
+  let mut key_value_length_pairs: Vec<(&str, Vec<&str>, usize)> = hashmap
     .iter()
-    .map(|(key, value)| (key.as_ref(), value.as_ref(), key.as_ref().len()))
+    .map(|(key, value)| (key.as_ref(), value.as_ref().split("\n").collect::<Vec<_>>(), key.as_ref().len()))
     .collect::<Vec<_>>();
   match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => {
       key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
       key_value_length_pairs
         .into_iter()
-        .map(|(key, value, len)| format!("{}{}  {}", key, " ".repeat(first_column_width - len), value))
+        .map(|(key, values, key_length)| {
+          let mut lines = vec![];
+          let mut values_iter = values.iter();
+          if let Some(first) = values_iter.next() {
+            lines.push(format!("{}{}  {}", key, " ".repeat(first_column_width - key_length), first));
+          }
+          for rest in values_iter {
+            lines.push(format!("{}  {}", " ".repeat(first_column_width), rest));
+          }
+          lines.join("\n")
+        })
         .collect::<Vec<_>>()
         .join("\n")
     }
+    None => "".to_string(),
+  }
+}
+
+/// Converts vector of vectors to a table string
+pub fn vec_to_table<K: AsRef<str>, V: AsRef<str>>(rows: &[(K, Vec<V>)]) -> String {
+  let key_values_length_pairs: Vec<(&str, Vec<&str>, usize)> = rows
+    .iter()
+    .map(|(key, values)| (key.as_ref(), values.iter().map(|value| value.as_ref()).collect::<Vec<_>>(), key.as_ref().len()))
+    .collect::<Vec<_>>();
+  match key_values_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
+    Some(first_column_width) => key_values_length_pairs
+      .into_iter()
+      .map(|(key, values, key_length)| {
+        let mut lines = vec![];
+        let mut values_iter = values.iter();
+        if let Some(first) = values_iter.next() {
+          lines.push(format!("{}{}  {}", key, " ".repeat(first_column_width - key_length), first));
+        }
+        for rest in values_iter {
+          lines.push(format!("{}  {}", " ".repeat(first_column_width), rest));
+        }
+        lines.join("\n")
+      })
+      .collect::<Vec<_>>()
+      .join("\n"),
     None => "".to_string(),
   }
 }

@@ -90,8 +90,8 @@ where
     }
   }
 
-  pub fn print(&self) -> Result<(), String> {
-    match self.context.output_format {
+  pub fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+    match self.context.output_format(default_output_format) {
       OutputFormat::Csv => {
         if self.context.show_headers {
           self.context.print(

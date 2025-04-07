@@ -1,12 +1,12 @@
+use crate::formatters::formatter::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::types::AppCatalogApp;
 use lazy_static::lazy_static;
+use serde::Serialize;
 use serde_json::de::from_str;
 use std::collections::HashMap;
-
-use crate::formatters::formatter::{Label, SubjectFormatter};
-use dsh_api::types::AppCatalogApp;
-use serde::Serialize;
 
 use dsh_api::types::AppCatalogAppResourcesValue;
 
@@ -77,10 +77,10 @@ struct AppListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for AppListConfiguration {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed apps and their configurations");
     let start_instant = context.now();
-    let apps = context.client_unchecked().get_appcatalogapp_configuration_map().await?;
+    let apps = client.get_appcatalogapp_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     app_ids.sort();
@@ -89,12 +89,12 @@ impl CommandExecutor for AppListConfiguration {
       let app = apps.get(&app_id).unwrap();
       formatter.push_target_id_value(app_id, app);
     }
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -102,19 +102,19 @@ struct AppListIds {}
 
 #[async_trait]
 impl CommandExecutor for AppListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all deployed app ids");
     let start_instant = context.now();
-    let ids = context.client_unchecked().list_app_ids().await?;
+    let ids = client.list_app_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("app id", context);
     formatter.push_target_ids(&ids);
-    formatter.print()?;
+    formatter.print(Some(OutputFormat::Plain))?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -122,42 +122,42 @@ struct AppShowAll {}
 
 #[async_trait]
 impl CommandExecutor for AppShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
     let start_instant = context.now();
-    let app = context.client_unchecked().get_appcatalogapp_configuration(&app_id).await?;
+    let app = client.get_appcatalogapp_configuration(&app_id).await?;
     context.print_execution_time(start_instant);
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(service) => {
-          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, Some("service resource"), context).print(service)?;
+          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, Some("service resource"), context).print(service, None)?;
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
-          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket)?;
+          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket, None)?;
         }
         AppCatalogAppResourcesValue::Certificate(certificate) => {
-          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), context).print(certificate)?;
+          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), context).print(certificate, None)?;
         }
         AppCatalogAppResourcesValue::Secret(secret) => {
-          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), context).print(&secret.name)?;
+          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), context).print(&secret.name, None)?;
         }
         AppCatalogAppResourcesValue::Topic(topic) => {
-          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), context).print(topic)?;
+          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), context).print(topic, None)?;
         }
         AppCatalogAppResourcesValue::Vhost(vhost) => {
-          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), context).print(vhost)?;
+          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), context).print(vhost, None)?;
         }
         AppCatalogAppResourcesValue::Volume(volume) => {
-          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), context).print(volume)?;
+          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), context).print(volume, None)?;
         }
       }
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

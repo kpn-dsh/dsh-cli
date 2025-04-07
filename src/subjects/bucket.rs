@@ -2,6 +2,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::{notifications_to_string, OutputFormat};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Bucket, BucketStatus};
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
@@ -73,20 +74,20 @@ struct BucketListAll {}
 
 #[async_trait]
 impl CommandExecutor for BucketListAll {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all buckets with their parameters");
     let start_instant = context.now();
-    let bucket_ids = context.client_unchecked().list_bucket_ids().await?;
-    let bucket_statuses = try_join_all(bucket_ids.iter().map(|bucket_id| context.client_unchecked().get_bucket(bucket_id))).await?;
+    let bucket_ids = client.list_bucket_ids().await?;
+    let bucket_statuses = try_join_all(bucket_ids.iter().map(|bucket_id| client.get_bucket(bucket_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&BUCKET_STATUS_LABELS, None, context);
     formatter.push_target_ids_and_values(bucket_ids.as_slice(), bucket_statuses.as_slice());
-    formatter.print()?;
+    formatter.print(None)?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -94,19 +95,19 @@ struct BucketListIds {}
 
 #[async_trait]
 impl CommandExecutor for BucketListIds {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all bucket ids");
     let start_instant = context.now();
-    let bucket_ids = context.client_unchecked().list_bucket_ids().await?;
+    let bucket_ids = client.list_bucket_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("bucket id", context);
     formatter.push_target_ids(&bucket_ids);
-    formatter.print()?;
+    formatter.print(Some(OutputFormat::Plain))?;
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, Some(OutputFormat::Plain))
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 
@@ -114,17 +115,17 @@ struct BucketShowAll {}
 
 #[async_trait]
 impl CommandExecutor for BucketShowAll {
-  async fn execute(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for bucket '{}'", bucket_id));
     let start_instant = context.now();
-    let bucket = context.client_unchecked().get_bucket(&bucket_id).await?;
+    let bucket = client.get_bucket(&bucket_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket)
+    UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&bucket, None)
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api_multiple(true, true, None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
   }
 }
 

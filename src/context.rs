@@ -5,24 +5,16 @@ use crate::global_arguments::{
 };
 use crate::settings::Settings;
 use crate::style::{style_from, wrap_style, DshColor, DshStyle};
-use crate::subject::Requirements;
-use crate::targets::read_target;
 use crate::verbosity::Verbosity;
 use crate::{
-  get_target_password, get_target_platforms, get_target_platforms_non_interactive, get_target_tenants, get_target_tenants_non_interactive, ENV_VAR_CSV_QUOTE,
-  ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_ERROR_COLOR, ENV_VAR_ERROR_STYLE, ENV_VAR_MATCHING_COLOR, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR, ENV_VAR_NO_ESCAPE,
-  ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_STDERR_COLOR, ENV_VAR_STDERR_STYLE, ENV_VAR_STDOUT_COLOR, ENV_VAR_STDOUT_STYLE,
-  ENV_VAR_SUPPRESS_EXIT_STATUS, ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY, ENV_VAR_WARNING_COLOR, ENV_VAR_WARNING_STYLE,
+  ENV_VAR_CSV_QUOTE, ENV_VAR_CSV_SEPARATOR, ENV_VAR_DRY_RUN, ENV_VAR_ERROR_COLOR, ENV_VAR_ERROR_STYLE, ENV_VAR_MATCHING_COLOR, ENV_VAR_MATCHING_STYLE, ENV_VAR_NO_COLOR,
+  ENV_VAR_NO_ESCAPE, ENV_VAR_NO_HEADERS, ENV_VAR_OUTPUT_FORMAT, ENV_VAR_QUIET, ENV_VAR_SHOW_EXECUTION_TIME, ENV_VAR_STDERR_COLOR, ENV_VAR_STDERR_STYLE, ENV_VAR_STDOUT_COLOR,
+  ENV_VAR_STDOUT_STYLE, ENV_VAR_SUPPRESS_EXIT_STATUS, ENV_VAR_TERMINAL_WIDTH, ENV_VAR_VERBOSITY, ENV_VAR_WARNING_COLOR, ENV_VAR_WARNING_STYLE,
 };
 use clap::builder::styling::Style;
 use clap::ArgMatches;
-use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::dsh_api_client_factory::DshApiClientFactory;
-use dsh_api::dsh_api_tenant::DshApiTenant;
-use dsh_api::platform::DshPlatform;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
-use futures::future::join_all;
 use log::debug;
 use rpassword::prompt_password;
 use serde::Serialize;
@@ -35,15 +27,15 @@ pub(crate) struct Context {
   pub(crate) csv_quote: Option<char>,
   pub(crate) csv_separator: String,
   pub(crate) dry_run: bool,
-  dsh_api_client: Option<DshApiClient>,
   pub(crate) error_color: DshColor,
   pub(crate) error_style: DshStyle,
   pub(crate) force: bool,
   pub(crate) matching_color: DshColor,
   pub(crate) matching_style: DshStyle,
   pub(crate) no_escape: bool,
-  pub(crate) output_format: OutputFormat,
+  output_format_specification: Option<OutputFormat>,
   pub(crate) quiet: bool,
+  pub(crate) settings: Settings,
   pub(crate) show_execution_time: bool,
   pub(crate) show_headers: bool,
   pub(crate) stderr_color: DshColor,
@@ -53,8 +45,6 @@ pub(crate) struct Context {
   pub(crate) stdout_color: DshColor,
   pub(crate) _stdout_escape: bool,
   pub(crate) stdout_style: DshStyle,
-  pub(crate) target_platform: Option<DshPlatform>,
-  pub(crate) target_tenant_name: Option<String>,
   pub(crate) terminal_width: Option<usize>,
   pub(crate) verbosity: Verbosity,
   pub(crate) warning_color: DshColor,
@@ -63,85 +53,17 @@ pub(crate) struct Context {
 }
 
 impl Context {
-  pub(crate) async fn create_multiple(matches: &ArgMatches, requirements: &Requirements, settings: &Settings) -> Result<Vec<Context>, String> {
-    let target_platforms = if requirements.needs_platform() { Some(get_target_platforms(matches, settings)?) } else { get_target_platforms_non_interactive(matches, settings)? };
-    if let Some(ref platforms) = target_platforms {
-      if platforms.len() > 1 && !requirements.allows_multiple_target_platforms() {
-        return Err("multiple target platforms not allowed".to_string());
-      }
-    }
-    let target_tenant_names = if requirements.needs_tenant_name() { Some(get_target_tenants(matches, settings)?) } else { get_target_tenants_non_interactive(matches, settings) };
-    if let Some(ref tenants) = target_tenant_names {
-      if tenants.len() > 1 && !requirements.allows_multiple_target_tenants() {
-        return Err("multiple target tenants not allowed".to_string());
-      }
-    }
-    match (target_platforms, target_tenant_names) {
-      (Some(target_platforms), Some(target_tenants)) => {
-        let multiple_targets = target_platforms.len() * target_tenants.len() > 1;
-        let mut contexts = vec![];
-        for target_platform in target_platforms {
-          for target_tenant in &target_tenants {
-            if !multiple_targets || read_target(&target_platform, target_tenant)?.is_some() {
-              debug!("create context for {}@{}", target_tenant, target_platform);
-              let context = Self::create(matches, requirements, settings, Some(target_platform.clone()), Some(target_tenant.to_string())).await?;
-              contexts.push(context);
-            } else {
-              debug!("target {}@{} is not configured and will be skipped", target_tenant, target_platform);
-            }
-          }
-        }
-        Ok(contexts)
-      }
-      (Some(target_platforms), None) => join_all(target_platforms.into_iter().map(|target_platform| {
-        debug!("create context for platform {}", target_platform);
-        Self::create(matches, requirements, settings, Some(target_platform.clone()), None)
-      }))
-      .await
-      .into_iter()
-      .collect::<Result<Vec<Context>, _>>(),
-      (None, Some(target_tenants)) => join_all(target_tenants.into_iter().map(|target_tenant| {
-        debug!("create context for tenant {}", target_tenant);
-        Self::create(matches, requirements, settings, None, Some(target_tenant.clone()))
-      }))
-      .await
-      .into_iter()
-      .collect::<Result<Vec<Context>, _>>(),
-      (None, None) => {
-        debug!("create context");
-        Ok(vec![Self::create(matches, requirements, settings, None, None).await?])
-      }
-    }
-  }
-
-  async fn create(
-    matches: &ArgMatches,
-    requirements: &Requirements,
-    settings: &Settings,
-    target_platform: Option<DshPlatform>,
-    target_tenant_name: Option<String>,
-  ) -> Result<Context, String> {
+  pub(crate) fn create(matches: &ArgMatches, settings: Settings) -> Result<Context, String> {
     let stdin_is_terminal = stdin().is_terminal();
-    let csv_quote = Self::csv_quote(settings)?;
-    let csv_separator = Self::csv_separator(settings)?;
+    let csv_quote = Self::csv_quote(&settings)?;
+    let csv_separator = Self::csv_separator(&settings)?;
     if let Some(quote) = csv_quote {
       if csv_separator.contains(quote) {
         return Err("csv separator string cannot contain quote character".to_string());
       }
     }
-    let dry_run = Self::dry_run(matches, settings);
-    let dsh_api_client = if requirements.needs_dsh_api_client() {
-      let dsh_api_tenant = DshApiTenant::new(target_tenant_name.clone().unwrap(), target_platform.clone().unwrap());
-      let password = get_target_password(matches, &dsh_api_tenant)?;
-      let dsh_api_client_factory = DshApiClientFactory::create(dsh_api_tenant, password)?;
-      let client = dsh_api_client_factory.client().await?;
-      debug!("api client created");
-      Some(client)
-    } else {
-      debug!("no api client required");
-      None
-    };
-    let no_escape = Self::no_escape(matches, settings);
+    let dry_run = Self::dry_run(matches, &settings);
+    let no_escape = Self::no_escape(matches, &settings);
     let (stderr_escape, stdout_escape) = if no_escape { (false, false) } else { (stderr().is_terminal(), stdout().is_terminal()) };
 
     let error_color = Self::dsh_color(no_escape, ENV_VAR_ERROR_COLOR, &settings.error_color, DshColor::Red)?;
@@ -155,20 +77,20 @@ impl Context {
     let warning_color = Self::dsh_color(no_escape, ENV_VAR_WARNING_COLOR, &settings.warning_color, DshColor::Blue)?;
     let warning_style = Self::dsh_style(no_escape, ENV_VAR_WARNING_STYLE, &settings.warning_style, DshStyle::Bold)?;
 
-    let quiet = Self::quiet(matches, settings);
-    let force = Self::force(matches, settings);
-    let suppress_exit_status = Self::suppress_exit_status(matches, settings);
-    let (output_format, show_execution_time, verbosity) = if quiet {
-      (OutputFormat::Quiet, false, Verbosity::Off)
+    let quiet = Self::quiet(matches, &settings);
+    let force = Self::force(matches, &settings);
+    let suppress_exit_status = Self::suppress_exit_status(matches, &settings);
+    let (output_format_specification, show_execution_time, verbosity) = if quiet {
+      (Some(OutputFormat::Quiet), false, Verbosity::Off)
     } else {
       (
-        Self::output_format(matches, settings, requirements.default_output_format())?,
-        Self::show_execution_time(matches, settings),
-        Self::verbosity(matches, settings)?,
+        Self::output_format_specification(matches, &settings)?,
+        Self::show_execution_time(matches, &settings),
+        Self::verbosity(matches, &settings)?,
       )
     };
-    let show_headers = !Self::no_headers(matches, settings);
-    let terminal_width = Self::terminal_width(matches, settings)?;
+    let show_headers = !Self::no_headers(matches, &settings);
+    let terminal_width = Self::terminal_width(matches, &settings)?;
     if dry_run && verbosity >= Verbosity::Medium {
       eprintln!("dry-run mode enabled");
     }
@@ -176,15 +98,15 @@ impl Context {
       csv_quote,
       csv_separator,
       dry_run,
-      dsh_api_client,
       error_color,
       error_style,
       force,
       matching_color,
       matching_style,
       no_escape,
-      output_format,
+      output_format_specification,
       quiet,
+      settings,
       show_execution_time,
       show_headers,
       stderr_color,
@@ -195,26 +117,11 @@ impl Context {
       _stdout_escape: stdout_escape,
       stdout_style,
       suppress_exit_status,
-      target_platform,
-      target_tenant_name,
       terminal_width,
       verbosity,
       warning_color,
       warning_style,
     })
-  }
-
-  /// Get client without check
-  ///
-  /// This method will panic when no client was created.
-  /// Make sure to have a pre-emptive indication that a client will be available
-  /// by setting the proper `Requirements` in your `CommandExecutor` implementation.
-  pub(crate) fn client_unchecked(&self) -> &DshApiClient {
-    self.dsh_api_client.as_ref().unwrap_or_else(|| unreachable!())
-  }
-
-  pub(crate) fn client(&self) -> Option<&DshApiClient> {
-    self.dsh_api_client.as_ref()
   }
 
   /// Ask for confirmation
@@ -409,27 +316,38 @@ impl Context {
     matches.get_flag(NO_HEADERS_ARGUMENT) || std::env::var(ENV_VAR_NO_HEADERS).is_ok() || settings.no_headers.unwrap_or(false)
   }
 
-  /// Gets output_format context value
+  /// Gets output format specification
   ///
   /// 1. Try flag `--output-format`
   /// 1. Try environment variable `DSH_CLI_OUTPUT_FORMAT`
   /// 1. Try settings file
+  /// 1. Else default to `None`
+  fn output_format_specification(matches: &ArgMatches, settings: &Settings) -> Result<Option<OutputFormat>, String> {
+    match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
+      Some(output_format_argument) => Ok(Some(output_format_argument.to_owned())),
+      None => match std::env::var(ENV_VAR_OUTPUT_FORMAT) {
+        Ok(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str())
+          .map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_OUTPUT_FORMAT))
+          .map(Some),
+        Err(_) => match settings.output_format.clone() {
+          Some(output_format_from_settings) => Ok(Some(output_format_from_settings)),
+          None => Ok(None),
+        },
+      },
+    }
+  }
+
+  /// Gets output_format context value
+  ///
+  /// 1. Try specification (flag `--output-format`, environment variable
+  ///    `DSH_CLI_OUTPUT_FORMAT` or settings file),
   /// 1. Try default_output_format parameter
   /// 1. If stdout is a terminal default to `OutputFormat::Table`,
   ///    else default to `OutputFormat::Json`
-  fn output_format(matches: &ArgMatches, settings: &Settings, default_output_format: Option<OutputFormat>) -> Result<OutputFormat, String> {
-    match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
-      Some(output_format_argument) => Ok(output_format_argument.to_owned()),
-      None => match std::env::var(ENV_VAR_OUTPUT_FORMAT) {
-        Ok(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str()).map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_OUTPUT_FORMAT)),
-        Err(_) => match settings.output_format.clone() {
-          Some(output_format_from_settings) => Ok(output_format_from_settings),
-          None => match default_output_format {
-            Some(output_format_from_default) => Ok(output_format_from_default),
-            None => Ok(if stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
-          },
-        },
-      },
+  pub(crate) fn output_format(&self, default_output_format: Option<OutputFormat>) -> OutputFormat {
+    match self.output_format_specification {
+      Some(ref output_format_from_specification) => output_format_from_specification.clone(),
+      None => default_output_format.unwrap_or_else(|| if stdout().is_terminal() { OutputFormat::Table } else { OutputFormat::Json }),
     }
   }
 
@@ -539,9 +457,9 @@ impl Context {
   /// If `quiet` is `true`, nothing will be printed.
   /// This standard output device can either be a tty, a pipe or an output file,
   /// depending on how the `dsh` tool was run from a shell or script.
-  pub(crate) fn print_serializable<T: Serialize>(&self, output: T) {
+  pub(crate) fn print_serializable<T: Serialize>(&self, output: T, default_output_format: Option<OutputFormat>) {
     if !self.quiet {
-      match self.output_format {
+      match self.output_format(default_output_format) {
         OutputFormat::Csv => self.print_warning("csv output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Json => match serde_json::to_string_pretty(&output) {
           Ok(json) => println!("{}", wrap_style(self.stdout_style(), json)),
@@ -576,7 +494,7 @@ impl Context {
   /// The prompt is only printed when stderr is a terminal.
   pub(crate) fn print_progress_step(&self) {
     if !self.quiet && stderr().is_terminal() {
-      eprintln!("{}", wrap_style(self.stderr_style(), "."));
+      eprint!("{}", wrap_style(self.stderr_style(), "."));
     }
   }
 
@@ -656,9 +574,9 @@ impl Context {
         Verbosity::Off | Verbosity::Low => (),
         Verbosity::Medium => eprintln!("{}", wrap_style(self.stderr_style(), explanation)),
         Verbosity::High => {
-          if let Some(ref client) = self.dsh_api_client {
-            eprintln!("{}", wrap_style(self.stderr_style(), format!("{}", client.tenant())));
-          }
+          // if let Some(ref client) = self.dsh_api_client {
+          //   eprintln!("{}", wrap_style(self.stderr_style(), format!("{}", client.tenant())));
+          // }
           eprintln!("{}", wrap_style(self.stderr_style(), explanation));
         }
       }

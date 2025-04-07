@@ -288,7 +288,7 @@ struct SettingDefault {}
 
 #[async_trait]
 impl CommandExecutor for SettingDefault {
-  async fn execute(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("set default platform and tenant");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
@@ -305,8 +305,8 @@ impl CommandExecutor for SettingDefault {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -316,14 +316,14 @@ const HIDE_PASSWORD: &str = "********";
 
 #[async_trait]
 impl CommandExecutor for SettingList {
-  async fn execute(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     let (settings, _) = get_settings(None)?;
     if let Some(ref settings_file) = settings.file_name {
       context.print_explanation(format!("list settings from settings file '{}'", settings_file));
-      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings)?
+      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings, None)?
     } else {
       context.print_explanation("list default settings");
-      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings)?
+      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings, None)?
     }
     let env_vars = get_environment_variables();
     if !env_vars.is_empty() {
@@ -337,13 +337,13 @@ impl CommandExecutor for SettingList {
           formatter.push_target_id_value(env_var.clone(), value);
         }
       }
-      formatter.print()?;
+      formatter.print(None)?;
     }
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -351,7 +351,7 @@ struct SettingSet {}
 
 #[async_trait]
 impl CommandExecutor for SettingSet {
-  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (target_setting, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
       SETTING_CSV_QUOTE => {
@@ -492,8 +492,8 @@ impl CommandExecutor for SettingSet {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
@@ -501,7 +501,7 @@ struct SettingUnset {}
 
 #[async_trait]
 impl CommandExecutor for SettingUnset {
-  async fn execute(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (target_setting, _) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
       SETTING_CSV_QUOTE => {
@@ -613,8 +613,8 @@ impl CommandExecutor for SettingUnset {
     Ok(())
   }
 
-  fn requirements(&self, _sub_matches: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api(None)
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
