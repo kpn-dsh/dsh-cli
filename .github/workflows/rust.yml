@@ -16,6 +16,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        override: true
+        components: clippy, rustfmt
     - name: Build all features
       run: cargo build --all-features --verbose
     - name: Run tests on all features
