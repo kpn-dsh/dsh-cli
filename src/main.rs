@@ -104,7 +104,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-const VERSION: &str = "0.7.1";
+const VERSION: &str = "0.7.2";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
