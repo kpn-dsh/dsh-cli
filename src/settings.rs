@@ -16,10 +16,10 @@ pub(crate) struct Settings {
   pub(crate) csv_separator: Option<String>,
   #[serde(rename = "default-platform", skip_serializing_if = "Option::is_none")]
   pub(crate) default_platform: Option<String>,
-  #[serde(rename = "dry-run", skip_serializing_if = "Option::is_none")]
-  pub(crate) dry_run: Option<bool>,
   #[serde(rename = "default-tenant", skip_serializing_if = "Option::is_none")]
   pub(crate) default_tenant: Option<String>,
+  #[serde(rename = "dry-run", skip_serializing_if = "Option::is_none")]
+  pub(crate) dry_run: Option<bool>,
   #[serde(rename = "error-color", skip_serializing_if = "Option::is_none")]
   pub(crate) error_color: Option<DshColor>,
   #[serde(rename = "error-style", skip_serializing_if = "Option::is_none")]
@@ -75,16 +75,19 @@ pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> Result<(
       )),
       None => Err(format!("explicit settings file '{}' does not exist", explicit_name)),
     },
-    None => {
-      let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
-      match read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))? {
-        Some(settings_from_default_file) => Ok((
-          Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings_from_default_file },
-          format!("read settings (default file '{}')", default_settings_file.to_string_lossy()),
-        )),
-        None => Ok((Settings::default(), "default settings".to_string())),
+    None => match dsh_directory()? {
+      Some(dsh_directory) => {
+        let default_settings_file = dsh_directory.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
+        match read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(default_settings_file.clone()))? {
+          Some(settings_from_default_file) => Ok((
+            Settings { file_name: Some(default_settings_file.to_string_lossy().to_string()), ..settings_from_default_file },
+            format!("read settings (default file '{}')", default_settings_file.to_string_lossy()),
+          )),
+          None => Ok((Settings::default(), "default settings, no settings file found".to_string())),
+        }
       }
-    }
+      None => Ok((Settings::default(), "default settings, dsh cli directory is set to none".to_string())),
+    },
   }
 }
 
@@ -94,11 +97,14 @@ pub(crate) fn write_settings(explicit_settings_filename: Option<&str>, settings:
       debug!("write settings to explicit file '{}'", explicit_name);
       serialize_and_write_to_toml_file::<Settings>(PathBuf::new().join(explicit_name), &settings)
     }
-    None => {
-      let default_settings_file = dsh_directory()?.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
-      debug!("write settings to default file '{}'", default_settings_file.to_string_lossy());
-      serialize_and_write_to_toml_file(default_settings_file, &settings)
-    }
+    None => match dsh_directory()? {
+      Some(dsh_directory) => {
+        let default_settings_file = dsh_directory.join(DEFAULT_DSH_CLI_SETTINGS_FILENAME);
+        debug!("write settings to default file '{}'", default_settings_file.to_string_lossy());
+        serialize_and_write_to_toml_file(default_settings_file, &settings)
+      }
+      None => Err("could not write settings file, dsh cli directory is set to none".to_string()),
+    },
   }
 }
 

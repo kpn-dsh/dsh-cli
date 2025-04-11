@@ -33,7 +33,7 @@ use dsh_api::platform::DshPlatform;
 use dsh_api::{crate_version, openapi_version};
 use homedir::my_home;
 use lazy_static::lazy_static;
-use log::debug;
+use log::{debug, trace};
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -104,7 +104,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-const VERSION: &str = "0.7.1";
+const VERSION: &str = "0.7.2";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
@@ -245,7 +245,7 @@ async fn inner_main() -> DshCliExit {
 
   let context = match Context::create(&matches, settings) {
     Ok(context) => {
-      debug!("{:?}", context);
+      trace!("{:#?}", context);
       context
     }
     Err(msg) => return DshCliExit::Err(msg),
@@ -704,13 +704,22 @@ fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> Result<String,
 /// If it doesn't already exist the directory (and possibly its parent directories)
 /// will be created.
 ///
-/// To determine the directory, first the environment variable DSH_CLI_HOME will be checked.
-/// If this variable is not defined, `${HOME}/.dsh_cli` will be used as the `dsh` tool directory.
-fn dsh_directory() -> Result<PathBuf, String> {
-  let dsh_directory = match env::var(ENV_VAR_HOME_DIRECTORY) {
-    Ok(dsh_directory) => PathBuf::new().join(dsh_directory),
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. If environment variable `DSH_CLI_HOME` exists:
+///    * If it is empty, return `Ok(None)`
+///    * Else return the specified directory.
+/// 1. If environment variable `HOME` exists, return its value concatenated with `/.dsh_cli`.
+fn dsh_directory() -> Result<Option<PathBuf>, String> {
+  let dsh_directory: Option<PathBuf> = match env::var(ENV_VAR_HOME_DIRECTORY) {
+    Ok(dsh_directory_from_env_var) => {
+      if dsh_directory_from_env_var.is_empty() {
+        None
+      } else {
+        Some(PathBuf::new().join(dsh_directory_from_env_var))
+      }
+    }
     Err(_) => match my_home() {
-      Ok(Some(user_home_directory)) => user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY),
+      Ok(Some(user_home_directory)) => Some(user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY)),
       _ => {
         let message = format!("could not determine dsh cli directory name (check environment variable {})", ENV_VAR_HOME_DIRECTORY);
         log::error!("{}", &message);
@@ -718,24 +727,27 @@ fn dsh_directory() -> Result<PathBuf, String> {
       }
     },
   };
-  match fs::create_dir_all(&dsh_directory) {
-    Ok(_) => match fs::create_dir_all(dsh_directory.join(TARGETS_SUBDIRECTORY)) {
-      Ok(_) => Ok(dsh_directory),
+  match dsh_directory {
+    Some(directory) => match fs::create_dir_all(&directory) {
+      Ok(_) => match fs::create_dir_all(directory.join(TARGETS_SUBDIRECTORY)) {
+        Ok(_) => Ok(Some(directory)),
+        Err(io_error) => {
+          let message = format!(
+            "could not create dsh targets directory '{}' ({})",
+            directory.join(TARGETS_SUBDIRECTORY).to_string_lossy(),
+            io_error
+          );
+          log::error!("{}", &message);
+          Err(message)
+        }
+      },
       Err(io_error) => {
-        let message = format!(
-          "could not create dsh targets directory '{}' ({})",
-          dsh_directory.join(TARGETS_SUBDIRECTORY).to_string_lossy(),
-          io_error
-        );
+        let message = format!("could not create dsh directory '{}' ({})", directory.to_string_lossy(), io_error);
         log::error!("{}", &message);
         Err(message)
       }
     },
-    Err(io_error) => {
-      let message = format!("could not create dsh directory '{}' ({})", dsh_directory.to_string_lossy(), io_error);
-      log::error!("{}", &message);
-      Err(message)
-    }
+    None => Ok(None),
   }
 }
 
@@ -829,9 +841,6 @@ where
 async fn create_client(matches: &ArgMatches, settings: &Settings) -> Result<DshApiClient, String> {
   let target_platform = get_target_platform(matches, settings)?;
   let target_tenant_name = get_target_tenant(matches, settings)?;
-  if read_target(&target_platform, target_tenant_name.as_str())?.is_none() {
-    return Err(format!("target '{}@{}' is not configured", target_tenant_name, target_platform));
-  }
   debug!("create client for target '{}@{}'", target_tenant_name, target_platform);
   let dsh_api_tenant = DshApiTenant::new(target_tenant_name.clone(), target_platform.clone());
   let password = get_target_password(matches, &dsh_api_tenant)?;

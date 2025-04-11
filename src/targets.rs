@@ -35,14 +35,19 @@ impl Display for Target {
 }
 
 pub(crate) fn all_targets() -> Result<Vec<Target>, String> {
-  let mut targets = vec![];
-  for target_file in fs::read_dir(targets_directory()?).map_err(|error| error.to_string())? {
-    if let Ok(Some(target)) = read_and_deserialize_from_toml_file(target_file.map_err(|error| error.to_string())?.path()) {
-      targets.push(target);
+  match targets_directory()? {
+    Some(targets_directory) => {
+      let mut targets = vec![];
+      for target_file in fs::read_dir(targets_directory).map_err(|error| error.to_string())? {
+        if let Ok(Some(target)) = read_and_deserialize_from_toml_file(target_file.map_err(|error| error.to_string())?.path()) {
+          targets.push(target);
+        }
+      }
+      targets.sort();
+      Ok(targets)
     }
+    None => Err("targets directory could not be determined".to_string()),
   }
-  targets.sort();
-  Ok(targets)
 }
 
 /// # Delete target
@@ -122,7 +127,7 @@ pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option
       Ok(Some(Target { password: None, ..target }))
     }
     None => {
-      debug!("target could not read target file '{}'", target_file.to_string_lossy());
+      debug!("could not read target file '{}'", target_file.to_string_lossy());
       Ok(None)
     }
   }
@@ -176,12 +181,15 @@ pub(crate) fn upsert_target(target: &Target) -> Result<(), String> {
   }
 }
 
-fn targets_directory() -> Result<PathBuf, String> {
-  Ok(dsh_directory()?.join(TARGETS_SUBDIRECTORY))
+fn targets_directory() -> Result<Option<PathBuf>, String> {
+  Ok(dsh_directory()?.map(|dsh_directory| dsh_directory.join(TARGETS_SUBDIRECTORY)))
 }
 
 fn target_file(platform: &DshPlatform, tenant: &str) -> Result<PathBuf, String> {
-  Ok(targets_directory()?.join(format!("{}.{}.{}", platform, tenant, TOML_FILENAME_EXTENSION)))
+  match targets_directory()? {
+    Some(targets_directory) => Ok(targets_directory.join(format!("{}.{}.{}", platform, tenant, TOML_FILENAME_EXTENSION))),
+    None => Err("targets directory could not be determined".to_string()),
+  }
 }
 
 fn delete_file(toml_file: &PathBuf) -> Result<(), String> {

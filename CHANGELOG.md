@@ -4,6 +4,13 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.2] - 2025-04-11
+
+### Fixes
+
+* Fixed bug where target configuration was checked while it shouldn't.
+* Fixed bug with verbosity level.
+
 ## [0.7.1] - 2025-04-07
 
 ### Added
