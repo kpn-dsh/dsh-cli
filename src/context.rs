@@ -13,6 +13,7 @@ use crate::{
 };
 use clap::builder::styling::Style;
 use clap::ArgMatches;
+use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
 use log::debug;
@@ -80,15 +81,9 @@ impl Context {
     let quiet = Self::quiet(matches, &settings);
     let force = Self::force(matches, &settings);
     let suppress_exit_status = Self::suppress_exit_status(matches, &settings);
-    let (output_format_specification, show_execution_time, verbosity) = if quiet {
-      (Some(OutputFormat::Quiet), false, Verbosity::Off)
-    } else {
-      (
-        Self::output_format_specification(matches, &settings)?,
-        Self::show_execution_time(matches, &settings),
-        Self::verbosity(matches, &settings)?,
-      )
-    };
+    let output_format_specification = Self::output_format_specification(matches, &settings)?;
+    let show_execution_time = Self::show_execution_time(matches, &settings);
+    let verbosity = Self::verbosity(matches, &settings)?;
     let show_headers = !Self::no_headers(matches, &settings);
     let terminal_width = Self::terminal_width(matches, &settings)?;
     if dry_run && verbosity >= Verbosity::Medium {
@@ -572,13 +567,23 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium => eprintln!("{}", wrap_style(self.stderr_style(), explanation)),
-        Verbosity::High => {
-          // if let Some(ref client) = self.dsh_api_client {
-          //   eprintln!("{}", wrap_style(self.stderr_style(), format!("{}", client.tenant())));
-          // }
-          eprintln!("{}", wrap_style(self.stderr_style(), explanation));
-        }
+        Verbosity::Medium | Verbosity::High => eprintln!("{}", wrap_style(self.stderr_style(), explanation)),
+      }
+    }
+  }
+
+  /// # Prints the target platform and tenant to stderr
+  ///
+  /// This method is used to print the target platform and tenant to stderr,
+  /// when the verbosity level is `High`.
+  /// If `quiet` is `true`, nothing will be printed.
+  /// The standard error device is almost always a tty, but can in special cases also be
+  /// a pipe or an output file.
+  pub(crate) fn print_target(&self, dsh_api_tenant: &DshApiTenant) {
+    if !self.quiet {
+      match self.verbosity {
+        Verbosity::Off | Verbosity::Low | Verbosity::Medium => (),
+        Verbosity::High => eprintln!("{}", wrap_style(self.stderr_style(), format!("target {}", dsh_api_tenant))),
       }
     }
   }
@@ -592,7 +597,7 @@ impl Context {
   /// The standard error device is almost always a tty, but can in special cases also be
   /// a pipe or an output file.
   pub(crate) fn print_execution_time(&self, start_instant: Instant) {
-    if !self.quiet && (self.show_execution_time || self.verbosity == Verbosity::High) {
+    if !self.quiet && self.show_execution_time {
       eprintln!(
         "{}",
         wrap_style(

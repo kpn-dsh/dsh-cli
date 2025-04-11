@@ -191,11 +191,14 @@ impl Capability for CapabilityBuilder<'_> {
     dsh_api_client: &DshApiClient,
     context: &Context,
   ) -> DshCliResult {
+    context.print_target(dsh_api_client.tenant());
     for (flag_type, executor, _) in &self.executors {
       if matches.get_flag(flag_type.id()) {
-        return executor
-          .execute_with_client(argument.clone(), sub_argument.clone(), matches, dsh_api_client, context)
-          .await;
+        return {
+          executor
+            .execute_with_client(argument.clone(), sub_argument.clone(), matches, dsh_api_client, context)
+            .await
+        };
       }
     }
     self
