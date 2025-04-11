@@ -15,15 +15,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy, rustfmt
-    - name: Build all features
-      run: cargo build --all-features --verbose
-    - name: Run tests on all features
-      run: cargo test --all-features --verbose
-    - name: Run clippy on all features
-      run: cargo clippy --all-features
-    - name: Run format checker
-      run: cargo +nightly fmt --check
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy, rustfmt
+      - name: Build all features
+        run: cargo build --all-features --verbose
+      - name: Run tests on all features
+        run: cargo test --all-features --verbose
+      - name: Run clippy on all features
+        run: cargo clippy --all-features
+      - name: Run format checker
+        run: cargo +nightly fmt --check
