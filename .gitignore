@@ -6,3 +6,4 @@
 /.idea
 /demo/
 /.dsh_cli/
+/tests/.dsh_cli*
