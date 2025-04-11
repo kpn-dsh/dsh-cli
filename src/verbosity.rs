@@ -25,7 +25,7 @@ impl TryFrom<&str> for Verbosity {
       "off" => Ok(Self::Off),
       "low" => Ok(Self::Low),
       "medium" => Ok(Self::Medium),
-      "high" => Ok(Self::Medium),
+      "high" => Ok(Self::High),
       _ => Err(format!("invalid verbosity value '{}'", value)),
     }
   }
