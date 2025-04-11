@@ -117,4 +117,9 @@ All commands must produce a controlled error message and never terminate in pani
 This will run some `dsh platform open` commands which will try to open DSH resources and web
 applications. If successful, you will have some open tabs in your browser.
 
+### `test_targets.sh`
+
+This will run the `dsh service list` command with different ways of providing the
+target platform, tenant and password.
+
 [README &#x2192;](README.md)
