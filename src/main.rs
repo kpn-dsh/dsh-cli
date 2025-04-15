@@ -17,6 +17,7 @@ use crate::global_arguments::{
 use crate::log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
 use crate::log_level::initialize_logger;
 use crate::settings::{get_settings, Settings};
+use crate::style::{style_from, wrap_style, DshColor, DshStyle};
 use crate::subject::Subject;
 use crate::subjects::api::API_SUBJECT;
 use crate::subjects::platform::PLATFORM_SUBJECT;
@@ -104,7 +105,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-const VERSION: &str = "0.7.2";
+const VERSION: &str = "0.7.3";
 
 const ENV_VAR_PREFIX: &str = "DSH_CLI_";
 
@@ -161,13 +162,13 @@ impl Termination for DshCliExit {
     match self {
       DshCliExit::Ok => ExitCode::SUCCESS,
       DshCliExit::Err(msg) => {
-        eprintln!("{}", msg);
+        eprintln!("{}", wrap_style(default_error_style(), msg.trim_start_matches("error: ").trim_end_matches("\n")));
         ExitCode::FAILURE
       }
       DshCliExit::ErrContext(msg, context) => {
-        eprintln!("{}", msg);
+        context.print_error(msg);
         if context.suppress_exit_status {
-          eprintln!("exit status suppressed");
+          context.print_warning("exit status suppressed");
           ExitCode::SUCCESS
         } else {
           ExitCode::FAILURE
@@ -184,7 +185,7 @@ async fn main() -> DshCliExit {
 
 async fn inner_main() -> DshCliExit {
   let _ = ctrlc::set_handler(move || {
-    eprintln!("interrupted");
+    eprintln!("{}", wrap_style(default_warning_style(), "interrupted"));
     process::exit(0);
   });
 
@@ -231,7 +232,10 @@ async fn inner_main() -> DshCliExit {
 
   let mut command = create_command(&subject_commands, &settings);
 
-  let matches = command.clone().get_matches();
+  let matches = match command.clone().try_get_matches() {
+    Ok(matches) => matches,
+    Err(error) => return DshCliExit::Err(error.to_string()),
+  };
 
   if let Some(shell) = matches.get_one::<AutocompleteShell>(AUTOCOMPLETE_ARGUMENT) {
     generate_autocomplete_file(&mut command, shell);
@@ -879,6 +883,14 @@ fn enabled_features() -> Option<Vec<&'static str>> {
   } else {
     Some(enabled_features)
   }
+}
+
+fn default_error_style() -> Style {
+  style_from(&DshStyle::Bold, &DshColor::Red)
+}
+
+fn default_warning_style() -> Style {
+  style_from(&DshStyle::Bold, &DshColor::Blue)
 }
 
 #[test]

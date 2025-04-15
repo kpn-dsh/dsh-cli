@@ -4,6 +4,12 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.3] - YYYY-MM-DD
+
+### Changed
+
+* Added styling to error messages.
+
 ## [0.7.2] - 2025-04-11
 
 ### Fixes
