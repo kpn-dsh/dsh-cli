@@ -10,7 +10,7 @@ license = "Apache-2.0"
 readme = "README_CRATES_IO.md"
 repository = "https://github.com/kpn-dsh/dsh-cli"
 rust-version = "1.79"
-version = "0.7.2"
+version = "0.7.3"
 
 [profile.release]
 opt-level = "s"
