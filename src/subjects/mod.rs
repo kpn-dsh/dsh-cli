@@ -12,6 +12,8 @@ pub(crate) mod secret;
 pub(crate) mod service;
 pub(crate) mod setting;
 pub(crate) mod target;
+#[cfg(feature = "manage")]
+pub(crate) mod tenant_limits;
 pub(crate) mod token;
 pub(crate) mod topic;
 pub(crate) mod vhost;

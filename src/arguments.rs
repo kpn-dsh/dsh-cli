@@ -5,6 +5,7 @@ use dsh_api::platform::DshPlatform;
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
 pub(crate) const CERTIFICATE_ID_ARGUMENT: &str = "certificate-id-argument";
+pub(crate) const MANAGED_TENANT_NAME_ARGUMENT: &str = "managed-tenant-name-argument";
 pub(crate) const MANIFEST_ID_ARGUMENT: &str = "manifest-id-argument";
 pub(crate) const PLATFORM_NAME_ARGUMENT: &str = "platform-name-argument";
 pub(crate) const PROXY_ID_ARGUMENT: &str = "proxy-argument";
@@ -43,6 +44,15 @@ pub(crate) fn certificate_id_argument() -> Arg {
     .value_name("CERT")
     .help("Certificate identifier")
     .long_help("Identifies a certificate on the DSH.")
+}
+
+pub(crate) fn managed_tenant_name_argument() -> Arg {
+  Arg::new(MANAGED_TENANT_NAME_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("TENANT")
+    .help("Managed tenant name")
+    .long_help("The name of the managed tenant.")
 }
 
 pub(crate) fn manifest_id_argument() -> Arg {

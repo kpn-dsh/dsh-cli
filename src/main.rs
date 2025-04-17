@@ -6,38 +6,31 @@
 )]
 extern crate core;
 
-use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
-use crate::context::Context;
-use crate::filter_flags::FilterFlagType;
-use crate::global_arguments::{
-  dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
-  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
-  TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
-};
-use crate::log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
-use crate::log_level::initialize_logger;
-use crate::settings::{get_settings, Settings};
-use crate::style::{style_from, wrap_style, DshColor, DshStyle};
-use crate::subject::Subject;
-use crate::subjects::api::API_SUBJECT;
-use crate::subjects::platform::PLATFORM_SUBJECT;
-use crate::subjects::service::SERVICE_SUBJECT;
-use crate::subjects::token::TOKEN_SUBJECT;
-use crate::targets::{get_target_password_from_keyring, read_target};
+use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
 use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
+use context::Context;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::{crate_version, openapi_version};
+use filter_flags::FilterFlagType;
+use global_arguments::{
+  dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
+  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
+  TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
+};
 use homedir::my_home;
 use lazy_static::lazy_static;
 use log::{debug, trace};
+use log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
+use log_level::initialize_logger;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
+use settings::{get_settings, Settings};
 use std::collections::HashMap;
 use std::env::temp_dir;
 use std::fmt::Debug;
@@ -46,6 +39,9 @@ use std::io::{stdin, stdout, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
 use std::{env, fs, process};
+use style::{style_from, wrap_style, DshColor, DshStyle};
+use subject::Subject;
+use subjects::api::API_SUBJECT;
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
@@ -53,13 +49,19 @@ use subjects::env::ENV_SUBJECT;
 use subjects::image::IMAGE_SUBJECT;
 use subjects::manifest::MANIFEST_SUBJECT;
 use subjects::metric::METRIC_SUBJECT;
+use subjects::platform::PLATFORM_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
+use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
+#[cfg(feature = "manage")]
+use subjects::tenant_limits::TENANT_LIMIT_SUBJECT;
+use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
 use subjects::volume::VOLUME_SUBJECT;
+use targets::{get_target_password_from_keyring, read_target};
 
 mod arguments;
 mod autocomplete;
@@ -70,6 +72,7 @@ mod filter_flags;
 mod flags;
 mod formatters;
 mod global_arguments;
+mod limits_flags;
 mod log_arguments;
 mod log_level;
 mod modifier_flags;
@@ -207,6 +210,8 @@ async fn inner_main() -> DshCliExit {
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),
+    #[cfg(feature = "manage")]
+    TENANT_LIMIT_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
     METRIC_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),

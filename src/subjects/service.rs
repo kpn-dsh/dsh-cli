@@ -12,6 +12,7 @@ use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::limits_flags::{cpu_flag, mem_flag, CPU_FLAG, MEM_FLAG};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{edit_configuration, include_started_stopped, read_single_line, DshCliResult};
@@ -42,7 +43,7 @@ lazy_static! {
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &ServiceCreate {}, "Create service")
       .set_long_about("Create a new service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag())
+      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
   );
   static ref SERVICE_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, None, &ServiceDelete {}, "Delete service")
@@ -95,7 +96,7 @@ lazy_static! {
     CapabilityBuilder::new(START_COMMAND, None, &ServiceStart {}, "Start service")
       .set_long_about("Start a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag())
+      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
   );
   static ref SERVICE_STOP_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(STOP_COMMAND, None, &ServiceStop {}, "Stop service")
@@ -106,9 +107,9 @@ lazy_static! {
     CapabilityBuilder::new(UPDATE_COMMAND, None, &ServiceUpdate {}, "Update service")
       .set_long_about("Update a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(cpus_flag())
-      .add_extra_argument(instances_flag())
-      .add_extra_argument(mem_flag())
+      .add_extra_argument(cpu_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(mem_flag().help_heading(HELP_HEADING))
   );
   static ref SERVICE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     SERVICE_CREATE_CAPABILITY.as_ref(),
@@ -161,19 +162,6 @@ impl Subject for ServiceSubject {
 
 const HELP_HEADING: &str = "Service options";
 
-const CPUS_FLAG: &str = "cpus";
-
-fn cpus_flag() -> Arg {
-  Arg::new(CPUS_FLAG)
-    .long("cpus")
-    .action(ArgAction::Set)
-    .value_parser(clap::value_parser!(f64))
-    .value_name("CPUS")
-    .help("Number of cpus")
-    .long_help("Number of cpus that will be started.")
-    .help_heading(HELP_HEADING)
-}
-
 const INSTANCES_FLAG: &str = "instances";
 
 fn instances_flag() -> Arg {
@@ -184,19 +172,6 @@ fn instances_flag() -> Arg {
     .value_name("INSTANCES")
     .help("Number of instances")
     .long_help("Number of service instances that will be started.")
-    .help_heading(HELP_HEADING)
-}
-
-const MEM_FLAG: &str = "mem";
-
-fn mem_flag() -> Arg {
-  Arg::new(MEM_FLAG)
-    .long("mem")
-    .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
-    .value_name("MEM")
-    .help("Amount of memory")
-    .long_help("Amount of memory your application needs in MB.")
     .help_heading(HELP_HEADING)
 }
 
@@ -681,7 +656,7 @@ struct ServiceUpdate {}
 impl CommandExecutor for ServiceUpdate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    let cpus: Option<f64> = match matches.get_one::<f64>(CPUS_FLAG).cloned() {
+    let cpus: Option<f64> = match matches.get_one::<f64>(CPU_FLAG).cloned() {
       Some(cpus) => {
         if cpus >= 0.1 {
           Some(cpus)
