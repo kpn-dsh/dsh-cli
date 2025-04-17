@@ -13,7 +13,6 @@ pub(crate) fn log_level_api_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<LogLevel>::new())
     .value_name("LEVEL")
-    .help("Set log level for the dsh api crate")
     .long_help(
       "If this option is provided, it will set the log level for the 'dsh_api' crate. \
       The default log level is 'error'. See option --log-level for the possible values.",
@@ -30,7 +29,6 @@ pub(crate) fn log_level_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<LogLevel>::new())
     .value_name("LEVEL")
-    .help("Set log level")
     .long_help(
       "If this option is provided, it will set the dsh tool's log level. \
       The default log level is 'error'.",
@@ -46,7 +44,6 @@ pub(crate) fn log_level_sdk_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<LogLevel>::new())
     .value_name("LEVEL")
-    .help("Set log level for the dsh sdk crate")
     .long_help(
       "If this option is provided, it will set the log level for the 'dsh_sdk' crate. \
       The default log level is 'error'. See option --log-level for the possible values.",
