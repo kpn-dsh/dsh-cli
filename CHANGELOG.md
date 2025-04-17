@@ -8,7 +8,12 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Changed
 
-* Added styling to error messages.
+* Added styling for error messages.
+* Upgraded dependency `dsh_api` to version `0.7.0`, resulting in smaller package.
+
+### Removed
+
+* Short flag (`-V`) to show the tools version number.
 
 ## [0.7.2] - 2025-04-11
 
