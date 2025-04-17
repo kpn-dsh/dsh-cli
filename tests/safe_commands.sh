@@ -24,6 +24,11 @@ export VOLUME_NON_EXISTING=non-existing-volume
 export VOLUME_UNDER_TEST=github-action-runner-home
 
 export SAFE_COMMANDS=(
+  "-h"
+  "--help"
+  "--version"
+  "--generate-autocomplete-file zsh"
+
   "api delete secret-configuration $SECRET_UNDER_TEST --force --dry-run"
   "api get secret $SECRET_UNDER_TEST"
   "api post secret --dry-run < /dev/null"

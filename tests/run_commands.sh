@@ -11,7 +11,8 @@ export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
 
 export DSH_CLI_LOG_LEVEL="error"
 export DSH_CLI_OUTPUT_FORMAT="table"
-export DSH_CLI_VERBOSITY="low"
+export DSH_CLI_VERBOSITY="high"
+export DSH_CLI_SHOW_EXECUTION_TIME=""
 
 source safe_commands.sh
 

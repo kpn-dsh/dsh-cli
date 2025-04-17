@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export ERRONEOUS_COMMANDS=(
+  ""
   "api --wrong"
   "api delete --wrong"
   "api delete unknown"
