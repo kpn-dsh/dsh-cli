@@ -11,8 +11,8 @@ use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::global_arguments::{
   dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
-  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, TARGET_PASSWORD_FILE_ARGUMENT,
-  TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT,
+  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
+  TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
 };
 use crate::log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
 use crate::log_level::initialize_logger;
@@ -26,6 +26,7 @@ use crate::subjects::token::TOKEN_SUBJECT;
 use crate::targets::{get_target_password_from_keyring, read_target};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
+use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
@@ -153,7 +154,9 @@ type DshCliResult = Result<(), String>;
 #[derive(Debug)]
 enum DshCliExit {
   Ok,
+  OkClap(ClapError),
   Err(String),
+  ErrClap(ClapError),
   ErrContext(String, Box<Context>),
 }
 
@@ -161,8 +164,16 @@ impl Termination for DshCliExit {
   fn report(self) -> ExitCode {
     match self {
       DshCliExit::Ok => ExitCode::SUCCESS,
+      DshCliExit::OkClap(clap_error) => {
+        let _ = clap_error.print();
+        ExitCode::SUCCESS
+      }
       DshCliExit::Err(msg) => {
         eprintln!("{}", wrap_style(default_error_style(), msg.trim_start_matches("error: ").trim_end_matches("\n")));
+        ExitCode::FAILURE
+      }
+      DshCliExit::ErrClap(clap_error) => {
+        let _ = clap_error.print();
         ExitCode::FAILURE
       }
       DshCliExit::ErrContext(msg, context) => {
@@ -234,11 +245,25 @@ async fn inner_main() -> DshCliExit {
 
   let matches = match command.clone().try_get_matches() {
     Ok(matches) => matches,
-    Err(error) => return DshCliExit::Err(error.to_string()),
+    Err(clap_error) => match clap_error.kind() {
+      ErrorKind::DisplayHelp => return DshCliExit::OkClap(clap_error),
+      ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => return DshCliExit::ErrClap(clap_error),
+      _ => return DshCliExit::Err(clap_error.to_string()),
+    },
   };
 
   if let Some(shell) = matches.get_one::<AutocompleteShell>(AUTOCOMPLETE_ARGUMENT) {
     generate_autocomplete_file(&mut command, shell);
+    return DshCliExit::Ok;
+  }
+
+  if matches.get_flag(VERSION_ARGUMENT) {
+    println!(
+      "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
+      VERSION,
+      crate_version(),
+      openapi_version()
+    );
     return DshCliExit::Ok;
   }
 
@@ -343,6 +368,7 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       suppress_exit_status_argument(),
       terminal_width_argument(),
       generate_autocomplete_file_argument(),
+      version_argument(),
     ])
     .subcommand_value_name("SUBJECT/COMMAND")
     .subcommand_help_heading("Subjects/commands")
@@ -351,13 +377,7 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
     .hide_possible_values(false)
     .styles(STYLES.clone())
     .subcommands(clap_commands)
-    .version(VERSION)
-    .long_version(format!(
-      "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
-      VERSION,
-      crate_version(),
-      openapi_version()
-    ));
+    .disable_version_flag(true);
   let mut default_settings: Vec<(&str, String)> = vec![];
   if let Some(default_platform) = &settings.default_platform {
     let platform = DshPlatform::try_from(default_platform.as_str()).unwrap();
@@ -900,5 +920,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.6.1");
+  assert_eq!(crate_version(), "0.7.0");
 }
