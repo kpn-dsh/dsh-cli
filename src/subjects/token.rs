@@ -8,7 +8,7 @@ use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_sdk::management_api::AccessToken;
+use dsh_api::token_fetcher::AccessToken;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
@@ -65,7 +65,7 @@ impl CommandExecutor for TokenFetch {
     let start_instant = context.now();
     let access_token = client.token_fetcher().fetch_access_token_from_server().await.map_err(|error| error.to_string())?;
     context.print_execution_time(start_instant);
-    context.print(access_token.access_token());
+    context.print(access_token.access_token);
     Ok(())
   }
 
@@ -124,13 +124,13 @@ impl Label for AccessTokenLabel {
 impl SubjectFormatter<AccessTokenLabel> for AccessToken {
   fn value(&self, label: &AccessTokenLabel, _target_id: &str) -> String {
     match label {
-      AccessTokenLabel::AccessToken => self.access_token().to_string(),
-      AccessTokenLabel::ExpiresIn => self.expires_in().to_string(),
+      AccessTokenLabel::AccessToken => self.access_token.to_string(),
+      AccessTokenLabel::ExpiresIn => self.expires_in.to_string(),
       AccessTokenLabel::Formatted => self.formatted_token(),
-      AccessTokenLabel::NotBeforePolicy => self.not_before_policy().to_string(),
-      AccessTokenLabel::RefreshExpiresIn => self.refresh_expires_in().to_string(),
-      AccessTokenLabel::Scope => self.scope().to_string(),
-      AccessTokenLabel::TokenType => self.token_type().to_string(),
+      AccessTokenLabel::NotBeforePolicy => self.not_before_policy.to_string(),
+      AccessTokenLabel::RefreshExpiresIn => self.refresh_expires_in.to_string(),
+      AccessTokenLabel::Scope => self.scope.to_string(),
+      AccessTokenLabel::TokenType => self.token_type.to_string(),
     }
   }
 }
@@ -144,29 +144,3 @@ pub static ACCES_TOKEN_LABELS: [AccessTokenLabel; 7] = [
   AccessTokenLabel::RefreshExpiresIn,
   AccessTokenLabel::AccessToken,
 ];
-
-// use dsh_api::dsh_api_client_factory::DshApiClientFactory;
-// use dsh_sdk::protocol_adapters::token::api_client_token_fetcher::ApiClientTokenFetcher;
-// use dsh_sdk::protocol_adapters::token::data_access_token::RequestDataAccessToken;
-// use dsh_sdk::Platform;
-//
-// #[tokio::main]
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//   let client = DshApiClientFactory::default().client().await?;
-//
-//   println!("{}", client.tenant());
-//
-//   // Create a request for the Data Access Token (this request for full access)
-//   let request = RequestDataAccessToken::new(client.tenant_name(), client.platform().client_id());
-//
-//   let sdk_platform = Platform::try_from(client.platform())?;
-//   let api_key = "";
-//
-//   let token_fetcher = ApiClientTokenFetcher::new(api_key, sdk_platform);
-//
-//   let token = token_fetcher.fetch_data_access_token(request).await.unwrap();
-//
-//   println!("{:#?}", token);
-//
-//   Ok(())
-// }
