@@ -19,10 +19,12 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{
-  LimitValue, LimitValueCertificateCount, LimitValueCertificateCountName, LimitValueConsumerRate, LimitValueConsumerRateName, LimitValueCpu, LimitValueCpuName,
+  LimitValue, LimitValueCertificateCount, LimitValueCertificateCountName, LimitValueConsumerRate, LimitValueConsumerRateName, LimitValueCpu, LimitValueCpuName, ManagedTenant,
+  ManagedTenantServicesName,
 };
 use dsh_api::DshApiError;
 use futures::future::try_join_all;
+use futures::try_join;
 use lazy_static::lazy_static;
 use log::warn;
 use serde::Serialize;
@@ -108,15 +110,15 @@ impl CommandExecutor for TenantListAll {
     if tenant_ids.is_empty() {
       context.print_error("you are not authorized to manage tenants");
     } else {
-      let tenant_limits: Vec<TenantLimits> = try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenant_limits(tenant_id)))
-        .await?
-        .iter()
-        .map(TenantLimits::from)
-        .collect::<Vec<_>>();
+      let (managed_tenants, limits) = try_join!(
+        try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenant_configuration(tenant_id))),
+        try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenant_limits(tenant_id)))
+      )?;
       context.print_execution_time(start_instant);
-      let mut formatter = ListFormatter::new(&TENANT_LIMIT_LABELS, None, context);
-      for (tenant_id, tenant_limits) in tenant_ids.iter().zip(&tenant_limits) {
-        formatter.push_target_id_value(tenant_id.clone(), tenant_limits);
+      let managed_tenants_limits: Vec<(ManagedTenant, TenantLimits)> = managed_tenants.into_iter().zip(limits.iter().map(TenantLimits::from)).collect::<Vec<_>>();
+      let mut formatter = ListFormatter::new(&TENANT_LABELS, None, context);
+      for (tenant_id, managed_tenant_limit) in tenant_ids.iter().zip(&managed_tenants_limits) {
+        formatter.push_target_id_value(tenant_id.clone(), managed_tenant_limit);
       }
       formatter.print(None)?;
     }
@@ -160,10 +162,10 @@ impl CommandExecutor for TenantShowAll {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all limits for tenant '{}'", tenant_id));
     let start_instant = context.now();
-    match client.get_tenant_limits(&tenant_id).await {
-      Ok(tenant_limits) => {
+    match try_join!(client.get_tenant_configuration(&tenant_id), client.get_tenant_limits(&tenant_id)) {
+      Ok((managed_tenant, limit_values)) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(tenant_id, &TENANT_LIMIT_LABELS, Some("tenant id"), context).print(&TenantLimits::from(&tenant_limits), None)
+        UnitFormatter::new(tenant_id, &TENANT_LABELS, Some("tenant id"), context).print(&(managed_tenant, TenantLimits::from(&limit_values)), None)
       }
       Err(error) => match error {
         DshApiError::NotFound => {
@@ -410,34 +412,44 @@ impl TryFrom<TenantLimits> for Vec<LimitValue> {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum TenantLimitLabel {
+pub(crate) enum TenantLabel {
   CertificateCount,
   ConsumerRate,
   Cpu,
   KafkaAclGroupCount,
+  Manager,
   Mem,
+  Monitoring,
+  Name,
   PartitionCount,
   ProducerRate,
   RequestRate,
   SecretCount,
   Tenant,
   TopicCount,
+  Tracing,
+  Vpn,
 }
 
-impl Label for TenantLimitLabel {
+impl Label for TenantLabel {
   fn as_str(&self) -> &str {
     match self {
       Self::CertificateCount => "certificate count",
       Self::ConsumerRate => "consumer rate",
       Self::Cpu => "cpu",
       Self::KafkaAclGroupCount => "kafka acl group count",
+      Self::Manager => "managing tenant",
       Self::Mem => "mem",
+      Self::Monitoring => "monitoring enabled",
+      Self::Name => "name",
       Self::PartitionCount => "partition count",
       Self::ProducerRate => "producer rate",
       Self::RequestRate => "request rate",
       Self::SecretCount => "secret count",
       Self::Tenant => "managed tenant",
       Self::TopicCount => "topic count",
+      Self::Tracing => "tracing enabled",
+      Self::Vpn => "vpn enabled",
     }
   }
 
@@ -447,13 +459,18 @@ impl Label for TenantLimitLabel {
       Self::ConsumerRate => "consumer",
       Self::Cpu => "cpu",
       Self::KafkaAclGroupCount => "acl groups",
+      Self::Manager => "manager",
       Self::Mem => "mem",
+      Self::Monitoring => "monitoring",
+      Self::Name => "name",
       Self::PartitionCount => "partitions",
       Self::ProducerRate => "producer",
       Self::RequestRate => "request",
       Self::SecretCount => "secrets",
       Self::Tenant => "tenant",
       Self::TopicCount => "topics",
+      Self::Tracing => "tracing",
+      Self::Vpn => "vpn",
     }
   }
 
@@ -462,34 +479,86 @@ impl Label for TenantLimitLabel {
   }
 }
 
-impl SubjectFormatter<TenantLimitLabel> for TenantLimits {
-  fn value(&self, label: &TenantLimitLabel, target_id: &str) -> String {
+impl SubjectFormatter<TenantLabel> for TenantLimits {
+  fn value(&self, label: &TenantLabel, target_id: &str) -> String {
     match label {
-      TenantLimitLabel::CertificateCount => self.certificate_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLimitLabel::ConsumerRate => self.consumer_rate.map(|rate| rate.to_string()).unwrap_or_default(),
-      TenantLimitLabel::Cpu => self.cpu.map(|cpu| cpu.to_string()).unwrap_or_default(),
-      TenantLimitLabel::KafkaAclGroupCount => self.kafka_acl_group_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLimitLabel::Mem => self.mem.map(|mem| mem.to_string()).unwrap_or_default(),
-      TenantLimitLabel::PartitionCount => self.partition_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLimitLabel::ProducerRate => self.producer_rate.map(|rate| rate.to_string()).unwrap_or_default(),
-      TenantLimitLabel::RequestRate => self.request_rate.map(|rate| rate.to_string()).unwrap_or_default(),
-      TenantLimitLabel::SecretCount => self.secret_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLimitLabel::Tenant => target_id.to_string(),
-      TenantLimitLabel::TopicCount => self.topic_count.map(|count| count.to_string()).unwrap_or_default(),
+      TenantLabel::CertificateCount => self.certificate_count.map(|count| count.to_string()).unwrap_or_default(),
+      TenantLabel::ConsumerRate => self.consumer_rate.map(|rate| rate.to_string()).unwrap_or_default(),
+      TenantLabel::Cpu => self.cpu.map(|cpu| cpu.to_string()).unwrap_or_default(),
+      TenantLabel::KafkaAclGroupCount => self.kafka_acl_group_count.map(|count| count.to_string()).unwrap_or_default(),
+      TenantLabel::Mem => self.mem.map(|mem| mem.to_string()).unwrap_or_default(),
+      TenantLabel::PartitionCount => self.partition_count.map(|count| count.to_string()).unwrap_or_default(),
+      TenantLabel::ProducerRate => self.producer_rate.map(|rate| rate.to_string()).unwrap_or_default(),
+      TenantLabel::RequestRate => self.request_rate.map(|rate| rate.to_string()).unwrap_or_default(),
+      TenantLabel::SecretCount => self.secret_count.map(|count| count.to_string()).unwrap_or_default(),
+      TenantLabel::Tenant => target_id.to_string(),
+      TenantLabel::TopicCount => self.topic_count.map(|count| count.to_string()).unwrap_or_default(),
+      _ => unreachable!(),
     }
   }
 }
 
-pub static TENANT_LIMIT_LABELS: [TenantLimitLabel; 11] = [
-  TenantLimitLabel::Tenant,
-  TenantLimitLabel::CertificateCount,
-  TenantLimitLabel::ConsumerRate,
-  TenantLimitLabel::Cpu,
-  TenantLimitLabel::KafkaAclGroupCount,
-  TenantLimitLabel::Mem,
-  TenantLimitLabel::PartitionCount,
-  TenantLimitLabel::ProducerRate,
-  TenantLimitLabel::RequestRate,
-  TenantLimitLabel::SecretCount,
-  TenantLimitLabel::TopicCount,
+pub static TENANT_LIMIT_LABELS: [TenantLabel; 11] = [
+  TenantLabel::Tenant,
+  TenantLabel::CertificateCount,
+  TenantLabel::ConsumerRate,
+  TenantLabel::Cpu,
+  TenantLabel::KafkaAclGroupCount,
+  TenantLabel::Mem,
+  TenantLabel::PartitionCount,
+  TenantLabel::ProducerRate,
+  TenantLabel::RequestRate,
+  TenantLabel::SecretCount,
+  TenantLabel::TopicCount,
 ];
+
+pub static TENANT_LABELS: [TenantLabel; 16] = [
+  TenantLabel::Tenant,
+  TenantLabel::Manager,
+  TenantLabel::Monitoring,
+  TenantLabel::Name,
+  TenantLabel::Tracing,
+  TenantLabel::Vpn,
+  TenantLabel::CertificateCount,
+  TenantLabel::ConsumerRate,
+  TenantLabel::Cpu,
+  TenantLabel::KafkaAclGroupCount,
+  TenantLabel::Mem,
+  TenantLabel::PartitionCount,
+  TenantLabel::ProducerRate,
+  TenantLabel::RequestRate,
+  TenantLabel::SecretCount,
+  TenantLabel::TopicCount,
+];
+
+impl SubjectFormatter<TenantLabel> for ManagedTenant {
+  fn value(&self, label: &TenantLabel, _target_id: &str) -> String {
+    match label {
+      TenantLabel::Manager => self.manager.to_string(),
+      TenantLabel::Monitoring => service(self, ManagedTenantServicesName::Monitoring),
+      TenantLabel::Name => self.name.to_string(),
+      TenantLabel::Tracing => service(self, ManagedTenantServicesName::Tracing),
+      TenantLabel::Vpn => service(self, ManagedTenantServicesName::Vpn),
+      _ => unreachable!(),
+    }
+  }
+}
+
+impl SubjectFormatter<TenantLabel> for (ManagedTenant, TenantLimits) {
+  fn value(&self, label: &TenantLabel, target_id: &str) -> String {
+    match label {
+      TenantLabel::Manager | TenantLabel::Monitoring | TenantLabel::Name | TenantLabel::Tracing | TenantLabel::Vpn => self.0.value(label, target_id),
+      _ => self.1.value(label, target_id),
+    }
+  }
+}
+
+fn service(managed_tenant: &ManagedTenant, name: ManagedTenantServicesName) -> String {
+  managed_tenant
+    .services
+    .iter()
+    .find_map(|service| if service.name == name { Some(service.enabled.to_string()) } else { None })
+    .unwrap_or_default()
+}
+
+pub static _MANAGED_TENANT_LABELS: [TenantLabel; 5] = [TenantLabel::Name, TenantLabel::Manager, TenantLabel::Monitoring, TenantLabel::Tracing, TenantLabel::Vpn];
