@@ -1,4 +1,4 @@
-use crate::arguments::managed_tenant_name_argument;
+use crate::arguments::managed_tenant_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UPDATE_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -23,40 +23,41 @@ use dsh_api::types::{
 };
 use dsh_api::DshApiError;
 use futures::future::try_join_all;
-use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::warn;
 use serde::Serialize;
 
-pub(crate) struct TenantLimitSubject {}
+pub(crate) struct TenantSubject {}
 
-const TENANT_LIMIT_SUBJECT_TARGET: &str = "tenant-limit";
+const TENANT_SUBJECT_TARGET: &str = "tenant";
 
 lazy_static! {
-  pub static ref TENANT_LIMIT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TenantLimitSubject {});
+  pub static ref TENANT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TenantSubject {});
 }
 
+const HELP_HEADING: &str = "Tenant options";
+
 lazy_static! {
-  static ref TENANT_LIMIT_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TenantLimitListAll {}, "List managed tenant limits")
-      .set_long_about("Lists all managed tenant limits.")
-      .add_target_argument(managed_tenant_name_argument())
+  static ref TENANT_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TenantListAll {}, "List managed tenants")
+      .set_long_about("Lists all managed tenants.")
+      .add_target_argument(managed_tenant_argument())
       .add_command_executor(FlagType::Ids, &TenantListIds {}, None)
   );
-  static ref TENANT_LIMIT_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(
       SHOW_COMMAND,
       Some(SHOW_COMMAND_ALIAS),
-      &TenantLimitShowAll {},
+      &TenantShowAll {},
       "Show managed tenant configuration"
     )
-    .set_long_about("Show the configuration of a DSH service.")
-    .add_target_argument(managed_tenant_name_argument().required(true))
+    .set_long_about("Show the configuration of a managed tenant.")
+    .add_target_argument(managed_tenant_argument().required(true))
   );
-  static ref TENANT_LIMIT_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(UPDATE_COMMAND, None, &TenantLimitUpdate {}, "Update managed tenant limits")
-      .set_long_about("Update a DSH service.")
-      .add_target_argument(managed_tenant_name_argument().required(true))
+  static ref TENANT_UPDATE_LIMIT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(UPDATE_COMMAND, None, &TenantUpdateLimit {}, "Update managed tenant limits")
+      .set_long_about("Update the limits of a managed tenant.")
+      .add_target_argument(managed_tenant_argument().required(true))
       .add_extra_argument(certificate_count_flag().help_heading(HELP_HEADING))
       .add_extra_argument(consumer_rate_flag().help_heading(HELP_HEADING))
       .add_extra_argument(cpu_flag().help_heading(HELP_HEADING))
@@ -68,55 +69,57 @@ lazy_static! {
       .add_extra_argument(secret_count_flag().help_heading(HELP_HEADING))
       .add_extra_argument(topic_count_flag().help_heading(HELP_HEADING))
   );
-  static ref TENANT_LIMIT_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![TENANT_LIMIT_LIST_CAPABILITY.as_ref(), TENANT_LIMIT_SHOW_CAPABILITY.as_ref(), TENANT_LIMIT_UPDATE_CAPABILITY.as_ref()];
+  static ref TENANT_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![TENANT_LIST_CAPABILITY.as_ref(), TENANT_SHOW_CAPABILITY.as_ref(), TENANT_UPDATE_LIMIT_CAPABILITY.as_ref()];
 }
 
 #[async_trait]
-impl Subject for TenantLimitSubject {
+impl Subject for TenantSubject {
   fn subject(&self) -> &'static str {
-    TENANT_LIMIT_SUBJECT_TARGET
+    TENANT_SUBJECT_TARGET
   }
 
   fn subject_command_about(&self) -> String {
-    "Show, manage and limits of tenants on the DSH.".to_string()
-  }
-
-  fn subject_command_alias(&self) -> Option<&str> {
-    Some("s")
+    "Show and manage tenants on the DSH.".to_string()
   }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      LIST_COMMAND => Some(TENANT_LIMIT_LIST_CAPABILITY.as_ref()),
-      SHOW_COMMAND => Some(TENANT_LIMIT_SHOW_CAPABILITY.as_ref()),
-      UPDATE_COMMAND => Some(TENANT_LIMIT_UPDATE_CAPABILITY.as_ref()),
+      LIST_COMMAND => Some(TENANT_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(TENANT_SHOW_CAPABILITY.as_ref()),
+      UPDATE_COMMAND => Some(TENANT_UPDATE_LIMIT_CAPABILITY.as_ref()),
       _ => None,
     }
   }
 
   fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
-    &TENANT_LIMIT_CAPABILITIES
+    &TENANT_CAPABILITIES
   }
 }
 
-const HELP_HEADING: &str = "Manage tenant limit options";
-
-struct TenantLimitListAll {}
+struct TenantListAll {}
 
 #[async_trait]
-impl CommandExecutor for TenantLimitListAll {
+impl CommandExecutor for TenantListAll {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all tenants with their limits");
     let start_instant = context.now();
     let tenant_ids: Vec<String> = client.get_tenant_ids().await?;
-    let tenant_limits: Vec<Vec<LimitValue>> = try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenant_limits(tenant_id))).await?;
-    context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&TENANT_LIMIT_LABELS, None, context);
-    for (tenant_id, limits) in tenant_ids.iter().zip(&tenant_limits) {
-      formatter.push_target_id_value(tenant_id.clone(), limits);
+    if tenant_ids.is_empty() {
+      context.print_error("you are not authorized to manage tenants");
+    } else {
+      let tenant_limits: Vec<TenantLimits> = try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenant_limits(tenant_id)))
+        .await?
+        .iter()
+        .map(TenantLimits::from)
+        .collect::<Vec<_>>();
+      context.print_execution_time(start_instant);
+      let mut formatter = ListFormatter::new(&TENANT_LIMIT_LABELS, None, context);
+      for (tenant_id, tenant_limits) in tenant_ids.iter().zip(&tenant_limits) {
+        formatter.push_target_id_value(tenant_id.clone(), tenant_limits);
+      }
+      formatter.print(None)?;
     }
-    formatter.print(None)?;
     Ok(())
   }
 
@@ -134,9 +137,13 @@ impl CommandExecutor for TenantListIds {
     let start_instant = context.now();
     let tenant_ids: Vec<String> = client.get_tenant_ids().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = IdsFormatter::new("tenant id", context);
-    formatter.push_target_ids(tenant_ids.as_slice());
-    formatter.print(Some(OutputFormat::Plain))?;
+    if tenant_ids.is_empty() {
+      context.print_error("you are not authorized to manage tenants");
+    } else {
+      let mut formatter = IdsFormatter::new("tenant id", context);
+      formatter.push_target_ids(tenant_ids.as_slice());
+      formatter.print(Some(OutputFormat::Plain))?;
+    }
     Ok(())
   }
 
@@ -145,57 +152,22 @@ impl CommandExecutor for TenantListIds {
   }
 }
 
-struct TenantLimitShowAll {}
+struct TenantShowAll {}
 
 #[async_trait]
-impl CommandExecutor for TenantLimitShowAll {
+impl CommandExecutor for TenantShowAll {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all limits for tenant '{}'", tenant_id));
     let start_instant = context.now();
-    let limits = client.get_tenant_limits(&tenant_id).await?;
-    context.print_execution_time(start_instant);
-    UnitFormatter::new(tenant_id, &TENANT_LIMIT_LABELS, Some("tenant id"), context).print(&limits, None)
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
-  }
-}
-
-struct TenantLimitUpdate {}
-
-#[async_trait]
-impl CommandExecutor for TenantLimitUpdate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    let tenant_id = target.unwrap_or_else(|| unreachable!());
-    let tenant_limits_from_arguments = TenantLimits::try_from(matches)?;
-    if tenant_limits_from_arguments.is_empty() {
-      return Err("at least one update argument must be provided".to_string());
-    }
-    context.print_explanation(format!("update tenant '{}'", tenant_id));
     match client.get_tenant_limits(&tenant_id).await {
-      Ok(limits) => {
-        let current_tenant_limits = TenantLimits::from(limits);
-        let mut updated_tenant_limits = current_tenant_limits.clone();
-        updated_tenant_limits.update(tenant_limits_from_arguments);
-        if current_tenant_limits != updated_tenant_limits {
-          if context.dry_run {
-            context.print_warning("dry-run mode, limits not updated");
-          } else {
-            let limit_values: Vec<LimitValue> = updated_tenant_limits.try_into()?;
-            client.patch_tenant_limit(&tenant_id, &limit_values).await?;
-            context.print_outcome(format!("tenant '{}' updated", tenant_id));
-          }
-          Ok(())
-        } else {
-          context.print_outcome("provided arguments are equal to the current tenant limits, limits not updated");
-          Ok(())
-        }
+      Ok(tenant_limits) => {
+        context.print_execution_time(start_instant);
+        UnitFormatter::new(tenant_id, &TENANT_LIMIT_LABELS, Some("tenant id"), context).print(&TenantLimits::from(&tenant_limits), None)
       }
       Err(error) => match error {
         DshApiError::NotFound => {
-          context.print_error(format!("tenant '{}' does not exist", tenant_id));
+          context.print_error(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
           Ok(())
         }
         error => Err(String::from(error)),
@@ -208,7 +180,58 @@ impl CommandExecutor for TenantLimitUpdate {
   }
 }
 
-#[derive(Clone, Default, PartialEq)]
+struct TenantUpdateLimit {}
+
+#[async_trait]
+impl CommandExecutor for TenantUpdateLimit {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let tenant_id = target.unwrap_or_else(|| unreachable!());
+    let tenant_limits_from_arguments = TenantLimits::try_from(matches)?;
+    if tenant_limits_from_arguments.is_empty() {
+      return Err("at least one limit argument must be provided".to_string());
+    }
+    context.print_explanation(format!("update limits of tenant '{}'", tenant_id));
+    match client.get_tenant_limits(&tenant_id).await {
+      Ok(limits) => {
+        let current_tenant_limits = TenantLimits::from(&limits);
+        let mut updated_tenant_limits = current_tenant_limits.clone();
+        updated_tenant_limits.update(tenant_limits_from_arguments);
+        if current_tenant_limits != updated_tenant_limits {
+          UnitFormatter::new(tenant_id.clone(), &TENANT_LIMIT_LABELS, Some("tenant id"), context).print(&updated_tenant_limits, None)?;
+          if context.confirmed(format!("update limits for tenant '{}' to the above values?", tenant_id))? {
+            if context.dry_run {
+              context.print_warning("dry-run mode, limits not updated");
+            } else {
+              let limit_values: Vec<LimitValue> = updated_tenant_limits.try_into()?;
+              client.patch_tenant_limit(&tenant_id, &limit_values).await?;
+              context.print_outcome(format!("limits for tenant '{}' updated", tenant_id));
+            }
+            Ok(())
+          } else {
+            context.print_outcome(format!("cancelled, limits for tenant '{}' not updated", tenant_id));
+            Ok(())
+          }
+        } else {
+          context.print_outcome("provided limits are equal to the current tenant limits, limits not updated");
+          Ok(())
+        }
+      }
+      Err(error) => match error {
+        DshApiError::NotFound => {
+          context.print_error(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
+          Ok(())
+        }
+        error => Err(String::from(error)),
+      },
+    }
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+#[derive(Clone, Default, PartialEq, Serialize)]
 struct TenantLimits {
   certificate_count: Option<u64>,
   consumer_rate: Option<u64>,
@@ -302,8 +325,8 @@ impl TryFrom<&ArgMatches> for TenantLimits {
   }
 }
 
-impl From<Vec<LimitValue>> for TenantLimits {
-  fn from(limits: Vec<LimitValue>) -> Self {
+impl From<&Vec<LimitValue>> for TenantLimits {
+  fn from(limits: &Vec<LimitValue>) -> Self {
     let mut tenant_limits = TenantLimits::default();
     for limit in limits {
       match limit {
@@ -453,84 +476,6 @@ impl SubjectFormatter<TenantLimitLabel> for TenantLimits {
       TenantLimitLabel::SecretCount => self.secret_count.map(|count| count.to_string()).unwrap_or_default(),
       TenantLimitLabel::Tenant => target_id.to_string(),
       TenantLimitLabel::TopicCount => self.topic_count.map(|count| count.to_string()).unwrap_or_default(),
-    }
-  }
-}
-
-impl SubjectFormatter<TenantLimitLabel> for Vec<LimitValue> {
-  fn value(&self, label: &TenantLimitLabel, tenant_id: &str) -> String {
-    match label {
-      TenantLimitLabel::CertificateCount => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::CertificateCount(count) => Some(count.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::ConsumerRate => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::ConsumerRate(rate) => Some(rate.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::Cpu => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::Cpu(cpu) => Some(cpu.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::KafkaAclGroupCount => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::KafkaAclGroupCount(count) => Some(count.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::Mem => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::Mem(mem) => Some(mem.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::PartitionCount => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::PartitionCount(count) => Some(count.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::ProducerRate => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::ProducerRate(rate) => Some(rate.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::RequestRate => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::RequestRate(rate) => Some(rate.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::SecretCount => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::SecretCount(count) => Some(count.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
-      TenantLimitLabel::Tenant => tenant_id.to_string(),
-      TenantLimitLabel::TopicCount => self
-        .iter()
-        .filter_map(|limit| match limit {
-          LimitValue::TopicCount(count) => Some(count.value.to_string()),
-          _ => None,
-        })
-        .join(", "),
     }
   }
 }

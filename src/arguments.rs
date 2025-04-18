@@ -46,7 +46,7 @@ pub(crate) fn certificate_id_argument() -> Arg {
     .long_help("Identifies a certificate on the DSH.")
 }
 
-pub(crate) fn managed_tenant_name_argument() -> Arg {
+pub(crate) fn managed_tenant_argument() -> Arg {
   Arg::new(MANAGED_TENANT_NAME_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())

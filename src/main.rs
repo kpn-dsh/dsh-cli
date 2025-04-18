@@ -56,7 +56,7 @@ use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
 #[cfg(feature = "manage")]
-use subjects::tenant_limits::TENANT_LIMIT_SUBJECT;
+use subjects::tenant::TENANT_SUBJECT;
 use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
@@ -210,14 +210,14 @@ async fn inner_main() -> DshCliExit {
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),
-    #[cfg(feature = "manage")]
-    TENANT_LIMIT_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
     METRIC_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     SERVICE_SUBJECT.as_ref(),
+    #[cfg(feature = "manage")]
+    TENANT_SUBJECT.as_ref(),
     TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
