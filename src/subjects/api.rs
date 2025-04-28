@@ -12,6 +12,7 @@ use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, POST_METHO
 use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::debug;
 
 pub(crate) struct ApiSubject {}
 
@@ -351,10 +352,17 @@ impl CommandExecutor for ApiPatch {
       Ok(())
     } else {
       let start_instant = context.now();
-      client.patch(selector, &parameters, body).await?;
-      context.print_execution_time(start_instant);
-      context.print_outcome("patched");
-      Ok(())
+      match client.patch(selector, &parameters, body).await {
+        Ok(_) => {
+          context.print_execution_time(start_instant);
+          context.print_outcome("patched");
+          Ok(())
+        }
+        Err(error) => {
+          debug!("{:#?}", error);
+          Err(error.to_string())
+        }
+      }
     }
   }
 

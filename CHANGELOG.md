@@ -6,10 +6,17 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [0.7.3] - YYYY-MM-DD
 
+### Added
+
+* Capability to create, delete, list and show managed tenants.
+* Capability to set limits and enable services for managed tenants.
+* Capability to fetch a token and copy it directly to the clipboard.
+
 ### Changed
 
 * Added styling for error messages.
-* Upgraded dependency `dsh_api` to version `0.7.0`, resulting in smaller package.
+* Upgraded dependency `dsh_api` to version `0.7.1`,
+  for patch on error in open api specification and smaller package.
 
 ### Removed
 
