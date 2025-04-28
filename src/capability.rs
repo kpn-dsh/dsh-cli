@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 
+pub(crate) const COPY_COMMAND: &str = "copy";
 pub(crate) const CREATE_COMMAND: &str = "create";
 pub(crate) const CREATE_COMMAND_ALIAS: &str = "c";
 pub(crate) const DEFAULT_COMMAND: &str = "default";
