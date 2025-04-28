@@ -98,7 +98,7 @@ impl CommandExecutor for ManifestExport {
         context.print(raw_manifest);
         Ok(())
       }
-      Err(DshApiError::NotFound) => {
+      Err(DshApiError::NotFound(None)) => {
         context.print_outcome(format!("manifest '{}' not found", manifest_id));
         Ok(())
       }

@@ -270,7 +270,7 @@ impl CommandExecutor for ServiceDuplicate {
         Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound => {
+        DshApiError::NotFound(None) => {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
@@ -314,7 +314,7 @@ impl CommandExecutor for ServiceEdit {
         Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound => {
+        DshApiError::NotFound(None) => {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
@@ -492,7 +492,7 @@ impl CommandExecutor for ServiceRestart {
         Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound => {
+        DshApiError::NotFound(None) => {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
@@ -596,7 +596,7 @@ impl CommandExecutor for ServiceStart {
         Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound => {
+        DshApiError::NotFound(None) => {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
@@ -636,7 +636,7 @@ impl CommandExecutor for ServiceStop {
         Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound => {
+        DshApiError::NotFound(None) => {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
@@ -700,7 +700,7 @@ impl CommandExecutor for ServiceUpdate {
         }
       }
       Err(error) => match error {
-        DshApiError::NotFound => {
+        DshApiError::NotFound(None) => {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
