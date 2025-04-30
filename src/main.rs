@@ -54,6 +54,8 @@ use subjects::proxy::PROXY_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
 use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
+#[cfg(feature = "manage")]
+use subjects::stream::STREAM_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
 #[cfg(feature = "manage")]
 use subjects::tenant::TENANT_SUBJECT;
@@ -216,6 +218,8 @@ async fn inner_main() -> DshCliExit {
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     SERVICE_SUBJECT.as_ref(),
+    #[cfg(feature = "manage")]
+    STREAM_SUBJECT.as_ref(),
     #[cfg(feature = "manage")]
     TENANT_SUBJECT.as_ref(),
     TOKEN_SUBJECT.as_ref(),
@@ -925,5 +929,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.7.0");
+  assert_eq!(crate_version(), "0.7.1");
 }
