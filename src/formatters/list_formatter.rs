@@ -139,7 +139,7 @@ where
           }
           Err(error) => Err(format!("could not convert simplified values to json compact ({})", error)),
         },
-        None => match serde_json::to_string_pretty(&self.values) {
+        None => match serde_json::to_string(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
@@ -228,7 +228,7 @@ where
           }
           Err(error) => Err(format!("could not convert simplified values to toml ({})", error)),
         },
-        None => match serde_json::to_string_pretty(&self.values) {
+        None => match toml::to_string_pretty(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
@@ -245,7 +245,7 @@ where
           }
           Err(error) => Err(format!("could not convert simplified values to toml compact ({})", error)),
         },
-        None => match serde_json::to_string_pretty(&self.values) {
+        None => match toml::to_string(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
@@ -262,7 +262,7 @@ where
           }
           Err(error) => Err(format!("could not convert simplified values to yaml ({})", error)),
         },
-        None => match serde_json::to_string_pretty(&self.values) {
+        None => match serde_yaml::to_string(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
