@@ -321,7 +321,7 @@ impl CommandExecutor for PlatformShow {
 fn get_app_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
   match matches.get_one::<String>(APP_ID_ARGUMENT) {
     Some(app_argument) => Ok(app_argument.to_string()),
-    None => Ok(read_single_line("enter ap: ")?),
+    None => Ok(read_single_line("enter app: ")?),
   }
 }
 
@@ -482,7 +482,7 @@ pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 31] = [
   DshPlatformLabel::RestApiEndpoint,
   DshPlatformLabel::SwaggerUrl,
   DshPlatformLabel::TracingUrl,
-  // Derived itens that do depend on tenant et cetera
+  // Derived items that do depend on tenant et cetera
   DshPlatformLabel::PublicVhostDomain,
   DshPlatformLabel::TenantPublicAppsDomain,
   DshPlatformLabel::TenantPublicAppDomain,
