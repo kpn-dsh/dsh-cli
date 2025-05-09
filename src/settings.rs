@@ -24,12 +24,14 @@ pub(crate) struct Settings {
   pub(crate) error_color: Option<DshColor>,
   #[serde(rename = "error-style", skip_serializing_if = "Option::is_none")]
   pub(crate) error_style: Option<DshStyle>,
+  #[serde(rename = "label-color", skip_serializing_if = "Option::is_none")]
+  pub(crate) label_color: Option<DshColor>,
+  #[serde(rename = "label-style", skip_serializing_if = "Option::is_none")]
+  pub(crate) label_style: Option<DshStyle>,
   #[serde(rename = "log-level", skip_serializing_if = "Option::is_none")]
   pub(crate) log_level: Option<LogLevel>,
   #[serde(rename = "log-level-api", skip_serializing_if = "Option::is_none")]
   pub(crate) log_level_api: Option<LogLevel>,
-  #[serde(rename = "log-level-sdk", skip_serializing_if = "Option::is_none")]
-  pub(crate) log_level_sdk: Option<LogLevel>,
   #[serde(rename = "matching-color", skip_serializing_if = "Option::is_none")]
   pub(crate) matching_color: Option<DshColor>,
   #[serde(rename = "matching-style", skip_serializing_if = "Option::is_none")]
