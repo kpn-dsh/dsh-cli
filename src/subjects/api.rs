@@ -255,7 +255,7 @@ impl CommandExecutor for ApiDelete {
     let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("DELETE {}", method_descriptor.path));
     if context.confirmed("delete?")? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, nothing deleted");
       } else {
         let parameters = method_descriptor
@@ -347,7 +347,7 @@ impl CommandExecutor for ApiPatch {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, nothing patched");
       Ok(())
     } else {
@@ -385,7 +385,7 @@ impl CommandExecutor for ApiPost {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, nothing posted");
       Ok(())
     } else {
@@ -416,7 +416,7 @@ impl CommandExecutor for ApiPut {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, nothing put");
       Ok(())
     } else {

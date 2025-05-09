@@ -114,12 +114,12 @@ impl CommandExecutor for SecretCreate {
     if client.get_secret(&secret_id).await.is_ok() {
       return Err(format!("secret '{}' already exists", secret_id));
     }
-    if context.stdin_is_terminal {
+    if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {
         context.print_explanation(format!("create new multi-line secret '{}'", secret_id));
         let secret = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
         let secret = Secret { name: secret_id.clone(), value: secret };
-        if context.dry_run {
+        if context.dry_run() {
           context.print_warning("dry-run mode, secret not created");
         } else {
           client.post_secret(&secret).await?;
@@ -129,7 +129,7 @@ impl CommandExecutor for SecretCreate {
         context.print_explanation(format!("create new single line secret '{}'", secret_id));
         let secret = context.read_single_line_password("enter secret: ")?;
         let secret = Secret { name: secret_id.clone(), value: secret };
-        if context.dry_run {
+        if context.dry_run() {
           context.print_warning("dry-run mode, secret not created");
         } else {
           client.post_secret(&secret).await?;
@@ -139,7 +139,7 @@ impl CommandExecutor for SecretCreate {
     } else {
       let secret = context.read_multi_line("")?;
       let secret = Secret { name: secret_id.clone(), value: secret };
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, secret not created");
       } else {
         client.post_secret(&secret).await?;
@@ -165,7 +165,7 @@ impl CommandExecutor for SecretDelete {
       return Err(format!("secret '{}' does not exist", secret_id));
     }
     if context.confirmed(format!("delete secret '{}'?", secret_id))? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, secret not deleted");
       } else {
         client.delete_secret_configuration(&secret_id).await?;
@@ -359,11 +359,11 @@ impl CommandExecutor for SecretUpdate {
     if client.get_secret(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exist", secret_id));
     }
-    if context.stdin_is_terminal {
+    if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {
         context.print_explanation(format!("update multi-line secret '{}'", secret_id));
         let secret = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
-        if context.dry_run {
+        if context.dry_run() {
           context.print_warning("dry-run mode, secret not updated");
         } else {
           client.put_secret(&secret_id, secret).await?;
@@ -372,7 +372,7 @@ impl CommandExecutor for SecretUpdate {
       } else {
         context.print_explanation(format!("update single line secret '{}'", secret_id));
         let secret = context.read_single_line_password("enter secret: ")?;
-        if context.dry_run {
+        if context.dry_run() {
           context.print_warning("dry-run mode, secret not updated");
         } else {
           client.put_secret(&secret_id, secret).await?;
@@ -381,7 +381,7 @@ impl CommandExecutor for SecretUpdate {
       }
     } else {
       let secret = context.read_multi_line("")?;
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, secret not updated");
       } else {
         client.put_secret(&secret_id, secret).await?;

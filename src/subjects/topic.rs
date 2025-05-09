@@ -282,7 +282,7 @@ impl CommandExecutor for TopicCreate {
       "create new topic '{}', number of partitions {}, replication factor {}",
       topic_id, topic.partitions, REPLICATION_FACTOR
     ));
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, topic not created");
     } else {
       client.put_topic_configuration(&topic_id, &topic).await?;
@@ -316,7 +316,7 @@ pub(crate) fn create_topic(matches: &ArgMatches) -> Result<Topic, String> {
   if let Some(compression_type) = matches.get_one::<String>(COMPRESSION_TYPE_FLAG) {
     kafka_properties.insert(COMPRESSION_TYPE_PROPERTY.to_string(), compression_type.to_string());
   }
-  if let Some(delete_retention_ms) = matches.get_one::<String>(DELETE_RETENTION_MS_FLAG) {
+  if let Some(delete_retention_ms) = matches.get_one::<u64>(DELETE_RETENTION_MS_FLAG) {
     kafka_properties.insert(DELETE_RETENTION_MS_PROPERTY.to_string(), delete_retention_ms.to_string());
   }
   if let Some(max_message_bytes) = matches.get_one::<u64>(MAX_MESSAGE_BYTES_FLAG) {
@@ -352,7 +352,7 @@ impl CommandExecutor for TopicDelete {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }
     if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, topic not deleted");
       } else {
         client.delete_topic_configuration(&topic_id).await?;

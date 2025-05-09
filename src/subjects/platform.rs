@@ -179,8 +179,8 @@ impl CommandExecutor for PlatformOpen {
 
 impl PlatformOpen {
   fn open_app(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = get_target_platform(matches, &context.settings)?;
-    let tenant_name = get_target_tenant(matches, &context.settings)?;
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant_name = get_target_tenant(matches, context.settings())?;
     let app = get_app_argument_or_prompt(matches)?;
     Self::open_url(
       platform.tenant_app_console_url(&tenant_name, &app),
@@ -190,13 +190,13 @@ impl PlatformOpen {
   }
 
   fn open_console(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = get_target_platform(matches, &context.settings)?;
+    let platform = get_target_platform(matches, context.settings())?;
     Self::open_url(platform.console_url(), format!("console for platform '{}'", platform), context)
   }
 
   fn open_monitoring(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = get_target_platform(matches, &context.settings)?;
-    let tenant_name = get_target_tenant(matches, &context.settings)?;
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant_name = get_target_tenant(matches, context.settings())?;
     Self::open_url(
       format!("{}/dashboards", platform.tenant_monitoring_url(&tenant_name)),
       format!("monitoring application for tenant '{}@{}'", tenant_name, platform),
@@ -205,8 +205,8 @@ impl PlatformOpen {
   }
 
   fn open_service(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = get_target_platform(matches, &context.settings)?;
-    let tenant_name = get_target_tenant(matches, &context.settings)?;
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant_name = get_target_tenant(matches, context.settings())?;
     let service = get_service_argument_or_prompt(matches)?;
     Self::open_url(
       platform.tenant_service_console_url(&tenant_name, &service),
@@ -216,8 +216,8 @@ impl PlatformOpen {
   }
 
   fn open_tenant(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = get_target_platform(matches, &context.settings)?;
-    let tenant_name = get_target_tenant(matches, &context.settings)?;
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant_name = get_target_tenant(matches, context.settings())?;
     Self::open_url(
       platform.tenant_console_url(&tenant_name),
       format!("console for tenant '{}@{}'", tenant_name, platform),
@@ -226,7 +226,7 @@ impl PlatformOpen {
   }
 
   async fn open_swagger(matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    let platform = get_target_platform(matches, &context.settings)?;
+    let platform = get_target_platform(matches, context.settings())?;
     let token = match client.token().await {
       Ok(token) => {
         debug!("token fetched");
@@ -257,12 +257,12 @@ impl PlatformOpen {
   }
 
   fn open_tracing(matches: &ArgMatches, context: &Context) -> DshCliResult {
-    let platform = get_target_platform(matches, &context.settings)?;
+    let platform = get_target_platform(matches, context.settings())?;
     Self::open_url(platform.tracing_url(), format!("tracing application for platform '{}'", platform), context)
   }
 
   fn open_url(url: String, opening_target: String, context: &Context) -> DshCliResult {
-    if context.dry_run {
+    if context.dry_run() {
       debug!("url (dry-run enabled) '{}'", url);
       context.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
       Ok(())
@@ -281,9 +281,9 @@ impl CommandExecutor for PlatformShow {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let platform = match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
       Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
-      None => get_target_platform(matches, &context.settings)?,
+      None => get_target_platform(matches, context.settings())?,
     };
-    let tenant = get_target_tenant_non_interactive(matches, &context.settings);
+    let tenant = get_target_tenant_non_interactive(matches, context.settings());
     let app = matches.get_one::<String>(APP_ID_ARGUMENT).cloned();
     let service = matches.get_one::<String>(SERVICE_ID_ARGUMENT).cloned();
     let vendor = matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned();

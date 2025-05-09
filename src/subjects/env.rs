@@ -95,7 +95,7 @@ impl CommandExecutor for EnvFind {
           .filter_map(|(key, value)| {
             query_processor
               .matching_parts(value)
-              .map(|ps| (key.to_string(), context.parts_to_string_stdout(ps.as_slice())))
+              .map(|ps| (key.to_string(), context.parts_to_string_for_stdout(ps.as_slice(), None)))
           })
           .collect();
         envs.sort_by_key(|env| env.0.clone());
