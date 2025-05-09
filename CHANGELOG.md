@@ -10,17 +10,34 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 * Capability to create, delete, list and show managed tenants.
 * Capability to set limits and enable services for managed tenants.
+* Capability to create, delete, list and show managed streams.
+* Additional properties when creating topics/streams (`compression.type`,
+  `delete.retention.ms`, `message.timestamp.type`, `retention.bytes`,
+  `retention.ms` and `segment.bytes`).
+* Capability to export service configuration file.
+* Capability to update service from configuration file.
 * Capability to fetch a token and copy it directly to the clipboard.
+* Capability to list and explain the used environment variables.
+* Some more colors.
 
 ### Changed
 
+* Capability to list vhosts improved.
+* Change to `service update` capability so it can also update from a configuration file.
 * Added styling for error messages.
 * Upgraded dependency `dsh_api` to version `0.7.1`,
-  for patch on error in open api specification and smaller package.
+  for patch on error in open api specification and smaller package size.
+* Added kafka properties to show topic command.
+
+### Fixes
+
+* Fixed bug when printing lists with some output formats.
 
 ### Removed
 
+* Removed `token show` command.
 * Short flag (`-V`) to show the tools version number.
+* Settings for `dsh_sdk` logging level.
 
 ## [0.7.2] - 2025-04-11
 
