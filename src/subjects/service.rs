@@ -1,7 +1,7 @@
 use crate::arguments::service_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, RESTART_COMMAND,
-  SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, EXPORT_COMMAND_ALIAS, LIST_COMMAND,
+  LIST_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -12,7 +12,6 @@ use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
-use crate::limits_flags::{cpu_flag, mem_flag, CPU_FLAG, MEM_FLAG};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{edit_configuration, include_started_stopped, read_single_line, DshCliResult};
@@ -61,6 +60,11 @@ lazy_static! {
       .set_long_about("Edit the service configuration using your default editor.")
       .add_target_argument(service_id_argument().required(true))
   );
+  static ref SERVICE_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(EXPORT_COMMAND, Some(EXPORT_COMMAND_ALIAS), &ServiceExport {}, "Export service configuration")
+      .set_long_about("Export the service configuration file.")
+      .add_target_argument(service_id_argument().required(true))
+  );
   static ref SERVICE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ServiceListAll {}, "List services")
       .set_long_about(
@@ -107,7 +111,7 @@ lazy_static! {
     CapabilityBuilder::new(UPDATE_COMMAND, None, &ServiceUpdate {}, "Update service")
       .set_long_about("Update a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(cpu_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(cpus_flag().help_heading(HELP_HEADING))
       .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
       .add_extra_argument(mem_flag().help_heading(HELP_HEADING))
   );
@@ -116,6 +120,7 @@ lazy_static! {
     SERVICE_DELETE_CAPABILITY.as_ref(),
     SERVICE_DUPLICATE_CAPABILITY.as_ref(),
     SERVICE_EDIT_CAPABILITY.as_ref(),
+    SERVICE_EXPORT_CAPABILITY.as_ref(),
     SERVICE_LIST_CAPABILITY.as_ref(),
     SERVICE_RESTART_CAPABILITY.as_ref(),
     SERVICE_SHOW_CAPABILITY.as_ref(),
@@ -144,6 +149,7 @@ impl Subject for ServiceSubject {
       CREATE_COMMAND => Some(SERVICE_CREATE_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(SERVICE_DELETE_CAPABILITY.as_ref()),
       EDIT_COMMAND => Some(SERVICE_EDIT_CAPABILITY.as_ref()),
+      EXPORT_COMMAND => Some(SERVICE_EXPORT_CAPABILITY.as_ref()),
       DUPLICATE_COMMAND => Some(SERVICE_DUPLICATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SERVICE_LIST_CAPABILITY.as_ref()),
       RESTART_COMMAND => Some(SERVICE_RESTART_CAPABILITY.as_ref()),
@@ -162,6 +168,18 @@ impl Subject for ServiceSubject {
 
 const HELP_HEADING: &str = "Service options";
 
+const CPUS_FLAG: &str = "cpus";
+
+fn cpus_flag() -> Arg {
+  Arg::new(CPUS_FLAG)
+    .long(CPUS_FLAG)
+    .action(ArgAction::Set)
+    .value_parser(clap::value_parser!(f64))
+    .value_name("CPUS")
+    .help("Number of cpus")
+    .long_help("Set number of cpus for the service.")
+}
+
 const INSTANCES_FLAG: &str = "instances";
 
 fn instances_flag() -> Arg {
@@ -175,6 +193,18 @@ fn instances_flag() -> Arg {
     .help_heading(HELP_HEADING)
 }
 
+const MEM_FLAG: &str = "mem";
+
+fn mem_flag() -> Arg {
+  Arg::new(MEM_FLAG)
+    .long(MEM_FLAG)
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..=131072))
+    .value_name("MEM")
+    .help("Amount of memory")
+    .long_help("Set amount of memory available for the service (MiB).")
+}
+
 struct ServiceCreate {}
 
 #[async_trait]
@@ -185,10 +215,10 @@ impl CommandExecutor for ServiceCreate {
       return Err(format!("service '{}' already exists", service_id));
     }
     context.print_explanation(format!("create new service '{}'", service_id));
-    let configuration = context.read_multi_line("enter json configuration text (terminate input with ctrl-d after last line)")?;
+    let configuration = context.read_multi_line("enter json configuration (terminate input with ctrl-d after last line)")?;
     match serde_json::from_str::<Application>(&configuration) {
       Ok(service) => {
-        if context.dry_run {
+        if context.dry_run() {
           context.print_warning("dry-run mode, service not created");
         } else {
           client.put_application_configuration(&service_id, &service).await?;
@@ -216,7 +246,7 @@ impl CommandExecutor for ServiceDelete {
       return Err(format!("service '{}' does not exist", service_id));
     }
     if context.confirmed(format!("delete service '{}'?", service_id))? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, service not deleted");
       } else {
         client.delete_application_configuration(&service_id).await?;
@@ -260,7 +290,7 @@ impl CommandExecutor for ServiceDuplicate {
           }
         }
         if context.confirmed(format!("create duplicate service '{}'?", duplicate_service_id))? {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, duplicate service not created");
           } else {
             client.put_application_configuration(&duplicate_service_id, &application).await?;
@@ -301,7 +331,7 @@ impl CommandExecutor for ServiceEdit {
         {
           Some(updated_application) => {
             if context.confirmed(format!("update service '{}'?", service_id))? {
-              if context.dry_run {
+              if context.dry_run() {
                 context.print_warning("dry-run mode, service configuration not updated");
               } else {
                 client.put_application_configuration(&service_id, &updated_application).await?;
@@ -321,6 +351,24 @@ impl CommandExecutor for ServiceEdit {
         error => Err(String::from(error)),
       },
     }
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct ServiceExport {}
+
+#[async_trait]
+impl CommandExecutor for ServiceExport {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let service_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("export configuration file for service '{}'", service_id));
+    let start_instant = context.now();
+    let service = client.get_application_configuration(&service_id).await?;
+    context.print_execution_time(start_instant);
+    UnitFormatter::new(service_id, &SERVICE_LABELS_SHOW, Some("service id"), context).print(&service, Some(OutputFormat::Json))
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -447,7 +495,7 @@ impl CommandExecutor for ServiceRestart {
         let instances = configuration.instances;
         if instances == 0 {
           context.print_warning(format!("service '{}' not started", service_id));
-        } else if context.dry_run {
+        } else if context.dry_run() {
           context.print_warning("dry-run mode, service not restarted");
         } else {
           let task_ids = client.get_task_appid_ids(&service_id).await?;
@@ -582,7 +630,7 @@ impl CommandExecutor for ServiceStart {
       Ok(mut configuration) => {
         if configuration.instances > 0 {
           context.print_warning(format!("service '{}' already started", service_id));
-        } else if context.dry_run {
+        } else if context.dry_run() {
           context.print_warning("dry-run mode, service not started");
         } else {
           configuration.instances = instances;
@@ -622,7 +670,7 @@ impl CommandExecutor for ServiceStop {
         let running_instances = configuration.instances;
         if running_instances == 0 {
           context.print_warning(format!("service '{}' already stopped", service_id));
-        } else if context.dry_run {
+        } else if context.dry_run() {
           context.print_warning("dry-run mode, service not stopped");
         } else {
           configuration.instances = 0;
@@ -656,7 +704,7 @@ struct ServiceUpdate {}
 impl CommandExecutor for ServiceUpdate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    let cpus: Option<f64> = match matches.get_one::<f64>(CPU_FLAG).cloned() {
+    let cpus: Option<f64> = match matches.get_one::<f64>(CPUS_FLAG).cloned() {
       Some(cpus) => {
         if cpus >= 0.1 {
           Some(cpus)
@@ -668,35 +716,49 @@ impl CommandExecutor for ServiceUpdate {
     };
     let instances = matches.get_one::<u64>(INSTANCES_FLAG).cloned();
     let mem = matches.get_one::<u64>(MEM_FLAG).cloned();
-    if cpus.is_none() && instances.is_none() && mem.is_none() {
-      return Err("at least one update argument must be provided".to_string());
-    }
-    context.print_explanation(format!("update service '{}'", service_id));
     match client.get_application_configuration(&service_id).await {
       Ok(mut configuration) => {
-        if cpus.iter().any(|cpus| *cpus != configuration.cpus)
-          | instances.iter().any(|instances| *instances != configuration.instances)
-          | mem.iter().any(|mem| *mem != configuration.mem)
-        {
-          if context.dry_run {
-            context.print_warning("dry-run mode, service not updated");
+        if cpus.is_some() || instances.is_some() || mem.is_some() {
+          context.print_explanation(format!("update service '{}' from arguments", service_id));
+          if cpus.iter().any(|cpus| *cpus != configuration.cpus)
+            | instances.iter().any(|instances| *instances != configuration.instances)
+            | mem.iter().any(|mem| *mem != configuration.mem)
+          {
+            if context.dry_run() {
+              context.print_warning("dry-run mode, service not updated");
+            } else {
+              if let Some(cpus) = cpus {
+                configuration.cpus = cpus
+              }
+              if let Some(instances) = instances {
+                configuration.instances = instances
+              }
+              if let Some(mem) = mem {
+                configuration.mem = mem
+              }
+              client.put_application_configuration(&service_id, &configuration).await?;
+              context.print_outcome(format!("service '{}' updated", service_id));
+            }
+            Ok(())
           } else {
-            if let Some(cpus) = cpus {
-              configuration.cpus = cpus
-            }
-            if let Some(instances) = instances {
-              configuration.instances = instances
-            }
-            if let Some(mem) = mem {
-              configuration.mem = mem
-            }
-            client.put_application_configuration(&service_id, &configuration).await?;
-            context.print_outcome(format!("service '{}' updated", service_id));
+            context.print_outcome("provided arguments are equal to the current configuration, service not updated");
+            Ok(())
           }
-          Ok(())
         } else {
-          context.print_outcome("provided arguments are equal to the current configuration, service not updated");
-          Ok(())
+          context.print_explanation(format!("update service '{}' from json configuration", service_id));
+          let update_configuration_json = context.read_multi_line("enter json configuration (terminate input with ctrl-d after last line)")?;
+          match serde_json::from_str::<Application>(&update_configuration_json) {
+            Ok(update_configuration) => {
+              if context.dry_run() {
+                context.print_warning("dry-run mode, service not updated");
+              } else {
+                client.put_application_configuration(&service_id, &update_configuration).await?;
+                context.print_outcome(format!("service '{}' updated", service_id));
+              }
+              Ok(())
+            }
+            Err(error) => Err(format!("invalid json configuration ({})", error)),
+          }
         }
       }
       Err(error) => match error {
