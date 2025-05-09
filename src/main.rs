@@ -6,6 +6,11 @@
 )]
 extern crate core;
 
+use crate::environment_variables::{
+  env_var_argument, env_vars_argument, get_set_environment_variables, print_environment_variable, print_environment_variables, ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
+  ENV_VAR_HOME_DIRECTORY, ENV_VAR_PASSWORD, ENV_VAR_PASSWORD_FILE, ENV_VAR_PLATFORM, ENV_VAR_TENANT,
+};
+use crate::style::{apply_default_error_style, apply_default_warning_style};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
@@ -26,7 +31,7 @@ use global_arguments::{
 use homedir::my_home;
 use lazy_static::lazy_static;
 use log::{debug, trace};
-use log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
+use log_arguments::{log_level_api_argument, log_level_argument};
 use log_level::initialize_logger;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
@@ -39,7 +44,6 @@ use std::io::{stdin, stdout, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
 use std::{env, fs, process};
-use style::{style_from, wrap_style, DshColor, DshStyle};
 use subject::Subject;
 use subjects::api::API_SUBJECT;
 use subjects::app::APP_SUBJECT;
@@ -70,6 +74,7 @@ mod autocomplete;
 mod capability;
 mod capability_builder;
 mod context;
+mod environment_variables;
 mod filter_flags;
 mod flags;
 mod formatters;
@@ -113,42 +118,6 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
 
 const VERSION: &str = "0.7.3";
 
-const ENV_VAR_PREFIX: &str = "DSH_CLI_";
-
-// Duplicate from dsh_api crate
-const ENV_VAR_PLATFORMS_FILE_NAME: &str = "DSH_API_PLATFORMS_FILE";
-
-const ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
-const ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
-const ENV_VAR_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
-const ENV_VAR_ERROR_COLOR: &str = "DSH_CLI_ERR_COLOR";
-const ENV_VAR_ERROR_STYLE: &str = "DSH_CLI_ERROR_STYLE";
-const ENV_VAR_HOME_DIRECTORY: &str = "DSH_CLI_HOME";
-const ENV_VAR_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
-const ENV_VAR_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
-const ENV_VAR_LOG_LEVEL_SDK: &str = "DSH_CLI_LOG_LEVEL_SDK";
-const ENV_VAR_MATCHING_COLOR: &str = "DSH_CLI_MATCHING_COLOR";
-const ENV_VAR_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
-const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-const ENV_VAR_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
-const ENV_VAR_NO_HEADERS: &str = "DSH_CLI_NO_HEADERS";
-const ENV_VAR_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
-const ENV_VAR_PASSWORD: &str = "DSH_CLI_PASSWORD";
-const ENV_VAR_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
-const ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
-const ENV_VAR_QUIET: &str = "DSH_CLI_QUIET";
-const ENV_VAR_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
-const ENV_VAR_STDERR_COLOR: &str = "DSH_CLI_STDERR_COLOR";
-const ENV_VAR_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
-const ENV_VAR_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
-const ENV_VAR_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
-const ENV_VAR_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
-const ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
-const ENV_VAR_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
-const ENV_VAR_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
-const ENV_VAR_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
-const ENV_VAR_WARNING_STYLE: &str = "DSH_CLI_WARNING_STYLE";
-
 const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const TARGETS_SUBDIRECTORY: &str = "targets";
 const DEFAULT_DSH_CLI_SETTINGS_FILENAME: &str = "settings.toml";
@@ -174,7 +143,7 @@ impl Termination for DshCliExit {
         ExitCode::SUCCESS
       }
       DshCliExit::Err(msg) => {
-        eprintln!("{}", wrap_style(default_error_style(), msg.trim_start_matches("error: ").trim_end_matches("\n")));
+        eprintln!("{}", apply_default_error_style(msg.trim_start_matches("error: ").trim_end_matches("\n")));
         ExitCode::FAILURE
       }
       DshCliExit::ErrClap(clap_error) => {
@@ -183,7 +152,7 @@ impl Termination for DshCliExit {
       }
       DshCliExit::ErrContext(msg, context) => {
         context.print_error(msg);
-        if context.suppress_exit_status {
+        if context.suppress_exit_status() {
           context.print_warning("exit status suppressed");
           ExitCode::SUCCESS
         } else {
@@ -201,7 +170,7 @@ async fn main() -> DshCliExit {
 
 async fn inner_main() -> DshCliExit {
   let _ = ctrlc::set_handler(move || {
-    eprintln!("{}", wrap_style(default_warning_style(), "interrupted"));
+    eprintln!("{}", apply_default_warning_style("interrupted"));
     process::exit(0);
   });
 
@@ -289,13 +258,23 @@ async fn inner_main() -> DshCliExit {
     Err(msg) => return DshCliExit::Err(msg),
   };
 
+  if let Some(env_var_name) = matches.get_one::<String>(ENV_VAR_ARGUMENT) {
+    print_environment_variable(env_var_name, &context);
+    return DshCliExit::Ok;
+  }
+
+  if matches.get_flag(ENV_VARS_ARGUMENT) {
+    print_environment_variables(&context);
+    return DshCliExit::Ok;
+  }
+
   match matches.subcommand() {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
         debug!("{:?}", requirements);
         if requirements.needs_dsh_api_client() {
-          let client = match create_client(&matches, &context.settings).await {
+          let client = match create_client(&matches, context.settings()).await {
             Ok(client) => client,
             Err(error) => return DshCliExit::ErrContext(error, Box::new(context)),
           };
@@ -319,7 +298,7 @@ async fn inner_main() -> DshCliExit {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
           debug!("{:?}", requirements);
           if requirements.needs_dsh_api_client() {
-            let client = match create_client(&matches, &context.settings).await {
+            let client = match create_client(&matches, context.settings()).await {
               Ok(client) => client,
               Err(error) => return DshCliExit::ErrContext(error, Box::new(context)),
             };
@@ -367,7 +346,6 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       force_argument(),
       log_level_argument(),
       log_level_api_argument(),
-      log_level_sdk_argument(),
       no_escape_argument(),
       no_headers_argument(),
       output_format_argument(),
@@ -376,6 +354,8 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       show_execution_time_argument(),
       suppress_exit_status_argument(),
       terminal_width_argument(),
+      env_var_argument(),
+      env_vars_argument(),
       generate_autocomplete_file_argument(),
       version_argument(),
     ])
@@ -403,7 +383,7 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
   }
 
   let mut environment_variables: Vec<(&str, String)> = vec![];
-  let env_vars = get_environment_variables();
+  let env_vars = get_set_environment_variables();
   if !env_vars.is_empty() {
     for (env_var, value) in &env_vars {
       if env_var == ENV_VAR_PASSWORD {
@@ -467,23 +447,6 @@ pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
     (true, false) => (true, false),
     (true, true) => (true, true),
   }
-}
-
-pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
-  let mut environment_variables: Vec<(String, String)> = vec![];
-  for (env_var, value) in env::vars() {
-    if env_var.starts_with(ENV_VAR_PREFIX) {
-      environment_variables.push((env_var, value));
-    }
-  }
-  if let Ok(platforms_file) = env::var(ENV_VAR_PLATFORMS_FILE_NAME) {
-    environment_variables.push((ENV_VAR_PLATFORMS_FILE_NAME.to_string(), platforms_file));
-  }
-  if env::var(ENV_VAR_NO_COLOR).is_ok() {
-    environment_variables.push((ENV_VAR_NO_COLOR.to_string(), "set".to_string()));
-  }
-  environment_variables.sort_by(|(env_var_a, _), (env_var_b, _)| env_var_a.cmp(env_var_b));
-  environment_variables
 }
 
 /// # Get the target platform from implicit sources
@@ -912,14 +875,6 @@ fn enabled_features() -> Option<Vec<&'static str>> {
   } else {
     Some(enabled_features)
   }
-}
-
-fn default_error_style() -> Style {
-  style_from(&DshStyle::Bold, &DshColor::Red)
-}
-
-fn default_warning_style() -> Style {
-  style_from(&DshStyle::Bold, &DshColor::Blue)
 }
 
 #[test]
