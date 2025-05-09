@@ -1,6 +1,6 @@
-use crate::log_arguments::{LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT, LOG_LEVEL_SDK_ARGUMENT};
+use crate::environment_variables::{ENV_VAR_LOG_LEVEL, ENV_VAR_LOG_LEVEL_API};
+use crate::log_arguments::{LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT};
 use crate::settings::Settings;
-use crate::{ENV_VAR_LOG_LEVEL, ENV_VAR_LOG_LEVEL_API, ENV_VAR_LOG_LEVEL_SDK};
 use clap::ArgMatches;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
@@ -46,18 +46,10 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Re
       Err(_) => settings.log_level_api.clone().unwrap_or_default(),
     },
   };
-  let log_level_dsh_sdk = match matches.get_one::<LogLevel>(LOG_LEVEL_SDK_ARGUMENT) {
-    Some(log_level_sdk_from_argument) => log_level_sdk_from_argument.clone(),
-    None => match env::var(ENV_VAR_LOG_LEVEL_SDK) {
-      Ok(log_level_sdk_from_env_var) => LogLevel::try_from(log_level_sdk_from_env_var.as_str())?,
-      Err(_) => settings.log_level_sdk.clone().unwrap_or_default(),
-    },
-  };
   if stdout().is_terminal() {
     env_logger::builder()
       .filter_module("dsh", LevelFilter::from(log_level_dsh))
       .filter_module("dsh_api", LevelFilter::from(log_level_dsh_api))
-      .filter_module("dsh_sdk", LevelFilter::from(log_level_dsh_sdk))
       .format_target(false)
       .format_timestamp(None)
       .init();
@@ -65,7 +57,6 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Re
     env_logger::builder()
       .filter_module("dsh", LevelFilter::from(log_level_dsh))
       .filter_module("dsh_api", LevelFilter::from(log_level_dsh_api))
-      .filter_module("dsh_sdk", LevelFilter::from(log_level_dsh_sdk))
       .format_file(true)
       .format_module_path(true)
       .format_source_path(false)
