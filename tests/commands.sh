@@ -5,6 +5,8 @@ export BUCKET_UNDER_TEST=cpr
 export CERTIFICATE_UNDER_TEST=broker
 export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="^info$"
+export ENV_VAR_QUERY_UNDER_TEST=password
+export ENV_VAR_UNDER_TEST=DSH_CLI_HOME
 export IMAGE_UNDER_TEST=registry:eavesdropper:0.9.2
 export IMAGE_UNDER_TEST_REGEX=registry
 export MANIFEST_UNDER_TEST=dsh-ollama
@@ -13,7 +15,6 @@ export PLATFORM_UNDER_TEST=nplz
 export PROXY_UNDER_TEST=broker
 export SECRET_NON_EXISTING=non-existing-secret
 export SECRET_UNDER_TEST=boss-account-ids
-export SERVICE_NON_EXISTING=non-existing-service
 export SERVICE_UNDER_TEST=keyring-dev
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
@@ -24,10 +25,13 @@ export VOLUME_NON_EXISTING=non-existing-volume
 export VOLUME_UNDER_TEST=github-action-runner-home
 
 export SAFE_COMMANDS=(
+  "--env-vars"
+  "--env-var $ENV_VAR_QUERY_UNDER_TEST"
+  "--env-var $ENV_VAR_UNDER_TEST"
   "-h"
   "--help"
   "--version"
-  "--generate-autocomplete-file zsh"
+  #  "--generate-autocomplete-file zsh"
 
   "api delete secret-configuration $SECRET_UNDER_TEST --force --dry-run"
   "api get secret $SECRET_UNDER_TEST"
@@ -125,6 +129,7 @@ export SAFE_COMMANDS=(
   "secret show $SECRET_UNDER_TEST"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
+  "service export $SERVICE_UNDER_TEST --dry-run"
   "service list --ids"
   "service list --started"
   "service list --status"
@@ -144,11 +149,21 @@ export SAFE_COMMANDS=(
 
   "target list"
 
+  "token copy --dry-run"
+  "token fetch"
+
   "topic create $TOPIC_NON_EXISTING --dry-run"
   "topic create $TOPIC_NON_EXISTING --cleanup-policy compact --dry-run"
+  "topic create $TOPIC_NON_EXISTING --compression-type gzip --dry-run"
+  "topic create $TOPIC_NON_EXISTING --delete-retention-ms 10000 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --max-message-bytes 2048 --dry-run"
   "topic create $TOPIC_NON_EXISTING --max-message-size 2048 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --message-timestamp-type create-time --dry-run"
   "topic create $TOPIC_NON_EXISTING --partitions 2 --dry-run"
-  "topic create $TOPIC_NON_EXISTING --segment-size 52428801 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --retention-bytes 1000 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --retention-ms 3600000 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --segment-bytes 52428800 --dry-run"
+  "topic create $TOPIC_NON_EXISTING --segment-size 52428800 --dry-run"
   "topic list --ids"
   "topic list --status"
   "topic list --usage"
@@ -159,6 +174,10 @@ export SAFE_COMMANDS=(
   "topic show $TOPIC_UNDER_TEST"
 
   "vhost list"
+  "vhost list --started"
+  "vhost list --stopped"
+  "vhost list --started --stopped"
+  "vhost list --usage"
 
   "volume create $VOLUME_NON_EXISTING --size 2 --dry-run"
   "volume delete $VOLUME_UNDER_TEST --force --dry-run"
