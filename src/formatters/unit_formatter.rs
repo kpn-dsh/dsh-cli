@@ -36,7 +36,7 @@ where
     }
   }
 
-  pub fn print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub fn _print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => Err("serialization to json is not supported for this type".to_string()),
@@ -52,14 +52,14 @@ where
   }
 
   fn print_csv<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
-    if self.context.show_headers {
+    if self.context.show_headers() {
       self.context.print(
         self
           .labels
           .iter()
           .map(|label| self.context.csv_value(label.as_str_for_csv()))
           .collect::<Result<Vec<_>, _>>()?
-          .join(self.context.csv_separator.as_str()),
+          .join(self.context.csv_separator().as_str()),
       );
     }
     self.context.print(
@@ -68,7 +68,7 @@ where
         .iter()
         .map(|label| self.context.csv_value(value.value(label, self.target_id.as_str()).as_str()))
         .collect::<Result<Vec<_>, _>>()?
-        .join(self.context.csv_separator.as_str()),
+        .join(self.context.csv_separator().as_str()),
     );
     Ok(())
   }
@@ -96,8 +96,8 @@ where
       }
     }
     let mut table = tabled_builder.build();
-    if let Some(terminal_width) = self.context.terminal_width {
-      table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
+    if let Some(terminal_width) = self.context.terminal_width() {
+      table.with(Width::wrap(terminal_width).keep_words(true).priority(PriorityMax::new(true)));
     }
     table
   }

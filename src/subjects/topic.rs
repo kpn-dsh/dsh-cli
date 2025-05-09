@@ -3,7 +3,7 @@ use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMM
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::formatter::PROPERTY_LABELS;
+use crate::formatters::formatter::{hashmap_to_table, PROPERTY_LABELS};
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
@@ -72,11 +72,15 @@ lazy_static! {
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TopicCreate {}, "Create new topic")
       .add_target_argument(topic_id_argument().required(true))
       .add_extra_arguments(vec![
-        cleanup_policy_flag(),
-        max_message_size_flag(),
-        partitions_flag(),
-        segment_size_flag(),
-        timestamp_type_flag()
+        cleanup_policy_flag(TOPIC_OPTIONS_HEADING),
+        compression_type_flag(TOPIC_OPTIONS_HEADING),
+        delete_retention_ms_flag(TOPIC_OPTIONS_HEADING),
+        max_message_size_flag(TOPIC_OPTIONS_HEADING),
+        message_timestamp_type_flag(TOPIC_OPTIONS_HEADING),
+        partitions_flag(TOPIC_OPTIONS_HEADING),
+        retention_bytes_flag(TOPIC_OPTIONS_HEADING),
+        retention_ms_flag(TOPIC_OPTIONS_HEADING),
+        segment_bytes_flag(TOPIC_OPTIONS_HEADING),
       ])
   );
   static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -106,75 +110,164 @@ lazy_static! {
     vec![TOPIC_CREATE_CAPABILITY.as_ref(), TOPIC_DELETE_CAPABILITY.as_ref(), TOPIC_LIST_CAPABILITY.as_ref(), TOPIC_SHOW_CAPABILITY.as_ref()];
 }
 
-const CLEANUP_POLICY_FLAG: &str = "cleanup-policy";
+const TOPIC_OPTIONS_HEADING: &str = "Topic options";
 
-fn cleanup_policy_flag() -> Arg {
+pub(crate) const CLEANUP_POLICY_FLAG: &str = "cleanup-policy";
+
+pub(crate) fn cleanup_policy_flag(heading: &'static str) -> Arg {
   Arg::new(CLEANUP_POLICY_FLAG)
     .long("cleanup-policy")
     .action(ArgAction::Set)
-    .value_parser(builder::PossibleValuesParser::new(vec![PossibleValue::new("1day"), PossibleValue::new("compact")]))
+    .value_parser(builder::PossibleValuesParser::new(vec![
+      PossibleValue::new("compact"),
+      PossibleValue::new("delete").alias("1day"), // TODO Remove in next non backwards compatible version
+    ]))
     .value_name("POLICY")
     .help("Cleanup policy")
     .long_help("Cleanup policy for the new topic.")
+    .help_heading(heading)
 }
 
-const MAX_MESSAGE_SIZE_FLAG: &str = "max-message-size";
+pub(crate) const COMPRESSION_TYPE_FLAG: &str = "compression-type";
 
-fn max_message_size_flag() -> Arg {
-  Arg::new(MAX_MESSAGE_SIZE_FLAG)
-    .long("max-message-size")
+pub(crate) fn compression_type_flag(heading: &'static str) -> Arg {
+  Arg::new(COMPRESSION_TYPE_FLAG)
+    .long("compression-type")
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1024..))
+    .value_parser(builder::PossibleValuesParser::new(vec![
+      PossibleValue::new("gzip"),
+      PossibleValue::new("lz4"),
+      PossibleValue::new("producer"),
+      PossibleValue::new("snappy"),
+      PossibleValue::new("uncompressed"),
+      PossibleValue::new("zstd"),
+    ]))
+    .value_name("TYPE")
+    .help("Compression type")
+    .long_help("Compression type for the new topic.")
+    .help_heading(heading)
+}
+
+pub(crate) const DELETE_RETENTION_MS_FLAG: &str = "delete-retention-ms";
+
+pub(crate) fn delete_retention_ms_flag(heading: &'static str) -> Arg {
+  Arg::new(DELETE_RETENTION_MS_FLAG)
+    .long("delete-retention-ms")
+    .alias("delete-retention") // TODO Remove in next non backwards compatible version
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(0..))
+    .value_name("MS")
+    .help("Delete retention")
+    .long_help("Delete retention time in milliseconds.")
+    .help_heading(heading)
+}
+
+pub(crate) const MAX_MESSAGE_BYTES_FLAG: &str = "max-message-bytes";
+
+pub(crate) fn max_message_size_flag(heading: &'static str) -> Arg {
+  Arg::new(MAX_MESSAGE_BYTES_FLAG)
+    .long("max-message-bytes")
+    .alias("max-message-size") // TODO Remove in next non backwards compatible version
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1024..=1048576))
     .value_name("BYTES")
     .help("Max message size")
-    .long_help("Maximum message size (in bytes) for the new topic. The minimum message size is 1024 bytes.")
+    .long_help(
+      "Maximum message size (in bytes) for the new topic. \
+      The minimum message size is 1024 bytes and the maximum size is 1048576 bytes.",
+    )
+    .help_heading(heading)
 }
 
-const PARTITIONS_FLAG: &str = "partitions";
+pub(crate) const MESSAGE_TIMESTAMP_TYPE_FLAG: &str = "message-timestamp-type";
+const TIMESTAMP_CREATE_TIME: &str = "create-time";
+const TIMESTAMP_LOG_APPEND_TIME: &str = "log-append-time";
 
-fn partitions_flag() -> Arg {
+pub(crate) fn message_timestamp_type_flag(heading: &'static str) -> Arg {
+  Arg::new(MESSAGE_TIMESTAMP_TYPE_FLAG)
+    .long("message-timestamp-type")
+    .alias("timestamps") // TODO Remove in next non backwards compatible version
+    .action(ArgAction::Set)
+    .value_parser(builder::PossibleValuesParser::new(vec![
+      PossibleValue::new(TIMESTAMP_CREATE_TIME).alias("producer"),   // TODO Remove in next non backwards compatible version
+      PossibleValue::new(TIMESTAMP_LOG_APPEND_TIME).alias("broker"), // TODO Remove in next non backwards compatible version
+    ]))
+    .value_name("TYPE")
+    .help("Message timestamp type")
+    .long_help(
+      "Message timestamp type for the new topic. \
+        The allowed values are 'create-time' and 'log-append-time'.",
+    )
+    .help_heading(heading)
+}
+
+pub(crate) const PARTITIONS_FLAG: &str = "partitions";
+
+pub(crate) fn partitions_flag(heading: &'static str) -> Arg {
   Arg::new(PARTITIONS_FLAG)
     .long("partitions")
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<u32>::new().range(1..=128))
     .value_name("PARTITIONS")
     .help("Number of partitions")
-    .long_help("Number of partitions for the new topic.")
+    .long_help(
+      "Number of partitions for the new topic. \
+          If this option is not specified the created topic will have only 1 partition.",
+    )
+    .help_heading(heading)
 }
 
-const SEGMENT_SIZE_FLAG: &str = "segment-size";
+pub(crate) const RETENTION_BYTES_FLAG: &str = "retention-bytes";
 
-fn segment_size_flag() -> Arg {
-  Arg::new(SEGMENT_SIZE_FLAG)
-    .long("segment-size")
+pub(crate) fn retention_bytes_flag(heading: &'static str) -> Arg {
+  Arg::new(RETENTION_BYTES_FLAG)
+    .long("retention-bytes")
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(0..))
+    .value_name("BYTES")
+    .help("Retention bytes")
+    .long_help(
+      "Retention bytes for the new topic. \
+      The minimum retention bytes value is 0.",
+    )
+    .help_heading(heading)
+}
+
+pub(crate) const RETENTION_MS_FLAG: &str = "retention-ms";
+
+pub(crate) fn retention_ms_flag(heading: &'static str) -> Arg {
+  Arg::new(RETENTION_MS_FLAG)
+    .long("retention-ms")
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(3600000..=31536000000))
+    .value_name("MS")
+    .help("Retention milliseconds")
+    .long_help(
+      "Retention time in milliseconds for the new topic. \
+      The minimum retention time value is 3600000 milliseconds (1 hour) \
+      and the maximum retention time is 31536000000 milliseconds (1 year).",
+    )
+    .help_heading(heading)
+}
+
+pub(crate) const SEGMENT_BYTES_FLAG: &str = "segment-bytes";
+
+pub(crate) fn segment_bytes_flag(heading: &'static str) -> Arg {
+  Arg::new(SEGMENT_BYTES_FLAG)
+    .long("segment-bytes")
+    .alias("segment-size") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<u64>::new().range(52428800..))
     .value_name("BYTES")
-    .help("Segment size")
-    .long_help("Segment size (in bytes) for the new topic. The minimum segment size is 52428800 bytes")
-}
-
-const TIMESTAMPS_FLAG: &str = "timestamps";
-
-fn timestamp_type_flag() -> Arg {
-  Arg::new(TIMESTAMPS_FLAG)
-    .long("timestamps")
-    .action(ArgAction::Set)
-    .value_parser(builder::PossibleValuesParser::new(vec![
-      PossibleValue::new("broker"),
-      PossibleValue::new("producer"),
-    ]))
-    .value_name("TYPE")
-    .help("Timestamps type")
-    .long_help("Timestamps type for the new topic.")
+    .help("Segment bytes")
+    .long_help(
+      "Segment bytes for the new topic. \
+          The minimum segment bytes value is 52428800 bytes",
+    )
+    .help_heading(heading)
 }
 
 struct TopicCreate {}
-
-const CLEANUP_POLICY_PROPERTY: &str = "cleanup.policy";
-const MAX_MESSAGE_BYTES_PROPERTY: &str = "max.message.bytes";
-const SEGMENT_BYTES_PROPERTY: &str = "segment.bytes";
-const MESSAGE_TIMESTAMP_PROPERTY: &str = "message.timestamp.type";
 
 #[async_trait]
 impl CommandExecutor for TopicCreate {
@@ -184,34 +277,12 @@ impl CommandExecutor for TopicCreate {
     if client.get_topic_configuration(&topic_id).await.is_ok() {
       return Err(format!("topic '{}' already exists", topic_id));
     }
-    let partitions = matches.get_one::<u32>(PARTITIONS_FLAG).cloned().unwrap_or(1);
+    let topic = create_topic(matches)?;
     context.print_explanation(format!(
       "create new topic '{}', number of partitions {}, replication factor {}",
-      topic_id, partitions, REPLICATION_FACTOR
+      topic_id, topic.partitions, REPLICATION_FACTOR
     ));
-    let mut kafka_properties = HashMap::new();
-    if let Some(cleanup_policy) = matches.get_one::<String>(CLEANUP_POLICY_FLAG) {
-      if cleanup_policy == "1day" {
-        kafka_properties.insert(CLEANUP_POLICY_PROPERTY.to_string(), "delete".to_string());
-      } else if cleanup_policy == "compact" {
-        kafka_properties.insert(CLEANUP_POLICY_PROPERTY.to_string(), "compact".to_string());
-      }
-    }
-    if let Some(max_message_size) = matches.get_one::<u64>(MAX_MESSAGE_SIZE_FLAG) {
-      kafka_properties.insert(MAX_MESSAGE_BYTES_PROPERTY.to_string(), max_message_size.to_string());
-    }
-    if let Some(segment_size) = matches.get_one::<u64>(SEGMENT_SIZE_FLAG) {
-      kafka_properties.insert(SEGMENT_BYTES_PROPERTY.to_string(), segment_size.to_string());
-    }
-    if let Some(timestamps_type) = matches.get_one::<String>(TIMESTAMPS_FLAG) {
-      if timestamps_type == "broker" {
-        kafka_properties.insert(MESSAGE_TIMESTAMP_PROPERTY.to_string(), "LogAppendTime".to_string());
-      } else if timestamps_type == "producer" {
-        kafka_properties.insert(MESSAGE_TIMESTAMP_PROPERTY.to_string(), "CreateTime".to_string());
-      }
-    }
-    let topic = Topic { kafka_properties, partitions: partitions as i64, replication_factor: REPLICATION_FACTOR as i64 };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, topic not created");
     } else {
       client.put_topic_configuration(&topic_id, &topic).await?;
@@ -225,6 +296,51 @@ impl CommandExecutor for TopicCreate {
   }
 }
 
+pub(crate) const CLEANUP_POLICY_PROPERTY: &str = "cleanup.policy";
+pub(crate) const COMPRESSION_TYPE_PROPERTY: &str = "compression.type";
+pub(crate) const DELETE_RETENTION_MS_PROPERTY: &str = "delete.retention.ms";
+pub(crate) const MAX_MESSAGE_BYTES_PROPERTY: &str = "max.message.bytes";
+pub(crate) const MESSAGE_TIMESTAMP_PROPERTY: &str = "message.timestamp.type";
+pub(crate) const RETENTION_BYTES_PROPERTY: &str = "retention.bytes";
+pub(crate) const RETENTION_MS_PROPERTY: &str = "retention.ms";
+pub(crate) const SEGMENT_BYTES_PROPERTY: &str = "segment.bytes";
+
+pub(crate) fn create_topic(matches: &ArgMatches) -> Result<Topic, String> {
+  const REPLICATION_FACTOR: u32 = 3;
+  let replication_factor = REPLICATION_FACTOR as i64;
+  let partitions = matches.get_one::<u32>(PARTITIONS_FLAG).cloned().unwrap_or(1) as i64;
+  let mut kafka_properties = HashMap::new();
+  if let Some(cleanup_policy) = matches.get_one::<String>(CLEANUP_POLICY_FLAG) {
+    kafka_properties.insert(CLEANUP_POLICY_PROPERTY.to_string(), cleanup_policy.to_string());
+  }
+  if let Some(compression_type) = matches.get_one::<String>(COMPRESSION_TYPE_FLAG) {
+    kafka_properties.insert(COMPRESSION_TYPE_PROPERTY.to_string(), compression_type.to_string());
+  }
+  if let Some(delete_retention_ms) = matches.get_one::<u64>(DELETE_RETENTION_MS_FLAG) {
+    kafka_properties.insert(DELETE_RETENTION_MS_PROPERTY.to_string(), delete_retention_ms.to_string());
+  }
+  if let Some(max_message_bytes) = matches.get_one::<u64>(MAX_MESSAGE_BYTES_FLAG) {
+    kafka_properties.insert(MAX_MESSAGE_BYTES_PROPERTY.to_string(), max_message_bytes.to_string());
+  }
+  if let Some(message_timestamp_type) = matches.get_one::<String>(MESSAGE_TIMESTAMP_TYPE_FLAG) {
+    if message_timestamp_type == TIMESTAMP_LOG_APPEND_TIME {
+      kafka_properties.insert(MESSAGE_TIMESTAMP_PROPERTY.to_string(), "LogAppendTime".to_string());
+    } else if message_timestamp_type == TIMESTAMP_CREATE_TIME {
+      kafka_properties.insert(MESSAGE_TIMESTAMP_PROPERTY.to_string(), "CreateTime".to_string());
+    }
+  }
+  if let Some(retention_bytes) = matches.get_one::<u64>(RETENTION_BYTES_FLAG) {
+    kafka_properties.insert(RETENTION_BYTES_PROPERTY.to_string(), retention_bytes.to_string());
+  }
+  if let Some(retention_ms) = matches.get_one::<u64>(RETENTION_MS_FLAG) {
+    kafka_properties.insert(RETENTION_MS_PROPERTY.to_string(), retention_ms.to_string());
+  }
+  if let Some(segment_bytes) = matches.get_one::<u64>(SEGMENT_BYTES_FLAG) {
+    kafka_properties.insert(SEGMENT_BYTES_PROPERTY.to_string(), segment_bytes.to_string());
+  }
+  Ok(Topic { kafka_properties, partitions, replication_factor })
+}
+
 struct TopicDelete {}
 
 #[async_trait]
@@ -236,7 +352,7 @@ impl CommandExecutor for TopicDelete {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }
     if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, topic not deleted");
       } else {
         client.delete_topic_configuration(&topic_id).await?;
@@ -441,13 +557,18 @@ impl CommandExecutor for TopicShowUsage {
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub enum TopicLabel {
   CleanupPolicy,
+  CompressionType,
+  DeleteRetentionMs,
   #[allow(dead_code)]
   DerivedFrom,
+  KafkaProperties,
   MaxMessageBytes,
   Notifications,
   Partitions,
   Provisioned,
   ReplicationFactor,
+  RetentionBytes,
+  RetentionMs,
   SegmentBytes,
   Target,
   TimestampType,
@@ -457,12 +578,17 @@ impl Label for TopicLabel {
   fn as_str(&self) -> &str {
     match self {
       Self::CleanupPolicy => "cleanup policy",
+      Self::CompressionType => "compression type",
+      Self::DeleteRetentionMs => "delete retention",
       Self::DerivedFrom => "derived from",
+      Self::KafkaProperties => "kafka properties",
       Self::MaxMessageBytes => "max message bytes",
       Self::Notifications => "notifications",
       Self::Partitions => "number of partitions",
       Self::Provisioned => "provisioned",
       Self::ReplicationFactor => "replication factor",
+      Self::RetentionBytes => "retention bytes",
+      Self::RetentionMs => "retention ms",
       Self::SegmentBytes => "segment bytes",
       Self::Target => "topic id",
       Self::TimestampType => "timestamp type",
@@ -472,12 +598,17 @@ impl Label for TopicLabel {
   fn as_str_for_list(&self) -> &str {
     match self {
       Self::CleanupPolicy => "cleanup",
+      Self::CompressionType => "compr",
+      Self::DeleteRetentionMs => "del ret",
       Self::DerivedFrom => "derived",
+      Self::KafkaProperties => "props",
       Self::MaxMessageBytes => "max bytes",
       Self::Notifications => "not",
       Self::Partitions => "part",
       Self::Provisioned => "prov",
       Self::ReplicationFactor => "repl",
+      Self::RetentionBytes => "ret bytes",
+      Self::RetentionMs => "ret ms",
       Self::SegmentBytes => "seg bytes",
       Self::Target => "topic id",
       Self::TimestampType => "ts",
@@ -494,6 +625,7 @@ impl SubjectFormatter<TopicLabel> for Topic {
     match label {
       TopicLabel::CleanupPolicy => self.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned().unwrap_or_default(),
       TopicLabel::DerivedFrom => "".to_string(),
+      TopicLabel::KafkaProperties => hashmap_to_table(&get_implicit_properties(&self.kafka_properties)),
       TopicLabel::MaxMessageBytes => self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned().unwrap_or_default(),
       TopicLabel::Notifications => "".to_string(),
       TopicLabel::Partitions => self.partitions.to_string(),
@@ -502,8 +634,29 @@ impl SubjectFormatter<TopicLabel> for Topic {
       TopicLabel::SegmentBytes => self.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned().unwrap_or_default(),
       TopicLabel::Target => target_id.to_string(),
       TopicLabel::TimestampType => self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned().unwrap_or_default(),
+      TopicLabel::CompressionType => self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned().unwrap_or_default(),
+      TopicLabel::DeleteRetentionMs => self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
+      TopicLabel::RetentionBytes => self.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned().unwrap_or_default(),
+      TopicLabel::RetentionMs => self.kafka_properties.get(RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
     }
   }
+}
+
+pub(crate) fn get_implicit_properties(kafka_properties: &HashMap<String, String>) -> HashMap<&String, &String> {
+  const EXPLICIT_VALUES: [&str; 8] = [
+    CLEANUP_POLICY_PROPERTY,
+    COMPRESSION_TYPE_PROPERTY,
+    DELETE_RETENTION_MS_PROPERTY,
+    MAX_MESSAGE_BYTES_PROPERTY,
+    MESSAGE_TIMESTAMP_PROPERTY,
+    RETENTION_BYTES_PROPERTY,
+    RETENTION_MS_PROPERTY,
+    SEGMENT_BYTES_PROPERTY,
+  ];
+  kafka_properties
+    .iter()
+    .filter(|(key, _)| !EXPLICIT_VALUES.contains(&key.as_str()))
+    .collect::<HashMap<_, _>>()
 }
 
 impl SubjectFormatter<TopicLabel> for TopicStatus {
@@ -512,50 +665,84 @@ impl SubjectFormatter<TopicLabel> for TopicStatus {
       TopicLabel::CleanupPolicy => self
         .actual
         .as_ref()
-        .and_then(|a| a.kafka_properties.get(CLEANUP_POLICY_PROPERTY))
+        .and_then(|topic| topic.kafka_properties.get(CLEANUP_POLICY_PROPERTY))
+        .cloned()
+        .unwrap_or_default(),
+      TopicLabel::CompressionType => self
+        .actual
+        .as_ref()
+        .and_then(|topic| topic.kafka_properties.get(COMPRESSION_TYPE_PROPERTY))
+        .cloned()
+        .unwrap_or_default(),
+      TopicLabel::DeleteRetentionMs => self
+        .actual
+        .as_ref()
+        .and_then(|topic| topic.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY))
         .cloned()
         .unwrap_or_default(),
       TopicLabel::DerivedFrom => self.status.derived_from.clone().unwrap_or_default(),
+      TopicLabel::KafkaProperties => self
+        .actual
+        .as_ref()
+        .map(|topic| hashmap_to_table(&get_implicit_properties(&topic.kafka_properties)))
+        .unwrap_or_default(),
       TopicLabel::MaxMessageBytes => self
         .actual
         .as_ref()
-        .and_then(|a| a.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY))
+        .and_then(|topic| topic.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY))
         .cloned()
         .unwrap_or_default(),
       TopicLabel::Notifications => notifications_to_string(&self.status.notifications),
       TopicLabel::Partitions => self.actual.as_ref().map(|a| a.partitions.to_string()).unwrap_or_default(),
       TopicLabel::Provisioned => self.status.provisioned.to_string(),
       TopicLabel::ReplicationFactor => self.actual.as_ref().map(|a| a.replication_factor.to_string()).unwrap_or_default(),
+      TopicLabel::RetentionBytes => self
+        .actual
+        .as_ref()
+        .and_then(|topic| topic.kafka_properties.get(RETENTION_BYTES_PROPERTY))
+        .cloned()
+        .unwrap_or_default(),
+      TopicLabel::RetentionMs => self
+        .actual
+        .as_ref()
+        .and_then(|topic| topic.kafka_properties.get(RETENTION_MS_PROPERTY))
+        .cloned()
+        .unwrap_or_default(),
       TopicLabel::SegmentBytes => self
         .actual
         .as_ref()
-        .and_then(|a| a.kafka_properties.get(SEGMENT_BYTES_PROPERTY))
+        .and_then(|topic| topic.kafka_properties.get(SEGMENT_BYTES_PROPERTY))
         .cloned()
         .unwrap_or_default(),
       TopicLabel::Target => target_id.to_string(),
       TopicLabel::TimestampType => self
         .actual
         .as_ref()
-        .and_then(|a| a.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY))
+        .and_then(|topic| topic.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY))
         .cloned()
         .unwrap_or_default(),
     }
   }
 }
 
-pub static TOPIC_STATUS_LABELS: [TopicLabel; 9] = [
+pub static TOPIC_STATUS_LABELS: [TopicLabel; 14] = [
   TopicLabel::Target,
   TopicLabel::Partitions,
   TopicLabel::ReplicationFactor,
   TopicLabel::CleanupPolicy,
+  TopicLabel::CompressionType,
+  TopicLabel::DeleteRetentionMs,
   TopicLabel::TimestampType,
   TopicLabel::MaxMessageBytes,
   TopicLabel::SegmentBytes,
+  TopicLabel::RetentionBytes,
+  TopicLabel::RetentionMs,
   TopicLabel::Notifications,
   TopicLabel::Provisioned,
+  TopicLabel::KafkaProperties,
 ];
 
-pub static TOPIC_LABELS: [TopicLabel; 9] = [
+pub static TOPIC_LABELS: [TopicLabel; 10] = [
   TopicLabel::Target,
   TopicLabel::Partitions,
   TopicLabel::ReplicationFactor,
@@ -565,4 +752,5 @@ pub static TOPIC_LABELS: [TopicLabel; 9] = [
   TopicLabel::SegmentBytes,
   TopicLabel::Notifications,
   TopicLabel::Provisioned,
+  TopicLabel::KafkaProperties,
 ];

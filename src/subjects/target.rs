@@ -104,7 +104,7 @@ impl CommandExecutor for TargetCreate {
     };
     let password = context.read_single_line_password("enter password: ")?;
     let target = Target::new(platform, tenant, Some(password))?;
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning(format!("dry-run mode, target '{}' not created", target));
     } else {
       upsert_target(&target)?;
@@ -130,7 +130,7 @@ impl CommandExecutor for TargetDelete {
       Some(target) => {
         let prompt = if target.password.is_some() { format!("delete target '{}' and password from the keyring?", target) } else { format!("delete target '{}'?", target) };
         if context.confirmed(prompt)? {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning(format!("dry-run mode, target '{}' not deleted", target));
           } else {
             delete_target(&platform, &tenant)?;

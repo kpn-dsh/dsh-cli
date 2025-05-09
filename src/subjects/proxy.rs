@@ -83,7 +83,7 @@ impl CommandExecutor for ProxyDelete {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
     if context.confirmed(format!("delete proxy '{}'?", proxy_id))? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, proxy not deleted");
       } else {
         client.delete_kafkaproxy_configuration(&proxy_id).await?;

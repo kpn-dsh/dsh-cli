@@ -12,6 +12,7 @@ use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, POST_METHO
 use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::debug;
 
 pub(crate) struct ApiSubject {}
 
@@ -254,7 +255,7 @@ impl CommandExecutor for ApiDelete {
     let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("DELETE {}", method_descriptor.path));
     if context.confirmed("delete?")? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, nothing deleted");
       } else {
         let parameters = method_descriptor
@@ -346,15 +347,22 @@ impl CommandExecutor for ApiPatch {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, nothing patched");
       Ok(())
     } else {
       let start_instant = context.now();
-      client.patch(selector, &parameters, body).await?;
-      context.print_execution_time(start_instant);
-      context.print_outcome("patched");
-      Ok(())
+      match client.patch(selector, &parameters, body).await {
+        Ok(_) => {
+          context.print_execution_time(start_instant);
+          context.print_outcome("patched");
+          Ok(())
+        }
+        Err(error) => {
+          debug!("{:#?}", error);
+          Err(error.to_string())
+        }
+      }
     }
   }
 
@@ -377,7 +385,7 @@ impl CommandExecutor for ApiPost {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, nothing posted");
       Ok(())
     } else {
@@ -408,7 +416,7 @@ impl CommandExecutor for ApiPut {
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
       .collect::<Vec<_>>();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, nothing put");
       Ok(())
     } else {

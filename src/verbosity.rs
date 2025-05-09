@@ -17,6 +17,12 @@ pub(crate) enum Verbosity {
   High = 4,
 }
 
+impl Default for Verbosity {
+  fn default() -> Self {
+    Self::Off
+  }
+}
+
 impl TryFrom<&str> for Verbosity {
   type Error = String;
 

@@ -91,8 +91,10 @@ pub trait Subject {
   }
 
   fn requirements(&self, subject_matches: &ArgMatches) -> Requirements {
-    let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!());
-    let capability = self.capability(capability_command_id).unwrap_or_else(|| unreachable!());
+    let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!("no subcommand specified"));
+    let capability = self
+      .capability(capability_command_id)
+      .unwrap_or_else(|| unreachable!("capability '{}' not recognized", capability_command_id));
     capability.requirements(capability_matches)
   }
 

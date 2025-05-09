@@ -7,6 +7,19 @@ all configurations and parameters can be specified via command line arguments.
 However, especially when using `dsh` interactively,
 it is much more convenient to make some settings persistent via environment variables.
 
+The `dsh` tool can print a list of all used environment variables via the command:
+
+```bash
+> dsh --env-vars
+```
+
+An explanation of an environment variable can be printed via the commands:
+
+```bash
+> dsh --env-var DSH_CLI_DRY_RUN  # Explains environment variable "DSH_CLI_DRY_RUN"
+> dsh --env-var dry              # Lists all variables that contain "dry" (case insensitive)
+```
+
 <table>
     <tr valign="top">
         <th align="left">variable</th>
@@ -60,17 +73,12 @@ it is much more convenient to make some settings persistent via environment vari
         <td>
             This environment variable specifies the color to be used when printing error messages. 
             If this variable is not set, the settings file will be checked for the 
-            <code>error-color</code> entry. Else the default color <code>red</code> will be used.
-            The supported colors are:
-            <ul>
-              <li>
-                <code>normal</code> - matches will be displayed in the terminals default 
-                foreground color,
-              </li>
-              <li><code>red</code> - matches will be displayed in red,</li>
-              <li><code>green</code> - matches will be displayed in green,</li>
-              <li><code>blue</code> - matches will be displayed in blue.</li>
-            </ul>
+            <code>error-color</code> entry. Else the default error color <code>red</code> 
+            will be used. When you specify the value <code>normal</code>, 
+            no color formatting will be applied and the terminal's default will be used.
+            The supported colors are: <code>normal</code> (terminal default), <code>black</code>,
+            <code>blue</code>, <code>cyan</code>, <code>green</code>, <code>magenta</code>, 
+            <code>red</code>, <code>white</code> and <code>yellow</code>.
         </td>
     </tr>
     <tr valign="top">
@@ -78,16 +86,11 @@ it is much more convenient to make some settings persistent via environment vari
         <td>
             This environment variable specifies the styling to be used when printing error 
             messages. If this variable is not set, the settings file will be checked for the 
-            <code>error-style</code> entry. Else the default value <code>bold</code> will be used.
-            The supported styles are:
-            <ul>
-              <li><code>normal</code> - no styling will be applied,</li>
-              <li><code>bold</code> - matches will be displayed in a bold typeface,</li>
-              <li><code>dim</code> - matches will be displayed dimmed,</li>
-              <li><code>italic</code> - matches will be displayed in an italics typeface,</li>
-              <li><code>underlined</code> - matches will be displayed underlined,</li>
-              <li><code>reverse</code> - matches will be displayed reversed.</li>
-            </ul>
+            <code>error-style</code> entry. Else the default style <code>bold</code> will be used.
+            When you specify the value <code>normal</code>, no style formatting will be applied 
+            and the terminal's default will be used.
+            The supported styles are: <code>normal</code> (no styling), <code>bold</code>, 
+            <code>dim</code>, <code>italic</code>, <code>underline</code> and <code>reverse</code>.
         </td>
     </tr>
     <tr valign="top">
@@ -96,6 +99,26 @@ it is much more convenient to make some settings persistent via environment vari
             Use this environment variable to change the location where <code>dsh</code> 
             stores its settings and targets information. 
             The default location is <code>$HOME/.dsh_cli</code>.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_LABEL_COLOR</code></td>
+        <td>
+            This environment variable specifies the color to be used when printing 
+            table headers and labels. 
+            If this variable is not set, the settings file will be checked for the 
+            <code>label-color</code> entry. Else the default color <code>blue</code> will be used.
+            See environment variable <code>DSH_CLI_ERROR_COLOR</code> for the supported colors.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_LABEL_STYLE</code></td>
+        <td>
+            This environment variable specifies the styling to be used when printing 
+            table headers and labels. 
+            If this variable is not set, the settings file will be checked for the 
+            <code>label-style</code> entry. Else the default value <code>bold</code> will be used.
+            See environment variable <code>DSH_CLI_ERROR_STYLE</code> for the supported styles.
         </td>
     </tr>
     <tr valign="top">
@@ -128,19 +151,6 @@ it is much more convenient to make some settings persistent via environment vari
             <code>DSH_CLI_LOG_LEVEL</code> environment variable.<br/>
             If this argument is not provided, the settings file will be checked. 
             When the <code>--log-level-api</code> command line argument is provided this will 
-            override this environment variable or the value in the settings file.
-            The default log level is <code>error</code>.
-        </td>
-    </tr>
-    <tr valign="top">
-        <td><code>DSH_CLI_LOG_LEVEL_SDK</code></td>
-        <td> 
-            Use this environment variable to set the log level for the functions 
-            in the library crate <code>dsh_sdk</code>, that supports the <code>dsh</code> tool.
-            For the available log levels see the description of the 
-            <code>DSH_CLI_LOG_LEVEL</code> environment variable.<br/>
-            If this argument is not provided, the settings file will be checked. 
-            When the <code>--log-level-sdk</code> command line argument is provided this will 
             override this environment variable or the value in the settings file.
             The default log level is <code>error</code>.
         </td>
@@ -389,6 +399,23 @@ it is much more convenient to make some settings persistent via environment vari
             <code>warning-style</code> entry. Else the default value <code>bold</code> will be 
             used. See environment variable <code>DSH_CLI_ERROR_STYLE</code> for the supported 
             styles.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>RUST_LOG</code></td>
+        <td>
+            You can configure the log levels and settings for the <code>dsh</code> tool entirely 
+            via the environment variables <code>DSH_CLI_LOG_LEVEL</code> and 
+            <code>DSH_CLI_LOG_LEVEL_API</code>, 
+            the options <code>--log-level</code> and <code>--log-level-api</code> 
+            and via the <code>dsh setting</code> command line functions.
+            Since the <code>dsh</code> tool depends on the  
+            <a href="https://docs.rs/env_logger/latest/env_logger"><code>env_logger</code></a> 
+            crate for its logging it also recognizes log configuration via the 
+            <code>RUST_LOG</code> environment variable.
+            Although the use of this variable is not recommended, 
+            there might be situations when this can be useful.
+            See the crate's <code>github</code> repository for more information.
         </td>
     </tr>
 

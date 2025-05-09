@@ -62,10 +62,11 @@ robot = ["dsh_api/robot"]
 
 Because of the strong dependencies between the `dsh` tool and the library,
 they are often been worked on at the same time.
-In that case it is convenient to set the dependency to the local copy of the library:
+In that case it is convenient to set the dependency to the local copy of the library.
+Also you might want to enable the `manage` feature while developing.
 
 ```toml
-dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
+dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
 ```
 
 However, when you publish the `dsh` tool make sure that you set the dependency

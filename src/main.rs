@@ -6,36 +6,36 @@
 )]
 extern crate core;
 
-use crate::autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
-use crate::context::Context;
-use crate::filter_flags::FilterFlagType;
-use crate::global_arguments::{
-  dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
-  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, TARGET_PASSWORD_FILE_ARGUMENT,
-  TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT,
+use crate::environment_variables::{
+  env_var_argument, env_vars_argument, get_set_environment_variables, print_environment_variable, print_environment_variables, ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
+  ENV_VAR_HOME_DIRECTORY, ENV_VAR_PASSWORD, ENV_VAR_PASSWORD_FILE, ENV_VAR_PLATFORM, ENV_VAR_TENANT,
 };
-use crate::log_arguments::{log_level_api_argument, log_level_argument, log_level_sdk_argument};
-use crate::log_level::initialize_logger;
-use crate::settings::{get_settings, Settings};
-use crate::subject::Subject;
-use crate::subjects::api::API_SUBJECT;
-use crate::subjects::platform::PLATFORM_SUBJECT;
-use crate::subjects::service::SERVICE_SUBJECT;
-use crate::subjects::token::TOKEN_SUBJECT;
-use crate::targets::{get_target_password_from_keyring, read_target};
+use crate::style::{apply_default_error_style, apply_default_warning_style};
+use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
+use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
+use context::Context;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::{crate_version, openapi_version};
+use filter_flags::FilterFlagType;
+use global_arguments::{
+  dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
+  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
+  TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
+};
 use homedir::my_home;
 use lazy_static::lazy_static;
 use log::{debug, trace};
+use log_arguments::{log_level_api_argument, log_level_argument};
+use log_level::initialize_logger;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
+use settings::{get_settings, Settings};
 use std::collections::HashMap;
 use std::env::temp_dir;
 use std::fmt::Debug;
@@ -44,6 +44,8 @@ use std::io::{stdin, stdout, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
 use std::{env, fs, process};
+use subject::Subject;
+use subjects::api::API_SUBJECT;
 use subjects::app::APP_SUBJECT;
 use subjects::bucket::BUCKET_SUBJECT;
 use subjects::certificate::CERTIFICATE_SUBJECT;
@@ -51,23 +53,33 @@ use subjects::env::ENV_SUBJECT;
 use subjects::image::IMAGE_SUBJECT;
 use subjects::manifest::MANIFEST_SUBJECT;
 use subjects::metric::METRIC_SUBJECT;
+use subjects::platform::PLATFORM_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
+use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
+#[cfg(feature = "manage")]
+use subjects::stream::STREAM_SUBJECT;
 use subjects::target::TARGET_SUBJECT;
+#[cfg(feature = "manage")]
+use subjects::tenant::TENANT_SUBJECT;
+use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
 use subjects::volume::VOLUME_SUBJECT;
+use targets::{get_target_password_from_keyring, read_target};
 
 mod arguments;
 mod autocomplete;
 mod capability;
 mod capability_builder;
 mod context;
+mod environment_variables;
 mod filter_flags;
 mod flags;
 mod formatters;
 mod global_arguments;
+mod limits_flags;
 mod log_arguments;
 mod log_level;
 mod modifier_flags;
@@ -104,43 +116,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-const VERSION: &str = "0.7.2";
-
-const ENV_VAR_PREFIX: &str = "DSH_CLI_";
-
-// Duplicate from dsh_api crate
-const ENV_VAR_PLATFORMS_FILE_NAME: &str = "DSH_API_PLATFORMS_FILE";
-
-const ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
-const ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
-const ENV_VAR_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
-const ENV_VAR_ERROR_COLOR: &str = "DSH_CLI_ERR_COLOR";
-const ENV_VAR_ERROR_STYLE: &str = "DSH_CLI_ERROR_STYLE";
-const ENV_VAR_HOME_DIRECTORY: &str = "DSH_CLI_HOME";
-const ENV_VAR_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
-const ENV_VAR_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
-const ENV_VAR_LOG_LEVEL_SDK: &str = "DSH_CLI_LOG_LEVEL_SDK";
-const ENV_VAR_MATCHING_COLOR: &str = "DSH_CLI_MATCHING_COLOR";
-const ENV_VAR_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
-const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-const ENV_VAR_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
-const ENV_VAR_NO_HEADERS: &str = "DSH_CLI_NO_HEADERS";
-const ENV_VAR_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
-const ENV_VAR_PASSWORD: &str = "DSH_CLI_PASSWORD";
-const ENV_VAR_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
-const ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
-const ENV_VAR_QUIET: &str = "DSH_CLI_QUIET";
-const ENV_VAR_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
-const ENV_VAR_STDERR_COLOR: &str = "DSH_CLI_STDERR_COLOR";
-const ENV_VAR_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
-const ENV_VAR_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
-const ENV_VAR_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
-const ENV_VAR_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
-const ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
-const ENV_VAR_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
-const ENV_VAR_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
-const ENV_VAR_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
-const ENV_VAR_WARNING_STYLE: &str = "DSH_CLI_WARNING_STYLE";
+const VERSION: &str = "0.7.3";
 
 const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const TARGETS_SUBDIRECTORY: &str = "targets";
@@ -152,7 +128,9 @@ type DshCliResult = Result<(), String>;
 #[derive(Debug)]
 enum DshCliExit {
   Ok,
+  OkClap(ClapError),
   Err(String),
+  ErrClap(ClapError),
   ErrContext(String, Box<Context>),
 }
 
@@ -160,14 +138,22 @@ impl Termination for DshCliExit {
   fn report(self) -> ExitCode {
     match self {
       DshCliExit::Ok => ExitCode::SUCCESS,
+      DshCliExit::OkClap(clap_error) => {
+        let _ = clap_error.print();
+        ExitCode::SUCCESS
+      }
       DshCliExit::Err(msg) => {
-        eprintln!("{}", msg);
+        eprintln!("{}", apply_default_error_style(msg.trim_start_matches("error: ").trim_end_matches("\n")));
+        ExitCode::FAILURE
+      }
+      DshCliExit::ErrClap(clap_error) => {
+        let _ = clap_error.print();
         ExitCode::FAILURE
       }
       DshCliExit::ErrContext(msg, context) => {
-        eprintln!("{}", msg);
-        if context.suppress_exit_status {
-          eprintln!("exit status suppressed");
+        context.print_error(msg);
+        if context.suppress_exit_status() {
+          context.print_warning("exit status suppressed");
           ExitCode::SUCCESS
         } else {
           ExitCode::FAILURE
@@ -184,7 +170,7 @@ async fn main() -> DshCliExit {
 
 async fn inner_main() -> DshCliExit {
   let _ = ctrlc::set_handler(move || {
-    eprintln!("interrupted");
+    eprintln!("{}", apply_default_warning_style("interrupted"));
     process::exit(0);
   });
 
@@ -201,6 +187,10 @@ async fn inner_main() -> DshCliExit {
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     SERVICE_SUBJECT.as_ref(),
+    #[cfg(feature = "manage")]
+    STREAM_SUBJECT.as_ref(),
+    #[cfg(feature = "manage")]
+    TENANT_SUBJECT.as_ref(),
     TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
     VHOST_SUBJECT.as_ref(),
@@ -231,10 +221,27 @@ async fn inner_main() -> DshCliExit {
 
   let mut command = create_command(&subject_commands, &settings);
 
-  let matches = command.clone().get_matches();
+  let matches = match command.clone().try_get_matches() {
+    Ok(matches) => matches,
+    Err(clap_error) => match clap_error.kind() {
+      ErrorKind::DisplayHelp => return DshCliExit::OkClap(clap_error),
+      ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => return DshCliExit::ErrClap(clap_error),
+      _ => return DshCliExit::Err(clap_error.to_string()),
+    },
+  };
 
   if let Some(shell) = matches.get_one::<AutocompleteShell>(AUTOCOMPLETE_ARGUMENT) {
     generate_autocomplete_file(&mut command, shell);
+    return DshCliExit::Ok;
+  }
+
+  if matches.get_flag(VERSION_ARGUMENT) {
+    println!(
+      "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
+      VERSION,
+      crate_version(),
+      openapi_version()
+    );
     return DshCliExit::Ok;
   }
 
@@ -251,13 +258,23 @@ async fn inner_main() -> DshCliExit {
     Err(msg) => return DshCliExit::Err(msg),
   };
 
+  if let Some(env_var_name) = matches.get_one::<String>(ENV_VAR_ARGUMENT) {
+    print_environment_variable(env_var_name, &context);
+    return DshCliExit::Ok;
+  }
+
+  if matches.get_flag(ENV_VARS_ARGUMENT) {
+    print_environment_variables(&context);
+    return DshCliExit::Ok;
+  }
+
   match matches.subcommand() {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
         debug!("{:?}", requirements);
         if requirements.needs_dsh_api_client() {
-          let client = match create_client(&matches, &context.settings).await {
+          let client = match create_client(&matches, context.settings()).await {
             Ok(client) => client,
             Err(error) => return DshCliExit::ErrContext(error, Box::new(context)),
           };
@@ -281,7 +298,7 @@ async fn inner_main() -> DshCliExit {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
           debug!("{:?}", requirements);
           if requirements.needs_dsh_api_client() {
-            let client = match create_client(&matches, &context.settings).await {
+            let client = match create_client(&matches, context.settings()).await {
               Ok(client) => client,
               Err(error) => return DshCliExit::ErrContext(error, Box::new(context)),
             };
@@ -329,7 +346,6 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       force_argument(),
       log_level_argument(),
       log_level_api_argument(),
-      log_level_sdk_argument(),
       no_escape_argument(),
       no_headers_argument(),
       output_format_argument(),
@@ -338,7 +354,10 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       show_execution_time_argument(),
       suppress_exit_status_argument(),
       terminal_width_argument(),
+      env_var_argument(),
+      env_vars_argument(),
       generate_autocomplete_file_argument(),
+      version_argument(),
     ])
     .subcommand_value_name("SUBJECT/COMMAND")
     .subcommand_help_heading("Subjects/commands")
@@ -347,13 +366,7 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
     .hide_possible_values(false)
     .styles(STYLES.clone())
     .subcommands(clap_commands)
-    .version(VERSION)
-    .long_version(format!(
-      "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
-      VERSION,
-      crate_version(),
-      openapi_version()
-    ));
+    .disable_version_flag(true);
   let mut default_settings: Vec<(&str, String)> = vec![];
   if let Some(default_platform) = &settings.default_platform {
     let platform = DshPlatform::try_from(default_platform.as_str()).unwrap();
@@ -370,7 +383,7 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
   }
 
   let mut environment_variables: Vec<(&str, String)> = vec![];
-  let env_vars = get_environment_variables();
+  let env_vars = get_set_environment_variables();
   if !env_vars.is_empty() {
     for (env_var, value) in &env_vars {
       if env_var == ENV_VAR_PASSWORD {
@@ -434,23 +447,6 @@ pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
     (true, false) => (true, false),
     (true, true) => (true, true),
   }
-}
-
-pub(crate) fn get_environment_variables() -> Vec<(String, String)> {
-  let mut environment_variables: Vec<(String, String)> = vec![];
-  for (env_var, value) in env::vars() {
-    if env_var.starts_with(ENV_VAR_PREFIX) {
-      environment_variables.push((env_var, value));
-    }
-  }
-  if let Ok(platforms_file) = env::var(ENV_VAR_PLATFORMS_FILE_NAME) {
-    environment_variables.push((ENV_VAR_PLATFORMS_FILE_NAME.to_string(), platforms_file));
-  }
-  if env::var(ENV_VAR_NO_COLOR).is_ok() {
-    environment_variables.push((ENV_VAR_NO_COLOR.to_string(), "set".to_string()));
-  }
-  environment_variables.sort_by(|(env_var_a, _), (env_var_b, _)| env_var_a.cmp(env_var_b));
-  environment_variables
 }
 
 /// # Get the target platform from implicit sources
@@ -888,5 +884,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.6.1");
+  assert_eq!(crate_version(), "0.7.1");
 }

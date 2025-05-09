@@ -26,10 +26,11 @@ Some of the capabilities of the `dsh` tool are:
 ## Features
 
 By enabling/disabling the features described below you have some control over what's included
-in the `dsh` tool and what's not. The features are all disabled by default.
+in the `dsh` tool and what's not. The features are disabled by default.
 The following features are defined:
 
-* `manage` - Enables the manage methods.
+* `manage` - Enables the manage methods. Enabling this feature is only useful
+  if your tenant is authorized for management capabilities.
 * `robot` - Enables the robot operation.
 
 ## Installation

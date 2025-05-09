@@ -7,6 +7,8 @@ pub(crate) enum FlagType {
   Configuration,
   Ids,
   Properties,
+  #[cfg(feature = "manage")]
+  Stream,
   System,
   Tasks,
   Usage,
@@ -21,6 +23,8 @@ impl FlagType {
       Self::Configuration => "configuration-flag",
       Self::Ids => "ids-flag",
       Self::Properties => "properties-flag",
+      #[cfg(feature = "manage")]
+      Self::Stream => "stream-flag",
       Self::System => "system-flag",
       Self::Tasks => "tasks-flag",
       Self::Usage => "usage-flag",
@@ -35,6 +39,8 @@ impl FlagType {
       Self::Configuration => "configuration",
       Self::Ids => "ids",
       Self::Properties => "properties",
+      #[cfg(feature = "manage")]
+      Self::Stream => "stream",
       Self::System => "system",
       Self::Tasks => "tasks",
       Self::Usage => "usage",
@@ -50,6 +56,8 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     FlagType::Configuration => create_clap_flag(FlagType::Configuration, format!("Include the {}'s initial configuration", subject), long_help),
     FlagType::Ids => create_clap_flag(FlagType::Ids, format!("Include the {}'s ids", subject), long_help),
     FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties", subject), long_help),
+    #[cfg(feature = "manage")]
+    FlagType::Stream => create_clap_flag(FlagType::Stream, format!("Include the {}'s stream", subject), long_help),
     FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s", subject), long_help),
     FlagType::Tasks => create_clap_flag(FlagType::Tasks, format!("Include the {}'s tasks", subject), long_help),
     FlagType::Usage => create_clap_flag(FlagType::Usage, format!("Include the {}'s usages", subject), long_help),

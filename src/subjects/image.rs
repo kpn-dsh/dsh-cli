@@ -143,7 +143,7 @@ fn list_images(services: HashMap<String, Application>, query_processor: &dyn Que
   for (image, image_usages) in &images {
     if let Some(image_parts) = query_processor.matching_parts(image) {
       for image_usage in image_usages {
-        formatter.push_target_id_value(context.parts_to_string_stdout(&image_parts), image_usage);
+        formatter.push_target_id_value(context.parts_to_string_for_stdout(&image_parts, None), image_usage);
       }
     }
   }

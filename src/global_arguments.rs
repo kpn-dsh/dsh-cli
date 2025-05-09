@@ -20,6 +20,7 @@ pub(crate) const TARGET_TENANT_ARGUMENT: &str = "target-tenant-argument";
 pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 // pub(crate) const TO_CLIPBOARD_ARGUMENT: &str = "to-clipboard-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
+pub(crate) const VERSION_ARGUMENT: &str = "version-argument";
 
 pub(crate) const OUTPUT_OPTIONS_HEADING: &str = "Output options";
 
@@ -69,7 +70,6 @@ pub(crate) fn no_escape_argument() -> Arg {
     .long("no-color")
     .alias("no-ansi")
     .action(ArgAction::SetTrue)
-    .help("No color")
     .long_help(
       "When this option is provided the output will not contain \
           any color or other ansi escape sequences. \
@@ -86,7 +86,6 @@ pub(crate) fn no_headers_argument() -> Arg {
   Arg::new(NO_HEADERS_ARGUMENT)
     .long("no-headers")
     .action(ArgAction::SetTrue)
-    .help("No headers")
     .long_help(
       "When this option is provided the output will not contain headers. \
           If this argument is not provided, the environment variable \
@@ -152,7 +151,6 @@ pub(crate) fn show_execution_time_argument() -> Arg {
   Arg::new(SHOW_EXECUTION_TIME_ARGUMENT)
     .long("show-execution-time")
     .action(ArgAction::SetTrue)
-    .help("Show execution time")
     .long_help(
       "When this option is provided the execution time of the executed function \
           will be shown, in milliseconds.",
@@ -166,7 +164,6 @@ pub(crate) fn suppress_exit_status_argument() -> Arg {
   Arg::new(SUPPRESS_EXIT_STATUS_ARGUMENT)
     .long("suppress-exit-status")
     .action(ArgAction::SetTrue)
-    .help("Suppress exit status")
     .long_help(
       "When this option is provided the dsh tool will always return exit status 0, \
             even when an error has occurred. This can be useful in scripting environments.",
@@ -242,7 +239,6 @@ pub(crate) fn terminal_width_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<usize>::from(40..))
     .value_name("WIDTH")
-    .help("Set terminal width")
     .long_help(
       "With this option the maximum terminal width can be set. \
           If not set, the environment variable DSH_CLI_TERMINAL_WIDTH will be used \
@@ -264,3 +260,15 @@ pub(crate) fn terminal_width_argument() -> Arg {
 //     )
 //     .global(true)
 // }
+
+pub(crate) fn version_argument() -> Arg {
+  Arg::new(VERSION_ARGUMENT)
+    .long("version")
+    .action(ArgAction::SetTrue)
+    .long_help(
+      "If this option is provided, the dsh tool will show its version number \
+          and the versions of some of its dependencies.",
+    )
+    .exclusive(true)
+    .hide_short_help(true)
+}

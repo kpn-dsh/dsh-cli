@@ -9,8 +9,8 @@ keywords = ["kpn", "dsh", "rest", "api", "cli"]
 license = "Apache-2.0"
 readme = "README_CRATES_IO.md"
 repository = "https://github.com/kpn-dsh/dsh-cli"
-rust-version = "1.79"
-version = "0.7.2"
+rust-version = "1.86"
+version = "0.7.3"
 
 [profile.release]
 opt-level = "s"
@@ -26,7 +26,6 @@ chrono = { version = "0.4", default-features = false }
 clap = { version = "4.5", features = ["color", "derive", "string", "wrap_help", "usage"], default-features = false }
 clap_complete = { version = "4.5", default-features = false }
 ctrlc = { version = "3.4" }
-dsh_sdk = { version = "0.6.1", features = ["bootstrap", "management-api-token-fetcher"] }
 env_logger = { version = "0.11", features = ["humantime"], default-features = false }
 futures = { version = "0.3", default-features = false }
 homedir = { version = "0.3", default-features = false }
@@ -46,6 +45,6 @@ tokio = { version = "1.43", features = ["rt", "rt-multi-thread", "macros"], defa
 toml = { version = "0.8", features = ["display", "parse"], default-features = false }
 
 # When publishing, alway use the crates.io dependency.
-dsh_api = { version = "0.6.1", features = ["generic"] }
-# While developing use the relative path dependency to dsh_api.
-# dsh_api = { path = "../dsh-api/dsh-api", features = ["generic"] }
+dsh_api = { version = "0.7.1", features = ["generic"] }
+# While developing use the relative path dependency to dsh_api and enable the manage feature.
+#dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }

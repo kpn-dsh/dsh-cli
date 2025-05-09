@@ -150,17 +150,17 @@ impl Capability for CapabilityBuilder<'_> {
       self
         .executors
         .iter()
-        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help.as_deref()))
+        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help.as_deref()).help_heading("Command options"))
         .collect::<Vec<_>>(),
       self
         .filter_flags
         .iter()
-        .map(|(flag_type, long_help)| create_filter_flag(flag_type, long_help.as_deref()))
+        .map(|(flag_type, long_help)| create_filter_flag(flag_type, long_help.as_deref()).help_heading("Filter options"))
         .collect::<Vec<_>>(),
       self
         .modifier_flags
         .iter()
-        .map(|(flag_type, _)| create_modifier_flag(flag_type, subject))
+        .map(|(flag_type, _)| create_modifier_flag(flag_type, subject).help_heading("Modifier options"))
         .collect::<Vec<_>>(),
     ]
     .concat()

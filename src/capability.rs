@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 
+pub(crate) const COPY_COMMAND: &str = "copy";
 pub(crate) const CREATE_COMMAND: &str = "create";
 pub(crate) const CREATE_COMMAND_ALIAS: &str = "c";
 pub(crate) const DEFAULT_COMMAND: &str = "default";
@@ -13,14 +14,19 @@ pub(crate) const DELETE_COMMAND: &str = "delete";
 pub(crate) const DUPLICATE_COMMAND: &str = "duplicate";
 pub(crate) const EDIT_COMMAND: &str = "edit";
 pub(crate) const EXPORT_COMMAND: &str = "export";
+pub(crate) const EXPORT_COMMAND_ALIAS: &str = "e";
 pub(crate) const FETCH_COMMAND: &str = "fetch";
 pub(crate) const FIND_COMMAND: &str = "find";
 pub(crate) const FIND_COMMAND_ALIAS: &str = "f";
+#[cfg(feature = "manage")]
+pub(crate) const GRANT_COMMAND: &str = "grant";
 pub(crate) const LIST_COMMAND: &str = "list";
 pub(crate) const LIST_COMMAND_ALIAS: &str = "l";
 pub(crate) const OPEN_COMMAND: &str = "open";
 pub(crate) const OPEN_COMMAND_ALIAS: &str = "o";
 pub(crate) const RESTART_COMMAND: &str = "restart";
+#[cfg(feature = "manage")]
+pub(crate) const REVOKE_COMMAND: &str = "revoke";
 pub(crate) const SET_COMMAND: &str = "set";
 pub(crate) const SHOW_COMMAND: &str = "show";
 pub(crate) const SHOW_COMMAND_ALIAS: &str = "s";

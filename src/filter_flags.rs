@@ -4,6 +4,10 @@ use clap::{Arg, ArgAction};
 pub(crate) enum FilterFlagType {
   App,
   Complete,
+  #[cfg(feature = "manage")]
+  Internal,
+  #[cfg(feature = "manage")]
+  Public,
   Service,
   Started,
   Stopped,
@@ -14,6 +18,10 @@ impl FilterFlagType {
     match &self {
       Self::App => "app-flag",
       Self::Complete => "complete-flag",
+      #[cfg(feature = "manage")]
+      Self::Internal => "internal-flag",
+      #[cfg(feature = "manage")]
+      Self::Public => "public-flag",
       Self::Service => "service-flag",
       Self::Started => "started-flag",
       Self::Stopped => "stopped-flag",
@@ -24,6 +32,10 @@ impl FilterFlagType {
     match &self {
       Self::App => "app",
       Self::Complete => "complete",
+      #[cfg(feature = "manage")]
+      Self::Internal => "internal",
+      #[cfg(feature = "manage")]
+      Self::Public => "public",
       Self::Service => "service",
       Self::Started => "started",
       Self::Stopped => "stopped",
@@ -34,6 +46,10 @@ impl FilterFlagType {
     match &self {
       Self::App => "Include apps",
       Self::Complete => "Include all parameters",
+      #[cfg(feature = "manage")]
+      Self::Internal => "Include internal streams",
+      #[cfg(feature = "manage")]
+      Self::Public => "Include public streams",
       Self::Service => "Include services",
       Self::Started => "Include only started apps/services",
       Self::Stopped => "Include only stopped apps/services",

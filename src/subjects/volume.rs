@@ -126,7 +126,7 @@ impl CommandExecutor for VolumeCreate {
       }
     };
     let volume = Volume { size_gi_b };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, volume not created");
     } else {
       client.put_volume_configuration(&volume_id, &volume).await?;
@@ -151,7 +151,7 @@ impl CommandExecutor for VolumeDelete {
       return Err(format!("volume '{}' does not exists", volume_id));
     }
     if context.confirmed(format!("delete volume '{}'?", volume_id))? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, volume not deleted");
       } else {
         client.delete_volume_configuration(&volume_id).await?;
