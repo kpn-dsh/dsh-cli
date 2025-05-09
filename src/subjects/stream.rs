@@ -2,13 +2,15 @@ use crate::subject::Requirements;
 
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
-use futures::{join, try_join};
+use dsh_api::AccessRights;
+use futures::try_join;
 use lazy_static::lazy_static;
 
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::stream::Stream;
 use dsh_api::types::{
   ManagedStream, ManagedStreamId, PublicManagedStreamContract, PublicManagedStreamKafkaDefaultPartitioner, PublicManagedStreamKafkaDefaultPartitionerKind,
-  PublicManagedStreamTopicLevelPartitioner, PublicManagedStreamTopicLevelPartitionerKind, Topic,
+  PublicManagedStreamTopicLevelPartitioner, PublicManagedStreamTopicLevelPartitionerKind,
 };
 
 use crate::arguments::{managed_stream_argument, MANAGED_STREAM_ARGUMENT};
@@ -29,7 +31,7 @@ use crate::subjects::topic::{
 };
 use crate::{read_single_line, Context, DshCliResult};
 use dsh_api::types::{PublicManagedStream, PublicManagedStreamContractPartitioner};
-use futures::future::try_join_all;
+use itertools::Itertools;
 use serde::Serialize;
 
 pub(crate) struct StreamSubject {}
@@ -180,15 +182,11 @@ struct StreamCreate {}
 impl CommandExecutor for StreamCreate {
   async fn execute_with_client(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
-    let (internal, public) = join!(
-      client.get_stream_internal_configuration(&managed_stream_id),
-      client.get_stream_public_configuration(&managed_stream_id)
-    );
-    if internal.is_ok() {
-      return Err(format!("internal managed stream '{}' already exists", managed_stream_id));
-    }
-    if public.is_ok() {
-      return Err(format!("public managed stream '{}' already exists", managed_stream_id));
+    if let Some(managed_stream) = client.get_stream_configuration(&managed_stream_id).await? {
+      match managed_stream {
+        Stream::Internal(_) => return Err(format!("internal managed stream '{}' already exists", managed_stream_id)),
+        Stream::Public(_) => return Err(format!("public managed stream '{}' already exists", managed_stream_id)),
+      }
     }
     let topic = create_topic(matches)?;
     if matches.get_flag(PUBLIC_FLAG) {
@@ -206,7 +204,7 @@ impl CommandExecutor for StreamCreate {
       let contract = PublicManagedStreamContract { can_be_retained, partitioner };
       let public_managed_stream =
         PublicManagedStream { contract, kafka_properties: topic.kafka_properties, partitions: topic.partitions, replication_factor: topic.replication_factor };
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, public managed stream not created");
       } else {
         client.post_stream_public_configuration(&managed_stream_id, &public_managed_stream).await?;
@@ -215,7 +213,7 @@ impl CommandExecutor for StreamCreate {
     } else {
       context.print_explanation(format!("create new internal managed stream '{}'", managed_stream_id));
       let managed_stream = ManagedStream(topic);
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, internal managed stream not created");
       } else {
         client.post_stream_internal_configuration(&managed_stream_id, &managed_stream).await?;
@@ -230,46 +228,17 @@ impl CommandExecutor for StreamCreate {
   }
 }
 
-fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<ManagedStreamId, String> {
-  match matches.get_one::<String>(MANAGED_STREAM_ARGUMENT) {
-    Some(managed_stream_argument) => Ok(ManagedStreamId::try_from(managed_stream_argument).map_err(|error| error.to_string())?),
-    None => {
-      let line = read_single_line(format!("enter managed stream id: {}---", managing_tenant))?;
-      let managed_stream_id = format!("{}---{}", managing_tenant, line);
-      let managed_stream_id = ManagedStreamId::try_from(managed_stream_id).map_err(|error| error.to_string())?;
-      Ok(managed_stream_id)
-    }
-  }
-}
-
 struct StreamDelete {}
 
 #[async_trait]
 impl CommandExecutor for StreamDelete {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
-    match join!(
-      client.get_stream_internal_configuration(&managed_stream_id),
-      client.get_stream_public_configuration(&managed_stream_id)
-    ) {
-      (Err(_), Err(_)) => return Err(format!("managed stream '{}' does not exist", managed_stream_id)),
-      (Err(_), Ok(_)) => {
-        context.print_explanation(format!("delete public managed stream '{}'", managed_stream_id));
-        if context.confirmed(format!("delete public managed stream '{}'?", managed_stream_id))? {
-          if context.dry_run {
-            context.print_warning("dry-run mode, public managed stream not deleted");
-          } else {
-            client.delete_stream_public_configuration(&managed_stream_id).await?;
-            context.print_outcome(format!("public managed stream '{}' deleted", managed_stream_id));
-          }
-        } else {
-          context.print_outcome(format!("cancelled, public managed stream '{}' not deleted", managed_stream_id));
-        }
-      }
-      (Ok(_), Err(_)) => {
+    match client.get_stream_configuration(&managed_stream_id).await? {
+      Some(Stream::Internal(_)) => {
         context.print_explanation(format!("delete internal managed stream '{}'", managed_stream_id));
         if context.confirmed(format!("delete internal managed stream '{}'?", managed_stream_id))? {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, internal managed stream not deleted");
           } else {
             client.delete_stream_internal_configuration(&managed_stream_id).await?;
@@ -278,10 +247,24 @@ impl CommandExecutor for StreamDelete {
         } else {
           context.print_outcome(format!("cancelled, internal managed stream '{}' not deleted", managed_stream_id));
         }
+        Ok(())
       }
-      (Ok(_), Ok(_)) => unreachable!(),
+      Some(Stream::Public(_)) => {
+        context.print_explanation(format!("delete public managed stream '{}'", managed_stream_id));
+        if context.confirmed(format!("delete public managed stream '{}'?", managed_stream_id))? {
+          if context.dry_run() {
+            context.print_warning("dry-run mode, public managed stream not deleted");
+          } else {
+            client.delete_stream_public_configuration(&managed_stream_id).await?;
+            context.print_outcome(format!("public managed stream '{}' deleted", managed_stream_id));
+          }
+        } else {
+          context.print_outcome(format!("cancelled, public managed stream '{}' not deleted", managed_stream_id));
+        }
+        Ok(())
+      }
+      None => Err(format!("managed stream '{}' does not exist", managed_stream_id)),
     }
-    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -294,57 +277,45 @@ struct StreamListAll {}
 #[async_trait]
 impl CommandExecutor for StreamListAll {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    let start_instant = context.now();
-    let (internals, publics) = match (matches.get_flag(INTERNAL_FLAG), matches.get_flag(PUBLIC_FLAG)) {
+    match (matches.get_flag(INTERNAL_FLAG), matches.get_flag(PUBLIC_FLAG)) {
       (false, false) | (true, true) => {
         context.print_explanation("list all internal and public managed streams");
-        let (internal_ids, public_ids) = try_join!(client.get_stream_internals(), client.get_stream_publics())?;
-        let (internal_streams, public_streams) = try_join!(
-          try_join_all(internal_ids.iter().map(|isi| client.get_stream_internal_configuration(isi))),
-          try_join_all(public_ids.iter().map(|psi| client.get_stream_public_configuration(psi)))
-        )?;
-        (Some((internal_ids, internal_streams)), Some((public_ids, public_streams)))
-      }
-      (false, true) => {
-        context.print_explanation("list all public managed streams");
-        let public_ids = client.get_stream_publics().await?;
-        let public_streams = try_join_all(public_ids.iter().map(|psi| client.get_stream_public_configuration(psi))).await?;
-        (None, Some((public_ids, public_streams)))
+        let start_instant = context.now();
+        let streams = client.get_stream_configurations().await?;
+        context.print_execution_time(start_instant);
+        let mut formatter = if streams.iter().any(|(_, stream)| matches!(stream, Stream::Public(_))) {
+          ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, None, context)
+        } else {
+          ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, None, context)
+        };
+        for (stream_id, stream) in streams.iter() {
+          formatter.push_target_id_value(stream_id.to_string(), stream);
+        }
+        formatter.print(None)
       }
       (true, false) => {
         context.print_explanation("list all internal managed streams");
-        let internal_ids = client.get_stream_internals().await?;
-        let internal_streams = try_join_all(internal_ids.iter().map(|isi| client.get_stream_internal_configuration(isi))).await?;
-        (Some((internal_ids, internal_streams)), None)
+        let start_instant = context.now();
+        let internal_streams = client.get_internal_stream_configurations().await?;
+        context.print_execution_time(start_instant);
+        let mut formatter = ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, None, context);
+        for (internal_stream_id, internal_stream) in internal_streams.iter() {
+          formatter.push_target_id_value(internal_stream_id.to_string(), internal_stream);
+        }
+        formatter.print(None)
       }
-    };
-    context.print_execution_time(start_instant);
-
-    let internals_zipped = internals.map(|(internal_ids, internal_streams)| {
-      let internal_streams = internal_streams.into_iter().map(FormatterManagedStream::Internal).collect::<Vec<_>>();
-      internal_ids.into_iter().zip(internal_streams).collect::<Vec<_>>()
-    });
-
-    let publics_zipped = publics.map(|(public_ids, public_streams)| {
-      let public_streams = public_streams.into_iter().map(FormatterManagedStream::Public).collect::<Vec<_>>();
-      public_ids.into_iter().zip(public_streams).collect::<Vec<_>>()
-    });
-
-    let mut formatter =
-      if publics_zipped.is_some() { ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, None, context) } else { ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, None, context) };
-    if let Some(internals) = &internals_zipped {
-      for (internal_id, internal_stream) in internals.iter() {
-        formatter.push_target_id_value(internal_id.to_string(), internal_stream);
+      (false, true) => {
+        context.print_explanation("list all public managed streams");
+        let start_instant = context.now();
+        let public_streams = client.get_public_stream_configurations().await?;
+        context.print_execution_time(start_instant);
+        let mut formatter = ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, None, context);
+        for (public_stream_id, public_stream) in public_streams.iter() {
+          formatter.push_target_id_value(public_stream_id.to_string(), public_stream);
+        }
+        formatter.print(None)
       }
     }
-    if let Some(publics) = &publics_zipped {
-      for (public_id, public_stream) in publics.iter() {
-        formatter.push_target_id_value(public_id.to_string(), public_stream);
-      }
-    }
-
-    formatter.print(None)?;
-    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -365,13 +336,13 @@ impl CommandExecutor for StreamListIds {
         stream_ids.append(&mut public_ids);
         stream_ids
       }
-      (false, true) => {
-        context.print_explanation("list all public managed stream ids");
-        client.get_stream_publics().await?
-      }
       (true, false) => {
         context.print_explanation("list all internal managed stream ids");
         client.get_stream_internals().await?
+      }
+      (false, true) => {
+        context.print_explanation("list all public managed stream ids");
+        client.get_stream_publics().await?
       }
     };
     context.print_execution_time(start_instant);
@@ -396,25 +367,23 @@ impl CommandExecutor for StreamShowAll {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     context.print_explanation(format!("show configuration for managed stream '{}'", managed_stream_id));
     let start_instant = context.now();
-    match join!(
-      client.get_stream_internal_configuration(&managed_stream_id),
-      client.get_stream_public_configuration(&managed_stream_id)
-    ) {
-      (Err(_), Err(_)) => {
+    match try_join!(
+      client.get_stream_configuration(&managed_stream_id),
+      client.get_tenants_with_access_rights(&managed_stream_id)
+    )? {
+      (Some(Stream::Internal(internal_managed_stream)), access_rights) => {
         context.print_execution_time(start_instant);
-        return Err(format!("managed stream '{}' does not exist", managed_stream_id));
+        UnitFormatter::new(managed_stream_id, &INTERNAL_STREAM_LABELS, None, context).print(&(Stream::Internal(internal_managed_stream), &access_rights), None)
       }
-      (Err(_), Ok(public_managed_stream)) => {
+      (Some(Stream::Public(public_managed_stream)), access_rights) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(managed_stream_id, &PUBLIC_STREAM_LABELS, None, context).print(&FormatterManagedStream::Public(public_managed_stream), None)?
+        UnitFormatter::new(managed_stream_id, &PUBLIC_STREAM_LABELS, None, context).print(&(Stream::Public(public_managed_stream), &access_rights), None)
       }
-      (Ok(internal_managed_stream), Err(_)) => {
+      (None, _) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(managed_stream_id, &INTERNAL_STREAM_LABELS, None, context).print(&FormatterManagedStream::Internal(internal_managed_stream), None)?
+        Err(format!("managed stream '{}' does not exist", managed_stream_id))
       }
-      (Ok(_), Ok(_)) => unreachable!(),
     }
-    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -437,6 +406,8 @@ pub enum ManagedStreamLabel {
   RetentionMs,
   SegmentBytes,
   Target,
+  TenantsGrantedReadAccess,
+  TenantsGrantedWriteAccess,
   TimestampType,
   Type,
 }
@@ -457,6 +428,8 @@ impl Label for ManagedStreamLabel {
       Self::RetentionMs => "retention ms",
       Self::SegmentBytes => "segment bytes",
       Self::Target => "stream id",
+      Self::TenantsGrantedReadAccess => "tenants granted read access",
+      Self::TenantsGrantedWriteAccess => "tenants granted write access",
       Self::TimestampType => "timestamp type",
       Self::Type => "type",
     }
@@ -477,6 +450,8 @@ impl Label for ManagedStreamLabel {
       Self::RetentionMs => "ret ms",
       Self::SegmentBytes => "seg bytes",
       Self::Target => "id",
+      Self::TenantsGrantedReadAccess => "read",
+      Self::TenantsGrantedWriteAccess => "write",
       Self::TimestampType => "ts",
       Self::Type => "type",
     }
@@ -487,38 +462,35 @@ impl Label for ManagedStreamLabel {
   }
 }
 
-#[derive(Serialize)]
-pub enum FormatterManagedStream {
-  Internal(ManagedStream),
-  Public(PublicManagedStream),
-}
-
-impl SubjectFormatter<ManagedStreamLabel> for FormatterManagedStream {
+impl SubjectFormatter<ManagedStreamLabel> for Stream {
   fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> String {
     match self {
-      FormatterManagedStream::Internal(internal) => topic_value(&internal.0, label, target_id),
-      FormatterManagedStream::Public(public) => public.value(label, target_id),
+      Stream::Internal(internal) => internal.value(label, target_id),
+      Stream::Public(public) => public.value(label, target_id),
     }
   }
 }
 
-fn topic_value(topic: &Topic, label: &ManagedStreamLabel, target_id: &str) -> String {
-  match label {
-    ManagedStreamLabel::CanBeRetained => "".to_string(),
-    ManagedStreamLabel::CleanupPolicy => topic.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::CompressionType => topic.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::DeleteRetentionMs => topic.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::KafkaProperties => hashmap_to_table(&get_implicit_properties(&topic.kafka_properties)),
-    ManagedStreamLabel::MaxMessageBytes => topic.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::Partitioner => "".to_string(),
-    ManagedStreamLabel::Partitions => topic.partitions.to_string(),
-    ManagedStreamLabel::ReplicationFactor => topic.replication_factor.to_string(),
-    ManagedStreamLabel::RetentionBytes => topic.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::RetentionMs => topic.kafka_properties.get(RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::SegmentBytes => topic.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::Target => target_id.to_string(),
-    ManagedStreamLabel::TimestampType => topic.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned().unwrap_or_default(),
-    ManagedStreamLabel::Type => "internal".to_string(),
+impl SubjectFormatter<ManagedStreamLabel> for ManagedStream {
+  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> String {
+    match label {
+      ManagedStreamLabel::CanBeRetained => "NA".to_string(),
+      ManagedStreamLabel::CleanupPolicy => self.0.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::CompressionType => self.0.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::DeleteRetentionMs => self.0.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::KafkaProperties => hashmap_to_table(&get_implicit_properties(&self.0.kafka_properties)),
+      ManagedStreamLabel::MaxMessageBytes => self.0.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::Partitioner => "NA".to_string(),
+      ManagedStreamLabel::Partitions => self.0.partitions.to_string(),
+      ManagedStreamLabel::ReplicationFactor => self.0.replication_factor.to_string(),
+      ManagedStreamLabel::RetentionBytes => self.0.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::RetentionMs => self.0.kafka_properties.get(RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::SegmentBytes => self.0.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::Target => target_id.to_string(),
+      ManagedStreamLabel::TimestampType => self.0.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::Type => "internal".to_string(),
+      _ => unreachable!("label '{}' was not expected", label.as_str()),
+    }
   }
 }
 
@@ -543,11 +515,32 @@ impl SubjectFormatter<ManagedStreamLabel> for PublicManagedStream {
       ManagedStreamLabel::Target => target_id.to_string(),
       ManagedStreamLabel::TimestampType => self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned().unwrap_or_default(),
       ManagedStreamLabel::Type => "public".to_string(),
+      _ => unreachable!("label '{}' was not expected", label.as_str()),
     }
   }
 }
 
-pub static INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 13] = [
+impl SubjectFormatter<ManagedStreamLabel> for (Stream, &Vec<(String, AccessRights)>) {
+  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> String {
+    match label {
+      ManagedStreamLabel::TenantsGrantedReadAccess => self
+        .1
+        .iter()
+        .filter(|(_, access_rights)| access_rights == &AccessRights::Read || access_rights == &AccessRights::ReadWrite)
+        .map(|(tenant_id, _)| tenant_id)
+        .join(", "),
+      ManagedStreamLabel::TenantsGrantedWriteAccess => self
+        .1
+        .iter()
+        .filter(|(_, access_rights)| access_rights == &AccessRights::Write || access_rights == &AccessRights::ReadWrite)
+        .map(|(tenant_id, _)| tenant_id)
+        .join(", "),
+      _ => self.0.value(label, target_id),
+    }
+  }
+}
+
+static INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 15] = [
   ManagedStreamLabel::Target,
   ManagedStreamLabel::Type,
   ManagedStreamLabel::Partitions,
@@ -561,9 +554,11 @@ pub static INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 13] = [
   ManagedStreamLabel::RetentionBytes,
   ManagedStreamLabel::RetentionMs,
   ManagedStreamLabel::KafkaProperties,
+  ManagedStreamLabel::TenantsGrantedReadAccess,
+  ManagedStreamLabel::TenantsGrantedWriteAccess,
 ];
 
-pub static PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 15] = [
+static PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 17] = [
   ManagedStreamLabel::Target,
   ManagedStreamLabel::Type,
   ManagedStreamLabel::Partitions,
@@ -579,9 +574,11 @@ pub static PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 15] = [
   ManagedStreamLabel::KafkaProperties,
   ManagedStreamLabel::Partitioner,
   ManagedStreamLabel::CanBeRetained,
+  ManagedStreamLabel::TenantsGrantedReadAccess,
+  ManagedStreamLabel::TenantsGrantedWriteAccess,
 ];
 
-pub static LIST_INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 8] = [
+static LIST_INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 8] = [
   ManagedStreamLabel::Target,
   ManagedStreamLabel::Type,
   ManagedStreamLabel::Partitions,
@@ -592,7 +589,7 @@ pub static LIST_INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 8] = [
   ManagedStreamLabel::TimestampType,
 ];
 
-pub static LIST_PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 10] = [
+static LIST_PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 10] = [
   ManagedStreamLabel::Target,
   ManagedStreamLabel::Type,
   ManagedStreamLabel::Partitions,
@@ -604,3 +601,15 @@ pub static LIST_PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 10] = [
   ManagedStreamLabel::Partitioner,
   ManagedStreamLabel::CanBeRetained,
 ];
+
+fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<ManagedStreamId, String> {
+  match matches.get_one::<String>(MANAGED_STREAM_ARGUMENT) {
+    Some(managed_stream_argument) => Ok(ManagedStreamId::try_from(managed_stream_argument).map_err(|error| error.to_string())?),
+    None => {
+      let line = read_single_line(format!("enter managed stream id: {}---", managing_tenant))?;
+      let managed_stream_id = format!("{}---{}", managing_tenant, line);
+      let managed_stream_id = ManagedStreamId::try_from(managed_stream_id).map_err(|error| error.to_string())?;
+      Ok(managed_stream_id)
+    }
+  }
+}

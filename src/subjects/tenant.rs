@@ -1,6 +1,7 @@
 use crate::arguments::managed_tenant_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND, SHOW_COMMAND,
+  SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -12,22 +13,24 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::limits_flags::{
   certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
-  topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_FLAG, CONSUMER_RATE_FLAG, CPU_FLAG, KAFKA_ACL_GROUP_COUNT_FLAG, MEM_FLAG, PARTITION_COUNT_FLAG, PRODUCER_RATE_FLAG,
-  REQUEST_RATE_FLAG, SECRET_COUNT_FLAG, TOPIC_COUNT_FLAG, TRACING_FLAG, VPN_FLAG,
+  stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_FLAG, CONSUMER_RATE_FLAG, CPU_FLAG, KAFKA_ACL_GROUP_COUNT_FLAG,
+  MEM_FLAG, PARTITION_COUNT_FLAG, PRODUCER_RATE_FLAG, REQUEST_RATE_FLAG, SECRET_COUNT_FLAG, STREAM_READ_FLAG, STREAM_RW_FLAG, STREAM_WRITE_FLAG, TOPIC_COUNT_FLAG, TRACING_FLAG,
+  VPN_FLAG,
 };
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::stream::Stream;
 use dsh_api::tenant::TenantLimits;
 use dsh_api::types::{
   LimitValue, LimitValueCertificateCount, LimitValueCertificateCountName, LimitValueConsumerRate, LimitValueConsumerRateName, LimitValueCpu, LimitValueCpuName,
   LimitValueKafkaAclGroupCount, LimitValueKafkaAclGroupCountName, LimitValueMem, LimitValueMemName, LimitValuePartitionCount, LimitValuePartitionCountName, LimitValueProducerRate,
   LimitValueProducerRateName, LimitValueRequestRate, LimitValueRequestRateName, LimitValueSecretCount, LimitValueSecretCountName, LimitValueTopicCount, LimitValueTopicCountName,
-  ManagedTenant, ManagedTenantServices, ManagedTenantServicesName, PutTenantLimitByManagerByTenantByKindKind,
+  ManagedStreamId, ManagedTenant, ManagedTenantServices, ManagedTenantServicesName, PutTenantLimitByManagerByTenantByKindKind,
 };
-use dsh_api::DshApiError;
+use dsh_api::{AccessRights, DshApiError};
 use futures::future::try_join_all;
 use futures::try_join;
 use lazy_static::lazy_static;
@@ -56,16 +59,40 @@ lazy_static! {
       .set_long_about("Delete a managed tenant and its configuration.")
       .add_target_argument(managed_tenant_argument().required(true))
   );
+  static ref TENANT_GRANT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(GRANT_COMMAND, None, &TenantGrant {}, "Grant access rights")
+      .set_long_about(
+        "Grant a managed tenant read and/or write access rights to restricted resources \
+         (managed streams)."
+      )
+      .add_target_argument(managed_tenant_argument().required(true))
+      .add_extra_argument(stream_read_flag("Grant").help_heading(HELP_HEADING))
+      .add_extra_argument(stream_write_flag("Grant").help_heading(HELP_HEADING))
+      .add_extra_argument(stream_rw_flag("Grant").help_heading(HELP_HEADING))
+  );
   static ref TENANT_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TenantListAll {}, "List managed tenants")
       .set_long_about("Lists all managed tenants.")
       .add_target_argument(managed_tenant_argument())
       .add_command_executor(FlagType::Ids, &TenantListIds {}, None)
+      .add_command_executor(FlagType::Stream, &TenantListStreams {}, None)
+  );
+  static ref TENANT_REVOKE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(REVOKE_COMMAND, None, &TenantRevoke {}, "Revoke access rights")
+      .set_long_about(
+        "Revoke read and/or write access rights to restricted resources \
+         (managed streams) from a managed tenant."
+      )
+      .add_target_argument(managed_tenant_argument().required(true))
+      .add_extra_argument(stream_read_flag("Revoke").help_heading(HELP_HEADING))
+      .add_extra_argument(stream_write_flag("Revoke").help_heading(HELP_HEADING))
+      .add_extra_argument(stream_rw_flag("Revoke").help_heading(HELP_HEADING))
   );
   static ref TENANT_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TenantShowAll {}, "Show managed tenant configuration")
       .set_long_about("Show the configuration of a managed tenant.")
       .add_target_argument(managed_tenant_argument().required(true))
+      .add_command_executor(FlagType::Stream, &TenantShowStreams {}, None)
   );
   static ref TENANT_UPDATE_LIMIT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &TenantUpdateLimit {}, "Update managed tenant limits")
@@ -87,7 +114,9 @@ lazy_static! {
   static ref TENANT_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     TENANT_CREATE_CAPABILITY.as_ref(),
     TENANT_DELETE_CAPABILITY.as_ref(),
+    TENANT_GRANT_CAPABILITY.as_ref(),
     TENANT_LIST_CAPABILITY.as_ref(),
+    TENANT_REVOKE_CAPABILITY.as_ref(),
     TENANT_SHOW_CAPABILITY.as_ref(),
     TENANT_UPDATE_LIMIT_CAPABILITY.as_ref()
   ];
@@ -107,7 +136,9 @@ impl Subject for TenantSubject {
     match capability_command {
       CREATE_COMMAND => Some(TENANT_CREATE_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(TENANT_DELETE_CAPABILITY.as_ref()),
+      GRANT_COMMAND => Some(TENANT_GRANT_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(TENANT_LIST_CAPABILITY.as_ref()),
+      REVOKE_COMMAND => Some(TENANT_REVOKE_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(TENANT_SHOW_CAPABILITY.as_ref()),
       UPDATE_COMMAND => Some(TENANT_UPDATE_LIMIT_CAPABILITY.as_ref()),
       _ => None,
@@ -142,7 +173,7 @@ impl CommandExecutor for TenantCreate {
       services.push(ManagedTenantServices { enabled: *vpn_enabled, name: ManagedTenantServicesName::Vpn });
     }
     let managed_tenant = ManagedTenant { manager: client.tenant_name().to_string(), name: tenant_id.clone(), services };
-    if context.dry_run {
+    if context.dry_run() {
       context.print_warning("dry-run mode, tenant not created");
     } else {
       client.put_tenant_configuration(&tenant_id, &managed_tenant).await?;
@@ -167,7 +198,7 @@ impl CommandExecutor for TenantDelete {
       return Err(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
     }
     if context.confirmed(format!("delete tenant '{}'?", tenant_id))? {
-      if context.dry_run {
+      if context.dry_run() {
         context.print_warning("dry-run mode, tenant not deleted");
       } else {
         client.delete_tenant_configuration(&tenant_id).await?;
@@ -176,6 +207,29 @@ impl CommandExecutor for TenantDelete {
     } else {
       context.print_outcome(format!("cancelled, tenant '{}' not deleted", tenant_id));
     }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct TenantGrant {}
+
+#[async_trait]
+impl CommandExecutor for TenantGrant {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let managed_tenant_id = target.unwrap_or_else(|| unreachable!());
+    let (managed_stream_id, access_rights) = get_managed_stream_id(matches, client.tenant_name())?;
+    context.print_explanation(format!(
+      "grant {} access to managed stream '{}' to managed tenant '{}'",
+      access_rights, managed_stream_id, managed_tenant_id
+    ));
+    let kind = client
+      .grant_managed_stream_access_rights(&managed_stream_id, &managed_tenant_id, &access_rights)
+      .await?;
+    context.print_outcome(format!("access granted to {} managed stream", kind));
     Ok(())
   }
 
@@ -197,7 +251,7 @@ impl CommandExecutor for TenantListAll {
     } else {
       let (managed_tenants, limits) = try_join!(
         try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenant_configuration(tenant_id))),
-        try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenantlimits(tenant_id)))
+        try_join_all(tenant_ids.iter().map(|tenant_id| client.get_managed_tenant_limits(tenant_id)))
       )?;
       context.print_execution_time(start_instant);
       let managed_tenants_limits: Vec<(ManagedTenant, TenantLimits)> = managed_tenants.into_iter().zip(limits).collect::<Vec<_>>();
@@ -239,6 +293,59 @@ impl CommandExecutor for TenantListIds {
   }
 }
 
+struct TenantListStreams {}
+
+#[async_trait]
+impl CommandExecutor for TenantListStreams {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    context.print_explanation("list all tenants with the managed streams that they are granted access");
+    let start_instant = context.now();
+
+    let tenant_ids = client.get_tenant_ids().await?;
+    if tenant_ids.is_empty() {
+      context.print_outcome("no managed tenants or you are not authorized to manage tenants");
+    } else {
+      let tenants_granted_streams: Vec<Vec<(ManagedStreamId, Stream, AccessRights)>> =
+        try_join_all(tenant_ids.iter().map(|tenant_id| client.get_granted_managed_streams(tenant_id))).await?;
+
+      context.print_execution_time(start_instant);
+      let mut formatter = ListFormatter::new(&LIST_STREAM_ACCESS_LABELS, None, context);
+      for (tenant_id, granted_streams) in tenant_ids.iter().zip(&tenants_granted_streams) {
+        for granted_stream in granted_streams {
+          formatter.push_target_id_value(tenant_id.clone(), granted_stream);
+        }
+      }
+      formatter.print(None)?;
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct TenantRevoke {}
+
+#[async_trait]
+impl CommandExecutor for TenantRevoke {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let managed_tenant_id = target.unwrap_or_else(|| unreachable!());
+    let (managed_stream_id, rights) = get_managed_stream_id(matches, client.tenant_name())?;
+    context.print_explanation(format!(
+      "revoke {} access to managed stream '{}' from managed tenant '{}'",
+      rights, managed_stream_id, managed_tenant_id
+    ));
+    let kind = client.revoke_managed_stream_access_rights(&managed_stream_id, &managed_tenant_id, &rights).await?;
+    context.print_outcome(format!("access revoked from {} managed stream", kind));
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
 struct TenantShowAll {}
 
 #[async_trait]
@@ -247,7 +354,7 @@ impl CommandExecutor for TenantShowAll {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all limits for tenant '{}'", tenant_id));
     let start_instant = context.now();
-    match try_join!(client.get_tenant_configuration(&tenant_id), client.get_tenantlimits(&tenant_id)) {
+    match try_join!(client.get_tenant_configuration(&tenant_id), client.get_managed_tenant_limits(&tenant_id)) {
       Ok((managed_tenant, tenant_limits)) => {
         context.print_execution_time(start_instant);
         UnitFormatter::new(tenant_id, &TENANT_LABELS, Some("tenant id"), context).print(&(managed_tenant, tenant_limits), None)
@@ -260,6 +367,26 @@ impl CommandExecutor for TenantShowAll {
         error => Err(String::from(error)),
       },
     }
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct TenantShowStreams {}
+
+#[async_trait]
+impl CommandExecutor for TenantShowStreams {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let tenant_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("show all streams that tenant '{}' has access to", tenant_id));
+    let start_instant = context.now();
+    let grants: Vec<(ManagedStreamId, Stream, AccessRights)> = client.get_granted_managed_streams(&tenant_id).await?;
+    context.print_execution_time(start_instant);
+    let mut formatter = ListFormatter::new(&STREAM_ACCESS_LABELS, None, context);
+    formatter.push_values(&grants);
+    formatter.print(None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -289,7 +416,7 @@ impl CommandExecutor for TenantUpdateLimit {
           return Err(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
         }
         if let Some(certificate_count) = tenant_limits_from_arguments.certificate_count {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, certificate count limit not updated");
           } else {
             client
@@ -302,7 +429,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(consumer_rate) = tenant_limits_from_arguments.consumer_rate {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, consumer rate limit not updated");
           } else {
             client
@@ -315,7 +442,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(cpu) = tenant_limits_from_arguments.cpu {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, cpu limit not updated");
           } else {
             client
@@ -328,7 +455,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(kafka_acl_group_count) = tenant_limits_from_arguments.kafka_acl_group_count {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, kafka acl group count limit not updated");
           } else {
             client
@@ -341,7 +468,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(mem) = tenant_limits_from_arguments.mem {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, mem limit not updated");
           } else {
             client
@@ -354,7 +481,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(partition_count) = tenant_limits_from_arguments.partition_count {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, partition count limit not updated");
           } else {
             client
@@ -367,7 +494,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(producer_rate) = tenant_limits_from_arguments.producer_rate {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, producer rate limit not updated");
           } else {
             client
@@ -380,7 +507,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(request_rate) = tenant_limits_from_arguments.request_rate {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, request rate limit not updated");
           } else {
             client
@@ -393,7 +520,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(secret_count) = tenant_limits_from_arguments.secret_count {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, secret count limit not updated");
           } else {
             client
@@ -406,7 +533,7 @@ impl CommandExecutor for TenantUpdateLimit {
           }
         }
         if let Some(topic_count) = tenant_limits_from_arguments.topic_count {
-          if context.dry_run {
+          if context.dry_run() {
             context.print_warning("dry-run mode, topic count limit not updated");
           } else {
             client
@@ -487,7 +614,7 @@ impl CommandExecutor for TenantUpdateLimit {
               }
             }
             if update {
-              if context.dry_run {
+              if context.dry_run() {
                 context.print_warning("dry-run mode, capabilities not updated");
               } else {
                 client.put_tenant_configuration(&tenant_id, &managed_tenant).await?;
@@ -513,6 +640,27 @@ impl CommandExecutor for TenantUpdateLimit {
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
     Requirements::standard_with_api()
+  }
+}
+
+fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<(ManagedStreamId, AccessRights), String> {
+  Ok(match matches.get_one::<String>(STREAM_READ_FLAG) {
+    Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Read),
+    None => match matches.get_one::<String>(STREAM_RW_FLAG) {
+      Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::ReadWrite),
+      None => match matches.get_one::<String>(STREAM_WRITE_FLAG) {
+        Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Write),
+        None => unreachable!(),
+      },
+    },
+  })
+}
+
+fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> Result<ManagedStreamId, String> {
+  if stream_argument.starts_with(&format!("{}---", managing_tenant)) {
+    ManagedStreamId::try_from(stream_argument).map_err(|error| error.to_string())
+  } else {
+    Err(format!("managed stream id must start with '{}---'", managing_tenant))
   }
 }
 
@@ -545,6 +693,8 @@ pub(crate) enum TenantLabel {
   CertificateCount,
   ConsumerRate,
   Cpu,
+  _InternalStreamReadAccess,
+  _InternalStreamWriteAccess,
   KafkaAclGroupCount,
   Manager,
   Mem,
@@ -552,6 +702,8 @@ pub(crate) enum TenantLabel {
   _Name,
   PartitionCount,
   ProducerRate,
+  _PublicStreamReadAccess,
+  _PublicStreamWriteAccess,
   RequestRate,
   SecretCount,
   Tenant,
@@ -563,16 +715,20 @@ pub(crate) enum TenantLabel {
 impl Label for TenantLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::_Name => "name",
       Self::CertificateCount => "certificate count",
       Self::ConsumerRate => "consumer rate",
       Self::Cpu => "cpu",
+      Self::_InternalStreamReadAccess => "internal stream read access",
+      Self::_InternalStreamWriteAccess => "internal stream write access",
       Self::KafkaAclGroupCount => "kafka acl group count",
       Self::Manager => "managing tenant",
       Self::Mem => "mem",
       Self::Monitoring => "monitoring",
-      Self::_Name => "name",
       Self::PartitionCount => "partition count",
       Self::ProducerRate => "producer rate",
+      Self::_PublicStreamReadAccess => "public stream read access",
+      Self::_PublicStreamWriteAccess => "public stream write access",
       Self::RequestRate => "request rate",
       Self::SecretCount => "secret count",
       Self::Tenant => "managed tenant",
@@ -584,16 +740,20 @@ impl Label for TenantLabel {
 
   fn as_str_for_list(&self) -> &str {
     match self {
+      Self::_Name => "name",
       Self::CertificateCount => "certificates",
       Self::ConsumerRate => "consumer",
       Self::Cpu => "cpu",
+      Self::_InternalStreamReadAccess => "int read",
+      Self::_InternalStreamWriteAccess => "int write",
       Self::KafkaAclGroupCount => "acl groups",
       Self::Manager => "manager",
       Self::Mem => "mem",
       Self::Monitoring => "monitoring",
-      Self::_Name => "name",
       Self::PartitionCount => "partitions",
       Self::ProducerRate => "producer",
+      Self::_PublicStreamReadAccess => "pub read",
+      Self::_PublicStreamWriteAccess => "pub write",
       Self::RequestRate => "request",
       Self::SecretCount => "secrets",
       Self::Tenant => "tenant",
@@ -666,6 +826,113 @@ impl SubjectFormatter<TenantLabel> for (ManagedTenant, TenantLimits) {
     }
   }
 }
+
+#[derive(Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum StreamAccessLabel {
+  ReadAccess,
+  StreamId,
+  StreamKind,
+  Tenant,
+  WriteAccess,
+  Partitions,
+  ReplicationFactor,
+}
+
+impl Label for StreamAccessLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::ReadAccess => "read ",
+      Self::Partitions => "partitions",
+      Self::ReplicationFactor => "replication",
+      Self::StreamId => "stream id",
+      Self::StreamKind => "kind",
+      Self::Tenant => "tenant id",
+      Self::WriteAccess => "write",
+    }
+  }
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::Tenant)
+  }
+}
+
+impl SubjectFormatter<StreamAccessLabel> for (&ManagedStreamId, &str, bool, bool) {
+  fn value(&self, label: &StreamAccessLabel, target_id: &str) -> String {
+    match label {
+      StreamAccessLabel::ReadAccess => {
+        if self.2 {
+          "granted".to_string()
+        } else {
+          "denied".to_string()
+        }
+      }
+      StreamAccessLabel::StreamId => self.0.to_string(),
+      StreamAccessLabel::StreamKind => self.1.to_string(),
+      StreamAccessLabel::Tenant => target_id.to_string(),
+      StreamAccessLabel::WriteAccess => {
+        if self.3 {
+          "granted".to_string()
+        } else {
+          "denied".to_string()
+        }
+      }
+      _ => "".to_string(),
+    }
+  }
+}
+
+impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRights) {
+  fn value(&self, label: &StreamAccessLabel, target_id: &str) -> String {
+    match label {
+      StreamAccessLabel::Partitions => match &self.1 {
+        Stream::Internal(internal) => internal.partitions.to_string(),
+        Stream::Public(public) => public.partitions.to_string(),
+      },
+      StreamAccessLabel::ReplicationFactor => match &self.1 {
+        Stream::Internal(internal) => internal.replication_factor.to_string(),
+        Stream::Public(public) => public.replication_factor.to_string(),
+      },
+      StreamAccessLabel::ReadAccess => {
+        if self.2.has_read_access() {
+          "granted".to_string()
+        } else {
+          "denied".to_string()
+        }
+      }
+      StreamAccessLabel::StreamId => self.0.to_string(),
+      StreamAccessLabel::StreamKind => match self.1 {
+        Stream::Internal(_) => "internal".to_string(),
+        Stream::Public(_) => "public".to_string(),
+      },
+      StreamAccessLabel::Tenant => target_id.to_string(),
+      StreamAccessLabel::WriteAccess => {
+        if self.2.has_write_access() {
+          "granted".to_string()
+        } else {
+          "denied".to_string()
+        }
+      }
+    }
+  }
+}
+
+pub static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
+  StreamAccessLabel::StreamId,
+  StreamAccessLabel::StreamKind,
+  StreamAccessLabel::ReadAccess,
+  StreamAccessLabel::WriteAccess,
+  StreamAccessLabel::Partitions,
+  StreamAccessLabel::ReplicationFactor,
+];
+
+pub static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
+  StreamAccessLabel::Tenant,
+  StreamAccessLabel::StreamId,
+  StreamAccessLabel::StreamKind,
+  StreamAccessLabel::ReadAccess,
+  StreamAccessLabel::WriteAccess,
+  StreamAccessLabel::Partitions,
+  StreamAccessLabel::ReplicationFactor,
+];
 
 fn service_enabled(managed_tenant: &ManagedTenant, name: ManagedTenantServicesName) -> String {
   managed_tenant

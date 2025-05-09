@@ -9,6 +9,9 @@ pub(crate) const PARTITION_COUNT_FLAG: &str = "partition-count";
 pub(crate) const PRODUCER_RATE_FLAG: &str = "producer-rate";
 pub(crate) const REQUEST_RATE_FLAG: &str = "request-rate";
 pub(crate) const SECRET_COUNT_FLAG: &str = "secret-count";
+pub(crate) const STREAM_READ_FLAG: &str = "stream-read";
+pub(crate) const STREAM_RW_FLAG: &str = "stream-rw";
+pub(crate) const STREAM_WRITE_FLAG: &str = "stream-write";
 pub(crate) const TOPIC_COUNT_FLAG: &str = "topic-count";
 pub(crate) const TRACING_FLAG: &str = "tracing";
 pub(crate) const VPN_FLAG: &str = "vpn";
@@ -144,6 +147,37 @@ pub(crate) fn secret_count_flag() -> Arg {
       "Set the limit for the number of secrets available for the managed tenant. \
           The value must be greater than or equal to 1 and lower than or equal to 40.",
     )
+}
+
+pub(crate) fn stream_read_flag(action: &str) -> Arg {
+  Arg::new(STREAM_READ_FLAG)
+    .long(STREAM_READ_FLAG)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("STREAM")
+    .help(format!("{} read access", action))
+    .long_help(format!("{} the managed tenant read access rights to a managed stream.", action))
+    .conflicts_with_all([STREAM_RW_FLAG, STREAM_WRITE_FLAG])
+}
+
+pub(crate) fn stream_rw_flag(action: &str) -> Arg {
+  Arg::new(STREAM_RW_FLAG)
+    .long(STREAM_RW_FLAG)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("STREAM")
+    .help(format!("{} read/write access", action))
+    .long_help(format!("{} the managed tenant read and write access rights to a managed stream.", action))
+}
+
+pub(crate) fn stream_write_flag(action: &str) -> Arg {
+  Arg::new(STREAM_WRITE_FLAG)
+    .long(STREAM_WRITE_FLAG)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("STREAM")
+    .help(format!("{} write access", action))
+    .long_help(format!("{} the managed tenant write access rights to a managed stream.", action))
 }
 
 pub(crate) fn topic_count_flag() -> Arg {
