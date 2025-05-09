@@ -73,7 +73,7 @@ impl<'a> IdsFormatter<'a> {
           tabled_builder.push_record::<[&str; 1]>([target_id]);
         }
         let mut table = tabled_builder.build();
-        if let Some(terminal_width) = self.context.terminal_width {
+        if let Some(terminal_width) = self.context.terminal_width() {
           table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
         }
         table.with(Padding::new(1, 1, 0, 0));
@@ -89,7 +89,7 @@ impl<'a> IdsFormatter<'a> {
           tabled_builder.push_record::<[&str; 1]>([target_id]);
         }
         let mut table = tabled_builder.build();
-        if let Some(terminal_width) = self.context.terminal_width {
+        if let Some(terminal_width) = self.context.terminal_width() {
           table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
         }
         table.with(Padding::new(0, 2, 0, 0));

@@ -84,7 +84,7 @@ where
   }
 
   fn add_csv_quote(&self, value: &str) -> String {
-    match self.context.csv_quote {
+    match self.context.csv_quote() {
       Some(csv_quote) => format!("{}{}{}", csv_quote, value, csv_quote),
       None => value.to_string(),
     }
@@ -93,13 +93,13 @@ where
   pub fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => {
-        if self.context.show_headers {
+        if self.context.show_headers() {
           self.context.print(
             self
               .labels
               .iter()
               .map(|label| self.label_to_header(label))
-              .join(self.context.csv_separator.as_str()),
+              .join(self.context.csv_separator().as_str()),
           );
         }
         for (target_id, value) in &self.values {
@@ -108,7 +108,7 @@ where
               .labels
               .iter()
               .map(|label| self.add_csv_quote(value.value(label, target_id).as_str()))
-              .join(self.context.csv_separator.as_str()),
+              .join(self.context.csv_separator().as_str()),
           );
         }
         Ok(())
@@ -149,7 +149,7 @@ where
       },
 
       OutputFormat::Plain => {
-        if self.context.show_headers {
+        if self.context.show_headers() {
           self.context.print(self.labels.iter().map(|label| label.as_str()).join(","));
         }
         for (target_id, value) in &self.values {
@@ -186,8 +186,8 @@ where
           tabled_builder.push_record(record);
         }
         let mut table = tabled_builder.build();
-        if let Some(terminal_width) = self.context.terminal_width {
-          table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
+        if let Some(terminal_width) = self.context.terminal_width() {
+          table.with(Width::wrap(terminal_width).keep_words(true).priority(PriorityMax::new(true)));
         }
         table.with(Padding::new(1, 1, 0, 0));
         if self.values.is_empty() {
@@ -211,7 +211,7 @@ where
           tabled_builder.push_record(self.labels.iter().map(|label| value.value(label, target_id)));
         }
         let mut table = tabled_builder.build();
-        if let Some(terminal_width) = self.context.terminal_width {
+        if let Some(terminal_width) = self.context.terminal_width() {
           table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
         }
         table.with(Padding::new(0, 2, 0, 0));
