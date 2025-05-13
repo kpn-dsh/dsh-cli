@@ -14,7 +14,6 @@ jobs:
       - uses: actions/checkout@master
       - uses: taiki-e/create-gh-release-action@v1
         with:
-          changelog: CHANGELOG_GEN.md
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:
