@@ -3,7 +3,7 @@ name: Try
 on: workflow_dispatch
 
 jobs:
-  create-release:
+  install-and-run-dsh:
     environment: try
     runs-on: ubuntu-latest
     steps:
@@ -11,9 +11,8 @@ jobs:
         env:
           DSH_CLI_PLATFORM: np-aws-lz-dsh
           DSH_CLI_TENANT: greenbox-dev
-          DSH_CLI_PASSWORD: '${{ secrets.DSH_CLI_PASSWORD }}'
+          DSH_CLI_PASSWORD: ${{ secrets.DSH_CLI_PASSWORD }}
         run: |
-          env
           wget https://github.com/kpn-dsh/dsh-cli/releases/download/0.7.3-try2/dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar.gz
           gzip -d dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar.gz
           tar x -f dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar
