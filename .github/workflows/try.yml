@@ -12,4 +12,5 @@ jobs:
           wget https://github.com/kpn-dsh/dsh-cli/releases/download/0.7.3-try2/dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar.gz
           gzip -d dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar.gz
           tar x -f dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar
-          ./dsh -p nplz -t greenbox-dev service list
+          echo ${{ secret.DSH_CLI_PASSWORD }} > np-aws-lz-dsh.greenbox-dev.pwd
+          ./dsh -p nplz -t greenbox-dev --password-file np-aws-lz-dsh.greenbox-dev.pwd --suppress-exit-status service list
