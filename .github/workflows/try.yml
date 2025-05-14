@@ -1,0 +1,16 @@
+name: Try
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release
+        run: |
+          wget https://github.com/kpn-dsh/dsh-cli/releases/download/0.7.3-try2/dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar.gz
+          gzip -d dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar.gz
+          tar x -f dsh-0.7.3-try2-x86_64-unknown-linux-gnu.tar
+          ls -al
+          ./dsh
