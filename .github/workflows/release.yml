@@ -38,6 +38,7 @@ jobs:
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: dsh
+          checksum: sha512
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           features: ${{ matrix.features || '' }}
