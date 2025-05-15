@@ -20,9 +20,9 @@ jobs:
           DSH_CLI_TENANT: ajuc
           DSH_CLI_PASSWORD: ${{ secrets.NP_AWS_LZ_DSH_AJUC }}
         run: |
-          wget https://github.com/kpn-dsh/dsh-cli/releases/download/0.7.3-try12/dsh-manage-0.7.3-try12-x86_64-unknown-linux-gnu.tar.gz
-          gzip -d dsh-manage-0.7.3-try12-x86_64-unknown-linux-gnu.tar.gz
-          tar x -f dsh-manage-0.7.3-try12-x86_64-unknown-linux-gnu.tar
+          wget https://github.com/kpn-dsh/dsh-cli/releases/download/v0.7.3-rc1/dsh-manage-v0.7.3-rc1-x86_64-unknown-linux-gnu.tar.gz
+          gzip -d dsh-manage-v0.7.3-rc1-x86_64-unknown-linux-gnu.tar.gz
+          tar x -f dsh-manage-v0.7.3-rc1-x86_64-unknown-linux-gnu.tar
           ./dsh stream list
       - name: Install and run with manage feature disabled
         if: ${{ !inputs.manage }}
@@ -31,7 +31,7 @@ jobs:
           DSH_CLI_TENANT: greenbox-dev
           DSH_CLI_PASSWORD: ${{ secrets.NP_AWS_LZ_DSH_GREENBOX_DEV }}
         run: |
-          wget https://github.com/kpn-dsh/dsh-cli/releases/download/0.7.3-try12/dsh-0.7.3-try12-x86_64-unknown-linux-gnu.tar.gz
-          gzip -d dsh-0.7.3-try12-x86_64-unknown-linux-gnu.tar.gz
-          tar x -f dsh-0.7.3-try12-x86_64-unknown-linux-gnu.tar
+          wget https://github.com/kpn-dsh/dsh-cli/releases/download/v0.7.3-rc1/dsh-v0.7.3-rc1-x86_64-unknown-linux-gnu.tar.gz
+          gzip -d dsh-v0.7.3-rc1-x86_64-unknown-linux-gnu.tar.gz
+          tar x -f dsh-v0.7.3-rc1-x86_64-unknown-linux-gnu.tar
           ./dsh service export cmd
