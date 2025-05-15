@@ -103,9 +103,9 @@ Functions that do not need to access the web service do not require these target
 
 ### Command line arguments
 
-* `--platform` - Specify the target platform by either the full name
+* `--platform` or `-p` - Specify the target platform by either the full name
   or the alias (e.g. `np-aws-lz-dsh` or `nplz`).
-* `--tenant` - Specify the target tenant name.
+* `--tenant` or `-t` - Specify the target tenant name.
 * `--password-file` - Specify the name of a file containing the target password.
   This can either be an absolute file name
   or a file name relative to the working directory.

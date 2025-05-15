@@ -45,6 +45,14 @@ on platform `np-aws-lz-dsh` by typing the following command:
 ...
 ```
 
+For the most used arguments there are shortcuts defined. The above command can
+also be run as follows:
+
+```bash
+> dsh secret list -p np-aws-lz-dsh -t my-tenant --password-file .password
+...
+```
+
 ### Environment variables
 
 Even more convenient is providing the required parameters via environment variables:

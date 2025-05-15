@@ -220,7 +220,7 @@ An explanation of an environment variable can be printed via the commands:
                 <li><code>yaml</code> - output will be in yaml format.</li>
             </ul>
             This environment variable can be overridden via the 
-            <code>--output-format</code> command line argument.
+            <code>--output-format</code> (or <code>-o</code>) command line argument.
         </td>
     </tr>
     <tr valign="top">
@@ -275,7 +275,7 @@ An explanation of an environment variable can be printed via the commands:
                 </li>
             </ul>
             This environment variable can be overridden via the 
-            <code>--platform</code> command line argument.
+            <code>--platform</code> (or <code>-p</code>) command line argument.
         </td>
     </tr>
     <tr valign="top">
@@ -285,7 +285,7 @@ An explanation of an environment variable can be printed via the commands:
             will run in quiet mode, meaning that no output will be produced to the terminal 
             (<code>stdout</code> and <code>stderr</code>).
             This environment variable can be overridden via the 
-            <code>--quit</code> command line argument.
+            <code>--quiet</code> (or <code>-q</code>) command line argument.
         </td>
     </tr>
     <tr valign="top">
@@ -360,7 +360,7 @@ An explanation of an environment variable can be printed via the commands:
         <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
             will be managed via the api.
             This environment variable can be overridden via the 
-            <code>--tenant</code> command line argument.
+            <code>--tenant</code> (or <code>-t</code>) command line argument.
         </td>
     </tr>
     <tr valign="top">
@@ -376,7 +376,7 @@ An explanation of an environment variable can be printed via the commands:
                 <li><code>high</code> - all info will be printed.</li>
             </ul>
             This environment variable can be overridden via the 
-            <code>--verbosity</code> command line argument.
+            <code>--verbosity</code> (or <code>-v</code>) command line argument.
             Also, when the environment variable <code>DSH_CLI_QUIET</code> is set
             or the command line argument <code>--quiet</code> is provided, nothing will be printed.
         </td>
