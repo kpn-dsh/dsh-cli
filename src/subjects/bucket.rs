@@ -1,7 +1,7 @@
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::{notifications_to_string, OutputFormat};
 use async_trait::async_trait;
-use clap::ArgMatches;
+use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Bucket, BucketStatus};
 use futures::future::try_join_all;
@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::arguments::bucket_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -17,7 +17,7 @@ use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{DshCliResult, COMMAND_OPTIONS_HEADING};
 
 pub(crate) struct BucketSubject {}
 
@@ -47,6 +47,8 @@ impl Subject for BucketSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      CREATE_COMMAND => Some(BUCKET_CREATE_CAPABILITY.as_ref()),
+      DELETE_COMMAND => Some(BUCKET_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(BUCKET_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(BUCKET_SHOW_CAPABILITY.as_ref()),
       _ => None,
@@ -59,6 +61,16 @@ impl Subject for BucketSubject {
 }
 
 lazy_static! {
+  static ref BUCKET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &BucketCreate {}, "Create new bucket")
+      .add_target_argument(bucket_id_argument().required(true))
+      .add_extra_arguments(vec![versioned_flag(COMMAND_OPTIONS_HEADING)])
+  );
+  static ref BUCKET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND, None, &BucketDelete {}, "Delete bucket")
+      .set_long_about("Delete a bucket.")
+      .add_target_argument(bucket_id_argument().required(true))
+  );
   static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &BucketListAll {}, "List buckets")
       .set_long_about("Lists all available buckets.")
@@ -67,7 +79,84 @@ lazy_static! {
   static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &BucketShowAll {}, "Show bucket configuration").add_target_argument(bucket_id_argument().required(true))
   );
-  static ref BUCKET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![BUCKET_LIST_CAPABILITY.as_ref(), BUCKET_SHOW_CAPABILITY.as_ref()];
+  static ref BUCKET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
+    vec![BUCKET_CREATE_CAPABILITY.as_ref(), BUCKET_DELETE_CAPABILITY.as_ref(), BUCKET_LIST_CAPABILITY.as_ref(), BUCKET_SHOW_CAPABILITY.as_ref()];
+}
+
+// Encrypted is mandatory
+// pub(crate) const ENCRYPTED_FLAG: &str = "encrypted";
+// pub(crate) fn encrypted_flag(heading: &'static str) -> Arg {
+//   Arg::new(ENCRYPTED_FLAG)
+//     .long("encrypted")
+//     .action(ArgAction::SetTrue)
+//     .help("Encrypted bucket")
+//     .long_help("Create an encrypted bucket.")
+//     .help_heading(heading)
+// }
+
+pub(crate) const VERSIONED_FLAG: &str = "versioned";
+
+pub(crate) fn versioned_flag(heading: &'static str) -> Arg {
+  Arg::new(VERSIONED_FLAG)
+    .long("versioned")
+    .action(ArgAction::SetTrue)
+    .help("Versioned bucket")
+    .long_help("Create a versioned bucket.")
+    .help_heading(heading)
+}
+
+struct BucketCreate {}
+
+#[async_trait]
+impl CommandExecutor for BucketCreate {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let bucket_id = target.unwrap_or_else(|| unreachable!());
+    let versioned = matches.get_flag(VERSIONED_FLAG);
+    if client.get_bucket_configuration(&bucket_id).await.is_ok() {
+      return Err(format!("bucket '{}' already exists", bucket_id));
+    }
+    context.print_explanation(format!("create new bucket '{}'", bucket_id));
+    if context.dry_run() {
+      context.print_warning("dry-run mode, bucket not created");
+    } else {
+      let bucket = Bucket { encrypted: true, versioned };
+      client.put_bucket_configuration(&bucket_id, &bucket).await?;
+      context.print_outcome(format!("bucket '{}' created", bucket_id));
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct BucketDelete {}
+
+#[async_trait]
+impl CommandExecutor for BucketDelete {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let bucket_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("delete bucket '{}'", bucket_id));
+    if client.get_bucket_configuration(&bucket_id).await.is_err() {
+      return Err(format!("bucket '{}' does not exists", bucket_id));
+    }
+    if context.confirmed(format!("delete bucket '{}'?", bucket_id))? {
+      if context.dry_run() {
+        context.print_warning("dry-run mode, bucket not deleted");
+      } else {
+        client.delete_bucket_configuration(&bucket_id).await?;
+        context.print_outcome(format!("bucket '{}' deleted", bucket_id));
+      }
+    } else {
+      context.print_outcome(format!("cancelled, bucket '{}' not deleted", bucket_id));
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
 }
 
 struct BucketListAll {}
