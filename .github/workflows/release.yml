@@ -41,7 +41,7 @@ jobs:
           checksum: sha512
           include: LICENSE.md
           target: ${{ matrix.target }}
-          archive: $bin-${{ matrix.features || '' }}-$tag-$target
+          archive: $bin-${{ matrix.features && '-${{ matrix.features }}' || '' }}-$tag-$target
           features: ${{ matrix.features || '' }}
           tar: unix
           zip: windows
