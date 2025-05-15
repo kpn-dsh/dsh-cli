@@ -12,7 +12,6 @@ use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, POST_METHO
 use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::debug;
 
 pub(crate) struct ApiSubject {}
 
@@ -359,7 +358,7 @@ impl CommandExecutor for ApiPatch {
           Ok(())
         }
         Err(error) => {
-          debug!("{:#?}", error);
+          log::debug!("{:#?}", error);
           Err(error.to_string())
         }
       }
