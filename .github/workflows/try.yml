@@ -18,14 +18,14 @@ jobs:
           DSH_CLI_PLATFORM: np-aws-lz-dsh
           DSH_CLI_TENANT: greenbox-dev
           DSH_CLI_PASSWORD: ${{ secrets.DSH_CLI_PASSWORD }}
-      - name: Install and run with 'manage' feature enabled
+      - name: Install and run with manage feature enabled
         if: ${{ inputs.manage }}
         run: |
           wget https://github.com/kpn-dsh/dsh-cli/releases/download/0.7.3-try12/dsh-manage-0.7.3-try12-x86_64-unknown-linux-gnu.tar.gz
           gzip -d dsh-manage-0.7.3-try12-x86_64-unknown-linux-gnu.tar.gz
           tar x -f dsh-manage-0.7.3-try12-x86_64-unknown-linux-gnu.tar
           ./dsh --help
-      - name: Install and run with 'manage' feature disabled
+      - name: Install and run with manage feature disabled
         if: ${{ !inputs.manage }}
         run: |
           wget https://github.com/kpn-dsh/dsh-cli/releases/download/0.7.3-try12/dsh-0.7.3-try12-x86_64-unknown-linux-gnu.tar.gz
