@@ -4,7 +4,7 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{hashmap_to_table, vec_to_table, Label, SubjectFormatter};
+use crate::formatters::formatter::{hashmap_to_table, hashmap_to_vec, vec_to_table, Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -98,10 +98,7 @@ impl CommandExecutor for ManifestExport {
         context.print(raw_manifest);
         Ok(())
       }
-      Err(DshApiError::NotFound(None)) => {
-        context.print_outcome(format!("manifest '{}' not found", manifest_id));
-        Ok(())
-      }
+      Err(DshApiError::NotFound(None)) => Err(format!("manifest '{}' not found", manifest_id)),
       Err(e) => Err(e.to_string()),
     }
   }
@@ -184,13 +181,13 @@ impl CommandExecutor for ManifestShowAll {
       .map(|manifest| (Version::from_str(manifest.version.as_str()).unwrap(), manifest))
       .collect::<Vec<_>>();
     if manifests.is_empty() {
-      context.print_outcome(format!("manifest '{}' not found", manifest_id));
+      return Err(format!("manifest '{}' not found", manifest_id));
     } else {
       let labels: &[ManifestLabel] = if complete { &MANIFEST_LABELS_SHOW_FULL } else { &MANIFEST_LABELS_SHOW };
       match version_argument {
         Some(version_argument) => match manifests.iter().find(|(version, _)| version == &version_argument) {
           Some((_, manifest)) => UnitFormatter::new(manifest_id, labels, Some("manifest id"), context).print(manifest, None)?,
-          None => context.print_outcome(format!("manifest '{}' has no version {}", manifest_id, version_argument)),
+          None => return Err(format!("manifest '{}' has no version {}", manifest_id, version_argument)),
         },
         None => {
           manifests.sort_by(|(version_a, _), (version_b, _)| version_a.cmp(version_b));
@@ -321,7 +318,7 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
         strings.push(format!("image console: {}", image_console));
       }
       if !application.env.is_empty() {
-        strings.push(hashmap_to_table(&application.env));
+        hashmap_to_vec(&application.env).into_iter().for_each(|a| strings.push(a));
       }
       strings
     }
