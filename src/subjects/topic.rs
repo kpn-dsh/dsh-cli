@@ -72,15 +72,15 @@ lazy_static! {
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TopicCreate {}, "Create new topic")
       .add_target_argument(topic_id_argument().required(true))
       .add_extra_arguments(vec![
-        cleanup_policy_flag(TOPIC_OPTIONS_HEADING),
-        compression_type_flag(TOPIC_OPTIONS_HEADING),
-        delete_retention_ms_flag(TOPIC_OPTIONS_HEADING),
-        max_message_size_flag(TOPIC_OPTIONS_HEADING),
-        message_timestamp_type_flag(TOPIC_OPTIONS_HEADING),
-        partitions_flag(TOPIC_OPTIONS_HEADING),
-        retention_bytes_flag(TOPIC_OPTIONS_HEADING),
-        retention_ms_flag(TOPIC_OPTIONS_HEADING),
-        segment_bytes_flag(TOPIC_OPTIONS_HEADING),
+        cleanup_policy_flag(),
+        compression_type_flag(),
+        delete_retention_ms_flag(),
+        max_message_size_flag(),
+        message_timestamp_type_flag(),
+        partitions_flag(),
+        retention_bytes_flag(),
+        retention_ms_flag(),
+        segment_bytes_flag(),
       ])
   );
   static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -110,11 +110,9 @@ lazy_static! {
     vec![TOPIC_CREATE_CAPABILITY.as_ref(), TOPIC_DELETE_CAPABILITY.as_ref(), TOPIC_LIST_CAPABILITY.as_ref(), TOPIC_SHOW_CAPABILITY.as_ref()];
 }
 
-const TOPIC_OPTIONS_HEADING: &str = "Topic options";
-
 pub(crate) const CLEANUP_POLICY_FLAG: &str = "cleanup-policy";
 
-pub(crate) fn cleanup_policy_flag(heading: &'static str) -> Arg {
+pub(crate) fn cleanup_policy_flag() -> Arg {
   Arg::new(CLEANUP_POLICY_FLAG)
     .long("cleanup-policy")
     .action(ArgAction::Set)
@@ -125,12 +123,11 @@ pub(crate) fn cleanup_policy_flag(heading: &'static str) -> Arg {
     .value_name("POLICY")
     .help("Cleanup policy")
     .long_help("Cleanup policy for the new topic.")
-    .help_heading(heading)
 }
 
 pub(crate) const COMPRESSION_TYPE_FLAG: &str = "compression-type";
 
-pub(crate) fn compression_type_flag(heading: &'static str) -> Arg {
+pub(crate) fn compression_type_flag() -> Arg {
   Arg::new(COMPRESSION_TYPE_FLAG)
     .long("compression-type")
     .action(ArgAction::Set)
@@ -145,12 +142,11 @@ pub(crate) fn compression_type_flag(heading: &'static str) -> Arg {
     .value_name("TYPE")
     .help("Compression type")
     .long_help("Compression type for the new topic.")
-    .help_heading(heading)
 }
 
 pub(crate) const DELETE_RETENTION_MS_FLAG: &str = "delete-retention-ms";
 
-pub(crate) fn delete_retention_ms_flag(heading: &'static str) -> Arg {
+pub(crate) fn delete_retention_ms_flag() -> Arg {
   Arg::new(DELETE_RETENTION_MS_FLAG)
     .long("delete-retention-ms")
     .alias("delete-retention") // TODO Remove in next non backwards compatible version
@@ -159,12 +155,11 @@ pub(crate) fn delete_retention_ms_flag(heading: &'static str) -> Arg {
     .value_name("MS")
     .help("Delete retention")
     .long_help("Delete retention time in milliseconds.")
-    .help_heading(heading)
 }
 
 pub(crate) const MAX_MESSAGE_BYTES_FLAG: &str = "max-message-bytes";
 
-pub(crate) fn max_message_size_flag(heading: &'static str) -> Arg {
+pub(crate) fn max_message_size_flag() -> Arg {
   Arg::new(MAX_MESSAGE_BYTES_FLAG)
     .long("max-message-bytes")
     .alias("max-message-size") // TODO Remove in next non backwards compatible version
@@ -176,14 +171,13 @@ pub(crate) fn max_message_size_flag(heading: &'static str) -> Arg {
       "Maximum message size (in bytes) for the new topic. \
       The minimum message size is 1024 bytes and the maximum size is 1048576 bytes.",
     )
-    .help_heading(heading)
 }
 
 pub(crate) const MESSAGE_TIMESTAMP_TYPE_FLAG: &str = "message-timestamp-type";
 const TIMESTAMP_CREATE_TIME: &str = "create-time";
 const TIMESTAMP_LOG_APPEND_TIME: &str = "log-append-time";
 
-pub(crate) fn message_timestamp_type_flag(heading: &'static str) -> Arg {
+pub(crate) fn message_timestamp_type_flag() -> Arg {
   Arg::new(MESSAGE_TIMESTAMP_TYPE_FLAG)
     .long("message-timestamp-type")
     .alias("timestamps") // TODO Remove in next non backwards compatible version
@@ -198,12 +192,11 @@ pub(crate) fn message_timestamp_type_flag(heading: &'static str) -> Arg {
       "Message timestamp type for the new topic. \
         The allowed values are 'create-time' and 'log-append-time'.",
     )
-    .help_heading(heading)
 }
 
 pub(crate) const PARTITIONS_FLAG: &str = "partitions";
 
-pub(crate) fn partitions_flag(heading: &'static str) -> Arg {
+pub(crate) fn partitions_flag() -> Arg {
   Arg::new(PARTITIONS_FLAG)
     .long("partitions")
     .action(ArgAction::Set)
@@ -214,12 +207,11 @@ pub(crate) fn partitions_flag(heading: &'static str) -> Arg {
       "Number of partitions for the new topic. \
           If this option is not specified the created topic will have only 1 partition.",
     )
-    .help_heading(heading)
 }
 
 pub(crate) const RETENTION_BYTES_FLAG: &str = "retention-bytes";
 
-pub(crate) fn retention_bytes_flag(heading: &'static str) -> Arg {
+pub(crate) fn retention_bytes_flag() -> Arg {
   Arg::new(RETENTION_BYTES_FLAG)
     .long("retention-bytes")
     .action(ArgAction::Set)
@@ -230,12 +222,11 @@ pub(crate) fn retention_bytes_flag(heading: &'static str) -> Arg {
       "Retention bytes for the new topic. \
       The minimum retention bytes value is 0.",
     )
-    .help_heading(heading)
 }
 
 pub(crate) const RETENTION_MS_FLAG: &str = "retention-ms";
 
-pub(crate) fn retention_ms_flag(heading: &'static str) -> Arg {
+pub(crate) fn retention_ms_flag() -> Arg {
   Arg::new(RETENTION_MS_FLAG)
     .long("retention-ms")
     .action(ArgAction::Set)
@@ -247,12 +238,11 @@ pub(crate) fn retention_ms_flag(heading: &'static str) -> Arg {
       The minimum retention time value is 3600000 milliseconds (1 hour) \
       and the maximum retention time is 31536000000 milliseconds (1 year).",
     )
-    .help_heading(heading)
 }
 
 pub(crate) const SEGMENT_BYTES_FLAG: &str = "segment-bytes";
 
-pub(crate) fn segment_bytes_flag(heading: &'static str) -> Arg {
+pub(crate) fn segment_bytes_flag() -> Arg {
   Arg::new(SEGMENT_BYTES_FLAG)
     .long("segment-bytes")
     .alias("segment-size") // TODO Remove in next non backwards compatible version
@@ -264,7 +254,6 @@ pub(crate) fn segment_bytes_flag(heading: &'static str) -> Arg {
       "Segment bytes for the new topic. \
           The minimum segment bytes value is 52428800 bytes",
     )
-    .help_heading(heading)
 }
 
 struct TopicCreate {}

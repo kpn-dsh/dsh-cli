@@ -1,4 +1,4 @@
-use crate::APPLICATION_NAME;
+use crate::{APPLICATION_NAME, TOOL_OPTIONS_HEADING};
 use clap::builder::EnumValueParser;
 use clap::{Arg, ArgAction, Command};
 use clap_complete::{generate, shells};
@@ -48,6 +48,7 @@ pub(crate) fn generate_autocomplete_file_argument() -> Arg {
     )
     .exclusive(true)
     .hide_short_help(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
 pub(crate) fn generate_autocomplete_file(command: &mut Command, shell: &AutocompleteShell) {

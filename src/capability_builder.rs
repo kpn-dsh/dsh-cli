@@ -4,7 +4,7 @@ use crate::filter_flags::{create_filter_flag, FilterFlagType};
 use crate::flags::{create_flag, FlagType};
 use crate::modifier_flags::{create_modifier_flag, ModifierFlagType};
 use crate::subject::Requirements;
-use crate::DshCliResult;
+use crate::{DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -91,12 +91,13 @@ impl<'a> CapabilityBuilder<'a> {
   }
 
   pub fn add_extra_argument(mut self, argument: Arg) -> Self {
-    self.extra_arguments.push(argument);
+    self.extra_arguments.push(argument.help_heading(COMMAND_OPTIONS_HEADING));
     self
   }
 
-  pub fn add_extra_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
-    self.extra_arguments.append(&mut arguments);
+  pub fn add_extra_arguments(mut self, arguments: Vec<Arg>) -> Self {
+    let mut args = arguments.into_iter().map(move |arg| arg.help_heading(COMMAND_OPTIONS_HEADING)).collect::<Vec<_>>();
+    self.extra_arguments.append(&mut args);
     self
   }
 
@@ -146,24 +147,26 @@ impl Capability for CapabilityBuilder<'_> {
   }
 
   fn clap_flags(&self, subject: &str) -> Vec<Arg> {
-    [
+    let mut flags: Vec<Arg> = [
       self
         .executors
         .iter()
-        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help.as_deref()).help_heading("Command options"))
+        .map(|(flag_type, _, long_help)| create_flag(flag_type, subject, long_help.as_deref()).help_heading(COMMAND_OPTIONS_HEADING))
         .collect::<Vec<_>>(),
       self
         .filter_flags
         .iter()
-        .map(|(flag_type, long_help)| create_filter_flag(flag_type, long_help.as_deref()).help_heading("Filter options"))
+        .map(|(flag_type, long_help)| create_filter_flag(flag_type, long_help.as_deref()).help_heading(COMMAND_OPTIONS_HEADING))
         .collect::<Vec<_>>(),
       self
         .modifier_flags
         .iter()
-        .map(|(flag_type, _)| create_modifier_flag(flag_type, subject).help_heading("Modifier options"))
+        .map(|(flag_type, _)| create_modifier_flag(flag_type, subject).help_heading(COMMAND_OPTIONS_HEADING))
         .collect::<Vec<_>>(),
     ]
-    .concat()
+    .concat();
+    flags.sort_by(|a, b| a.get_long().cmp(&b.get_long()));
+    flags
   }
 
   fn long_about(&self) -> Option<String> {

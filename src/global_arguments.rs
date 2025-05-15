@@ -1,5 +1,6 @@
 use crate::formatters::OutputFormat;
 use crate::verbosity::Verbosity;
+use crate::{OUTPUT_OPTIONS_HEADING, TOOL_OPTIONS_HEADING};
 use builder::EnumValueParser;
 use clap::builder::{PossibleValue, ValueParser};
 use clap::{builder, Arg, ArgAction};
@@ -21,8 +22,6 @@ pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 // pub(crate) const TO_CLIPBOARD_ARGUMENT: &str = "to-clipboard-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
 pub(crate) const VERSION_ARGUMENT: &str = "version-argument";
-
-pub(crate) const OUTPUT_OPTIONS_HEADING: &str = "Output options";
 
 pub(crate) fn dry_run_argument() -> Arg {
   Arg::new(DRY_RUN_ARGUMENT)
@@ -63,6 +62,7 @@ pub(crate) fn force_argument() -> Arg {
 //           instead of being read from the terminal, pipes or redirects.",
 //     )
 //     .global(true)
+//     .help_heading(MAIN_OPTIONS_HEADING)
 // }
 
 pub(crate) fn no_escape_argument() -> Arg {
@@ -170,7 +170,7 @@ pub(crate) fn suppress_exit_status_argument() -> Arg {
     )
     .hide_short_help(true)
     .global(true)
-    .help_heading(OUTPUT_OPTIONS_HEADING)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
 pub(crate) fn target_password_file_argument() -> Arg {
@@ -259,6 +259,7 @@ pub(crate) fn terminal_width_argument() -> Arg {
 //           instead of being printed to the terminal.",
 //     )
 //     .global(true)
+//     .help_heading(MAIN_OPTIONS_HEADING)
 // }
 
 pub(crate) fn version_argument() -> Arg {
@@ -271,4 +272,5 @@ pub(crate) fn version_argument() -> Arg {
     )
     .exclusive(true)
     .hide_short_help(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }

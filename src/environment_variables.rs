@@ -2,6 +2,7 @@ use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::OutputFormat;
+use crate::TOOL_OPTIONS_HEADING;
 use clap::{builder, Arg, ArgAction};
 use serde::Serialize;
 use std::env;
@@ -157,6 +158,7 @@ pub(crate) fn env_vars_argument() -> Arg {
           When this option is used, all other provided commands or options will be ignored.",
     )
     .hide_short_help(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
 pub(crate) const ENV_VAR_ARGUMENT: &str = "env-var-argument";
@@ -173,6 +175,7 @@ pub(crate) fn env_var_argument() -> Arg {
           When this option is used, all other provided commands or options will be ignored.",
     )
     .hide_short_help(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
 const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [

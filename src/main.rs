@@ -79,6 +79,7 @@ mod filter_flags;
 mod flags;
 mod formatters;
 mod global_arguments;
+#[cfg(feature = "manage")]
 mod limits_flags;
 mod log_arguments;
 mod log_level;
@@ -122,6 +123,10 @@ const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const TARGETS_SUBDIRECTORY: &str = "targets";
 const DEFAULT_DSH_CLI_SETTINGS_FILENAME: &str = "settings.toml";
 const TOML_FILENAME_EXTENSION: &str = "toml";
+
+pub(crate) const COMMAND_OPTIONS_HEADING: &str = "Command options";
+pub(crate) const OUTPUT_OPTIONS_HEADING: &str = "Output options";
+pub(crate) const TOOL_OPTIONS_HEADING: &str = "Tool options";
 
 type DshCliResult = Result<(), String>;
 
@@ -338,25 +343,29 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
     .author(AUTHOR)
     .long_about(long_about)
     .disable_help_subcommand(true)
+    .subcommands(clap_commands)
     .args(vec![
-      target_platform_argument(),
-      target_tenant_argument(),
-      target_password_file_argument(),
+      // Main options
       dry_run_argument(),
       force_argument(),
-      log_level_argument(),
-      log_level_api_argument(),
+      target_password_file_argument(),
+      target_platform_argument(),
+      target_tenant_argument(),
+      // Output options
       no_escape_argument(),
       no_headers_argument(),
       output_format_argument(),
       quiet_argument(),
       set_verbosity_argument(),
       show_execution_time_argument(),
-      suppress_exit_status_argument(),
       terminal_width_argument(),
+      // Tool options
       env_var_argument(),
       env_vars_argument(),
       generate_autocomplete_file_argument(),
+      log_level_argument(),
+      log_level_api_argument(),
+      suppress_exit_status_argument(),
       version_argument(),
     ])
     .subcommand_value_name("SUBJECT/COMMAND")
@@ -365,7 +374,6 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
     .max_term_width(120)
     .hide_possible_values(false)
     .styles(STYLES.clone())
-    .subcommands(clap_commands)
     .disable_version_flag(true);
   let mut default_settings: Vec<(&str, String)> = vec![];
   if let Some(default_platform) = &settings.default_platform {

@@ -44,15 +44,13 @@ lazy_static! {
   pub static ref TENANT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TenantSubject {});
 }
 
-const HELP_HEADING: &str = "Tenant options";
-
 lazy_static! {
   static ref TENANT_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TenantCreate {}, "Create managed tenant")
       .set_long_about("Create a configured managed tenant.")
       .add_target_argument(managed_tenant_argument().required(true))
-      .add_extra_argument(tracing_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(vpn_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(tracing_flag())
+      .add_extra_argument(vpn_flag())
   );
   static ref TENANT_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, None, &TenantDelete {}, "Delete managed tenant")
@@ -66,9 +64,9 @@ lazy_static! {
          (managed streams)."
       )
       .add_target_argument(managed_tenant_argument().required(true))
-      .add_extra_argument(stream_read_flag("Grant").help_heading(HELP_HEADING))
-      .add_extra_argument(stream_write_flag("Grant").help_heading(HELP_HEADING))
-      .add_extra_argument(stream_rw_flag("Grant").help_heading(HELP_HEADING))
+      .add_extra_argument(stream_read_flag("Grant"))
+      .add_extra_argument(stream_write_flag("Grant"))
+      .add_extra_argument(stream_rw_flag("Grant"))
   );
   static ref TENANT_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TenantListAll {}, "List managed tenants")
@@ -84,9 +82,9 @@ lazy_static! {
          (managed streams) from a managed tenant."
       )
       .add_target_argument(managed_tenant_argument().required(true))
-      .add_extra_argument(stream_read_flag("Revoke").help_heading(HELP_HEADING))
-      .add_extra_argument(stream_write_flag("Revoke").help_heading(HELP_HEADING))
-      .add_extra_argument(stream_rw_flag("Revoke").help_heading(HELP_HEADING))
+      .add_extra_argument(stream_read_flag("Revoke"))
+      .add_extra_argument(stream_write_flag("Revoke"))
+      .add_extra_argument(stream_rw_flag("Revoke"))
   );
   static ref TENANT_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TenantShowAll {}, "Show managed tenant configuration")
@@ -98,18 +96,18 @@ lazy_static! {
     CapabilityBuilder::new(UPDATE_COMMAND, None, &TenantUpdateLimit {}, "Update managed tenant limits")
       .set_long_about("Update the limits of a managed tenant.")
       .add_target_argument(managed_tenant_argument().required(true))
-      .add_extra_argument(certificate_count_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(consumer_rate_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(cpu_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(kafka_acl_group_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(mem_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(partition_count_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(producer_rate_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(request_rate_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(secret_count_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(topic_count_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(tracing_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(vpn_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(certificate_count_flag())
+      .add_extra_argument(consumer_rate_flag())
+      .add_extra_argument(cpu_flag())
+      .add_extra_argument(kafka_acl_group_flag())
+      .add_extra_argument(mem_flag())
+      .add_extra_argument(partition_count_flag())
+      .add_extra_argument(producer_rate_flag())
+      .add_extra_argument(request_rate_flag())
+      .add_extra_argument(secret_count_flag())
+      .add_extra_argument(topic_count_flag())
+      .add_extra_argument(tracing_flag())
+      .add_extra_argument(vpn_flag())
   );
   static ref TENANT_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     TENANT_CREATE_CAPABILITY.as_ref(),

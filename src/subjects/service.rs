@@ -14,7 +14,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
-use crate::{edit_configuration, include_started_stopped, read_single_line, DshCliResult};
+use crate::{edit_configuration, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use chrono::DateTime;
 use clap::{builder, Arg, ArgAction, ArgMatches};
@@ -42,7 +42,7 @@ lazy_static! {
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &ServiceCreate {}, "Create service")
       .set_long_about("Create a new service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(instances_flag())
   );
   static ref SERVICE_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, None, &ServiceDelete {}, "Delete service")
@@ -100,7 +100,7 @@ lazy_static! {
     CapabilityBuilder::new(START_COMMAND, None, &ServiceStart {}, "Start service")
       .set_long_about("Start a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(instances_flag().help_heading(COMMAND_OPTIONS_HEADING))
   );
   static ref SERVICE_STOP_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(STOP_COMMAND, None, &ServiceStop {}, "Stop service")
@@ -111,9 +111,9 @@ lazy_static! {
     CapabilityBuilder::new(UPDATE_COMMAND, None, &ServiceUpdate {}, "Update service")
       .set_long_about("Update a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(cpus_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(mem_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(cpus_flag().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(instances_flag().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(mem_flag().help_heading(COMMAND_OPTIONS_HEADING))
   );
   static ref SERVICE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     SERVICE_CREATE_CAPABILITY.as_ref(),
@@ -166,8 +166,6 @@ impl Subject for ServiceSubject {
   }
 }
 
-const HELP_HEADING: &str = "Service options";
-
 const CPUS_FLAG: &str = "cpus";
 
 fn cpus_flag() -> Arg {
@@ -190,7 +188,6 @@ fn instances_flag() -> Arg {
     .value_name("INSTANCES")
     .help("Number of instances")
     .long_help("Number of service instances that will be started.")
-    .help_heading(HELP_HEADING)
 }
 
 const MEM_FLAG: &str = "mem";

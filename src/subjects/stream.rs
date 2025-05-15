@@ -71,8 +71,6 @@ impl Subject for StreamSubject {
   }
 }
 
-const STREAM_OPTIONS_HEADING: &str = "Stream options";
-
 const INTERNAL_FLAG: &str = "internal-flag";
 const PUBLIC_FLAG: &str = "public-flag";
 
@@ -94,18 +92,18 @@ lazy_static! {
       )
       .add_target_argument(managed_stream_argument())
       .add_extra_arguments(vec![
-        can_be_retained_flag(STREAM_OPTIONS_HEADING),
-        cleanup_policy_flag(STREAM_OPTIONS_HEADING),
-        compression_type_flag(STREAM_OPTIONS_HEADING),
-        delete_retention_ms_flag(STREAM_OPTIONS_HEADING),
-        kafka_default_partitioner_flag(STREAM_OPTIONS_HEADING),
-        max_message_size_flag(STREAM_OPTIONS_HEADING),
-        message_timestamp_type_flag(STREAM_OPTIONS_HEADING),
-        partitions_flag(STREAM_OPTIONS_HEADING),
-        retention_bytes_flag(STREAM_OPTIONS_HEADING),
-        retention_ms_flag(STREAM_OPTIONS_HEADING),
-        segment_bytes_flag(STREAM_OPTIONS_HEADING),
-        topic_level_partitioner_arg(STREAM_OPTIONS_HEADING),
+        can_be_retained_flag(),
+        cleanup_policy_flag(),
+        compression_type_flag(),
+        delete_retention_ms_flag(),
+        kafka_default_partitioner_flag(),
+        max_message_size_flag(),
+        message_timestamp_type_flag(),
+        partitions_flag(),
+        retention_bytes_flag(),
+        retention_ms_flag(),
+        segment_bytes_flag(),
+        topic_level_partitioner_arg(),
       ])
       .set_long_about("Create an internal or public managed stream.")
   );
@@ -133,7 +131,7 @@ lazy_static! {
 
 const CAN_BE_RETAINED_FLAG: &str = "can-be-retained";
 
-fn can_be_retained_flag(heading: &'static str) -> Arg {
+fn can_be_retained_flag() -> Arg {
   Arg::new(CAN_BE_RETAINED_FLAG)
     .long("can-be-retained")
     .action(ArgAction::SetTrue)
@@ -142,12 +140,11 @@ fn can_be_retained_flag(heading: &'static str) -> Arg {
       "Whether MQTT records can have the 'retained' flag. \
     This option is only meaningful for public managed streams.",
     )
-    .help_heading(heading)
 }
 
 const KAFKA_DEFAULT_PARTITIONER: &str = "kafka-default-partitioner";
 
-fn kafka_default_partitioner_flag(heading: &'static str) -> Arg {
+fn kafka_default_partitioner_flag() -> Arg {
   Arg::new(KAFKA_DEFAULT_PARTITIONER)
     .long("kafka-default-partitioner")
     .action(ArgAction::SetTrue)
@@ -156,12 +153,11 @@ fn kafka_default_partitioner_flag(heading: &'static str) -> Arg {
       "Use the kafka default partitioner to partition messages across different kafka partitions. \
       This option is only meaningful for public managed streams.",
     )
-    .help_heading(heading)
 }
 
 const TOPIC_LEVEL_PARTITIONER: &str = "topic-level-partitioner";
 
-fn topic_level_partitioner_arg(heading: &'static str) -> Arg {
+fn topic_level_partitioner_arg() -> Arg {
   Arg::new(TOPIC_LEVEL_PARTITIONER)
     .long("topic-level-partitioner")
     .action(ArgAction::Set)
@@ -172,7 +168,6 @@ fn topic_level_partitioner_arg(heading: &'static str) -> Arg {
       "Use the topic level partitioner to partition messages across different kafka partitions. \
       This option is only meaningful for public managed streams.",
     )
-    .help_heading(heading)
     .conflicts_with(KAFKA_DEFAULT_PARTITIONER)
 }
 
