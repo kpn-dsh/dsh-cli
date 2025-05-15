@@ -1,11 +1,7 @@
 name: Rust
 
 on:
-  workflow_dispatch:
-# push:
-#   branches: [ "master" ]
-# pull_request:
-#   branches: [ "master" ]
+  push:
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,11 +16,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rustfmt
-      - name: Build all features
-        run: cargo build --all-features --verbose
-      - name: Run tests on all features
+      - name: Run unit tests with default features
+        run: cargo test --verbose
+      - name: Run clippy with default features
+        run: cargo clippy
+      - name: Run unit tests with all features enabled
         run: cargo test --all-features --verbose
-      - name: Run clippy on all features
+      - name: Run clippy with all features enabled
         run: cargo clippy --all-features
       - name: Run format checker
-        run: cargo +nightly fmt --check
+        run: cargo +nightly fmt --check --all
