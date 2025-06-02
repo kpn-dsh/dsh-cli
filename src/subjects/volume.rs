@@ -146,7 +146,6 @@ struct VolumeDelete {}
 impl CommandExecutor for VolumeDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let volume_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete volume '{}'", volume_id));
     if client.get_volume(&volume_id).await.is_err() {
       return Err(format!("volume '{}' does not exists", volume_id));
     }

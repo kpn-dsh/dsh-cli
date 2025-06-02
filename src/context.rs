@@ -10,18 +10,20 @@ use crate::global_arguments::{
   TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::settings::Settings;
-use crate::style::{style_from, DshColor, DshStyle};
+use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
 use crate::verbosity::Verbosity;
 use clap::builder::styling::Style;
 use clap::ArgMatches;
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
+use getch_rs::{Getch, Key};
 use log::debug;
 use rpassword::prompt_password;
 use serde::Serialize;
 use std::fmt::Display;
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
+use std::process;
 use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
 use OutputFormat::Csv;
@@ -169,13 +171,28 @@ impl Context {
   /// 1. When not run from a terminal confirmation is always false.
   pub(crate) fn confirmed(&self, prompt: impl Display) -> Result<bool, String> {
     if self.force {
+      self.eprintln(format!("{}, confirmed by --force option", prompt));
       Ok(true)
     } else if self.stdin_is_terminal {
-      eprint!("{} [y/N]", self.apply_stderr_style(prompt));
+      self.eprint(format!("{} [y/N]", prompt));
       let _ = stdout().lock().flush();
-      let mut line = String::new();
-      stdin().read_line(&mut line).expect("could not read line");
-      Ok(line.trim().to_lowercase() == "y")
+      match Getch::new().getch() {
+        Ok(key) => match key {
+          Key::Char('y') | Key::Char('Y') => {
+            eprintln!();
+            Ok(true)
+          }
+          Key::Ctrl('c') => {
+            eprintln!("{}", apply_default_warning_style("\ninterrupted"));
+            process::exit(0);
+          }
+          _ => {
+            eprintln!();
+            Ok(false)
+          }
+        },
+        Err(error) => Err(format!("\nerror getting key event ({})", error)),
+      }
     } else {
       Ok(false)
     }
@@ -742,7 +759,7 @@ impl Context {
     }
   }
 
-  fn apply_stderr_style<T: Display>(&self, text: T) -> String {
+  fn _apply_stderr_style<T: Display>(&self, text: T) -> String {
     if self.stderr_no_escape {
       text.to_string()
     } else {

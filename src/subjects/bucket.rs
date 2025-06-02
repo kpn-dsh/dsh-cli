@@ -137,7 +137,6 @@ struct BucketDelete {}
 impl CommandExecutor for BucketDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete bucket '{}'", bucket_id));
     if client.get_bucket_configuration(&bucket_id).await.is_err() {
       return Err(format!("bucket '{}' does not exists", bucket_id));
     }

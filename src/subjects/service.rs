@@ -26,8 +26,8 @@ use dsh_api::DshApiError;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::thread::sleep;
 use std::time::Duration;
+use tokio::time::sleep;
 
 pub(crate) struct ServiceSubject {}
 
@@ -238,7 +238,6 @@ struct ServiceDelete {}
 impl CommandExecutor for ServiceDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete service '{}'", service_id));
     if client.get_application_configuration(&service_id).await.is_err() {
       return Err(format!("service '{}' does not exist", service_id));
     }
@@ -512,7 +511,7 @@ impl CommandExecutor for ServiceRestart {
           client.put_application_configuration(&service_id, &configuration).await?;
           loop {
             context.print_progress_step();
-            sleep(Duration::from_millis(1000));
+            sleep(Duration::from_millis(1000)).await;
             let poll_tasks = try_join_all(running_task_ids.iter().map(|running_task_id| client.get_task(&service_id, running_task_id))).await?;
             if poll_tasks
               .iter()

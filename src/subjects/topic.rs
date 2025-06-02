@@ -336,7 +336,6 @@ struct TopicDelete {}
 impl CommandExecutor for TopicDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete topic '{}'", topic_id));
     if client.get_topic(&topic_id).await.is_err() {
       return Err(format!("scratch topic '{}' does not exists", topic_id));
     }

@@ -231,7 +231,6 @@ impl CommandExecutor for StreamDelete {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     match client.get_stream_configuration(&managed_stream_id).await? {
       Some(Stream::Internal(_)) => {
-        context.print_explanation(format!("delete internal managed stream '{}'", managed_stream_id));
         if context.confirmed(format!("delete internal managed stream '{}'?", managed_stream_id))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, internal managed stream not deleted");
@@ -245,7 +244,6 @@ impl CommandExecutor for StreamDelete {
         Ok(())
       }
       Some(Stream::Public(_)) => {
-        context.print_explanation(format!("delete public managed stream '{}'", managed_stream_id));
         if context.confirmed(format!("delete public managed stream '{}'?", managed_stream_id))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, public managed stream not deleted");

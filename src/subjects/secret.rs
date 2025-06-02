@@ -160,7 +160,6 @@ struct SecretDelete {}
 impl CommandExecutor for SecretDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete secret '{}'", secret_id));
     if client.get_secret_configuration(&secret_id).await.is_err() {
       return Err(format!("secret '{}' does not exist", secret_id));
     }

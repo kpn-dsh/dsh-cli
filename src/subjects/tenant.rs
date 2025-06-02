@@ -191,7 +191,6 @@ struct TenantDelete {}
 impl CommandExecutor for TenantDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete tenant '{}'", tenant_id));
     if client.get_tenant_configuration(&tenant_id).await.is_err() {
       return Err(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
     }

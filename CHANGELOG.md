@@ -4,7 +4,13 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.7.3] - YYYY-MM-DD
+## [0.7.4] - YYYY-MM-DD
+
+### Changed
+
+* Confirmation doesn't require the enter key to be pressed.
+
+## [0.7.3] - 2025-05-09
 
 ### Added
 
@@ -19,6 +25,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Capability to fetch a token and copy it directly to the clipboard.
 * Capability to list and explain the used environment variables.
 * Some more colors.
+* Pre-built release version for Ubuntu.
 
 ### Changed
 
