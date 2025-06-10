@@ -117,10 +117,10 @@ impl CommandExecutor for ManifestListAll {
     let start_instant = context.now();
     let app_catalog_manifests: Vec<AppCatalogManifest> = client.get_appcatalog_manifests().await?;
     context.print_execution_time(start_instant);
-    let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect::<Vec<_>>();
-    let manifests_with_id = manifests.iter().map(|manifest| (manifest.id.clone(), manifest)).collect::<Vec<_>>();
+    let manifests = app_catalog_manifests.iter().map(|acm| Manifest::try_from(acm).unwrap()).collect_vec();
+    let manifests_with_id = manifests.iter().map(|manifest| (manifest.id.clone(), manifest)).collect_vec();
     let manifests_grouped = manifests_with_id.clone().into_iter().into_group_map();
-    let mut manifest_ids = manifests_grouped.keys().collect::<Vec<_>>();
+    let mut manifest_ids = manifests_grouped.keys().collect_vec();
     manifest_ids.sort();
     let mut formatter = ListFormatter::new(&MANIFEST_LABELS_LIST, None, context);
     for manifest_id in manifest_ids {
@@ -179,7 +179,7 @@ impl CommandExecutor for ManifestShowAll {
       .map(|acm| Manifest::try_from(acm).unwrap())
       .filter(|manifest| manifest.id == manifest_id)
       .map(|manifest| (Version::from_str(manifest.version.as_str()).unwrap(), manifest))
-      .collect::<Vec<_>>();
+      .collect_vec();
     if manifests.is_empty() {
       return Err(format!("manifest '{}' not found", manifest_id));
     } else {
@@ -395,7 +395,7 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
           .resources
           .values()
           .map(|resource| (resource_to_key(resource), resource_to_strings(resource)))
-          .collect::<Vec<_>>(),
+          .collect_vec(),
       ),
       ManifestLabel::Vendor => self.vendor.clone(),
     }

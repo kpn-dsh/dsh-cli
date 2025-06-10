@@ -137,7 +137,7 @@ fn create_generic_capability<'a>(
   let subcommands = method_descriptors(method)
     .iter()
     .map(|(selector, method_descriptor)| create_generic_capability_selector_command(method, selector, method_descriptor))
-    .collect::<Vec<_>>();
+    .collect_vec();
   Box::new(
     CapabilityBuilder::new(method, None, command_executor, about)
       .set_long_about(long_about)
@@ -167,14 +167,14 @@ fn create_generic_capability_selector_command(method_command: &str, selector: &s
           }
           arg
         })
-        .collect::<Vec<_>>(),
+        .collect_vec(),
     )
   }
   command
 }
 
 fn create_about(description: &str) -> String {
-  let first = match description.split(". ").collect::<Vec<&str>>().first() {
+  let first = match description.split(". ").collect_vec().first() {
     Some(first) => first.to_string(),
     None => description.trim_end_matches('.').to_string(),
   };
@@ -217,7 +217,7 @@ fn create_long_about(method_command: &str, method_descriptor: &MethodDescriptor,
               if parameter_type == &"&str" { "".to_string() } else { format!(" (string representing a {})", parameter_type.trim_start_matches('&')) }
             )
           })
-          .collect::<Vec<_>>()
+          .collect_vec()
           .join("\n"),
       ))
     },
@@ -261,7 +261,7 @@ impl CommandExecutor for ApiDelete {
           .parameters
           .iter()
           .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-          .collect::<Vec<_>>();
+          .collect_vec();
         let start_instant = context.now();
         client.delete(selector, &parameters).await?;
         context.print_execution_time(start_instant);
@@ -290,7 +290,7 @@ impl CommandExecutor for ApiGet {
       .parameters
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect::<Vec<_>>();
+      .collect_vec();
     let start_instant = context.now();
     let response = client.get(selector, &parameters).await?;
     context.print_execution_time(start_instant);
@@ -317,7 +317,7 @@ impl CommandExecutor for ApiHead {
       .parameters
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect::<Vec<_>>();
+      .collect_vec();
     let start_instant = context.now();
     client.head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
@@ -344,7 +344,7 @@ impl CommandExecutor for ApiPatch {
       .parameters
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect::<Vec<_>>();
+      .collect_vec();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
     if context.dry_run() {
       context.print_warning("dry-run mode, nothing patched");
@@ -382,7 +382,7 @@ impl CommandExecutor for ApiPost {
       .parameters
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect::<Vec<_>>();
+      .collect_vec();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
     if context.dry_run() {
       context.print_warning("dry-run mode, nothing posted");
@@ -413,7 +413,7 @@ impl CommandExecutor for ApiPut {
       .parameters
       .iter()
       .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect::<Vec<_>>();
+      .collect_vec();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
     if context.dry_run() {
       context.print_warning("dry-run mode, nothing put");

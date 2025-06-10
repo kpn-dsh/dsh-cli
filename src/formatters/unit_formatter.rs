@@ -1,6 +1,7 @@
 use crate::context::Context;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::OutputFormat;
+use itertools::Itertools;
 use serde::Serialize;
 use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
@@ -80,7 +81,7 @@ where
       for label in self.labels {
         if !label.is_target_label() && label.as_str_for_unit() != target_label {
           let value = value.value(label, self.target_id.as_str());
-          let split_value = value.split("\n").collect::<Vec<_>>();
+          let split_value = value.split("\n").collect_vec();
           let mut value_iterator = split_value.iter();
           if let Some(first_line) = value_iterator.next() {
             tabled_builder.push_record([label.as_str_for_unit(), first_line]);

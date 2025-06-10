@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -83,7 +84,7 @@ impl CommandExecutor for EnvFind {
     let services = &client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
 
-    let mut service_pairs = services.iter().collect::<Vec<_>>();
+    let mut service_pairs = services.iter().collect_vec();
     service_pairs.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
 
     let mut matching_services: Vec<(String, HashMap<ServiceEnvLabel, String>)> = vec![];

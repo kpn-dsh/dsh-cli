@@ -4,6 +4,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::OutputFormat;
 use crate::TOOL_OPTIONS_HEADING;
 use clap::{builder, Arg, ArgAction};
+use itertools::Itertools;
 use serde::Serialize;
 use std::env;
 
@@ -67,7 +68,7 @@ pub(crate) fn print_environment_variables(context: &Context) {
         explanation,
       )
     })
-    .collect::<Vec<_>>();
+    .collect_vec();
   formatter.push_values(&styled);
   formatter.print(Some(OutputFormat::Table)).unwrap()
 }
@@ -76,7 +77,7 @@ pub(crate) fn print_environment_variable(env_var: &str, context: &Context) {
   let matching_env_vars: Vec<&(&str, &str, &str)> = ENVIRONMENT_VARIABLES
     .iter()
     .filter(|(defined_env_var, _, _)| defined_env_var.contains(&env_var.to_uppercase()))
-    .collect::<Vec<_>>();
+    .collect_vec();
   if matching_env_vars.is_empty() {
     context.print_warning(format!("'{}' could not be matched to an environment variable recognized by the dsh tool", env_var));
   } else if matching_env_vars.len() == 1 {
@@ -99,7 +100,7 @@ pub(crate) fn print_environment_variable(env_var: &str, context: &Context) {
           *long_explanation,
         )
       })
-      .collect::<Vec<_>>();
+      .collect_vec();
     formatter.push_values(&styled_matching_env_vars);
     formatter.print(Some(OutputFormat::Table)).unwrap();
   }

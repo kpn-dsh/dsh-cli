@@ -1,6 +1,7 @@
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
+use itertools::Itertools;
 
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
@@ -86,7 +87,7 @@ pub(crate) fn platform_name_argument() -> Arg {
         .alias(platform.alias())
         .help(format!("{} ({})", platform.description(), platform.alias()))
     })
-    .collect::<Vec<_>>();
+    .collect_vec();
   Arg::new(PLATFORM_NAME_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(possible_values)

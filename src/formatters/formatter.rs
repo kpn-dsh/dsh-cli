@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -198,8 +199,8 @@ pub static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [Environ
 pub fn hashmap_to_table<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -> String {
   let mut key_value_length_pairs: Vec<(&str, Vec<&str>, usize)> = hashmap
     .iter()
-    .map(|(key, value)| (key.as_ref(), value.as_ref().split("\n").collect::<Vec<_>>(), key.as_ref().len()))
-    .collect::<Vec<_>>();
+    .map(|(key, value)| (key.as_ref(), value.as_ref().split("\n").collect_vec(), key.as_ref().len()))
+    .collect_vec();
   match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => {
       key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
@@ -216,7 +217,7 @@ pub fn hashmap_to_table<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -
           }
           lines.join("\n")
         })
-        .collect::<Vec<_>>()
+        .collect_vec()
         .join("\n")
     }
     None => "".to_string(),
@@ -227,8 +228,8 @@ pub fn hashmap_to_table<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -
 pub fn hashmap_to_vec<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -> Vec<String> {
   let mut key_value_length_pairs: Vec<(&str, Vec<&str>, usize)> = hashmap
     .iter()
-    .map(|(key, value)| (key.as_ref(), value.as_ref().split("\n").collect::<Vec<_>>(), key.as_ref().len()))
-    .collect::<Vec<_>>();
+    .map(|(key, value)| (key.as_ref(), value.as_ref().split("\n").collect_vec(), key.as_ref().len()))
+    .collect_vec();
   match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => {
       key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
@@ -245,7 +246,7 @@ pub fn hashmap_to_vec<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -> 
           }
           lines.join("\n")
         })
-        .collect::<Vec<_>>()
+        .collect_vec()
     }
     None => vec![],
   }
@@ -255,8 +256,8 @@ pub fn hashmap_to_vec<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, V>) -> 
 pub fn vec_to_table<K: AsRef<str>, V: AsRef<str>>(rows: &[(K, Vec<V>)]) -> String {
   let key_values_length_pairs: Vec<(&str, Vec<&str>, usize)> = rows
     .iter()
-    .map(|(key, values)| (key.as_ref(), values.iter().map(|value| value.as_ref()).collect::<Vec<_>>(), key.as_ref().len()))
-    .collect::<Vec<_>>();
+    .map(|(key, values)| (key.as_ref(), values.iter().map(|value| value.as_ref()).collect_vec(), key.as_ref().len()))
+    .collect_vec();
   match key_values_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => key_values_length_pairs
       .into_iter()
@@ -271,7 +272,7 @@ pub fn vec_to_table<K: AsRef<str>, V: AsRef<str>>(rows: &[(K, Vec<V>)]) -> Strin
         }
         lines.join("\n")
       })
-      .collect::<Vec<_>>()
+      .collect_vec()
       .join("\n"),
     None => "".to_string(),
   }

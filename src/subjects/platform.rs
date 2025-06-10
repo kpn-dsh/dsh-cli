@@ -16,6 +16,7 @@ use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::DshPlatform;
 use dsh_api::DEFAULT_PLATFORMS;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use serde::Serialize;
@@ -132,7 +133,7 @@ impl CommandExecutor for PLatformList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
     context.print_explanation("list platforms");
     let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, None, context);
-    let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect::<Vec<_>>();
+    let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect_vec();
     formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
     formatter.print(None)?;
     Ok(())
@@ -299,7 +300,7 @@ impl CommandExecutor for PlatformShow {
           && (!vhost_required || vhost.is_some())
       })
       .map(|label| label.to_owned())
-      .collect::<Vec<_>>();
+      .collect_vec();
     UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print(
       &(
         platform.clone(),
@@ -455,7 +456,7 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
         .tenant_private_vhost_domain(tenant, vhost)
         .unwrap_or("private domain not configured".to_string()),
       DshPlatformLabel::TenantPublicAppDomain => platform.tenant_public_app_domain(tenant, app),
-      DshPlatformLabel::TenantPublicAppsDomain => platform.tenant_public_apps_domain(tenant),
+      DshPlatformLabel::TenantPublicAppsDomain => platform.tenant_public_domain(tenant),
       DshPlatformLabel::TenantServiceConsoleUrl => platform.tenant_service_console_url(tenant, service),
       _ => platform.value(label, target_id),
     }

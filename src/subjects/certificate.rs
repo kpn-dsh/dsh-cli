@@ -18,6 +18,7 @@ use dsh_api::types::CertificateStatus;
 use dsh_api::types::{ActualCertificate, Certificate};
 use dsh_api::UsedBy;
 use futures::future::try_join_all;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
@@ -95,7 +96,7 @@ impl CommandExecutor for CertificateListAll {
     let certificates_statuses_unwrapped = certificate_statuses
       .iter()
       .map(|certificate_status| certificate_status.as_ref().unwrap().to_owned().actual.unwrap())
-      .collect::<Vec<_>>();
+      .collect_vec();
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, None, context);
     formatter.push_target_ids_and_values(certificate_ids.as_slice(), certificates_statuses_unwrapped.as_slice());
     formatter.print(None)?;
@@ -312,7 +313,7 @@ impl SubjectFormatter<CertificateLabel> for ActualCertificate {
   fn value(&self, label: &CertificateLabel, target_id: &str) -> String {
     match label {
       CertificateLabel::CertChainSecret => self.cert_chain_secret.to_string(),
-      CertificateLabel::DistinguishedName => self.distinguished_name.clone().split(",").collect::<Vec<_>>().join("\n"),
+      CertificateLabel::DistinguishedName => self.distinguished_name.clone().split(",").collect_vec().join("\n"),
       CertificateLabel::DnsNames => self.dns_names.join("\n"),
       CertificateLabel::KeySecret => self.key_secret.to_string(),
       CertificateLabel::NotAfter => self.not_after.to_string(),

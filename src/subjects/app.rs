@@ -8,8 +8,6 @@ use serde::Serialize;
 use serde_json::de::from_str;
 use std::collections::HashMap;
 
-use dsh_api::types::AppCatalogAppResourcesValue;
-
 use crate::arguments::app_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
@@ -27,6 +25,8 @@ use crate::subjects::topic::TOPIC_LABELS;
 use crate::subjects::vhost::VHOST_LABELS;
 use crate::subjects::volume::VOLUME_LABELS;
 use crate::DshCliResult;
+use dsh_api::types::AppCatalogAppResourcesValue;
+use itertools::Itertools;
 
 pub(crate) struct AppSubject {}
 
@@ -82,7 +82,7 @@ impl CommandExecutor for AppListConfiguration {
     let start_instant = context.now();
     let apps = client.get_appcatalogapp_configuration_map().await?;
     context.print_execution_time(start_instant);
-    let mut app_ids = apps.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+    let mut app_ids = apps.keys().map(|k| k.to_string()).collect_vec();
     app_ids.sort();
     let mut formatter = ListFormatter::new(&APP_CATALOG_APP_LABELS, Some("app id"), context);
     for app_id in app_ids {
@@ -196,7 +196,7 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
             keys
               .iter()
               .map(|key| format!("{}: {}", key, map.get(key).map(|v| v.to_string()).unwrap_or("".to_string())))
-              .collect::<Vec<_>>()
+              .collect_vec()
               .join("\n")
           }
           Err(_) => "error".to_string(),

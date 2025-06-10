@@ -20,6 +20,7 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Secret;
 use dsh_api::{secret, UsedBy};
 use futures::future::try_join_all;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 
 pub(crate) struct SecretSubject {}
@@ -188,12 +189,7 @@ impl CommandExecutor for SecretListAllocationStatus {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secrets with their allocation status");
     let start_instant = context.now();
-    let non_system_secret_ids = client
-      .get_secret_ids()
-      .await?
-      .into_iter()
-      .filter(|id| !secret::is_system_secret(id))
-      .collect::<Vec<_>>();
+    let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !secret::is_system_secret(id)).collect_vec();
     let allocation_statuses = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context);
@@ -214,12 +210,7 @@ impl CommandExecutor for SecretListSystem {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all system secret ids");
     let start_instant = context.now();
-    let system_secret_ids = client
-      .get_secret_ids()
-      .await?
-      .into_iter()
-      .filter(|id| secret::is_system_secret(id))
-      .collect::<Vec<_>>();
+    let system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| secret::is_system_secret(id)).collect_vec();
     let allocation_statuses = try_join_all(system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("system secret id"), context);
@@ -240,12 +231,7 @@ impl CommandExecutor for SecretListIds {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secret ids");
     let start_instant = context.now();
-    let non_system_secrets = client
-      .get_secret_ids()
-      .await?
-      .into_iter()
-      .filter(|id| !secret::is_system_secret(id))
-      .collect::<Vec<_>>();
+    let non_system_secrets = client.get_secret_ids().await?.into_iter().filter(|id| !secret::is_system_secret(id)).collect_vec();
     context.print_execution_time(start_instant);
     let header = format!("secret ids ({})", non_system_secrets.len());
     let mut formatter = IdsFormatter::new(&header, context);

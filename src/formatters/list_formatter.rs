@@ -32,7 +32,7 @@ where
   /// It is assumed that both slices contain the same number of values
   /// and that target ids and values with the same index belong to each other.
   pub fn push_target_ids_and_values(&mut self, target_ids: &[String], values: &'a [V]) -> &Self {
-    for (target_id, value) in target_ids.iter().zip(values).collect::<Vec<_>>() {
+    for (target_id, value) in target_ids.iter().zip(values).collect_vec() {
       self.values.push((target_id.clone(), value));
     }
     self
@@ -281,7 +281,7 @@ where
     if self.has_target_label() {
       None
     } else {
-      Some(self.values.iter().map(|(_, value)| *value).collect::<Vec<_>>())
+      Some(self.values.iter().map(|(_, value)| *value).collect_vec())
     }
   }
 }

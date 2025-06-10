@@ -339,7 +339,7 @@ impl CommandExecutor for StreamListIds {
       }
     };
     context.print_execution_time(start_instant);
-    let mut stream_ids = stream_ids.iter().map(|msi| msi.to_string()).collect::<Vec<_>>();
+    let mut stream_ids = stream_ids.iter().map(|msi| msi.to_string()).collect_vec();
     stream_ids.sort();
     let mut formatter = IdsFormatter::new("stream id", context);
     formatter.push_target_ids(&stream_ids);

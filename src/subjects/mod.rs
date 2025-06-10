@@ -25,6 +25,7 @@ use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::notifications_to_string;
 use dsh_api::types::AllocationStatus;
 use dsh_api::UsedBy;
+use itertools::Itertools;
 use serde::Serialize;
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
@@ -109,8 +110,8 @@ impl SubjectFormatter<UsedByLabel> for UsedBy {
   fn value(&self, label: &UsedByLabel, target_id: &str) -> String {
     match label {
       UsedByLabel::Injections => match self {
-        UsedBy::App(_, resources) => resources.iter().map(|resource| resource.to_string()).collect::<Vec<_>>().join("\n"),
-        UsedBy::Application(_, _, injections) => injections.iter().map(|injection| injection.to_string()).collect::<Vec<_>>().join("\n"),
+        UsedBy::App(_, resources) => resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
+        UsedBy::Application(_, _, injections) => injections.iter().map(|injection| injection.to_string()).collect_vec().join("\n"),
       },
       UsedByLabel::Instances => match self {
         UsedBy::App(_, _) => "".to_string(),

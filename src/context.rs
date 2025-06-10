@@ -18,6 +18,7 @@ use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
 use getch_rs::{Getch, Key};
+use itertools::Itertools;
 use log::debug;
 use rpassword::prompt_password;
 use serde::Serialize;
@@ -709,7 +710,7 @@ impl Context {
               Matching(matching_part) => format!("{}{}{:#}{}", self.matching_style, matching_part, self.matching_style, self.stdout_style),
               NonMatching(non_matching_part) => non_matching_part.to_string(),
             })
-            .collect::<Vec<_>>()
+            .collect_vec()
             .join("")
         }
       }
@@ -718,7 +719,7 @@ impl Context {
   }
 
   fn parts_to_string(parts: &[Part]) -> String {
-    parts.iter().map(|part| part.to_string()).collect::<Vec<_>>().join("")
+    parts.iter().map(|part| part.to_string()).collect_vec().join("")
   }
 
   /// Applies styling for labels for stdout

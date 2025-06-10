@@ -5,6 +5,7 @@ use builder::EnumValueParser;
 use clap::builder::{PossibleValue, ValueParser};
 use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
+use itertools::Itertools;
 
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
@@ -198,7 +199,7 @@ pub(crate) fn target_platform_argument() -> Arg {
         .alias(platform.alias())
         .help(format!("{} ({})", platform.description(), platform.alias()))
     })
-    .collect::<Vec<_>>();
+    .collect_vec();
   Arg::new(TARGET_PLATFORM_ARGUMENT)
     .long("platform")
     .short('p')

@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::Application;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -88,7 +89,7 @@ impl CommandExecutor for MetricList {
 }
 
 fn metrics_usage_from_services(services: &HashMap<String, Application>, include_started: bool, include_stopped: bool) -> Vec<MetricUsage> {
-  let mut services = services.iter().collect::<Vec<_>>();
+  let mut services = services.iter().collect_vec();
   services.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
   let mut metric_uage: Vec<MetricUsage> = vec![];
   for (service_id, service) in services {
