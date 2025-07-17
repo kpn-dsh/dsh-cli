@@ -161,7 +161,7 @@ In order to poll the status of the process you can use the following command:
 ```
 
 When the notarise process is finished, you can check whether it was successful using the
-`codesign` command:
+<tt>codesign</tt> command:
 
 ```bash
 > codesign -vvvv -R="notarized" --check-notarization target/release/dsh
@@ -177,4 +177,4 @@ It allows you to check the status by right-clicking the `dsh` binary in the Find
 `Signing Info` context menu. When codesigning and notarising are both completed the tool will show
 this as follows:
 
-![](whats-your-sign.png)
+<img src="docs/images/whats-your-sign.png" width="600" />
