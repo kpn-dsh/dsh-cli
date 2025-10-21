@@ -7,3 +7,4 @@
 /demo/
 /.dsh_cli/
 /tests/.dsh_cli*
+/certificates/
