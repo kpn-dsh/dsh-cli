@@ -57,7 +57,7 @@ you should also have their CA certificate installed (`Developer ID Certification
 order for the KPN certificate to be trusted. If you don't have it already, you can download and
 install it from [DeveloperIDG2CA](https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer).
 
-You can check whether the KPN Developer Certificate is properly installed use the command:
+You can check whether the KPN Developer Certificate is properly installed using the command:
 
 ```bash
 > security find-identity -v -p codesigning
