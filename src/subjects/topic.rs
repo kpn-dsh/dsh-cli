@@ -1,3 +1,4 @@
+use crate::argument_parsers::RangedValueParser;
 use crate::arguments::topic_id_argument;
 use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
@@ -15,13 +16,12 @@ use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction, ArgMatches};
-use dsh_api::application::find_applications_that_use_topic;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::types::Application;
 use dsh_api::types::{Topic, TopicStatus};
-use dsh_api::{Injection, UsedBy};
+use dsh_api::UsedBy;
 use futures::future::try_join_all;
 use futures::try_join;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -114,7 +114,7 @@ pub(crate) const CLEANUP_POLICY_FLAG: &str = "cleanup-policy";
 
 pub(crate) fn cleanup_policy_flag() -> Arg {
   Arg::new(CLEANUP_POLICY_FLAG)
-    .long("cleanup-policy")
+    .long(CLEANUP_POLICY_FLAG)
     .action(ArgAction::Set)
     .value_parser(builder::PossibleValuesParser::new(vec![
       PossibleValue::new("compact"),
@@ -129,7 +129,7 @@ pub(crate) const COMPRESSION_TYPE_FLAG: &str = "compression-type";
 
 pub(crate) fn compression_type_flag() -> Arg {
   Arg::new(COMPRESSION_TYPE_FLAG)
-    .long("compression-type")
+    .long(COMPRESSION_TYPE_FLAG)
     .action(ArgAction::Set)
     .value_parser(builder::PossibleValuesParser::new(vec![
       PossibleValue::new("gzip"),
@@ -148,10 +148,10 @@ pub(crate) const DELETE_RETENTION_MS_FLAG: &str = "delete-retention-ms";
 
 pub(crate) fn delete_retention_ms_flag() -> Arg {
   Arg::new(DELETE_RETENTION_MS_FLAG)
-    .long("delete-retention-ms")
+    .long(DELETE_RETENTION_MS_FLAG)
     .alias("delete-retention") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(0..))
+    .value_parser(RangedValueParser::<u64>::with_lower(0))
     .value_name("MS")
     .help("Delete retention")
     .long_help("Delete retention time in milliseconds.")
@@ -161,10 +161,10 @@ pub(crate) const MAX_MESSAGE_BYTES_FLAG: &str = "max-message-bytes";
 
 pub(crate) fn max_message_size_flag() -> Arg {
   Arg::new(MAX_MESSAGE_BYTES_FLAG)
-    .long("max-message-bytes")
+    .long(MAX_MESSAGE_BYTES_FLAG)
     .alias("max-message-size") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1024..=1048576))
+    .value_parser(RangedValueParser::<u64>::new(1024, 1048576))
     .value_name("BYTES")
     .help("Max message size")
     .long_help(
@@ -179,7 +179,7 @@ const TIMESTAMP_LOG_APPEND_TIME: &str = "log-append-time";
 
 pub(crate) fn message_timestamp_type_flag() -> Arg {
   Arg::new(MESSAGE_TIMESTAMP_TYPE_FLAG)
-    .long("message-timestamp-type")
+    .long(MESSAGE_TIMESTAMP_TYPE_FLAG)
     .alias("timestamps") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
     .value_parser(builder::PossibleValuesParser::new(vec![
@@ -198,9 +198,9 @@ pub(crate) const PARTITIONS_FLAG: &str = "partitions";
 
 pub(crate) fn partitions_flag() -> Arg {
   Arg::new(PARTITIONS_FLAG)
-    .long("partitions")
+    .long(PARTITIONS_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u32>::new().range(1..=128))
+    .value_parser(RangedValueParser::<u32>::new(1, 128))
     .value_name("PARTITIONS")
     .help("Number of partitions")
     .long_help(
@@ -213,14 +213,14 @@ pub(crate) const RETENTION_BYTES_FLAG: &str = "retention-bytes";
 
 pub(crate) fn retention_bytes_flag() -> Arg {
   Arg::new(RETENTION_BYTES_FLAG)
-    .long("retention-bytes")
+    .long(RETENTION_BYTES_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(0..))
+    .value_parser(RangedValueParser::<i64>::with_lower(-1))
     .value_name("BYTES")
     .help("Retention bytes")
     .long_help(
       "Retention bytes for the new topic. \
-      The minimum retention bytes value is 0.",
+      If minimum retention bytes value is set to -1, no limit is applied.",
     )
 }
 
@@ -228,9 +228,9 @@ pub(crate) const RETENTION_MS_FLAG: &str = "retention-ms";
 
 pub(crate) fn retention_ms_flag() -> Arg {
   Arg::new(RETENTION_MS_FLAG)
-    .long("retention-ms")
+    .long(RETENTION_MS_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(3600000..=31536000000))
+    .value_parser(RangedValueParser::<u64>::new(3600000, 31536000000))
     .value_name("MS")
     .help("Retention milliseconds")
     .long_help(
@@ -244,10 +244,10 @@ pub(crate) const SEGMENT_BYTES_FLAG: &str = "segment-bytes";
 
 pub(crate) fn segment_bytes_flag() -> Arg {
   Arg::new(SEGMENT_BYTES_FLAG)
-    .long("segment-bytes")
+    .long(SEGMENT_BYTES_FLAG)
     .alias("segment-size") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(52428800..))
+    .value_parser(RangedValueParser::<u64>::with_lower(52428800))
     .value_name("BYTES")
     .help("Segment bytes")
     .long_help(
@@ -318,7 +318,7 @@ pub(crate) fn create_topic(matches: &ArgMatches) -> Result<Topic, String> {
       kafka_properties.insert(MESSAGE_TIMESTAMP_PROPERTY.to_string(), "CreateTime".to_string());
     }
   }
-  if let Some(retention_bytes) = matches.get_one::<u64>(RETENTION_BYTES_FLAG) {
+  if let Some(retention_bytes) = matches.get_one::<i64>(RETENTION_BYTES_FLAG) {
     kafka_properties.insert(RETENTION_BYTES_PROPERTY.to_string(), retention_bytes.to_string());
   }
   if let Some(retention_ms) = matches.get_one::<u64>(RETENTION_MS_FLAG) {
@@ -426,16 +426,17 @@ impl CommandExecutor for TopicListUsage {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all scratch topics with the services that use them");
     let start_instant = context.now();
-    let (topic_ids, services) = try_join!(client.get_topic_ids(), client.get_application_configuration_map(),)?;
+    let (topic_ids, _services) = try_join!(client.get_topic_ids(), client.get_application_configuration_map(),)?;
     context.print_execution_time(start_instant);
-    let mut tuples: Vec<(String, UsedBy)> = vec![];
-    for topic_id in &topic_ids {
-      let service_usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(topic_id, &services);
-      for (service_id, service, injections) in service_usages {
-        if !injections.is_empty() {
-          tuples.push((topic_id.to_string(), UsedBy::Application(service_id, service.instances, injections)));
-        }
-      }
+    let tuples: Vec<(String, UsedBy)> = vec![];
+    for _topic_id in &topic_ids {
+      // TODO
+      // let service_usages: Vec<(String, &Application, Vec<Injection>)> = scratch_topic_used_in_applications(topic_id, &services);
+      // for (service_id, service, injections) in service_usages {
+      //   if !injections.is_empty() {
+      //     tuples.push((topic_id.to_string(), UsedBy::Application(service_id, service.instances, injections)));
+      //   }
+      // }
     }
     if tuples.is_empty() {
       context.print_outcome("no topics found in services");
@@ -498,7 +499,7 @@ impl CommandExecutor for TopicShowProperties {
     let start_instant = context.now();
     let topic_status = client.get_topic(&topic_id).await?;
     context.print_execution_time(start_instant);
-    let mut pairs: Vec<(String, String)> = topic_status.actual.unwrap().kafka_properties.into_iter().collect::<Vec<_>>();
+    let mut pairs: Vec<(String, String)> = topic_status.actual.unwrap().kafka_properties.into_iter().collect_vec();
     pairs.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
     let (properties, values): (Vec<String>, Vec<String>) = pairs.into_iter().unzip();
     let mut formatter = ListFormatter::new(&PROPERTY_LABELS, Some("property"), context);
@@ -520,20 +521,21 @@ impl CommandExecutor for TopicShowUsage {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the services that use topic '{}'", topic_id));
     let start_instant = context.now();
-    let services = client.get_application_configuration_map().await?;
+    let _services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-    let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(&topic_id, &services);
-    let used_bys = usages
-      .into_iter()
-      .filter_map(|(service_id, service, injections)| if injections.is_empty() { None } else { Some(UsedBy::Application(service_id.clone(), service.instances, injections)) })
-      .collect::<Vec<_>>();
-    if !used_bys.is_empty() {
-      let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);
-      formatter.push_values(&used_bys);
-      formatter.print(None)?;
-    } else {
-      context.print_outcome("topic not used");
-    }
+    // TODO
+    // let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(&topic_id, &services);
+    // let used_bys = usages
+    //   .into_iter()
+    //   .filter_map(|(service_id, service, injections)| if injections.is_empty() { None } else { Some(UsedBy::Application(service_id.clone(), service.instances, injections)) })
+    //   .collect_vec();
+    // if !used_bys.is_empty() {
+    //   let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);
+    //   formatter.push_values(&used_bys);
+    //   formatter.print(None)?;
+    // } else {
+    //   context.print_outcome("topic not used");
+    // }
     Ok(())
   }
 
