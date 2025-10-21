@@ -8,6 +8,7 @@ use dsh_api::platform::DshPlatform;
 use itertools::Itertools;
 
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
+pub(crate) const ENVIRONMENT_VARIABLE_ARGUMENT: &str = "environment-variable-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
 // pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
@@ -36,6 +37,23 @@ pub(crate) fn dry_run_argument() -> Arg {
           environment variable DSH_CLI_DRY_RUN or in the settings file. \
           Dry-run mode will take precedence over the --force flag.",
     )
+    .global(true)
+}
+
+pub(crate) fn environment_variable_argument() -> Arg {
+  Arg::new(ENVIRONMENT_VARIABLE_ARGUMENT)
+    .long("environment-variable")
+    .short('e')
+    .action(ArgAction::Append)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("ENV_VAR=value")
+    .help("Set environment variable")
+    .long_help(
+      "This option allows setting environment variables from the command line. \
+          The environment variable must be specified as \"VAR=value\". \
+          This option can be provided multiple times.",
+    )
+    .hide_short_help(true)
     .global(true)
 }
 

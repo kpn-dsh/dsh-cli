@@ -9,40 +9,40 @@ use serde::Serialize;
 use std::env;
 
 // Environment variable is defined in the dsh_api crate
-const ENV_VAR_PLATFORMS_FILE_NAME: &str = "DSH_API_PLATFORMS_FILE";
+const ENV_VAR_DSH_API_PLATFORMS_FILE: &str = "DSH_API_PLATFORMS_FILE";
 
-pub(crate) const ENV_VAR_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
-pub(crate) const ENV_VAR_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
-pub(crate) const ENV_VAR_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
-pub(crate) const ENV_VAR_ERROR_COLOR: &str = "DSH_CLI_ERROR_COLOR";
-pub(crate) const ENV_VAR_ERROR_STYLE: &str = "DSH_CLI_ERROR_STYLE";
-pub(crate) const ENV_VAR_HOME_DIRECTORY: &str = "DSH_CLI_HOME";
-pub(crate) const ENV_VAR_LABEL_COLOR: &str = "DSH_CLI_LABEL_COLOR";
-pub(crate) const ENV_VAR_LABEL_STYLE: &str = "DSH_CLI_LABEL_STYLE";
-pub(crate) const ENV_VAR_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
-pub(crate) const ENV_VAR_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
-pub(crate) const ENV_VAR_MATCHING_COLOR: &str = "DSH_CLI_MATCHING_COLOR";
-pub(crate) const ENV_VAR_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
+pub(crate) const ENV_VAR_DSH_CLI_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
+pub(crate) const ENV_VAR_DSH_CLI_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
+pub(crate) const ENV_VAR_DSH_CLI_ERROR_COLOR: &str = "DSH_CLI_ERROR_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_ERROR_STYLE: &str = "DSH_CLI_ERROR_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_HOME: &str = "DSH_CLI_HOME";
+pub(crate) const ENV_VAR_DSH_CLI_LABEL_COLOR: &str = "DSH_CLI_LABEL_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_LABEL_STYLE: &str = "DSH_CLI_LABEL_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_LOG_LEVEL: &str = "DSH_CLI_LOG_LEVEL";
+pub(crate) const ENV_VAR_DSH_CLI_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
+pub(crate) const ENV_VAR_DSH_CLI_MATCHING_COLOR: &str = "DSH_CLI_MATCHING_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
+pub(crate) const ENV_VAR_DSH_CLI_NO_HEADERS: &str = "DSH_CLI_NO_HEADERS";
+pub(crate) const ENV_VAR_DSH_CLI_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
+pub(crate) const ENV_VAR_DSH_CLI_PASSWORD: &str = "DSH_CLI_PASSWORD";
+pub(crate) const ENV_VAR_DSH_CLI_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
+pub(crate) const ENV_VAR_DSH_CLI_PLATFORM: &str = "DSH_CLI_PLATFORM";
+pub(crate) const ENV_VAR_DSH_CLI_QUIET: &str = "DSH_CLI_QUIET";
+pub(crate) const ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
+pub(crate) const ENV_VAR_DSH_CLI_STDERR_COLOR: &str = "DSH_CLI_STDERR_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
+pub(crate) const ENV_VAR_DSH_CLI_TENANT: &str = "DSH_CLI_TENANT";
+pub(crate) const ENV_VAR_DSH_CLI_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
+pub(crate) const ENV_VAR_DSH_CLI_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
+pub(crate) const ENV_VAR_DSH_CLI_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_WARNING_STYLE: &str = "DSH_CLI_WARNING_STYLE";
 pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-pub(crate) const ENV_VAR_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
-pub(crate) const ENV_VAR_NO_HEADERS: &str = "DSH_CLI_NO_HEADERS";
-pub(crate) const ENV_VAR_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
-pub(crate) const ENV_VAR_PASSWORD: &str = "DSH_CLI_PASSWORD";
-pub(crate) const ENV_VAR_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
-pub(crate) const ENV_VAR_PLATFORM: &str = "DSH_CLI_PLATFORM";
-pub(crate) const ENV_VAR_QUIET: &str = "DSH_CLI_QUIET";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
-pub(crate) const ENV_VAR_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
-pub(crate) const ENV_VAR_STDERR_COLOR: &str = "DSH_CLI_STDERR_COLOR";
-pub(crate) const ENV_VAR_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
-pub(crate) const ENV_VAR_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
-pub(crate) const ENV_VAR_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
-pub(crate) const ENV_VAR_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
-pub(crate) const ENV_VAR_TENANT: &str = "DSH_CLI_TENANT";
-pub(crate) const ENV_VAR_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
-pub(crate) const ENV_VAR_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
-pub(crate) const ENV_VAR_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
-pub(crate) const ENV_VAR_WARNING_STYLE: &str = "DSH_CLI_WARNING_STYLE";
 
 /// Returns the defined environment variables that are currently set
 pub(crate) fn get_set_environment_variables() -> Vec<(String, String)> {
@@ -82,7 +82,7 @@ pub(crate) fn print_environment_variable(env_var: &str, context: &Context) {
     context.print_warning(format!("'{}' could not be matched to an environment variable recognized by the dsh tool", env_var));
   } else if matching_env_vars.len() == 1 {
     let (env_var, short_explanation, long_explanation) = matching_env_vars.first().unwrap();
-    if let Ok(env_var_value) = std::env::var(env_var) {
+    if let Ok(env_var_value) = env::var(env_var) {
       context.print_warning(format!("{}={}", env_var, env_var_value));
     } else {
       context.print_warning(env_var);
@@ -181,7 +181,7 @@ pub(crate) fn env_var_argument() -> Arg {
 
 const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
   (
-    ENV_VAR_PLATFORMS_FILE_NAME,
+    ENV_VAR_DSH_API_PLATFORMS_FILE,
     "Overrides the default list of available platforms.",
     "Set this environment variable to override the default list of available platforms. \
      The value of the environment variable must be the name \
@@ -193,7 +193,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See the bottom of this page for more information.",
   ),
   (
-    ENV_VAR_CSV_QUOTE,
+    ENV_VAR_DSH_CLI_CSV_QUOTE,
     "Specifies the quote character that will be used when printing csv data.",
     "This environment variable specifies the quote character that will be used \
      when printing csv data. If this variable is not provided, the value from the \
@@ -202,7 +202,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      contains the quote character.",
   ),
   (
-    ENV_VAR_CSV_SEPARATOR,
+    ENV_VAR_DSH_CLI_CSV_SEPARATOR,
     "Specifies the separator string that will be used when printing csv data.",
     "This environment variable specifies the separator string that will be used \
      when printing csv data. If this variable is not provided, the value from the \
@@ -211,7 +211,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      contains the csv separator string.",
   ),
   (
-    ENV_VAR_DRY_RUN,
+    ENV_VAR_DSH_CLI_DRY_RUN,
     "Inhibits api operations that could potentially make changes to the DSH platform, \
      like delete, create or change.",
     "If this environment variable is set (to any value) the dsh tool will not \
@@ -221,7 +221,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      command line argument.",
   ),
   (
-    ENV_VAR_ERROR_COLOR,
+    ENV_VAR_DSH_CLI_ERROR_COLOR,
     "Specify the color to be used when printing error messages.",
     "This environment variable specifies the color to be used when printing error messages. \
     If this variable is not set, the settings file will be checked for the \
@@ -230,7 +230,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
     'magenta', 'red', 'white' and 'yellow'.",
   ),
   (
-    ENV_VAR_ERROR_STYLE,
+    ENV_VAR_DSH_CLI_ERROR_STYLE,
     "Specifies the styling to be used when printing error messages.",
     "This environment variable specifies the styling to be used when printing error \
      messages. If this variable is not set, the settings file will be checked for the \
@@ -239,15 +239,16 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      or 'reverse'.",
   ),
   (
-    ENV_VAR_HOME_DIRECTORY,
+    ENV_VAR_DSH_CLI_HOME,
     "Specifies the location of the directory where the dsh tool stores its settings and \
      targets information.",
     "Use this environment variable to change the location where dsh \
      stores its settings and targets information. \
-     The default location is $HOME/.dsh_cli.",
+     The default location is $HOME/.dsh_cli. This environment variable cannot be overridden \
+     via the --environment-variable command line argument.",
   ),
   (
-    ENV_VAR_LABEL_COLOR,
+    ENV_VAR_DSH_CLI_LABEL_COLOR,
     "Specify the color to be used when printing table headers or labels.",
     "This environment variable specifies the color to be used when printing \
      table headers or labels. \
@@ -256,7 +257,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_COLOR' for the supported colors.",
   ),
   (
-    ENV_VAR_LABEL_STYLE,
+    ENV_VAR_DSH_CLI_LABEL_STYLE,
     "Specifies the styling to be used when printing table headers or labels.",
     "This environment variable specifies the styling to be used when printing \
      table headers or labels. \
@@ -265,7 +266,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_STYLE' for the supported styles.",
   ),
   (
-    ENV_VAR_LOG_LEVEL,
+    ENV_VAR_DSH_CLI_LOG_LEVEL,
     "Specifies the log level of the dsh tool.",
     "Use this environment variable to set the log level of the dsh tool. \
      The available log levels are: off, error, warn, info, debug or trace. \
@@ -275,7 +276,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      The default log level is 'error'.",
   ),
   (
-    ENV_VAR_LOG_LEVEL_API,
+    ENV_VAR_DSH_CLI_LOG_LEVEL_API,
     "Specifies the log level for the dsh_api library functions.",
     "Use this environment variable to set the log level for the functions \
      in the library crate dsh_api, that supports the dsh tool. \
@@ -287,7 +288,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      The default log level is 'error'.",
   ),
   (
-    ENV_VAR_MATCHING_COLOR,
+    ENV_VAR_DSH_CLI_MATCHING_COLOR,
     "Specifies the color to be used when printing matching results for the find functions.",
     "This environment variable specifies the color to be used when printing matching \
      results for the find functions, e.q. when matching regular expressions. \
@@ -296,7 +297,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_COLOR' for the supported colors.",
   ),
   (
-    ENV_VAR_MATCHING_STYLE,
+    ENV_VAR_DSH_CLI_MATCHING_STYLE,
     "Specifies the styling to be used when printing matching results for the find functions.",
     "This environment variable specifies the styling to be used when printing matching \
      results for the find functions, e.q. when matching regular expressions. \
@@ -306,7 +307,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_STYLE' for the supported styles.",
   ),
   (
-    ENV_VAR_NO_ESCAPE,
+    ENV_VAR_DSH_CLI_NO_ESCAPE,
     "Disables color and styling escape sequences in the generated output.",
     "When this environment variable is set (to any value) \
      the output will not contain any color or other escape sequences. \
@@ -314,13 +315,13 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      --no-color or --no-ansi command line argument.",
   ),
   (
-    ENV_VAR_NO_HEADERS,
+    ENV_VAR_DSH_CLI_NO_HEADERS,
     "Disables headers in the generated output.",
     "When this environment variables is set (to any value) the output will not contain headers. \
      This environment variable can be overridden via the --no-headers command line argument.",
   ),
   (
-    ENV_VAR_OUTPUT_FORMAT,
+    ENV_VAR_DSH_CLI_OUTPUT_FORMAT,
     "Specifies the format used when printing the output.",
     "This option specifies the format used when printing the output. \
      If this argument is not provided, the value from the settings file will be used. \
@@ -332,17 +333,18 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      --output-format command line argument.",
   ),
   (
-    ENV_VAR_PASSWORD,
+    ENV_VAR_DSH_CLI_PASSWORD,
     "Specifies the secret api token/password for the target tenant.",
     "This environment variable specifies the secret api token/password for the target \
      tenant. Note that when the environment variable 'DSH_CLI_PASSWORD_FILE' \
      or the argument --password-file command line argument is provided, \
      this environment variable will never be used. \
      For better security, consider using one of these two options instead of \
-     defining 'DSH_CLI_PASSWORD'.",
+     defining 'DSH_CLI_PASSWORD'. This environment variable cannot be overridden via the \
+     --environment-variable command line argument.",
   ),
   (
-    ENV_VAR_PASSWORD_FILE,
+    ENV_VAR_DSH_CLI_PASSWORD_FILE,
     "Specifies the location of a file containing the secret api token/password \
      for the target tenant.",
     "This environment variable specifies a file containing the secret api \
@@ -351,7 +353,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      this environment variable will not be used.",
   ),
   (
-    ENV_VAR_PLATFORM,
+    ENV_VAR_DSH_CLI_PLATFORM,
     "Specifies the target platform on which the target tenant environments live.",
     "Target platform on which the tenants environment lives. \
      The supported platforms are: 'np-aws-lz-dsh' / 'nplz', 'poc-aws-dsh' / 'poc', \
@@ -360,7 +362,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      This environment variable can be overridden via the --platform command line argument.",
   ),
   (
-    ENV_VAR_QUIET,
+    ENV_VAR_DSH_CLI_QUIET,
     "Enables quiet mode, which means that no output will be produced to the terminal.",
     "When this environment variable is set (to any value) the dsh tool \
      will run in quiet mode, meaning that no output will be produced to the terminal \
@@ -368,7 +370,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      This environment variable can be overridden via the --quit command line argument.",
   ),
   (
-    ENV_VAR_SHOW_EXECUTION_TIME,
+    ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME,
     "Enables printing the execution time of the executed api functions, in milliseconds.",
     "When this environment variable is set (to any value) the execution time of the \
      executed function will be shown, in milliseconds. \
@@ -377,7 +379,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      '--show-execution-time' command line argument.",
   ),
   (
-    ENV_VAR_STDERR_COLOR,
+    ENV_VAR_DSH_CLI_STDERR_COLOR,
     "Specifies the color to be used when printing explanations and metadata.",
     "This environment variable specifies the color to be used when printing explanations \
      and metadata. \
@@ -386,7 +388,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_COLOR' for the supported colors.",
   ),
   (
-    ENV_VAR_STDERR_STYLE,
+    ENV_VAR_DSH_CLI_STDERR_STYLE,
     "Specifies the styling to be used when printing explanations and metadata.",
     "This environment variable specifies the styling to be used when printing explanations \
      and metadata. \
@@ -395,7 +397,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_STYLE' for the supported styles.",
   ),
   (
-    ENV_VAR_STDOUT_COLOR,
+    ENV_VAR_DSH_CLI_STDOUT_COLOR,
     "Specifies the color to be used when printing results.",
     "This environment variable specifies the color to be used when printing results. \
      If this variable is not set, the settings file will be checked for the \
@@ -403,7 +405,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_COLOR' for the supported colors.",
   ),
   (
-    ENV_VAR_STDOUT_STYLE,
+    ENV_VAR_DSH_CLI_STDOUT_STYLE,
     "Specifies the styling to be used when printing results.",
     "This environment variable specifies the styling to be used when printing results. \
      If this variable is not set, the settings file will be checked for the \
@@ -412,7 +414,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      See environment variable 'DSH_CLI_ERROR_STYLE' for the supported styles.",
   ),
   (
-    ENV_VAR_SUPPRESS_EXIT_STATUS,
+    ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS,
     "Suppress the returned exit status of the tool (will always be 0).",
     "If this environment variable is set (to any value) the dsh tool will \
      always return exit status 0, even when an error has occurred. \
@@ -421,21 +423,21 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      command line argument or the 'suppress-exit-status' setting.",
   ),
   (
-    ENV_VAR_TERMINAL_WIDTH,
+    ENV_VAR_DSH_CLI_TERMINAL_WIDTH,
     "Specifies the maximum terminal width.",
     "When this environment variable is set it will define the maximum terminal width. \
      This environment variable can be overridden via the \
      --terminal-width command line argument.",
   ),
   (
-    ENV_VAR_TENANT,
+    ENV_VAR_DSH_CLI_TENANT,
     "Specifies the target tenant.",
     "Tenant id for the target tenant. The target tenant is the tenant whose resources \
      will be managed via the api. \
      This environment variable can be overridden via the --tenant command line argument.",
   ),
   (
-    ENV_VAR_VERBOSITY,
+    ENV_VAR_DSH_CLI_VERBOSITY,
     "Specifies the verbosity level of the dsh tool.",
     "If this option is provided, it will set the verbosity level. \
      The default verbosity setting is 'low'. \
@@ -446,7 +448,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      or the command line argument '--quiet' is provided, nothing will be printed.",
   ),
   (
-    ENV_VAR_WARNING_COLOR,
+    ENV_VAR_DSH_CLI_WARNING_COLOR,
     "Specifies the color to be used when printing warnings.",
     "This environment variable specifies the color to be used when printing warnings. \
      If this variable is not set, the settings file will be checked for the \
@@ -455,7 +457,7 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      colors.",
   ),
   (
-    ENV_VAR_WARNING_STYLE,
+    ENV_VAR_DSH_CLI_WARNING_STYLE,
     "Specifies the styling to be used when printing warnings.",
     "This environment variable specifies the styling to be used when printing warnings. \
      If this variable is not set, the settings file will be checked for the \
