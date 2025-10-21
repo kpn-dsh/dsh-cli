@@ -1,3 +1,4 @@
+use crate::argument_parsers::RangedValueParser;
 use clap::{builder, Arg, ArgAction};
 
 pub(crate) const CERTIFICATE_COUNT_FLAG: &str = "certificate-count";
@@ -16,36 +17,24 @@ pub(crate) const TOPIC_COUNT_FLAG: &str = "topic-count";
 pub(crate) const TRACING_FLAG: &str = "tracing";
 pub(crate) const VPN_FLAG: &str = "vpn";
 
-// TODO Remove conflicts_with_all once PATCH /manage/{manager}/tenant/{tenant}/limit is fixed
 pub(crate) fn certificate_count_flag() -> Arg {
   Arg::new(CERTIFICATE_COUNT_FLAG)
     .long(CERTIFICATE_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1..=40))
+    .value_parser(RangedValueParser::<i64>::new(1, 40))
     .value_name("COUNT")
     .help("Limit for number of certificates")
     .long_help(
       "Set the limit for the number of certificates available for the managed tenant. \
           The value must be greater than or equal to 1 and lower than or equal to 40.",
     )
-    .conflicts_with_all([
-      CONSUMER_RATE_FLAG,
-      CPU_FLAG,
-      KAFKA_ACL_GROUP_COUNT_FLAG,
-      MEM_FLAG,
-      PARTITION_COUNT_FLAG,
-      PRODUCER_RATE_FLAG,
-      REQUEST_RATE_FLAG,
-      SECRET_COUNT_FLAG,
-      TOPIC_COUNT_FLAG,
-    ])
 }
 
 pub(crate) fn consumer_rate_flag() -> Arg {
   Arg::new(CONSUMER_RATE_FLAG)
     .long(CONSUMER_RATE_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1048576..=1250000000))
+    .value_parser(RangedValueParser::<i64>::new(1048576, 1250000000))
     .value_name("RATE")
     .help("Limit for consumer rate")
     .long_help(
@@ -59,8 +48,8 @@ pub(crate) fn cpu_flag() -> Arg {
   Arg::new(CPU_FLAG)
     .long(CPU_FLAG)
     .action(ArgAction::Set)
-    .value_parser(clap::value_parser!(f64))
-    .value_name("CPUS")
+    .value_parser(RangedValueParser::<f64>::new(0.01, 16.0))
+    .value_name("CPU")
     .help("Limit for number of cpus")
     .long_help(
       "Set the limit for the number of cpus to provision for the managed tenant \
@@ -74,12 +63,12 @@ pub(crate) fn kafka_acl_group_flag() -> Arg {
   Arg::new(KAFKA_ACL_GROUP_COUNT_FLAG)
     .long(KAFKA_ACL_GROUP_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(0..=50))
+    .value_parser(RangedValueParser::<i64>::new(0, 100))
     .value_name("COUNT")
     .help("Limit for number of kafka acl groups")
     .long_help(
       "Set the limit for the number of Kafka ACL groups available for the managed tenant. \
-          The value must be greater than or equal to 0 and lower than or equal to 50.",
+          The value must be greater than or equal to 0 and lower than or equal to 100.",
     )
 }
 
@@ -87,7 +76,7 @@ pub(crate) fn mem_flag() -> Arg {
   Arg::new(MEM_FLAG)
     .long(MEM_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1..=131072))
+    .value_parser(RangedValueParser::<i64>::new(1, 131072))
     .value_name("MEM")
     .help("Limit for amount of memory")
     .long_help(
@@ -100,7 +89,7 @@ pub(crate) fn partition_count_flag() -> Arg {
   Arg::new(PARTITION_COUNT_FLAG)
     .long(PARTITION_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1..=40))
+    .value_parser(RangedValueParser::<i64>::new(1, 40))
     .value_name("COUNT")
     .help("Limit for number of partitions")
     .long_help(
@@ -113,7 +102,7 @@ pub(crate) fn producer_rate_flag() -> Arg {
   Arg::new(PRODUCER_RATE_FLAG)
     .long(PRODUCER_RATE_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1048576..=1250000000))
+    .value_parser(RangedValueParser::<i64>::new(1048576, 1250000000))
     .value_name("RATE")
     .help("Limit for producer rate")
     .long_help(
@@ -127,7 +116,7 @@ pub(crate) fn request_rate_flag() -> Arg {
   Arg::new(REQUEST_RATE_FLAG)
     .long(REQUEST_RATE_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1..=100))
+    .value_parser(RangedValueParser::<i64>::new(1, 100))
     .value_name("RATE")
     .help("Limit for request rate")
     .long_help(
@@ -140,7 +129,7 @@ pub(crate) fn secret_count_flag() -> Arg {
   Arg::new(SECRET_COUNT_FLAG)
     .long(SECRET_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1..=40))
+    .value_parser(RangedValueParser::<i64>::new(1, 40))
     .value_name("COUNT")
     .help("Limit for number of secrets")
     .long_help(
@@ -184,7 +173,7 @@ pub(crate) fn topic_count_flag() -> Arg {
   Arg::new(TOPIC_COUNT_FLAG)
     .long(TOPIC_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1..=40))
+    .value_parser(RangedValueParser::<i64>::new(1, 40))
     .value_name("COUNT")
     .help("Limit for number of topics")
     .long_help(

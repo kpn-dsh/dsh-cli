@@ -1,11 +1,11 @@
-use crate::environment_variables::{ENV_VAR_LOG_LEVEL, ENV_VAR_LOG_LEVEL_API};
+use crate::environment_variable;
+use crate::environment_variables::{ENV_VAR_DSH_CLI_LOG_LEVEL, ENV_VAR_DSH_CLI_LOG_LEVEL_API};
 use crate::log_arguments::{LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT};
 use crate::settings::Settings;
 use clap::ArgMatches;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use std::env;
 use std::fmt::{Display, Formatter};
 use std::io::{stdout, IsTerminal};
 
@@ -34,16 +34,16 @@ pub(crate) enum LogLevel {
 pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Result<(), String> {
   let log_level_dsh = match matches.get_one::<LogLevel>(LOG_LEVEL_ARGUMENT) {
     Some(log_level_from_argument) => log_level_from_argument.clone(),
-    None => match env::var(ENV_VAR_LOG_LEVEL) {
-      Ok(log_level_from_env_var) => LogLevel::try_from(log_level_from_env_var.as_str())?,
-      Err(_) => settings.log_level.clone().unwrap_or_default(),
+    None => match environment_variable(ENV_VAR_DSH_CLI_LOG_LEVEL, matches)? {
+      Some(log_level_from_env_var) => LogLevel::try_from(log_level_from_env_var.as_str())?,
+      None => settings.log_level.clone().unwrap_or_default(),
     },
   };
   let log_level_dsh_api = match matches.get_one::<LogLevel>(LOG_LEVEL_API_ARGUMENT) {
     Some(log_level_api_from_argument) => log_level_api_from_argument.clone(),
-    None => match env::var(ENV_VAR_LOG_LEVEL_API) {
-      Ok(log_level_api_from_env_var) => LogLevel::try_from(log_level_api_from_env_var.as_str())?,
-      Err(_) => settings.log_level_api.clone().unwrap_or_default(),
+    None => match environment_variable(ENV_VAR_DSH_CLI_LOG_LEVEL_API, matches)? {
+      Some(log_level_api_from_env_var) => LogLevel::try_from(log_level_api_from_env_var.as_str())?,
+      None => settings.log_level_api.clone().unwrap_or_default(),
     },
   };
   if stdout().is_terminal() {

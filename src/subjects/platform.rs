@@ -284,7 +284,7 @@ impl CommandExecutor for PlatformShow {
       Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
       None => get_target_platform(matches, context.settings())?,
     };
-    let tenant = get_target_tenant_non_interactive(matches, context.settings());
+    let tenant = get_target_tenant_non_interactive(matches, context.settings())?;
     let app = matches.get_one::<String>(APP_ID_ARGUMENT).cloned();
     let service = matches.get_one::<String>(SERVICE_ID_ARGUMENT).cloned();
     let vendor = matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned();

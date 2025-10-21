@@ -24,15 +24,11 @@ use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::stream::Stream;
 use dsh_api::tenant::TenantLimits;
-use dsh_api::types::{
-  LimitValue, LimitValueCertificateCount, LimitValueCertificateCountName, LimitValueConsumerRate, LimitValueConsumerRateName, LimitValueCpu, LimitValueCpuName,
-  LimitValueKafkaAclGroupCount, LimitValueKafkaAclGroupCountName, LimitValueMem, LimitValueMemName, LimitValuePartitionCount, LimitValuePartitionCountName, LimitValueProducerRate,
-  LimitValueProducerRateName, LimitValueRequestRate, LimitValueRequestRateName, LimitValueSecretCount, LimitValueSecretCountName, LimitValueTopicCount, LimitValueTopicCountName,
-  ManagedStreamId, ManagedTenant, ManagedTenantServices, ManagedTenantServicesName, PutTenantLimitByManagerByTenantByKindKind,
-};
+use dsh_api::types::{LimitValue, ManagedStreamId, ManagedTenant, ManagedTenantServices, ManagedTenantServicesName};
 use dsh_api::{AccessRights, DshApiError};
 use futures::future::try_join_all;
 use futures::try_join;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
@@ -251,7 +247,7 @@ impl CommandExecutor for TenantListAll {
         try_join_all(tenant_ids.iter().map(|tenant_id| client.get_managed_tenant_limits(tenant_id)))
       )?;
       context.print_execution_time(start_instant);
-      let managed_tenants_limits: Vec<(ManagedTenant, TenantLimits)> = managed_tenants.into_iter().zip(limits).collect::<Vec<_>>();
+      let managed_tenants_limits: Vec<(ManagedTenant, TenantLimits)> = managed_tenants.into_iter().zip(limits).collect_vec();
       let mut formatter = ListFormatter::new(&TENANT_LABELS, None, context);
       for (tenant_id, managed_tenant_limit) in tenant_ids.iter().zip(&managed_tenants_limits) {
         formatter.push_target_id_value(tenant_id.clone(), managed_tenant_limit);
@@ -406,173 +402,36 @@ impl CommandExecutor for TenantUpdateLimit {
       !tenant_limits_from_arguments.is_empty(),
     ) {
       (false, false) => Err("at least one limit or capability argument must be provided".to_string()),
+
       (false, true) => {
-        // TODO This code must be replaced once PATCH /manage/{manager}/tenant/{tenant}/limit is fixed
-        context.print_explanation(format!("update limit of managed tenant '{}'", tenant_id));
-        if client.get_tenant_limits(&tenant_id).await.is_err() {
-          return Err(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
-        }
-        if let Some(certificate_count) = tenant_limits_from_arguments.certificate_count {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, certificate count limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Certificatecount,
-                &LimitValue::CertificateCount(LimitValueCertificateCount { name: LimitValueCertificateCountName::CertificateCount, value: certificate_count }),
-              )
-              .await?;
+        context.print_explanation(format!("update limits of managed tenant '{}'", tenant_id));
+        match client.get_managed_tenant_limits(&tenant_id).await {
+          Ok(current_tenant_limits) => {
+            let mut updated_tenant_limits = current_tenant_limits.clone();
+            updated_tenant_limits.update(&tenant_limits_from_arguments);
+            if current_tenant_limits != updated_tenant_limits {
+              if context.dry_run() {
+                context.print_warning("dry-run mode, limits not updated");
+              } else {
+                let limit_values: Vec<LimitValue> = (&updated_tenant_limits).into();
+                client.patch_tenant_limit(&tenant_id, &limit_values).await?;
+                context.print_outcome(format!("limits for managed tenant '{}' updated", tenant_id));
+              }
+            } else {
+              context.print_outcome("provided limits are equal to the current managed tenant limits, limits not updated");
+            }
+            Ok(())
           }
+          Err(error) => match error {
+            DshApiError::NotFound(None) => {
+              context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
+              Ok(())
+            }
+            error => Err(String::from(error)),
+          },
         }
-        if let Some(consumer_rate) = tenant_limits_from_arguments.consumer_rate {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, consumer rate limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Consumerrate,
-                &LimitValue::ConsumerRate(LimitValueConsumerRate { name: LimitValueConsumerRateName::ConsumerRate, value: consumer_rate }),
-              )
-              .await?;
-          }
-        }
-        if let Some(cpu) = tenant_limits_from_arguments.cpu {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, cpu limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Cpu,
-                &LimitValue::Cpu(LimitValueCpu { name: LimitValueCpuName::Cpu, value: cpu }),
-              )
-              .await?;
-          }
-        }
-        if let Some(kafka_acl_group_count) = tenant_limits_from_arguments.kafka_acl_group_count {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, kafka acl group count limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Kafkaaclgroupcount,
-                &LimitValue::KafkaAclGroupCount(LimitValueKafkaAclGroupCount { name: LimitValueKafkaAclGroupCountName::KafkaAclGroupCount, value: kafka_acl_group_count }),
-              )
-              .await?;
-          }
-        }
-        if let Some(mem) = tenant_limits_from_arguments.mem {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, mem limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Mem,
-                &LimitValue::Mem(LimitValueMem { name: LimitValueMemName::Mem, value: mem }),
-              )
-              .await?;
-          }
-        }
-        if let Some(partition_count) = tenant_limits_from_arguments.partition_count {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, partition count limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Partitioncount,
-                &LimitValue::PartitionCount(LimitValuePartitionCount { name: LimitValuePartitionCountName::PartitionCount, value: partition_count }),
-              )
-              .await?;
-          }
-        }
-        if let Some(producer_rate) = tenant_limits_from_arguments.producer_rate {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, producer rate limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Producerrate,
-                &LimitValue::ProducerRate(LimitValueProducerRate { name: LimitValueProducerRateName::ProducerRate, value: producer_rate }),
-              )
-              .await?;
-          }
-        }
-        if let Some(request_rate) = tenant_limits_from_arguments.request_rate {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, request rate limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Requestrate,
-                &LimitValue::RequestRate(LimitValueRequestRate { name: LimitValueRequestRateName::RequestRate, value: request_rate }),
-              )
-              .await?;
-          }
-        }
-        if let Some(secret_count) = tenant_limits_from_arguments.secret_count {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, secret count limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Secretcount,
-                &LimitValue::SecretCount(LimitValueSecretCount { name: LimitValueSecretCountName::SecretCount, value: secret_count }),
-              )
-              .await?;
-          }
-        }
-        if let Some(topic_count) = tenant_limits_from_arguments.topic_count {
-          if context.dry_run() {
-            context.print_warning("dry-run mode, topic count limit not updated");
-          } else {
-            client
-              .put_tenant_limit(
-                &tenant_id,
-                PutTenantLimitByManagerByTenantByKindKind::Topiccount,
-                &LimitValue::TopicCount(LimitValueTopicCount { name: LimitValueTopicCountName::TopicCount, value: topic_count }),
-              )
-              .await?;
-          }
-        }
-        Ok(())
       }
-      // (false, true) => {
-      //   // TODO This code must be used once PATCH /manage/{manager}/tenant/{tenant}/limit is fixed
-      //   context.print_explanation(format!("update limits of managed tenant '{}'", tenant_id));
-      //   match client.get_tenantlimits(&tenant_id).await {
-      //     Ok(current_tenant_limits) => {
-      //       let mut updated_tenant_limits = current_tenant_limits.clone();
-      //       updated_tenant_limits.update(tenant_limits_from_arguments);
-      //       if current_tenant_limits != updated_tenant_limits {
-      //         if context.dry_run {
-      //           context.print_warning("dry-run mode, limits not updated");
-      //         } else {
-      //           let limit_values: Vec<LimitValue> = updated_tenant_limits.try_into()?;
-      //           client.patch_tenant_limit(&tenant_id, &limit_values).await?;
-      //           context.print_outcome(format!("limits for managed tenant '{}' updated", tenant_id));
-      //         }
-      //       } else {
-      //         context.print_outcome("provided limits are equal to the current managed tenant limits, limits not updated");
-      //       }
-      //       Ok(())
-      //     }
-      //     Err(error) => match error {
-      //       DshApiError::NotFound(None) => {
-      //         context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
-      //         Ok(())
-      //       }
-      //       error => Err(String::from(error)),
-      //     },
-      //   }
-      // }
+
       (true, false) => {
         context.print_explanation(format!("update capabilities of managed tenant '{}'", tenant_id));
         match client.get_tenant_configuration(&tenant_id).await {
@@ -631,6 +490,7 @@ impl CommandExecutor for TenantUpdateLimit {
           },
         }
       }
+
       (true, true) => Err("provide either limit arguments or capability arguments, but not both".to_string()),
     }
   }
@@ -690,17 +550,12 @@ pub(crate) enum TenantLabel {
   CertificateCount,
   ConsumerRate,
   Cpu,
-  _InternalStreamReadAccess,
-  _InternalStreamWriteAccess,
   KafkaAclGroupCount,
   Manager,
   Mem,
   Monitoring,
-  _Name,
   PartitionCount,
   ProducerRate,
-  _PublicStreamReadAccess,
-  _PublicStreamWriteAccess,
   RequestRate,
   SecretCount,
   Tenant,
@@ -712,20 +567,15 @@ pub(crate) enum TenantLabel {
 impl Label for TenantLabel {
   fn as_str(&self) -> &str {
     match self {
-      Self::_Name => "name",
       Self::CertificateCount => "certificate count",
       Self::ConsumerRate => "consumer rate",
       Self::Cpu => "cpu",
-      Self::_InternalStreamReadAccess => "internal stream read access",
-      Self::_InternalStreamWriteAccess => "internal stream write access",
       Self::KafkaAclGroupCount => "kafka acl group count",
       Self::Manager => "managing tenant",
       Self::Mem => "mem",
       Self::Monitoring => "monitoring",
       Self::PartitionCount => "partition count",
       Self::ProducerRate => "producer rate",
-      Self::_PublicStreamReadAccess => "public stream read access",
-      Self::_PublicStreamWriteAccess => "public stream write access",
       Self::RequestRate => "request rate",
       Self::SecretCount => "secret count",
       Self::Tenant => "managed tenant",
@@ -737,20 +587,15 @@ impl Label for TenantLabel {
 
   fn as_str_for_list(&self) -> &str {
     match self {
-      Self::_Name => "name",
       Self::CertificateCount => "certificates",
       Self::ConsumerRate => "consumer",
       Self::Cpu => "cpu",
-      Self::_InternalStreamReadAccess => "int read",
-      Self::_InternalStreamWriteAccess => "int write",
       Self::KafkaAclGroupCount => "acl groups",
       Self::Manager => "manager",
       Self::Mem => "mem",
       Self::Monitoring => "monitoring",
       Self::PartitionCount => "partitions",
       Self::ProducerRate => "producer",
-      Self::_PublicStreamReadAccess => "pub read",
-      Self::_PublicStreamWriteAccess => "pub write",
       Self::RequestRate => "request",
       Self::SecretCount => "secrets",
       Self::Tenant => "tenant",
@@ -807,7 +652,6 @@ impl SubjectFormatter<TenantLabel> for ManagedTenant {
     match label {
       TenantLabel::Manager => self.manager.to_string(),
       TenantLabel::Monitoring => service_enabled(self, ManagedTenantServicesName::Monitoring),
-      TenantLabel::_Name => self.name.to_string(),
       TenantLabel::Tracing => service_enabled(self, ManagedTenantServicesName::Tracing),
       TenantLabel::Vpn => service_enabled(self, ManagedTenantServicesName::Vpn),
       _ => unreachable!(),
@@ -818,7 +662,7 @@ impl SubjectFormatter<TenantLabel> for ManagedTenant {
 impl SubjectFormatter<TenantLabel> for (ManagedTenant, TenantLimits) {
   fn value(&self, label: &TenantLabel, target_id: &str) -> String {
     match label {
-      TenantLabel::Manager | TenantLabel::Monitoring | TenantLabel::_Name | TenantLabel::Tracing | TenantLabel::Vpn => self.0.value(label, target_id),
+      TenantLabel::Manager | TenantLabel::Monitoring | TenantLabel::Tracing | TenantLabel::Vpn => self.0.value(label, target_id),
       _ => self.1.value(label, target_id),
     }
   }
@@ -938,5 +782,3 @@ fn service_enabled(managed_tenant: &ManagedTenant, name: ManagedTenantServicesNa
     .find_map(|service| if service.name == name { Some(if service.enabled { "enabled".to_string() } else { "disabled".to_string() }) } else { None })
     .unwrap_or_default()
 }
-
-pub static _MANAGED_TENANT_LABELS: [TenantLabel; 5] = [TenantLabel::_Name, TenantLabel::Manager, TenantLabel::Monitoring, TenantLabel::Tracing, TenantLabel::Vpn];

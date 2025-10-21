@@ -22,7 +22,7 @@ use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::{get_target_password_from_keyring, read_target};
 use crate::verbosity::Verbosity;
-use crate::{get_set_environment_variables, DshCliResult, ENV_VAR_PASSWORD};
+use crate::{get_set_environment_variables, DshCliResult, ENV_VAR_DSH_CLI_PASSWORD};
 
 pub(crate) struct SettingSubject {}
 
@@ -340,7 +340,7 @@ impl CommandExecutor for SettingList {
       let mut formatter = ListFormatter::new(&ENVIRONMENT_VARIABLE_LABELS, None, context);
       let hide_password = HIDE_PASSWORD.to_string();
       for (env_var, value) in &env_vars {
-        if env_var == ENV_VAR_PASSWORD {
+        if env_var == ENV_VAR_DSH_CLI_PASSWORD {
           formatter.push_target_id_value(env_var.clone(), &hide_password);
         } else {
           formatter.push_target_id_value(env_var.clone(), value);
