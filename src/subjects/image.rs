@@ -10,10 +10,11 @@ use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
-use dsh_api::application::parse_image_string;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::parse::ImageString;
 use dsh_api::query_processor::{DummyQueryProcessor, ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::Application;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -124,20 +125,19 @@ impl CommandExecutor for ImageListAll {
 
 fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> Result<(), String> {
   let (include_started, include_stopped) = include_started_stopped(matches);
-  let mut services = services.iter().collect::<Vec<_>>();
+  let mut services = services.iter().collect_vec();
   services.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
   let mut images: HashMap<String, Vec<ImageUsage>> = HashMap::new();
   for (service_id, service) in services {
-    if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {
-      let image = service.image.clone();
-      let (registry, image) = parse_image_string(&image)?;
+    if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) && !service.image.is_empty() {
+      let image_string = ImageString::from(service.image.as_str());
       images
-        .entry(image)
+        .entry(image_string.id())
         .or_default()
-        .push(ImageUsage::new(registry, service_id.to_string(), service.instances));
+        .push(ImageUsage::new(image_string, service_id.to_string(), service.instances));
     }
   }
-  let mut images: Vec<(String, Vec<ImageUsage>)> = images.into_iter().collect::<Vec<_>>();
+  let mut images: Vec<(String, Vec<ImageUsage>)> = images.into_iter().collect_vec();
   images.sort_by(|(image_a, _), (image_b, _)| image_a.cmp(image_b));
   let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, None, context);
   for (image, image_usages) in &images {
@@ -157,49 +157,76 @@ fn list_images(services: HashMap<String, Application>, query_processor: &dyn Que
 
 #[derive(Debug, Eq, Hash, PartialEq, Serialize)]
 enum ImageUsageLabel {
-  Image,
+  Id,
   Instances,
-  Registry,
   Service,
+  Source,
+  Stage,
+  Supplier,
+  Tenant,
+  Version,
 }
 
 impl Label for ImageUsageLabel {
   fn as_str(&self) -> &str {
     match self {
-      ImageUsageLabel::Image => "image",
+      ImageUsageLabel::Id => "image id",
       ImageUsageLabel::Instances => "#",
-      ImageUsageLabel::Registry => "registry",
       ImageUsageLabel::Service => "service id",
+      ImageUsageLabel::Source => "source",
+      ImageUsageLabel::Stage => "stage",
+      ImageUsageLabel::Supplier => "supplier",
+      ImageUsageLabel::Tenant => "tenant",
+      ImageUsageLabel::Version => "version",
     }
   }
 
   fn is_target_label(&self) -> bool {
-    matches!(self, Self::Image)
+    matches!(self, Self::Id)
   }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Debug, Hash, PartialEq, Serialize)]
 struct ImageUsage {
-  registry: String,
+  image: ImageString,
   service_id: String,
   instances: u64,
 }
 
 impl ImageUsage {
-  fn new(registry: String, service_id: String, instances: u64) -> Self {
-    Self { registry, service_id, instances }
+  fn new(image: ImageString, service_id: String, instances: u64) -> Self {
+    Self { image, service_id, instances }
   }
 }
 
 impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
   fn value(&self, label: &ImageUsageLabel, target_id: &str) -> String {
     match label {
-      ImageUsageLabel::Service => self.service_id.clone(),
-      ImageUsageLabel::Image => target_id.to_string(),
+      ImageUsageLabel::Id => target_id.to_string(),
       ImageUsageLabel::Instances => self.instances.to_string(),
-      ImageUsageLabel::Registry => self.registry.to_string(),
+      ImageUsageLabel::Service => self.service_id.clone(),
+      ImageUsageLabel::Source => self.image.source().to_string(),
+      ImageUsageLabel::Stage => match &self.image {
+        ImageString::App(app) => app.stage.clone(),
+        _ => "".to_string(),
+      },
+      ImageUsageLabel::Supplier => match &self.image {
+        ImageString::App(app) => app.supplier.clone(),
+        _ => "".to_string(),
+      },
+      ImageUsageLabel::Tenant => self.image.tenant().clone(),
+      ImageUsageLabel::Version => self.image.version().clone(),
     }
   }
 }
 
-const IMAGE_USAGE_LABELS: [ImageUsageLabel; 4] = [ImageUsageLabel::Image, ImageUsageLabel::Registry, ImageUsageLabel::Service, ImageUsageLabel::Instances];
+const IMAGE_USAGE_LABELS: [ImageUsageLabel; 8] = [
+  ImageUsageLabel::Id,
+  ImageUsageLabel::Service,
+  ImageUsageLabel::Instances,
+  ImageUsageLabel::Version,
+  ImageUsageLabel::Source,
+  ImageUsageLabel::Stage,
+  ImageUsageLabel::Supplier,
+  ImageUsageLabel::Tenant,
+];

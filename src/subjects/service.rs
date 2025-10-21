@@ -1,7 +1,8 @@
+use crate::argument_parsers::RangedValueParser;
 use crate::arguments::service_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, EXPORT_COMMAND_ALIAS, LIST_COMMAND,
-  LIST_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS,
+  RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -17,13 +18,14 @@ use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{edit_configuration, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use chrono::DateTime;
-use clap::{builder, Arg, ArgAction, ArgMatches};
-use dsh_api::application::parse_image_string;
+use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::parse::ImageString;
 use dsh_api::types::{Application, TaskState};
 use dsh_api::types::{Task, TaskStatus};
 use dsh_api::DshApiError;
 use futures::future::try_join_all;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::time::Duration;
@@ -61,7 +63,7 @@ lazy_static! {
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(EXPORT_COMMAND, Some(EXPORT_COMMAND_ALIAS), &ServiceExport {}, "Export service configuration")
+    CapabilityBuilder::new(EXPORT_COMMAND, None, &ServiceExport {}, "Export service configuration")
       .set_long_about("Export the service configuration file.")
       .add_target_argument(service_id_argument().required(true))
   );
@@ -172,10 +174,15 @@ fn cpus_flag() -> Arg {
   Arg::new(CPUS_FLAG)
     .long(CPUS_FLAG)
     .action(ArgAction::Set)
-    .value_parser(clap::value_parser!(f64))
+    .value_parser(RangedValueParser::<f64>::new(0.01, 16.0))
     .value_name("CPUS")
     .help("Number of cpus")
-    .long_help("Set number of cpus for the service.")
+    .long_help(
+      "Set the maximum number of cpus available for the service \
+       (factions of a vCPU core, 1.0 equals 1 vCPU). \
+       The value must be greater than or equal to 0.01 \
+       and lower than or equal to 16.0.",
+    )
 }
 
 const INSTANCES_FLAG: &str = "instances";
@@ -184,10 +191,13 @@ fn instances_flag() -> Arg {
   Arg::new(INSTANCES_FLAG)
     .long("instances")
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
+    .value_parser(RangedValueParser::<u64>::with_lower(0))
     .value_name("INSTANCES")
     .help("Number of instances")
-    .long_help("Number of service instances that will be started.")
+    .long_help(
+      "Set the number of service instances that will be started. \
+       Setting this value to 0 will deploy the service without starting it.",
+    )
 }
 
 const MEM_FLAG: &str = "mem";
@@ -196,10 +206,13 @@ fn mem_flag() -> Arg {
   Arg::new(MEM_FLAG)
     .long(MEM_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..=131072))
+    .value_parser(RangedValueParser::<u64>::new(1, 131072))
     .value_name("MEM")
     .help("Amount of memory")
-    .long_help("Set amount of memory available for the service (MiB).")
+    .long_help(
+      "Set the amount of memory available for the service (MiB). \
+       The value must be greater than or equal to 1 and lower than or equal to 131072.",
+    )
 }
 
 struct ServiceCreate {}
@@ -278,6 +291,7 @@ impl CommandExecutor for ServiceDuplicate {
           match edit_configuration(
             &application,
             &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
+            matches,
           )
           .await?
           {
@@ -314,7 +328,7 @@ struct ServiceEdit {}
 
 #[async_trait]
 impl CommandExecutor for ServiceEdit {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("edit service '{}' configuration", service_id));
     match client.get_application_configuration(&service_id).await {
@@ -322,6 +336,7 @@ impl CommandExecutor for ServiceEdit {
         match edit_configuration(
           &application,
           &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
+          matches,
         )
         .await?
         {
@@ -381,7 +396,7 @@ impl CommandExecutor for ServiceListAll {
     let start_instant = context.now();
     let services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-    let mut service_ids = services.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+    let mut service_ids = services.keys().map(|k| k.to_string()).collect_vec();
     service_ids.sort();
     let (include_started, include_stopped) = include_started_stopped(matches);
     let mut formatter = ListFormatter::new(&SERVICE_LABELS_LIST, None, context);
@@ -449,11 +464,11 @@ impl CommandExecutor for ServiceListTasks {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     fn tasks_to_string(tasks: Vec<String>) -> String {
       if tasks.len() <= 4 {
-        tasks.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")
+        tasks.iter().map(|t| t.to_string()).collect_vec().join(", ")
       } else {
         format!(
           "{}, plus {} more",
-          tasks.iter().take(4).map(|t| t.to_string()).collect::<Vec<_>>().join(", "),
+          tasks.iter().take(4).map(|t| t.to_string()).collect_vec().join(", "),
           tasks.len() - 4,
         )
       }
@@ -467,7 +482,7 @@ impl CommandExecutor for ServiceListTasks {
       .iter()
       .zip(tasks)
       .map(|(id, tasks)| (id.to_string(), tasks_to_string(tasks)))
-      .collect::<Vec<_>>();
+      .collect_vec();
     let mut formatter: ListFormatter<ServiceLabel, (String, String)> = ListFormatter::new(&[ServiceLabel::Target, ServiceLabel::Tasks], None, context);
     formatter.push_values(&service_id_tasks_pairs);
     formatter.print(None)?;
@@ -501,7 +516,7 @@ impl CommandExecutor for ServiceRestart {
             .zip(task_statuses)
             .filter(|(_, task_status)| task_status.actual.clone().is_some_and(|t| t.state == TaskState::Running))
             .map(|(task_id, _)| task_id)
-            .collect::<Vec<_>>();
+            .collect_vec();
           configuration.instances = 0;
           if running_task_ids.len() == 1 {
             context.print_outcome(format!("stop service '{}'", service_id));
@@ -854,18 +869,9 @@ impl SubjectFormatter<ServiceLabel> for Application {
     match label {
       ServiceLabel::Cpus => self.cpus.to_string(),
       ServiceLabel::Env => hashmap_to_table(&self.env),
-      ServiceLabel::ExposedPorts => self.exposed_ports.keys().map(|port| port.to_string()).collect::<Vec<_>>().join(","),
-      ServiceLabel::HealthCheck => match self.health_check {
-        Some(ref health_check) => match health_check.protocol {
-          Some(protocol) => format!("{}:{}/{}", protocol.to_string(), health_check.port, health_check.path),
-          None => format!("{}/{}", health_check.port, health_check.path),
-        },
-        None => "".to_string(),
-      },
-      ServiceLabel::Image => match parse_image_string(&self.image) {
-        Ok((kind, image)) => format!("{}:{}", kind, image),
-        Err(_) => self.image.clone(),
-      },
+      ServiceLabel::ExposedPorts => self.exposed_ports.keys().map(|port| port.to_string()).collect_vec().join(","),
+      ServiceLabel::HealthCheck => self.health_check.clone().map(|health_check| health_check.to_string()).unwrap_or_default(),
+      ServiceLabel::Image => ImageString::from(self.image.as_str()).to_string(),
       ServiceLabel::Instances => self.instances.to_string(),
       ServiceLabel::Mem => self.mem.to_string(),
       ServiceLabel::Metrics => self
@@ -879,22 +885,22 @@ impl SubjectFormatter<ServiceLabel> for Application {
         .clone()
         .into_iter()
         .map(|readable_stream| readable_stream.to_string())
-        .collect::<Vec<_>>()
+        .collect_vec()
         .join(", "),
-      ServiceLabel::Secrets => self.secrets.clone().into_iter().map(|secret| secret.name).collect::<Vec<_>>().join(", "),
+      ServiceLabel::Secrets => self.secrets.clone().into_iter().map(|secret| secret.name).collect_vec().join(", "),
       ServiceLabel::SingleInstance => self.single_instance.to_string(),
       ServiceLabel::SpreadGroup => self.spread_group.clone().unwrap_or_default(),
       ServiceLabel::Target => service_id.to_string(),
       ServiceLabel::Tasks => "".to_string(),
-      ServiceLabel::Topics => self.topics.clone().into_iter().map(|topic| topic.to_string()).collect::<Vec<_>>().join(", "),
+      ServiceLabel::Topics => self.topics.clone().into_iter().map(|topic| topic.to_string()).collect_vec().join(", "),
       ServiceLabel::User => self.user.clone(),
-      ServiceLabel::Volumes => self.volumes.keys().map(|k| k.to_string()).collect::<Vec<_>>().join(","),
+      ServiceLabel::Volumes => self.volumes.keys().map(|k| k.to_string()).collect_vec().join(","),
       ServiceLabel::WritableStreams => self
         .writable_streams
         .clone()
         .into_iter()
         .map(|writable_stream| writable_stream.to_string())
-        .collect::<Vec<_>>()
+        .collect_vec()
         .join(", "),
     }
   }
