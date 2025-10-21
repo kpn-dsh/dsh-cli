@@ -48,7 +48,7 @@ should specify the dependency:
 
 ```toml
 [dependencies]
-dsh_api = { version = "0.7.1", features = ["generic"] }
+dsh_api = { version = "0.7.2", features = ["generic"] }
 ```
 
 The `generic` feature must be enabled. The `dsh` tool has some optional features specified,
@@ -114,6 +114,11 @@ you have to explicitly change the output format in the script file.
 ### `test_erroneous_commands.sh`
 
 This script will run many erroneous commands and print the error message to `stderr`.
+All commands must produce a controlled error message and never terminate in panic.
+
+### `test_erroneous_manage_commands.sh`
+
+This script will run many erroneous manage commands and print the error message to `stderr`.
 All commands must produce a controlled error message and never terminate in panic.
 
 ### `test_manage_commands.sh`
