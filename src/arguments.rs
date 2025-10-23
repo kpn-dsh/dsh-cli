@@ -162,13 +162,16 @@ pub(crate) fn vendor_name_argument() -> Arg {
     .long_help("This option specifies the name of an app vendor. Allowed values are \"kpn\".")
 }
 
-pub(crate) fn version_argument() -> Arg {
+pub(crate) fn app_version_argument() -> Arg {
   Arg::new(VERSION_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("VERSION")
-    .help("Version string")
-    .long_help("Identifies a version.")
+    .help("App version")
+    .long_help(
+      "Identifies the version of an app or manifest from the app catalog. When this \
+          argument is omitted, typically the latest final version will be used.",
+    )
 }
 
 pub(crate) fn vhost_id_argument() -> Arg {

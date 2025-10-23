@@ -1,5 +1,5 @@
-use crate::arguments::{manifest_id_argument, version_argument, VERSION_ARGUMENT};
-use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, MANUAL_COMMAND, MANUAL_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::arguments::{app_version_argument, manifest_id_argument, VERSION_ARGUMENT};
+use crate::capability::{Capability, CommandExecutor, EXPLAIN_COMMAND, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
@@ -47,9 +47,9 @@ impl Subject for ManifestSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      EXPLAIN_COMMAND => Some(MANIFEST_EXPLAIN_CAPABILITY.as_ref()),
       EXPORT_COMMAND => Some(MANIFEST_EXPORT_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(MANIFEST_LIST_CAPABILITY.as_ref()),
-      MANUAL_COMMAND => Some(MANIFEST_MANUAL_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(MANIFEST_SHOW_CAPABILITY.as_ref()),
       _ => None,
     }
@@ -61,32 +61,121 @@ impl Subject for ManifestSubject {
 }
 
 lazy_static! {
+  static ref MANIFEST_EXPLAIN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(EXPLAIN_COMMAND, None, &ManifestExplain {}, "Explain manifest configuration")
+      .set_long_about(
+        "Explains the app catalog manifest, including the short and long description \
+         and all configuration parameters. When the <VERSION> argument is not provided the \
+         latest final version will be explained."
+      )
+      .add_target_argument(manifest_id_argument().required(true))
+      .add_target_argument(app_version_argument())
+  );
   static ref MANIFEST_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(EXPORT_COMMAND, None, &ManifestExport {}, "Export manifest")
-      .set_long_about("Export a manifest file from the App Catalog.")
+      .set_long_about(
+        "Exports the app catalog manifest file. When the <VERSION> argument is not provided the \
+         latest final version will be exported."
+      )
       .add_target_argument(manifest_id_argument().required(true))
-      .add_target_argument(version_argument().required(true))
+      .add_target_argument(app_version_argument())
   );
   static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ManifestListAll {}, "List manifests")
-      .set_long_about("Lists all manifest files from the App Catalog.")
-      .add_command_executor(FlagType::AllVersions, &ManifestListAllVersions {}, None)
-      .add_command_executor(FlagType::Ids, &ManifestListIds {}, None)
-  );
-  static ref MANIFEST_MANUAL_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(MANUAL_COMMAND, Some(MANUAL_COMMAND_ALIAS), &ManifestManual {}, "Show manifest manual")
-      .add_target_argument(manifest_id_argument().required(true))
-      .add_target_argument(version_argument())
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ManifestListLatest {}, "List manifests")
+      .set_long_about(
+        "Lists all manifest files from the app catalog. Only the latest final versions are \
+         listed by default. If you want all final versions use the --all-versions option. \
+         If you also want to include the draft versions, use the --draft option. \
+         Use the --ids option to list only the manifest identifiers."
+      )
+      .add_command_executor(
+        FlagType::AllVersions,
+        &ManifestListAllVersions {},
+        Some("List all versions of the manifests.".to_string())
+      )
+      .add_command_executor(FlagType::Ids, &ManifestListIds {}, Some("List only the manifest identifiers.".to_string()))
+      .add_filter_flag(FilterFlagType::Draft, Some("Include draft versions of the manifests.".to_string()))
   );
   static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ManifestShowAll {}, "Show manifest configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ManifestShow {}, "Show manifest configuration")
+      .set_long_about(
+        "Shows parameters in the app catalog manifest like name, description, \
+         last modification date, vendor, configuration parameters and required resources. \
+         When the <VERSION> argument is not provided the latest final version will be shown."
+      )
       .add_target_argument(manifest_id_argument().required(true))
-      .add_target_argument(version_argument())
-      .add_command_executor(FlagType::AllVersions, &ManifestShowAllVersions {}, None)
-      .add_filter_flag(FilterFlagType::Complete, None)
+      .add_target_argument(app_version_argument())
+      .add_command_executor(
+        FlagType::AllVersions,
+        &ManifestShowAllVersions {},
+        Some("List all versions of the manifest. Use the --draft option to include draft versions in the list.".to_string())
+      )
+      .add_filter_flag(FilterFlagType::Complete, Some("Show all manifest parameters instead of a selection.".to_string()))
+      .add_filter_flag(
+        FilterFlagType::Draft,
+        Some("Include draft versions of the manifests when used in combination with the --all-versions option.".to_string())
+      )
   );
   static ref MANIFEST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![MANIFEST_EXPORT_CAPABILITY.as_ref(), MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_MANUAL_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];
+    vec![MANIFEST_EXPLAIN_CAPABILITY.as_ref(), MANIFEST_EXPORT_CAPABILITY.as_ref(), MANIFEST_LIST_CAPABILITY.as_ref(), MANIFEST_SHOW_CAPABILITY.as_ref()];
+}
+
+// Also used for app explain capability, hence public
+pub(crate) struct ManifestExplain {}
+
+#[async_trait]
+impl CommandExecutor for ManifestExplain {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let manifest_id = target.unwrap_or_else(|| unreachable!());
+    let version_argument = matches
+      .get_one::<String>(VERSION_ARGUMENT)
+      .map(|version| Version::from_str(version.as_str()))
+      .transpose()?;
+    match &version_argument {
+      Some(version) => context.print_explanation(format!("explain configuration for app catalog manifest '{}:{}'", manifest_id, version)),
+      None => context.print_explanation(format!("explain configuration for latest version of app catalog manifest '{}'", manifest_id)),
+    }
+    let start_instant = context.now();
+    let manifest: Manifest = match version_argument {
+      Some(version) => client
+        .get_app_catalog_manifest(manifest_id.as_str(), &version)
+        .await
+        .map_err(|_| format!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
+      None => client
+        .get_app_catalog_manifest_latest(manifest_id.as_str(), false)
+        .await
+        .map_err(|_| format!("app catalog manifest '{}' does not exist", manifest_id))?,
+    };
+    context.print_execution_time(start_instant);
+    context.print_outcome(manifest.name);
+    if let Some(description) = manifest.description {
+      context.print_outcome(description);
+    }
+    if manifest.draft {
+      context.print_warning(format!("{}:{} is a draft manifest", manifest.id, manifest.version));
+    } else {
+      context.print_outcome(format!("{}:{}", manifest.id, manifest.version));
+    }
+    if let Some(more_info) = manifest.more_info {
+      context.print_outcome("");
+      context.print_outcome(termimad::text(more_info.as_str()));
+    }
+    if let Some(configuration) = &manifest.configuration {
+      let mut property_ids = configuration.properties.keys().map(|id| id.to_string()).collect_vec();
+      property_ids.sort();
+      let mut formatter = ListFormatter::new(&PROPERTY_LABELS_LIST, None, context);
+      for property_id in property_ids {
+        let property = configuration.properties.get(&property_id).unwrap();
+        formatter.push_target_id_value(property_id, property);
+      }
+      formatter.print(None)?;
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
 }
 
 struct ManifestExport {}
@@ -95,19 +184,35 @@ struct ManifestExport {}
 impl CommandExecutor for ManifestExport {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
-    let manifest_version = matches.get_one::<String>(VERSION_ARGUMENT).map(|v| Version::from_str(v.as_str())).unwrap()?;
-    context.print_explanation(format!("export app catalog manifest '{}' version {}", manifest_id, manifest_version));
-    let start_instant = context.now();
-    let raw_manifest = client.get_raw_manifest(&manifest_id, &manifest_version).await;
-    context.print_execution_time(start_instant);
-    match raw_manifest {
-      Ok(raw_manifest) => {
-        context.print(raw_manifest);
-        Ok(())
-      }
-      Err(DshApiError::NotFound(None)) => Err(format!("manifest '{}' not found", manifest_id)),
-      Err(e) => Err(e.to_string()),
+    let version_argument = matches
+      .get_one::<String>(VERSION_ARGUMENT)
+      .map(|version| Version::from_str(version.as_str()))
+      .transpose()?;
+    match &version_argument {
+      Some(version) => context.print_explanation(format!("export app catalog manifest '{}:{}'", manifest_id, version)),
+      None => context.print_explanation(format!("export latest version of app catalog manifest '{}'", manifest_id)),
     }
+    let start_instant = context.now();
+    let (version, raw_manifest, draft) = match &version_argument {
+      Some(version) => client
+        .get_raw_manifest(manifest_id.as_str(), version)
+        .await
+        .map(|(raw_manifest, draft)| (version.clone(), raw_manifest, draft))
+        .map_err(|error| match error {
+          DshApiError::NotFound(_) => format!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
+          _ => error.to_string(),
+        })?,
+      None => client.get_raw_manifest_latest(manifest_id.as_str(), false).await.map_err(|error| match error {
+        DshApiError::NotFound(_) => format!("app catalog manifest '{}' does not exist", manifest_id),
+        _ => error.to_string(),
+      })?,
+    };
+    context.print_execution_time(start_instant);
+    if draft {
+      context.print_warning(format!("{}:{} is a draft manifest", manifest_id, version));
+    }
+    context.print(raw_manifest);
+    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -115,18 +220,24 @@ impl CommandExecutor for ManifestExport {
   }
 }
 
-struct ManifestListAll {}
+struct ManifestListLatest {}
 
 #[async_trait]
-impl CommandExecutor for ManifestListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    context.print_explanation("list all app catalog manifests");
+impl CommandExecutor for ManifestListLatest {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let include_draft = matches.get_flag(FilterFlagType::Draft.id());
+    if include_draft {
+      context.print_explanation("list all latest versions of app catalog manifests (draft and final)");
+    } else {
+      context.print_explanation("list all latest final versions of app catalog manifests");
+    }
     let start_instant = context.now();
-    let manifests_by_id: Vec<(String, Vec<(Version, Manifest)>)> = client.list_app_catalog_manifests().await?;
+    let mut latest_manifests: Vec<(String, Manifest)> = client.list_app_catalog_manifests_latest(include_draft).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&MANIFEST_LABELS_LIST, None, context);
-    for (manifest_id, manifests) in &manifests_by_id {
-      formatter.push_target_id_value(manifest_id.clone(), &manifests.last().unwrap().1);
+    let mut formatter =
+      if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
+    for (manifest_id, manifest) in latest_manifests.iter_mut() {
+      formatter.push_target_id_value(manifest_id.clone(), manifest);
     }
     formatter.print(None)?;
     Ok(())
@@ -141,15 +252,23 @@ struct ManifestListAllVersions {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListAllVersions {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    context.print_explanation("list all versions of all app catalog manifests");
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let include_draft = matches.get_flag(FilterFlagType::Draft.id());
+    if include_draft {
+      context.print_explanation("list all versions of all app catalog manifests (draft and final)");
+    } else {
+      context.print_explanation("list all final versions of all app catalog manifests");
+    }
     let start_instant = context.now();
-    let manifests_by_id: Vec<(String, Vec<(Version, Manifest)>)> = client.list_app_catalog_manifests().await?;
+    let manifests_by_id: Vec<(String, Vec<Manifest>)> = client.list_app_catalog_manifests().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&MANIFEST_LABELS_LIST, None, context);
+    let mut formatter =
+      if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
     for (manifest_id, manifests) in &manifests_by_id {
-      for (_, manifest) in manifests {
-        formatter.push_target_id_value(manifest_id.clone(), manifest);
+      for manifest in manifests {
+        if !manifest.draft || include_draft {
+          formatter.push_target_id_value(manifest_id.clone(), manifest);
+        }
       }
     }
     formatter.print(None)?;
@@ -181,57 +300,10 @@ impl CommandExecutor for ManifestListIds {
   }
 }
 
-struct ManifestManual {}
+struct ManifestShow {}
 
 #[async_trait]
-impl CommandExecutor for ManifestManual {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    let manifest_id = target.unwrap_or_else(|| unreachable!());
-    let version_argument = match matches.get_one::<String>(VERSION_ARGUMENT) {
-      Some(version) => Some(Version::from_str(version.as_str())?),
-      None => None,
-    };
-    match &version_argument {
-      Some(version) => context.print_explanation(format!("show configuration manual for app catalog manifest '{}', version {}", manifest_id, version)),
-      None => context.print_explanation(format!("show configuration manual for app catalog manifest '{}', latest version", manifest_id)),
-    }
-    let start_instant = context.now();
-    context.print_execution_time(start_instant);
-    let manifest: Manifest = match version_argument {
-      Some(version_argument) => client.get_app_catalog_manifest(manifest_id.as_str(), &version_argument).await?,
-      None => client.get_app_catalog_manifest_latest(manifest_id.as_str()).await?,
-    };
-    println!("{}", manifest.name);
-    if let Some(description) = manifest.description {
-      println!("{}", description);
-    }
-    println!("{}:{}", manifest.id, manifest.version);
-    if let Some(more_info) = manifest.more_info {
-      println!();
-      println!("{}", termimad::text(more_info.as_str()));
-    }
-    if let Some(configuration) = &manifest.configuration {
-      let mut property_ids = configuration.properties.iter().map(|(id, _)| id.to_string()).collect_vec();
-      property_ids.sort();
-      let mut formatter = ListFormatter::new(&PROPERTY_LABELS_LIST, None, context);
-      for property_id in property_ids {
-        let property = configuration.properties.get(&property_id).unwrap();
-        formatter.push_target_id_value(property_id, property);
-      }
-      formatter.print(None)?;
-    }
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
-  }
-}
-
-struct ManifestShowAll {}
-
-#[async_trait]
-impl CommandExecutor for ManifestShowAll {
+impl CommandExecutor for ManifestShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     let version_argument = matches.get_one::<String>(VERSION_ARGUMENT).map(|version| Version::from_str(version)).transpose()?;
@@ -241,21 +313,21 @@ impl CommandExecutor for ManifestShowAll {
       None => context.print_explanation(format!("show all parameters for app catalog manifest '{}', latest version", manifest_id)),
     }
     let start_instant = context.now();
-    let manifests: Vec<(Version, Manifest)> = client.get_app_catalog_manifests(manifest_id.as_str()).await?;
-    context.print_execution_time(start_instant);
-    if manifests.is_empty() {
-      return Err(format!("manifest '{}' not found", manifest_id));
-    } else {
-      let labels: &[ManifestLabel] = if complete { &MANIFEST_LABELS_SHOW_FULL } else { &MANIFEST_LABELS_SHOW };
-      match version_argument {
-        Some(version_argument) => match manifests.iter().find(|(version, _)| version == &version_argument) {
-          Some((_, manifest)) => UnitFormatter::new(manifest_id, labels, Some("manifest id"), context).print(manifest, None)?,
-          None => return Err(format!("manifest '{}' has no version {}", manifest_id, version_argument)),
-        },
-        None => UnitFormatter::new(manifest_id, labels, Some("manifest id"), context).print(&manifests.last().unwrap().clone().1, None)?,
-      }
+    let manifest = match &version_argument {
+      Some(version) => client.get_app_catalog_manifest(manifest_id.as_str(), version).await?,
+      None => client.get_app_catalog_manifest_latest(manifest_id.as_str(), false).await?,
     };
-    Ok(())
+    context.print_execution_time(start_instant);
+    if manifest.draft {
+      context.print_warning(format!("{}:{} is a draft manifest", manifest_id, manifest.version));
+    }
+    UnitFormatter::new(
+      manifest_id,
+      if complete { &MANIFEST_LABELS_SHOW_FULL } else { &MANIFEST_LABELS_SHOW },
+      Some("manifest id"),
+      context,
+    )
+    .print(&manifest, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -267,15 +339,23 @@ struct ManifestShowAllVersions {}
 
 #[async_trait]
 impl CommandExecutor for ManifestShowAllVersions {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("list all versions of app catalog manifest '{}'", manifest_id));
+    let include_draft = matches.get_flag(FilterFlagType::Draft.id());
+    if include_draft {
+      context.print_explanation(format!("list all versions of app catalog manifest '{}' (draft and final)", manifest_id));
+    } else {
+      context.print_explanation(format!("list all final versions of app catalog manifest '{}'", manifest_id));
+    }
     let start_instant = context.now();
-    let manifests_by_id: Vec<(Version, Manifest)> = client.get_app_catalog_manifests(manifest_id.as_str()).await?;
+    let manifests_by_id: Vec<Manifest> = client.get_app_catalog_manifests(manifest_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&MANIFEST_LABELS_LIST, None, context);
-    for (_, manifest) in &manifests_by_id {
-      formatter.push_target_id_value(manifest_id.clone(), manifest);
+    let mut formatter =
+      if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
+    for manifest in &manifests_by_id {
+      if !manifest.draft || include_draft {
+        formatter.push_target_id_value(manifest_id.clone(), manifest);
+      }
     }
     formatter.print(None)?;
     Ok(())
@@ -540,7 +620,9 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
   }
 }
 
-pub static MANIFEST_LABELS_LIST: [ManifestLabel; 6] =
+pub static MANIFEST_LABELS_LIST: [ManifestLabel; 5] = [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Vendor, ManifestLabel::LastModified];
+
+pub static MANIFEST_LABELS_LIST_INCLUDE_DRAFT: [ManifestLabel; 6] =
   [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Draft, ManifestLabel::Vendor, ManifestLabel::LastModified];
 
 pub static MANIFEST_LABELS_SHOW: [ManifestLabel; 9] = [

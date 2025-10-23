@@ -2,13 +2,12 @@ use clap::{Arg, ArgAction};
 
 #[derive(Debug)]
 pub(crate) enum FilterFlagType {
-  App,
   Complete,
+  Draft,
   #[cfg(feature = "manage")]
   Internal,
   #[cfg(feature = "manage")]
   Public,
-  Service,
   Started,
   Stopped,
 }
@@ -16,13 +15,12 @@ pub(crate) enum FilterFlagType {
 impl FilterFlagType {
   pub(crate) fn id(&self) -> &'static str {
     match &self {
-      Self::App => "app-flag",
       Self::Complete => "complete-flag",
+      Self::Draft => "draft-flag",
       #[cfg(feature = "manage")]
       Self::Internal => "internal-flag",
       #[cfg(feature = "manage")]
       Self::Public => "public-flag",
-      Self::Service => "service-flag",
       Self::Started => "started-flag",
       Self::Stopped => "stopped-flag",
     }
@@ -30,13 +28,12 @@ impl FilterFlagType {
 
   fn option(&self) -> &'static str {
     match &self {
-      Self::App => "app",
       Self::Complete => "complete",
+      Self::Draft => "draft",
       #[cfg(feature = "manage")]
       Self::Internal => "internal",
       #[cfg(feature = "manage")]
       Self::Public => "public",
-      Self::Service => "service",
       Self::Started => "started",
       Self::Stopped => "stopped",
     }
@@ -44,13 +41,12 @@ impl FilterFlagType {
 
   fn help(&self) -> &'static str {
     match &self {
-      Self::App => "Include apps",
       Self::Complete => "Include all parameters",
+      Self::Draft => "Include draft versions",
       #[cfg(feature = "manage")]
       Self::Internal => "Include internal streams",
       #[cfg(feature = "manage")]
       Self::Public => "Include public streams",
-      Self::Service => "Include services",
       Self::Started => "Include only started apps/services",
       Self::Stopped => "Include only stopped apps/services",
     }
