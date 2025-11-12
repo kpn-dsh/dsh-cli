@@ -102,7 +102,7 @@ impl CommandExecutor for TargetCreate {
         existing_target
       ));
     };
-    let password = context.read_single_line_password("enter password: ")?;
+    let password = context.read_single_line_password("enter password")?;
     let target = Target::new(platform, tenant, Some(password))?;
     if context.dry_run() {
       context.print_warning(format!("dry-run mode, target '{}' not created", target));
