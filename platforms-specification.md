@@ -12,7 +12,7 @@ will <em>not</em> be included. If you need these too, make sure that you also
 include the default platforms in your platforms file.
 
 The default platforms file is defined in the `dsh_api` library crate.
-When tou want to create your own platforms file you can use the default file as a starting point.
+When you want to create your own platforms file you can use the default file as a starting point.
 
 ```bash
 > dsh platform export > my-platforms.json
