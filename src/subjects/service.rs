@@ -2,7 +2,7 @@ use crate::argument_parsers::RangedValueParser;
 use crate::arguments::service_id_argument;
 use crate::capability::{
   Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS,
-  RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
+  OPEN_COMMAND, OPEN_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -15,7 +15,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
-use crate::{edit_configuration, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::{edit_configuration, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use chrono::DateTime;
 use clap::{Arg, ArgAction, ArgMatches};
@@ -23,11 +23,13 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::parse::ImageString;
 use dsh_api::types::{Application, TaskState};
 use dsh_api::types::{Task, TaskStatus};
+use dsh_api::vhost::VhostString;
 use dsh_api::DshApiError;
 use futures::future::try_join_all;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -84,6 +86,11 @@ lazy_static! {
         (FilterFlagType::Stopped, Some("List all stopped services.".to_string()))
       ])
   );
+  static ref SERVICE_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), &ServiceOpen {}, "Open service vhost")
+      .set_long_about("Open the vhost of a DSH service.")
+      .add_target_argument(service_id_argument().required(true))
+  );
   static ref SERVICE_RESTART_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(RESTART_COMMAND, None, &ServiceRestart {}, "Restart service")
       .set_long_about("Restarts an already running service.")
@@ -124,6 +131,7 @@ lazy_static! {
     SERVICE_EDIT_CAPABILITY.as_ref(),
     SERVICE_EXPORT_CAPABILITY.as_ref(),
     SERVICE_LIST_CAPABILITY.as_ref(),
+    SERVICE_OPEN_CAPABILITY.as_ref(),
     SERVICE_RESTART_CAPABILITY.as_ref(),
     SERVICE_SHOW_CAPABILITY.as_ref(),
     SERVICE_START_CAPABILITY.as_ref(),
@@ -154,6 +162,7 @@ impl Subject for ServiceSubject {
       EXPORT_COMMAND => Some(SERVICE_EXPORT_CAPABILITY.as_ref()),
       DUPLICATE_COMMAND => Some(SERVICE_DUPLICATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SERVICE_LIST_CAPABILITY.as_ref()),
+      OPEN_COMMAND => Some(SERVICE_OPEN_CAPABILITY.as_ref()),
       RESTART_COMMAND => Some(SERVICE_RESTART_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(SERVICE_SHOW_CAPABILITY.as_ref()),
       START_COMMAND => Some(SERVICE_START_CAPABILITY.as_ref()),
@@ -423,7 +432,7 @@ impl CommandExecutor for ServiceListAllocationStatus {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all services with their allocation status");
     let start_instant = context.now();
-    let service_ids = client.list_application_ids().await?;
+    let service_ids = client.application_ids().await?;
     let allocation_statuses = try_join_all(service_ids.iter().map(|service_id| client.get_application_status(service_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("service id"), context);
@@ -444,7 +453,7 @@ impl CommandExecutor for ServiceListIds {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all service ids");
     let start_instant = context.now();
-    let ids = client.list_application_ids().await?;
+    let ids = client.application_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("service id", context);
     formatter.push_target_ids(ids.as_slice());
@@ -487,6 +496,58 @@ impl CommandExecutor for ServiceListTasks {
     formatter.push_values(&service_id_tasks_pairs);
     formatter.print(None)?;
     Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct ServiceOpen {}
+
+#[async_trait]
+impl CommandExecutor for ServiceOpen {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant_name = get_target_tenant(matches, context.settings())?;
+    let service_id = target.unwrap_or_else(|| unreachable!());
+    let start_instant = context.now();
+    let service = client.get_application_configuration(&service_id).await?;
+    context.print_execution_time(start_instant);
+    if service.exposed_ports.is_empty() {
+      Err("service has no exposed ports".to_string())
+    } else if service.exposed_ports.len() > 1 {
+      Err("service has more than one exposed port".to_string())
+    } else {
+      let (_, port_mapping) = service.exposed_ports.iter().next().unwrap();
+      match &port_mapping.vhost {
+        Some(vhost) => {
+          let vhost_string = VhostString::from_str(vhost)?;
+          match vhost_string.zone {
+            Some(zone) => {
+              if zone == "private" {
+                context.open_url(
+                  format!(
+                    "https://{}",
+                    client.platform().tenant_private_vhost_domain(client.tenant().name(), vhost_string.vhost_name)?
+                  ),
+                  format!("private vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                )
+              } else if zone == "public" {
+                context.open_url(
+                  format!("https://{}", client.platform().public_vhost_domain(vhost_string.vhost_name)),
+                  format!("public vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                )
+              } else {
+                Err(format!("exposed port has illegal zone {}", zone))
+              }
+            }
+            None => Err("exposed port has no zone".to_string()),
+          }
+        }
+        None => Err("port mapping has no vhost".to_string()),
+      }
+    }
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -869,7 +930,18 @@ impl SubjectFormatter<ServiceLabel> for Application {
     match label {
       ServiceLabel::Cpus => self.cpus.to_string(),
       ServiceLabel::Env => hashmap_to_table(&self.env),
-      ServiceLabel::ExposedPorts => self.exposed_ports.keys().map(|port| port.to_string()).collect_vec().join(","),
+      ServiceLabel::ExposedPorts => self
+        .exposed_ports
+        .iter()
+        .map(|(port, port_mapping)| {
+          format!(
+            "{} : {}",
+            port,
+            VhostString::try_from(port_mapping).map(|vhost_string| vhost_string.to_string()).unwrap_or_default()
+          )
+        })
+        .collect_vec()
+        .join("\n"),
       ServiceLabel::HealthCheck => self.health_check.clone().map(|health_check| health_check.to_string()).unwrap_or_default(),
       ServiceLabel::Image => ImageString::from(self.image.as_str()).to_string(),
       ServiceLabel::Instances => self.instances.to_string(),

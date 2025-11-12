@@ -24,9 +24,10 @@ pub(crate) mod volume;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::notifications_to_string;
 use dsh_api::types::AllocationStatus;
-use dsh_api::UsedBy;
+use dsh_api::{Dependant, DependantApp, DependantApplication};
 use itertools::Itertools;
 use serde::Serialize;
+use std::fmt::Display;
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub enum AllocationStatusLabel {
@@ -75,29 +76,32 @@ pub static DEFAULT_ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
   [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::Notifications, AllocationStatusLabel::DerivedFrom];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum UsedByLabel {
-  Target,
-  User,
-  Instances,
+pub enum DependantLabel {
   Injections,
+  Instances,
+  Kind,
+  _Resources,
+  Target,
 }
 
-impl Label for UsedByLabel {
+impl Label for DependantLabel {
   fn as_str(&self) -> &str {
     match self {
-      UsedByLabel::Injections => "injections",
-      UsedByLabel::Instances => "instances",
-      UsedByLabel::Target => "target id",
-      UsedByLabel::User => "app/service",
+      DependantLabel::Injections => "injections",
+      DependantLabel::Instances => "instances",
+      DependantLabel::Kind => "app/service",
+      DependantLabel::_Resources => "app/resources",
+      DependantLabel::Target => "target id",
     }
   }
 
   fn as_str_for_list(&self) -> &str {
     match self {
-      UsedByLabel::Injections => "injections",
-      UsedByLabel::Instances => "#",
-      UsedByLabel::Target => "target id",
-      UsedByLabel::User => "app/service",
+      DependantLabel::Injections => "injections",
+      DependantLabel::Instances => "#",
+      DependantLabel::Kind => "app/service",
+      DependantLabel::_Resources => "resources",
+      DependantLabel::Target => "target id",
     }
   }
 
@@ -106,33 +110,60 @@ impl Label for UsedByLabel {
   }
 }
 
-impl SubjectFormatter<UsedByLabel> for UsedBy {
-  fn value(&self, label: &UsedByLabel, target_id: &str) -> String {
+impl<T> SubjectFormatter<DependantLabel> for DependantApplication<T>
+where
+  T: Display,
+{
+  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
     match label {
-      UsedByLabel::Injections => match self {
-        UsedBy::App(_, resources) => resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
-        UsedBy::Application(_, _, injections) => injections.iter().map(|injection| injection.to_string()).collect_vec().join("\n"),
-      },
-      UsedByLabel::Instances => match self {
-        UsedBy::App(_, _) => "".to_string(),
-        UsedBy::Application(_, instances, _) => instances.to_string(),
-      },
-      UsedByLabel::Target => target_id.to_string(),
-      UsedByLabel::User => match self {
-        UsedBy::App(app_id, _) => app_id.to_string(),
-        UsedBy::Application(service_id, _, _) => service_id.to_string(),
-      },
+      DependantLabel::Injections => self.injections.iter().map(|injection| injection.to_string()).collect_vec().join("\n"),
+      DependantLabel::Instances => self.instances.to_string(),
+      DependantLabel::Kind => "application".to_string(),
+      DependantLabel::_Resources => "".to_string(),
+      DependantLabel::Target => target_id.to_string(),
     }
   }
 
   fn target_id(&self) -> Option<String> {
-    Some(match self {
-      UsedBy::App(app_id, _) => app_id.to_string(),
-      UsedBy::Application(service_id, _, _) => service_id.to_string(),
-    })
+    Some(self.application_id.to_string())
   }
 }
 
-pub static USED_BY_LABELS_LIST: [UsedByLabel; 4] = [UsedByLabel::Target, UsedByLabel::Instances, UsedByLabel::User, UsedByLabel::Injections];
+impl SubjectFormatter<DependantLabel> for DependantApp {
+  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
+    match label {
+      DependantLabel::Injections => "".to_string(),
+      DependantLabel::Instances => "".to_string(),
+      DependantLabel::Kind => "app".to_string(),
+      DependantLabel::_Resources => self.resources.iter().join(", "),
+      DependantLabel::Target => target_id.to_string(),
+    }
+  }
 
-pub static USED_BY_LABELS: [UsedByLabel; 3] = [UsedByLabel::User, UsedByLabel::Instances, UsedByLabel::Injections];
+  fn target_id(&self) -> Option<String> {
+    Some(self.app_id.to_string())
+  }
+}
+
+impl<T> SubjectFormatter<DependantLabel> for Dependant<T>
+where
+  T: Display,
+{
+  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
+    match self {
+      Dependant::App(app) => app.value(label, target_id),
+      Dependant::Application(application) => application.value(label, target_id),
+    }
+  }
+
+  fn target_id(&self) -> Option<String> {
+    match self {
+      Dependant::App(app) => Some(app.app_id.to_string()),
+      Dependant::Application(application) => Some(application.application_id.to_string()),
+    }
+  }
+}
+
+pub static DEPENDANT_LABELS_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Instances, DependantLabel::Kind, DependantLabel::Injections];
+
+pub static DEPENDANT_LABELS: [DependantLabel; 3] = [DependantLabel::Kind, DependantLabel::Instances, DependantLabel::Injections];

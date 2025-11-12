@@ -220,7 +220,7 @@ impl CommandExecutor for TenantGrant {
       access_rights, managed_stream_id, managed_tenant_id
     ));
     let kind = client
-      .grant_managed_stream_access_rights(&managed_stream_id, &managed_tenant_id, &access_rights)
+      .managed_stream_grant_access_rights(&managed_stream_id, &managed_tenant_id, &access_rights)
       .await?;
     context.print_outcome(format!("access granted to {} managed stream", kind));
     Ok(())
@@ -244,7 +244,7 @@ impl CommandExecutor for TenantListAll {
     } else {
       let (managed_tenants, limits) = try_join!(
         try_join_all(tenant_ids.iter().map(|tenant_id| client.get_tenant_configuration(tenant_id))),
-        try_join_all(tenant_ids.iter().map(|tenant_id| client.get_managed_tenant_limits(tenant_id)))
+        try_join_all(tenant_ids.iter().map(|tenant_id| client.managed_tenant_limits(tenant_id)))
       )?;
       context.print_execution_time(start_instant);
       let managed_tenants_limits: Vec<(ManagedTenant, TenantLimits)> = managed_tenants.into_iter().zip(limits).collect_vec();
@@ -299,8 +299,7 @@ impl CommandExecutor for TenantListStreams {
       context.print_outcome("no managed tenants or you are not authorized to manage tenants");
     } else {
       let tenants_granted_streams: Vec<Vec<(ManagedStreamId, Stream, AccessRights)>> =
-        try_join_all(tenant_ids.iter().map(|tenant_id| client.get_granted_managed_streams(tenant_id))).await?;
-
+        try_join_all(tenant_ids.iter().map(|tenant_id| client.managed_tenant_granted_managed_streams(tenant_id))).await?;
       context.print_execution_time(start_instant);
       let mut formatter = ListFormatter::new(&LIST_STREAM_ACCESS_LABELS, None, context);
       for (tenant_id, granted_streams) in tenant_ids.iter().zip(&tenants_granted_streams) {
@@ -329,7 +328,7 @@ impl CommandExecutor for TenantRevoke {
       "revoke {} access to managed stream '{}' from managed tenant '{}'",
       rights, managed_stream_id, managed_tenant_id
     ));
-    let kind = client.revoke_managed_stream_access_rights(&managed_stream_id, &managed_tenant_id, &rights).await?;
+    let kind = client.managed_stream_revoke_access_rights(&managed_stream_id, &managed_tenant_id, &rights).await?;
     context.print_outcome(format!("access revoked from {} managed stream", kind));
     Ok(())
   }
@@ -347,7 +346,7 @@ impl CommandExecutor for TenantShowAll {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all limits for tenant '{}'", tenant_id));
     let start_instant = context.now();
-    match try_join!(client.get_tenant_configuration(&tenant_id), client.get_managed_tenant_limits(&tenant_id)) {
+    match try_join!(client.get_tenant_configuration(&tenant_id), client.managed_tenant_limits(&tenant_id)) {
       Ok((managed_tenant, tenant_limits)) => {
         context.print_execution_time(start_instant);
         UnitFormatter::new(tenant_id, &TENANT_LABELS, Some("tenant id"), context).print(&(managed_tenant, tenant_limits), None)
@@ -375,7 +374,7 @@ impl CommandExecutor for TenantShowStreams {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all streams that tenant '{}' has access to", tenant_id));
     let start_instant = context.now();
-    let grants: Vec<(ManagedStreamId, Stream, AccessRights)> = client.get_granted_managed_streams(&tenant_id).await?;
+    let grants: Vec<(ManagedStreamId, Stream, AccessRights)> = client.managed_tenant_granted_managed_streams(&tenant_id).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&STREAM_ACCESS_LABELS, None, context);
     formatter.push_values(&grants);
@@ -405,7 +404,7 @@ impl CommandExecutor for TenantUpdateLimit {
 
       (false, true) => {
         context.print_explanation(format!("update limits of managed tenant '{}'", tenant_id));
-        match client.get_managed_tenant_limits(&tenant_id).await {
+        match client.managed_tenant_limits(&tenant_id).await {
           Ok(current_tenant_limits) => {
             let mut updated_tenant_limits = current_tenant_limits.clone();
             updated_tenant_limits.update(&tenant_limits_from_arguments);

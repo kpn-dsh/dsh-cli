@@ -1,4 +1,4 @@
-use crate::arguments::{app_version_argument, manifest_id_argument, VERSION_ARGUMENT};
+use crate::arguments::{manifest_id_argument, manifest_version_argument, MANIFEST_VERSION_ARGUMENT};
 use crate::capability::{Capability, CommandExecutor, EXPLAIN_COMMAND, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -13,8 +13,8 @@ use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
-use dsh_api::app_manifest::{Manifest, Numerical, Property, Resource};
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::manifest::{Manifest, Property, PropertyKind, Resource};
 use dsh_api::version::Version;
 use dsh_api::DshApiError;
 use itertools::Itertools;
@@ -69,7 +69,7 @@ lazy_static! {
          latest final version will be explained."
       )
       .add_target_argument(manifest_id_argument().required(true))
-      .add_target_argument(app_version_argument())
+      .add_target_argument(manifest_version_argument())
   );
   static ref MANIFEST_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(EXPORT_COMMAND, None, &ManifestExport {}, "Export manifest")
@@ -78,7 +78,7 @@ lazy_static! {
          latest final version will be exported."
       )
       .add_target_argument(manifest_id_argument().required(true))
-      .add_target_argument(app_version_argument())
+      .add_target_argument(manifest_version_argument())
   );
   static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ManifestListLatest {}, "List manifests")
@@ -104,7 +104,7 @@ lazy_static! {
          When the <VERSION> argument is not provided the latest final version will be shown."
       )
       .add_target_argument(manifest_id_argument().required(true))
-      .add_target_argument(app_version_argument())
+      .add_target_argument(manifest_version_argument())
       .add_command_executor(
         FlagType::AllVersions,
         &ManifestShowAllVersions {},
@@ -128,7 +128,7 @@ impl CommandExecutor for ManifestExplain {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     let version_argument = matches
-      .get_one::<String>(VERSION_ARGUMENT)
+      .get_one::<String>(MANIFEST_VERSION_ARGUMENT)
       .map(|version| Version::from_str(version.as_str()))
       .transpose()?;
     match &version_argument {
@@ -138,11 +138,11 @@ impl CommandExecutor for ManifestExplain {
     let start_instant = context.now();
     let manifest: Manifest = match version_argument {
       Some(version) => client
-        .get_app_catalog_manifest(manifest_id.as_str(), &version)
+        .manifest(manifest_id.as_str(), &version)
         .await
         .map_err(|_| format!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
       None => client
-        .get_app_catalog_manifest_latest(manifest_id.as_str(), false)
+        .manifest_latest_version(manifest_id.as_str(), false)
         .await
         .map_err(|_| format!("app catalog manifest '{}' does not exist", manifest_id))?,
     };
@@ -185,7 +185,7 @@ impl CommandExecutor for ManifestExport {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     let version_argument = matches
-      .get_one::<String>(VERSION_ARGUMENT)
+      .get_one::<String>(MANIFEST_VERSION_ARGUMENT)
       .map(|version| Version::from_str(version.as_str()))
       .transpose()?;
     match &version_argument {
@@ -195,14 +195,14 @@ impl CommandExecutor for ManifestExport {
     let start_instant = context.now();
     let (version, raw_manifest, draft) = match &version_argument {
       Some(version) => client
-        .get_raw_manifest(manifest_id.as_str(), version)
+        .manifest_raw(manifest_id.as_str(), version)
         .await
         .map(|(raw_manifest, draft)| (version.clone(), raw_manifest, draft))
         .map_err(|error| match error {
           DshApiError::NotFound(_) => format!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
           _ => error.to_string(),
         })?,
-      None => client.get_raw_manifest_latest(manifest_id.as_str(), false).await.map_err(|error| match error {
+      None => client.manifest_raw_latest(manifest_id.as_str(), false).await.map_err(|error| match error {
         DshApiError::NotFound(_) => format!("app catalog manifest '{}' does not exist", manifest_id),
         _ => error.to_string(),
       })?,
@@ -232,7 +232,7 @@ impl CommandExecutor for ManifestListLatest {
       context.print_explanation("list all latest final versions of app catalog manifests");
     }
     let start_instant = context.now();
-    let mut latest_manifests: Vec<(String, Manifest)> = client.list_app_catalog_manifests_latest(include_draft).await?;
+    let mut latest_manifests: Vec<(String, Manifest)> = client.manifests_latest_version(include_draft).await?;
     context.print_execution_time(start_instant);
     let mut formatter =
       if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
@@ -260,7 +260,7 @@ impl CommandExecutor for ManifestListAllVersions {
       context.print_explanation("list all final versions of all app catalog manifests");
     }
     let start_instant = context.now();
-    let manifests_by_id: Vec<(String, Vec<Manifest>)> = client.list_app_catalog_manifests().await?;
+    let manifests_by_id: Vec<(String, Vec<Manifest>)> = client.manifests_all_versions().await?;
     context.print_execution_time(start_instant);
     let mut formatter =
       if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
@@ -287,7 +287,7 @@ impl CommandExecutor for ManifestListIds {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all app catalog manifest ids");
     let start_instant = context.now();
-    let manifest_ids: Vec<String> = client.list_app_catalog_manifest_ids().await?;
+    let manifest_ids: Vec<String> = client.manifest_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("manifest id", context);
     formatter.push_target_ids(&manifest_ids);
@@ -306,7 +306,10 @@ struct ManifestShow {}
 impl CommandExecutor for ManifestShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
-    let version_argument = matches.get_one::<String>(VERSION_ARGUMENT).map(|version| Version::from_str(version)).transpose()?;
+    let version_argument = matches
+      .get_one::<String>(MANIFEST_VERSION_ARGUMENT)
+      .map(|version| Version::from_str(version))
+      .transpose()?;
     let complete = matches.get_flag(FilterFlagType::Complete.id());
     match &version_argument {
       Some(version) => context.print_explanation(format!("show all parameters for app catalog manifest '{}', version {}", manifest_id, version)),
@@ -314,8 +317,8 @@ impl CommandExecutor for ManifestShow {
     }
     let start_instant = context.now();
     let manifest = match &version_argument {
-      Some(version) => client.get_app_catalog_manifest(manifest_id.as_str(), version).await?,
-      None => client.get_app_catalog_manifest_latest(manifest_id.as_str(), false).await?,
+      Some(version) => client.manifest(manifest_id.as_str(), version).await?,
+      None => client.manifest_latest_version(manifest_id.as_str(), false).await?,
     };
     context.print_execution_time(start_instant);
     if manifest.draft {
@@ -348,7 +351,7 @@ impl CommandExecutor for ManifestShowAllVersions {
       context.print_explanation(format!("list all final versions of app catalog manifest '{}'", manifest_id));
     }
     let start_instant = context.now();
-    let manifests_by_id: Vec<Manifest> = client.get_app_catalog_manifests(manifest_id.as_str()).await?;
+    let manifests_by_id: Vec<Manifest> = client.manifest_all_versions(manifest_id.as_str()).await?;
     context.print_execution_time(start_instant);
     let mut formatter =
       if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
@@ -409,21 +412,19 @@ impl Label for ManifestLabel {
 
 #[derive(Debug, Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum PropertyLabel {
-  _Default,
+  Default,
   Description,
-  Enum,
   Id,
-  _Type,
+  ValueExplanation,
 }
 
 impl Label for PropertyLabel {
   fn as_str(&self) -> &str {
     match self {
-      Self::_Default => "default",
+      Self::Default => "default",
       Self::Description => "description",
-      Self::Enum => "value",
       Self::Id => "property",
-      Self::_Type => "type",
+      Self::ValueExplanation => "value",
     }
   }
 
@@ -435,65 +436,69 @@ impl Label for PropertyLabel {
 impl SubjectFormatter<PropertyLabel> for Property {
   fn value(&self, label: &PropertyLabel, target_id: &str) -> String {
     match label {
-      PropertyLabel::_Default => self.default.clone().map(|default| default.to_string()).unwrap_or_default(),
-      PropertyLabel::Description => self.description.to_string(),
-      PropertyLabel::Enum => match &self.r#enum {
-        Some(enum_values) => match &self.default {
-          Some(default_value) => enum_values
-            .iter()
-            .map(|enum_value| if enum_value == default_value { format!("{}*", enum_value) } else { enum_value.to_string() })
-            .join(", "),
-          None => enum_values.iter().join(", "),
+      PropertyLabel::Default => match self.kind {
+        PropertyKind::DnsZone => "private".to_string(),
+        PropertyKind::Number => match &self.default {
+          Some(default_value) => default_value.to_string(),
+          None => "mandatory".to_string(),
         },
-        None => match &self.default {
-          Some(default_value) => format!("default: {}", default_value),
-          None => "".to_string(),
+        PropertyKind::String => match &self.default {
+          Some(default_value) => {
+            if self.enumeration.is_some() {
+              default_value.to_string()
+            } else {
+              format!("\"{}\"", default_value)
+            }
+          }
+          None => "mandatory".to_string(),
         },
       },
+      PropertyLabel::Description => self.description.to_string(),
       PropertyLabel::Id => target_id.to_string(),
-      PropertyLabel::_Type => self.r#type.to_string(),
+      PropertyLabel::ValueExplanation => match self.kind {
+        PropertyKind::DnsZone => property_dns_zone_explanation(),
+        PropertyKind::Number => property_value_explanation(self, "number", ", "),
+        PropertyKind::String => property_value_explanation(self, "string", "\n"),
+      },
     }
   }
 }
 
-pub static PROPERTY_LABELS_LIST: [PropertyLabel; 3] = [PropertyLabel::Id, PropertyLabel::Description, PropertyLabel::Enum];
+pub static PROPERTY_LABELS_LIST: [PropertyLabel; 4] = [PropertyLabel::Id, PropertyLabel::ValueExplanation, PropertyLabel::Default, PropertyLabel::Description];
 
-fn property_to_string(property: &Property) -> String {
-  format!(
-    "{}{}: {}{}",
-    property.r#type,
-    if property.default.is_some() { "" } else { "*" },
-    property.description,
-    match property.r#enum {
-      Some(ref enumeration) => format!(
-        "\noptions: {}",
-        enumeration
-          .iter()
-          .map(|value| if property.default.clone().is_some_and(|ref default| default == value) { format!("{}*", value) } else { value.to_string() })
-          .join(", ")
-      ),
-      None => match property.default {
-        Some(ref default) =>
-          if default.is_empty() {
-            "".to_string()
+fn property_dns_zone_explanation() -> String {
+  "private *\npublic".to_string()
+}
+
+fn property_value_explanation(property: &Property, kind: &str, separator: &str) -> String {
+  if let Some(ref enumeration) = property.enumeration {
+    enumeration
+      .iter()
+      .map(|enumeration_value| match property.default.clone() {
+        Some(default_value) => {
+          if default_value == *enumeration_value {
+            format!("{} *", enumeration_value)
           } else {
-            format!("\ndefault: {}", default)
-          },
-        None => "".to_string(),
-      },
-    },
-  )
+            enumeration_value.to_string()
+          }
+        }
+        None => enumeration_value.to_string(),
+      })
+      .join(separator)
+  } else {
+    kind.to_string()
+  }
 }
 
 fn resource_to_key(resource: &Resource) -> String {
   match resource {
     Resource::Application(application) => format!("application: {}", application.name),
     Resource::Bucket(bucket) => format!("bucket: {}", bucket.name),
-    Resource::Certificate(certificate) => format!("certificate: {}", certificate),
+    Resource::Certificate(certificate) => format!("certificate: {}", certificate.unformatted_representation),
     Resource::Database(database) => format!("database: {}", database.name),
-    Resource::Secret(secret) => format!("secret: {}", secret),
+    Resource::Secret(secret) => format!("secret: {}", secret.unformatted_representation),
     Resource::Topic(topic) => format!("topic: {}", topic.name),
-    Resource::Vhost(vhost) => format!("vhost: {}", vhost),
+    Resource::Vhost(vhost) => format!("vhost: {}", vhost.unformatted_representation),
     Resource::Volume(volume) => format!("volume: {}", volume.name),
   }
 }
@@ -503,9 +508,9 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
     Resource::Application(application) => {
       let mut strings = vec![];
       strings.push(format!("image: {}", application.image));
-      strings.push(format!("cpus: {}", numerical_to_string(&application.cpus)));
-      strings.push(format!("mem: {} (MB)", numerical_to_string(&application.mem)));
-      strings.push(format!("instances: {}", numerical_to_string(&application.instances)));
+      strings.push(format!("cpus: {}", application.cpus));
+      strings.push(format!("mem: {} (MB)", application.mem));
+      strings.push(format!("instances: {}", application.instances));
       strings.push(format!("single instance: {}", application.single_instance));
       strings.push(format!("needs token: {}", application.needs_token));
       if let Some(ref secrets) = application.secrets {
@@ -524,8 +529,8 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
           ));
         }
       }
-      if let Some(ref metrics) = application.metrics {
-        strings.push(format!("metrics: {}:{}", metrics.path, metrics.port));
+      if let Some(metrics) = &application.metrics {
+        strings.push(format!("metrics: {}", metrics));
       }
       strings.push(format!("user: {}", application.user));
       if let Some(ref image_console) = application.image_console {
@@ -542,19 +547,19 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
       strings.push(format!("versioned: {}", &bucket.versioned));
       strings
     }
-    Resource::Certificate(certificate) => vec![certificate.to_string()],
+    Resource::Certificate(certificate) => vec![certificate.unformatted_representation.to_string()],
     Resource::Database(database) => {
       let mut strings = vec![];
-      strings.push(format!("cpus: {}", numerical_to_string(&database.cpus),));
-      strings.push(format!("mem: {}", numerical_to_string(&database.mem),));
-      strings.push(format!("instances: {}", numerical_to_string(&database.instances),));
+      strings.push(format!("cpus: {}", database.cpus));
+      strings.push(format!("mem: {}", database.mem));
+      strings.push(format!("instances: {}", database.instances));
       strings.push(format!("version: {}", &database.version));
       strings.push(format!("extensions: {}", database.extensions.join(", ")));
-      strings.push(format!("snapshot interval: {}", numerical_to_string(&database.snapshot_interval)));
-      strings.push(format!("volume size: {}", numerical_to_string(&database.volume_size),));
+      strings.push(format!("snapshot interval: {}", database.snapshot_interval));
+      strings.push(format!("volume size: {}", database.volume_size));
       strings
     }
-    Resource::Secret(secret) => vec![secret.to_string()],
+    Resource::Secret(secret) => vec![secret.unformatted_representation.to_string()],
     Resource::Topic(topic) => {
       let mut strings = vec![];
       strings.push(format!("partitions: {}", topic.partitions));
@@ -564,20 +569,12 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
       }
       strings
     }
-    Resource::Vhost(vhost) => vec![vhost.to_string()],
+    Resource::Vhost(vhost) => vec![vhost.unformatted_representation.to_string()],
     Resource::Volume(volume) => {
       let mut strings = vec![];
-      strings.push(format!("size: {} (GB)", numerical_to_string(&volume.size)));
+      strings.push(format!("size: {} (GB)", volume.size));
       strings
     }
-  }
-}
-
-fn numerical_to_string(numerical: &Numerical) -> String {
-  match numerical {
-    Numerical::Float(float) => float.to_string(),
-    Numerical::Integer(integer) => integer.to_string(),
-    Numerical::Template(template) => template.to_string(),
   }
 }
 
@@ -590,7 +587,7 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
           &configuration
             .properties
             .iter()
-            .map(|(key, property)| (key, property_to_string(property)))
+            .map(|(key, property)| (key, property.to_string()))
             .collect::<HashMap<_, _>>(),
         ),
         None => "".to_string(),

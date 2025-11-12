@@ -2,7 +2,6 @@ use crate::arguments::volume_id_argument;
 use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
@@ -10,13 +9,14 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
+use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Volume, VolumeStatus};
-use dsh_api::UsedBy;
+use dsh_api::volume::VolumeInjection;
+use dsh_api::Dependant;
 use futures::future::try_join_all;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -77,11 +77,7 @@ lazy_static! {
         (FlagType::AllocationStatus, &VolumeListAllocationStatus {}, None),
         (FlagType::Configuration, &VolumeListConfiguration {}, None),
         (FlagType::Ids, &VolumeListIds {}, None),
-        (FlagType::Usage, &VolumeListUsage {}, None),
-      ])
-      .add_filter_flags(vec![
-        (FilterFlagType::App, Some("List all apps that use the volume.".to_string())),
-        (FilterFlagType::Service, Some("List all services that use the volume.".to_string()))
+        (FlagType::Usage, &VolumeListUsage {}, None)
       ])
   );
   static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -121,7 +117,7 @@ impl CommandExecutor for VolumeCreate {
     let size_gi_b: i64 = match matches.get_one::<i64>(SIZE_FLAG) {
       Some(size) => *size,
       None => {
-        let line = context.read_single_line("enter size in gigabytes: ")?;
+        let line = context.read_single_line("enter size in gigabytes")?;
         line.parse::<i64>().map_err(|_| format!("could not parse '{}' as a valid integer", line))?
       }
     };
@@ -257,9 +253,9 @@ impl CommandExecutor for VolumeListUsage {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all volumes that are used in apps or services");
     let start_instant = context.now();
-    let volumes_with_usage: Vec<(String, Vec<UsedBy>)> = client.list_volumes_with_usage().await?;
+    let volumes_with_usage: Vec<(String, Vec<Dependant<VolumeInjection>>)> = client.volumes_with_dependants().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("volume id"), context);
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("volume id"), context);
     for (volume_id, used_bys) in &volumes_with_usage {
       for used_by in used_bys {
         formatter.push_target_id_value(volume_id.clone(), used_by);
@@ -322,12 +318,12 @@ impl CommandExecutor for VolumeShowUsage {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the apps and services that use volume '{}'", volume_id));
     let start_instant = context.now();
-    let (_, usages) = client.get_volume_with_usage(&volume_id).await?;
+    let (_, usages) = client.volume_with_dependants(&volume_id).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("volume not used")
     } else {
-      let mut formatter = ListFormatter::new(&USED_BY_LABELS, Some("volume id"), context);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS, Some("volume id"), context);
       formatter.push_values(&usages);
       formatter.print(None)?;
     }

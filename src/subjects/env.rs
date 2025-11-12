@@ -11,7 +11,7 @@ use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
+use dsh_api::query_processor::{ExactMatchQueryProcessor, Match, QueryProcessor, RegexQueryProcessor};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -77,26 +77,27 @@ impl CommandExecutor for EnvFind {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
-      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&query)? } else { &ExactMatchQueryProcessor::create(&query)? };
+      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*query)? } else { &ExactMatchQueryProcessor::create(&query)? };
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation(format!("find environment variables in services that {}", query_processor.describe()));
     let start_instant = context.now();
     let services = &client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-
     let mut service_pairs = services.iter().collect_vec();
     service_pairs.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
-
     let mut matching_services: Vec<(String, HashMap<ServiceEnvLabel, String>)> = vec![];
     for (service_id, service) in service_pairs {
       if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {
         let mut envs: Vec<(String, String)> = service
           .env
           .iter()
-          .filter_map(|(key, value)| {
-            query_processor
-              .matching_parts(value)
-              .map(|ps| (key.to_string(), context.parts_to_string_for_stdout(ps.as_slice(), None)))
+          .filter_map(|(key, value)| match query_processor.matching(value) {
+            Some(matching) => match matching {
+              Match::Expression(_, _, _) => None,
+              Match::Parts(parts) => Some((key.to_string(), context.parts_to_string_for_stdout(parts.as_slice(), None))),
+              Match::Simple => None,
+            },
+            None => None,
           })
           .collect();
         envs.sort_by_key(|env| env.0.clone());

@@ -11,16 +11,16 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{notifications_to_string, OutputFormat};
 use crate::subject::{Requirements, Subject};
-use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS_LIST};
+use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_LIST};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::topic::TopicInjection;
 use dsh_api::types::{Topic, TopicStatus};
-use dsh_api::UsedBy;
+use dsh_api::Dependant;
 use futures::future::try_join_all;
-use futures::try_join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -41,11 +41,11 @@ impl Subject for TopicSubject {
   }
 
   fn subject_command_about(&self) -> String {
-    "Show, manage and list DSH topics.".to_string()
+    "Show, manage and list DSH scratch topics.".to_string()
   }
 
   fn subject_command_long_about(&self) -> String {
-    "Show, manage and list topics deployed on the DSH.".to_string()
+    "Show, manage and list scratch topics deployed on the DSH.".to_string()
   }
 
   fn subject_command_alias(&self) -> Option<&str> {
@@ -69,7 +69,7 @@ impl Subject for TopicSubject {
 
 lazy_static! {
   static ref TOPIC_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TopicCreate {}, "Create new topic")
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TopicCreate {}, "Create new scratch topic")
       .add_target_argument(topic_id_argument().required(true))
       .add_extra_arguments(vec![
         cleanup_policy_flag(),
@@ -89,7 +89,7 @@ lazy_static! {
       .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TopicListConfiguration {}, "List topics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TopicListConfiguration {}, "List scratch topics")
       .set_long_about("Lists all available scratch topics.")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
@@ -98,7 +98,7 @@ lazy_static! {
       ])
   );
   static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TopicShow {}, "Show topic configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TopicShow {}, "Show scratch topic configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),
         (FlagType::Properties, &TopicShowProperties {}, None),
@@ -116,13 +116,10 @@ pub(crate) fn cleanup_policy_flag() -> Arg {
   Arg::new(CLEANUP_POLICY_FLAG)
     .long(CLEANUP_POLICY_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::PossibleValuesParser::new(vec![
-      PossibleValue::new("compact"),
-      PossibleValue::new("delete").alias("1day"), // TODO Remove in next non backwards compatible version
-    ]))
+    .value_parser(builder::PossibleValuesParser::new(vec![PossibleValue::new("compact")]))
     .value_name("POLICY")
     .help("Cleanup policy")
-    .long_help("Cleanup policy for the new topic.")
+    .long_help("Cleanup policy for the new scratch topic.")
 }
 
 pub(crate) const COMPRESSION_TYPE_FLAG: &str = "compression-type";
@@ -141,7 +138,7 @@ pub(crate) fn compression_type_flag() -> Arg {
     ]))
     .value_name("TYPE")
     .help("Compression type")
-    .long_help("Compression type for the new topic.")
+    .long_help("Compression type for the new scratch topic.")
 }
 
 pub(crate) const DELETE_RETENTION_MS_FLAG: &str = "delete-retention-ms";
@@ -149,7 +146,6 @@ pub(crate) const DELETE_RETENTION_MS_FLAG: &str = "delete-retention-ms";
 pub(crate) fn delete_retention_ms_flag() -> Arg {
   Arg::new(DELETE_RETENTION_MS_FLAG)
     .long(DELETE_RETENTION_MS_FLAG)
-    .alias("delete-retention") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<u64>::with_lower(0))
     .value_name("MS")
@@ -162,13 +158,12 @@ pub(crate) const MAX_MESSAGE_BYTES_FLAG: &str = "max-message-bytes";
 pub(crate) fn max_message_size_flag() -> Arg {
   Arg::new(MAX_MESSAGE_BYTES_FLAG)
     .long(MAX_MESSAGE_BYTES_FLAG)
-    .alias("max-message-size") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<u64>::new(1024, 1048576))
     .value_name("BYTES")
     .help("Max message size")
     .long_help(
-      "Maximum message size (in bytes) for the new topic. \
+      "Maximum message size (in bytes) for the new scratch topic. \
       The minimum message size is 1024 bytes and the maximum size is 1048576 bytes.",
     )
 }
@@ -180,16 +175,15 @@ const TIMESTAMP_LOG_APPEND_TIME: &str = "log-append-time";
 pub(crate) fn message_timestamp_type_flag() -> Arg {
   Arg::new(MESSAGE_TIMESTAMP_TYPE_FLAG)
     .long(MESSAGE_TIMESTAMP_TYPE_FLAG)
-    .alias("timestamps") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
     .value_parser(builder::PossibleValuesParser::new(vec![
-      PossibleValue::new(TIMESTAMP_CREATE_TIME).alias("producer"),   // TODO Remove in next non backwards compatible version
-      PossibleValue::new(TIMESTAMP_LOG_APPEND_TIME).alias("broker"), // TODO Remove in next non backwards compatible version
+      PossibleValue::new(TIMESTAMP_CREATE_TIME),
+      PossibleValue::new(TIMESTAMP_LOG_APPEND_TIME),
     ]))
     .value_name("TYPE")
     .help("Message timestamp type")
     .long_help(
-      "Message timestamp type for the new topic. \
+      "Message timestamp type for the new scratch topic. \
         The allowed values are 'create-time' and 'log-append-time'.",
     )
 }
@@ -204,7 +198,7 @@ pub(crate) fn partitions_flag() -> Arg {
     .value_name("PARTITIONS")
     .help("Number of partitions")
     .long_help(
-      "Number of partitions for the new topic. \
+      "Number of partitions for the new scratch topic. \
           If this option is not specified the created topic will have only 1 partition.",
     )
 }
@@ -219,7 +213,7 @@ pub(crate) fn retention_bytes_flag() -> Arg {
     .value_name("BYTES")
     .help("Retention bytes")
     .long_help(
-      "Retention bytes for the new topic. \
+      "Retention bytes for the new scratch topic. \
       If minimum retention bytes value is set to -1, no limit is applied.",
     )
 }
@@ -234,7 +228,7 @@ pub(crate) fn retention_ms_flag() -> Arg {
     .value_name("MS")
     .help("Retention milliseconds")
     .long_help(
-      "Retention time in milliseconds for the new topic. \
+      "Retention time in milliseconds for the new scratch topic. \
       The minimum retention time value is 3600000 milliseconds (1 hour) \
       and the maximum retention time is 31536000000 milliseconds (1 year).",
     )
@@ -245,13 +239,12 @@ pub(crate) const SEGMENT_BYTES_FLAG: &str = "segment-bytes";
 pub(crate) fn segment_bytes_flag() -> Arg {
   Arg::new(SEGMENT_BYTES_FLAG)
     .long(SEGMENT_BYTES_FLAG)
-    .alias("segment-size") // TODO Remove in next non backwards compatible version
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<u64>::with_lower(52428800))
     .value_name("BYTES")
     .help("Segment bytes")
     .long_help(
-      "Segment bytes for the new topic. \
+      "Segment bytes for the new scratch topic. \
           The minimum segment bytes value is 52428800 bytes",
     )
 }
@@ -264,18 +257,18 @@ impl CommandExecutor for TopicCreate {
     const REPLICATION_FACTOR: u32 = 3;
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if client.get_topic_configuration(&topic_id).await.is_ok() {
-      return Err(format!("topic '{}' already exists", topic_id));
+      return Err(format!("scratch topic '{}' already exists", topic_id));
     }
     let topic = create_topic(matches)?;
     context.print_explanation(format!(
-      "create new topic '{}', number of partitions {}, replication factor {}",
+      "create new scratch topic '{}', number of partitions {}, replication factor {}",
       topic_id, topic.partitions, REPLICATION_FACTOR
     ));
     if context.dry_run() {
-      context.print_warning("dry-run mode, topic not created");
+      context.print_warning("dry-run mode, scratch topic not created");
     } else {
       client.put_topic_configuration(&topic_id, &topic).await?;
-      context.print_outcome(format!("topic '{}' created", topic_id));
+      context.print_outcome(format!("scratch topic '{}' created", topic_id));
     }
     Ok(())
   }
@@ -341,13 +334,13 @@ impl CommandExecutor for TopicDelete {
     }
     if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
       if context.dry_run() {
-        context.print_warning("dry-run mode, topic not deleted");
+        context.print_warning("dry-run mode, scratch topic not deleted");
       } else {
         client.delete_topic_configuration(&topic_id).await?;
-        context.print_outcome(format!("topic '{}' deleted", topic_id));
+        context.print_outcome(format!("scratch topic '{}' deleted", topic_id));
       }
     } else {
-      context.print_outcome(format!("cancelled, topic '{}' not deleted", topic_id));
+      context.print_outcome(format!("cancelled, scratch topic '{}' not deleted", topic_id));
     }
     Ok(())
   }
@@ -424,25 +417,19 @@ struct TopicListUsage {}
 #[async_trait]
 impl CommandExecutor for TopicListUsage {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    context.print_explanation("list all scratch topics with the services that use them");
+    context.print_explanation("list all scratch topics with the services and apps that use them");
     let start_instant = context.now();
-    let (topic_ids, _services) = try_join!(client.get_topic_ids(), client.get_application_configuration_map(),)?;
+    let topics_with_dependants: Vec<(String, Vec<Dependant<TopicInjection>>)> = client.topics_with_dependants().await?;
     context.print_execution_time(start_instant);
-    let tuples: Vec<(String, UsedBy)> = vec![];
-    for _topic_id in &topic_ids {
-      // TODO
-      // let service_usages: Vec<(String, &Application, Vec<Injection>)> = scratch_topic_used_in_applications(topic_id, &services);
-      // for (service_id, service, injections) in service_usages {
-      //   if !injections.is_empty() {
-      //     tuples.push((topic_id.to_string(), UsedBy::Application(service_id, service.instances, injections)));
-      //   }
-      // }
-    }
-    if tuples.is_empty() {
-      context.print_outcome("no topics found in services");
+    if topics_with_dependants.is_empty() {
+      context.print_outcome("no scratch topics found in services");
     } else {
-      let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);
-      formatter.push_target_id_value_pairs(&tuples);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("topic id"), context);
+      for (topic_id, dependants) in &topics_with_dependants {
+        for dependant in dependants {
+          formatter.push_target_id_value(topic_id.clone(), dependant);
+        }
+      }
       formatter.print(None)?;
     }
     Ok(())
@@ -459,7 +446,7 @@ struct TopicShow {}
 impl CommandExecutor for TopicShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the configuration for topic '{}'", topic_id));
+    context.print_explanation(format!("show the configuration for scratch topic '{}'", topic_id));
     let start_instant = context.now();
     let topic = client.get_topic_configuration(&topic_id).await?;
     context.print_execution_time(start_instant);
@@ -477,7 +464,7 @@ struct TopicShowAllocationStatus {}
 impl CommandExecutor for TopicShowAllocationStatus {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the allocation status for topic '{}'", topic_id));
+    context.print_explanation(format!("show the allocation status for scratch topic '{}'", topic_id));
     let start_instant = context.now();
     let allocation_status = client.get_topic_status(&topic_id).await?;
     context.print_execution_time(start_instant);
@@ -495,7 +482,7 @@ struct TopicShowProperties {}
 impl CommandExecutor for TopicShowProperties {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the properties for topic '{}'", topic_id));
+    context.print_explanation(format!("show the properties for scratch topic '{}'", topic_id));
     let start_instant = context.now();
     let topic_status = client.get_topic(&topic_id).await?;
     context.print_execution_time(start_instant);
@@ -519,7 +506,7 @@ struct TopicShowUsage {}
 impl CommandExecutor for TopicShowUsage {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let topic_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the services that use topic '{}'", topic_id));
+    context.print_explanation(format!("show the services that use scratch topic '{}'", topic_id));
     let start_instant = context.now();
     let _services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
@@ -580,7 +567,7 @@ impl Label for TopicLabel {
       Self::RetentionBytes => "retention bytes",
       Self::RetentionMs => "retention ms",
       Self::SegmentBytes => "segment bytes",
-      Self::Target => "topic id",
+      Self::Target => "scratch topic id",
       Self::TimestampType => "timestamp type",
     }
   }

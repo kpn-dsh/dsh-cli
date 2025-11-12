@@ -4,7 +4,6 @@ use crate::capability::{
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
@@ -12,13 +11,14 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
+use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::secret::SecretInjection;
 use dsh_api::types::Secret;
-use dsh_api::{secret, UsedBy};
+use dsh_api::{secret, Dependant};
 use futures::future::try_join_all;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -79,11 +79,7 @@ lazy_static! {
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
         (FlagType::System, &SecretListSystem {}, None),
-        (FlagType::Usage, &SecretListUsage {}, None),
-      ])
-      .add_filter_flags(vec![
-        (FilterFlagType::App, Some("List all apps that use the secret.".to_string())),
-        (FilterFlagType::Service, Some("List all services that use the secret.".to_string())),
+        (FlagType::Usage, &SecretListUsage {}, None)
       ])
   );
   static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
@@ -128,7 +124,7 @@ impl CommandExecutor for SecretCreate {
         }
       } else {
         context.print_explanation(format!("create new single line secret '{}'", secret_id));
-        let secret = context.read_single_line_password("enter secret: ")?;
+        let secret = context.read_single_line_password("enter secret")?;
         let secret = Secret { name: secret_id.clone(), value: secret };
         if context.dry_run() {
           context.print_warning("dry-run mode, secret not created");
@@ -189,7 +185,7 @@ impl CommandExecutor for SecretListAllocationStatus {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secrets with their allocation status");
     let start_instant = context.now();
-    let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !secret::is_system_secret(id)).collect_vec();
+    let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !secret::secret_is_system(id)).collect_vec();
     let allocation_statuses = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context);
@@ -210,7 +206,7 @@ impl CommandExecutor for SecretListSystem {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all system secret ids");
     let start_instant = context.now();
-    let system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| secret::is_system_secret(id)).collect_vec();
+    let system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| secret::secret_is_system(id)).collect_vec();
     let allocation_statuses = try_join_all(system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("system secret id"), context);
@@ -231,7 +227,7 @@ impl CommandExecutor for SecretListIds {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secret ids");
     let start_instant = context.now();
-    let non_system_secrets = client.get_secret_ids().await?.into_iter().filter(|id| !secret::is_system_secret(id)).collect_vec();
+    let non_system_secrets = client.get_secret_ids().await?.into_iter().filter(|id| !secret::secret_is_system(id)).collect_vec();
     context.print_execution_time(start_instant);
     let header = format!("secret ids ({})", non_system_secrets.len());
     let mut formatter = IdsFormatter::new(&header, context);
@@ -252,12 +248,12 @@ impl CommandExecutor for SecretListUsage {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all secrets that are used in apps or services");
     let start_instant = context.now();
-    let secrets_with_usage: Vec<(String, Vec<UsedBy>)> = client.list_secrets_with_usage().await?;
+    let secrets_with_dependants: Vec<(String, Vec<Dependant<SecretInjection>>)> = client.secrets_with_dependants().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("secret id"), context);
-    for (secret_id, used_bys) in &secrets_with_usage {
-      for used_by in used_bys {
-        formatter.push_target_id_value(secret_id.clone(), used_by);
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("secret id"), context);
+    for (secret_id, dependants) in &secrets_with_dependants {
+      for dependant in dependants {
+        formatter.push_target_id_value(secret_id.clone(), dependant);
       }
     }
     if formatter.is_empty() {
@@ -299,12 +295,12 @@ impl CommandExecutor for SecretShowUsage {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the apps and services that use secret '{}'", secret_id));
     let start_instant = context.now();
-    let usages = client.get_secret_with_usage(&secret_id).await?;
+    let usages = client.applications_dependant_on_secret(&secret_id).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("secret not used")
     } else {
-      let mut formatter = ListFormatter::new(&USED_BY_LABELS, Some("secret id"), context);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS, Some("secret id"), context);
       formatter.push_values(&usages);
       formatter.print(None)?;
     }
@@ -356,7 +352,7 @@ impl CommandExecutor for SecretUpdate {
         }
       } else {
         context.print_explanation(format!("update single line secret '{}'", secret_id));
-        let secret = context.read_single_line_password("enter secret: ")?;
+        let secret = context.read_single_line_password("enter secret")?;
         if context.dry_run() {
           context.print_warning("dry-run mode, secret not updated");
         } else {

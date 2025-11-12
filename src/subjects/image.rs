@@ -91,7 +91,7 @@ impl CommandExecutor for ImageFind {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let image_query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
-      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&image_query)? } else { &ExactMatchQueryProcessor::create(&image_query)? };
+      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*image_query)? } else { &ExactMatchQueryProcessor::create(&image_query)? };
     context.print_explanation(format!("find images that {}", query_processor.describe()));
     let start_instant = context.now();
     let services = client.get_application_configuration_map().await?;
@@ -141,9 +141,9 @@ fn list_images(services: HashMap<String, Application>, query_processor: &dyn Que
   images.sort_by(|(image_a, _), (image_b, _)| image_a.cmp(image_b));
   let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, None, context);
   for (image, image_usages) in &images {
-    if let Some(image_parts) = query_processor.matching_parts(image) {
+    if let Some(matching) = query_processor.matching_parts(image) {
       for image_usage in image_usages {
-        formatter.push_target_id_value(context.parts_to_string_for_stdout(&image_parts, None), image_usage);
+        formatter.push_target_id_value(context.parts_to_string_for_stdout(&matching, None), image_usage);
       }
     }
   }

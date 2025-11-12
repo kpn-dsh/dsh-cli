@@ -528,15 +528,6 @@ pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<Strin
   }
 }
 
-pub(crate) fn _include_app_service(matches: &ArgMatches) -> (bool, bool) {
-  match (matches.get_flag(FilterFlagType::App.id()), matches.get_flag(FilterFlagType::Service.id())) {
-    (false, false) => (true, true),
-    (false, true) => (false, true),
-    (true, false) => (true, false),
-    (true, true) => (true, true),
-  }
-}
-
 pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
   match (matches.get_flag(FilterFlagType::Started.id()), matches.get_flag(FilterFlagType::Stopped.id())) {
     (false, false) => (true, true),
@@ -988,5 +979,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.7.2");
+  assert_eq!(crate_version(), "0.8.0");
 }
