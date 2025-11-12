@@ -2,6 +2,7 @@ use clap::{Arg, ArgAction};
 
 #[derive(Debug)]
 pub(crate) enum ModifierFlagType {
+  ImplicitDefaults,
   MultiLine,
   Regex,
 }
@@ -9,6 +10,7 @@ pub(crate) enum ModifierFlagType {
 impl ModifierFlagType {
   pub(crate) fn id(&self) -> &'static str {
     match &self {
+      Self::ImplicitDefaults => "implicit-defaults-flag",
       Self::MultiLine => "multi-line-flag",
       Self::Regex => "regex-flag",
     }
@@ -16,6 +18,7 @@ impl ModifierFlagType {
 
   pub(crate) fn option(&self) -> &'static str {
     match &self {
+      Self::ImplicitDefaults => "implicit-defaults",
       Self::MultiLine => "multi-line",
       Self::Regex => "regex",
     }
@@ -23,6 +26,7 @@ impl ModifierFlagType {
 
   pub(crate) fn shortcut(&self) -> Option<char> {
     match &self {
+      Self::ImplicitDefaults => None,
       Self::MultiLine => Some('m'),
       Self::Regex => Some('r'),
     }
@@ -31,6 +35,11 @@ impl ModifierFlagType {
 
 pub(crate) fn create_modifier_flag(flag_type: &ModifierFlagType, subject: &str) -> Arg {
   match flag_type {
+    ModifierFlagType::ImplicitDefaults => create_clap_modifier_flag(
+      ModifierFlagType::ImplicitDefaults,
+      "Implicitly use default values for optional parameters".to_string(),
+      "If this option is provided the user will not be prompted for optional parameters. Instead the default value will be used.".to_string(),
+    ),
     ModifierFlagType::MultiLine => create_clap_modifier_flag(
       ModifierFlagType::MultiLine,
       format!("Enter {} as multi-line string", subject),
