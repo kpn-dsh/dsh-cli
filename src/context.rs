@@ -13,7 +13,7 @@ use crate::global_arguments::{
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
 use crate::verbosity::Verbosity;
-use crate::{environment_variable, environment_variable_specified};
+use crate::{environment_variable, environment_variable_specified, DshCliResult};
 use clap::builder::styling::Style;
 use clap::ArgMatches;
 use dsh_api::dsh_api_tenant::DshApiTenant;
@@ -24,6 +24,7 @@ use itertools::Itertools;
 use log::debug;
 use rpassword::prompt_password;
 use serde::Serialize;
+use std::ffi::OsStr;
 use std::fmt::Display;
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
 use std::process;
@@ -486,6 +487,17 @@ impl Context {
     }
   }
 
+  /// Open the provided url in the system browser
+  pub(crate) fn open_url(&self, url: impl AsRef<OsStr>, opening_target: impl Display) -> DshCliResult {
+    if self.dry_run() {
+      self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
+      Ok(())
+    } else {
+      self.print_explanation(format!("open {}", opening_target));
+      open::that(url).map_err(|error| format!("could not open browser ({})", error))
+    }
+  }
+
   /// # Returns current time `Instant`
   pub(crate) fn now(&self) -> Instant {
     Instant::now()
@@ -560,7 +572,7 @@ impl Context {
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: Display>(&self, prompt: T) {
     if !self.quiet && self.stderr_is_terminal {
-      self.eprintln(prompt);
+      self.eprint(prompt);
     }
   }
 
@@ -678,12 +690,27 @@ impl Context {
 
   pub(crate) fn read_single_line(&self, prompt: impl Display) -> Result<String, String> {
     if self.stdin_is_terminal {
-      self.print_prompt(prompt);
+      self.print_prompt(format!("{}: ", prompt));
     }
     let _ = stdout().lock().flush();
     let mut line = String::new();
     stdin().read_line(&mut line).expect("could not read line");
     Ok(line.trim().to_string())
+  }
+
+  pub(crate) fn read_single_line_with_default(&self, prompt: impl Display, default: impl Display) -> Result<String, String> {
+    if self.stdin_is_terminal {
+      self.print_prompt(format!("{} [{}]: ", prompt, default));
+    }
+    let _ = stdout().lock().flush();
+    let mut line = String::new();
+    stdin().read_line(&mut line).expect("could not read line");
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+      Ok(default.to_string())
+    } else {
+      Ok(trimmed.to_string())
+    }
   }
 
   pub(crate) fn read_single_line_password(&self, prompt: impl Display) -> Result<String, String> {
