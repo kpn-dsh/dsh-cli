@@ -537,11 +537,11 @@ impl Context {
         OutputFormat::Plain => self.print_warning("plain output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Quiet => (),
         OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use --output-format json|toml|yaml"),
-        OutputFormat::Toml => match toml::to_string_pretty(&output) {
+        OutputFormat::Toml => match toml::ser::to_string_pretty(&output) {
           Ok(toml) => self.println(toml),
           Err(_) => self.print_error("serializing to toml failed"),
         },
-        OutputFormat::TomlCompact => match toml::to_string(&output) {
+        OutputFormat::TomlCompact => match toml::ser::to_string(&output) {
           Ok(toml) => self.println(toml),
           Err(_) => self.print_error("serializing to toml failed"),
         },
