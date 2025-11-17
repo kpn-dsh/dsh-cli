@@ -10,7 +10,7 @@ use crate::environment_variables::{
   env_var_argument, env_vars_argument, get_set_environment_variables, print_environment_variable, print_environment_variables, ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
   ENV_VAR_DSH_CLI_HOME, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
 };
-use crate::global_arguments::{environment_variable_argument, ENVIRONMENT_VARIABLE_ARGUMENT};
+use crate::global_arguments::{authentication_argument, browser_argument, environment_variable_argument, ENVIRONMENT_VARIABLE_ARGUMENT};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -74,6 +74,7 @@ use targets::{get_target_password_from_keyring, read_target};
 
 mod argument_parsers;
 mod arguments;
+mod authentication;
 mod autocomplete;
 mod capability;
 mod capability_builder;
@@ -302,7 +303,7 @@ async fn inner_main() -> DshCliExit {
         let requirements = subject.requirements(sub_matches);
         debug!("{:?}", requirements);
         if requirements.needs_dsh_api_client() {
-          let client = match create_client(&matches, context.settings()).await {
+          let client = match create_client(&matches, &context).await {
             Ok(client) => client,
             Err(error) => return DshCliExit::ErrContext(error.clone(), Box::new(context)),
           };
@@ -326,7 +327,7 @@ async fn inner_main() -> DshCliExit {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
           debug!("{:?}", requirements);
           if requirements.needs_dsh_api_client() {
-            let client = match create_client(&matches, context.settings()).await {
+            let client = match create_client(&matches, &context).await {
               Ok(client) => client,
               Err(error) => return DshCliExit::ErrContext(error.clone(), Box::new(context)),
             };
@@ -369,6 +370,8 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
     .subcommands(clap_commands)
     .args(vec![
       // Main options
+      authentication_argument(),
+      browser_argument(),
       dry_run_argument(),
       environment_variable_argument(),
       force_argument(),
@@ -929,9 +932,9 @@ where
   }
 }
 
-async fn create_client(matches: &ArgMatches, settings: &Settings) -> Result<DshApiClient, String> {
-  let target_platform = get_target_platform(matches, settings)?;
-  let target_tenant_name = get_target_tenant(matches, settings)?;
+async fn create_client(matches: &ArgMatches, context: &Context) -> Result<DshApiClient, String> {
+  let target_platform = get_target_platform(matches, context.settings())?;
+  let target_tenant_name = get_target_tenant(matches, context.settings())?;
   debug!("create client for target '{}@{}'", target_tenant_name, target_platform);
   let dsh_api_tenant = DshApiTenant::new(target_tenant_name.clone(), target_platform.clone());
   let password = get_target_password(matches, &dsh_api_tenant)?;

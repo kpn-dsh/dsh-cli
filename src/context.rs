@@ -1,14 +1,15 @@
+use crate::authentication::AuthenticationMethod;
 use crate::environment_variables::{
-  ENV_VAR_DSH_CLI_CSV_QUOTE, ENV_VAR_DSH_CLI_CSV_SEPARATOR, ENV_VAR_DSH_CLI_DRY_RUN, ENV_VAR_DSH_CLI_ERROR_COLOR, ENV_VAR_DSH_CLI_ERROR_STYLE, ENV_VAR_DSH_CLI_LABEL_COLOR,
-  ENV_VAR_DSH_CLI_LABEL_STYLE, ENV_VAR_DSH_CLI_MATCHING_COLOR, ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_ESCAPE, ENV_VAR_DSH_CLI_NO_HEADERS,
-  ENV_VAR_DSH_CLI_OUTPUT_FORMAT, ENV_VAR_DSH_CLI_QUIET, ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, ENV_VAR_DSH_CLI_STDERR_COLOR, ENV_VAR_DSH_CLI_STDERR_STYLE,
-  ENV_VAR_DSH_CLI_STDOUT_COLOR, ENV_VAR_DSH_CLI_STDOUT_STYLE, ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TERMINAL_WIDTH, ENV_VAR_DSH_CLI_VERBOSITY,
-  ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
+  ENV_VAR_DSH_CLI_AUTHENTICATION, ENV_VAR_DSH_CLI_BROWSER, ENV_VAR_DSH_CLI_CSV_QUOTE, ENV_VAR_DSH_CLI_CSV_SEPARATOR, ENV_VAR_DSH_CLI_DRY_RUN, ENV_VAR_DSH_CLI_ERROR_COLOR,
+  ENV_VAR_DSH_CLI_ERROR_STYLE, ENV_VAR_DSH_CLI_LABEL_COLOR, ENV_VAR_DSH_CLI_LABEL_STYLE, ENV_VAR_DSH_CLI_MATCHING_COLOR, ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_ESCAPE,
+  ENV_VAR_DSH_CLI_NO_HEADERS, ENV_VAR_DSH_CLI_OUTPUT_FORMAT, ENV_VAR_DSH_CLI_QUIET, ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, ENV_VAR_DSH_CLI_STDERR_COLOR,
+  ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR, ENV_VAR_DSH_CLI_STDOUT_STYLE, ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TERMINAL_WIDTH,
+  ENV_VAR_DSH_CLI_VERBOSITY, ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
 };
 use crate::formatters::OutputFormat;
 use crate::global_arguments::{
-  DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT, SHOW_EXECUTION_TIME_ARGUMENT, SUPPRESS_EXIT_STATUS_ARGUMENT,
-  TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
+  AUTHENTICATION_ARGUMENT, BROWSER_ARGUMENT, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
+  SHOW_EXECUTION_TIME_ARGUMENT, SUPPRESS_EXIT_STATUS_ARGUMENT, TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
@@ -23,17 +24,56 @@ use getch_rs::{Getch, Key};
 use itertools::Itertools;
 use log::debug;
 use rpassword::prompt_password;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
 use std::process;
 use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
 use OutputFormat::Csv;
 
+#[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
+pub enum BrowserMethod {
+  /// User will be instructed to open the browser
+  #[serde(rename = "instruct")]
+  Instruct,
+  /// Tool will try to open the browser automatically
+  #[serde(rename = "open")]
+  Open,
+}
+
+impl TryFrom<&str> for BrowserMethod {
+  type Error = String;
+
+  fn try_from(value: &str) -> Result<Self, Self::Error> {
+    match value {
+      "instruct" => Ok(Self::Instruct),
+      "open" => Ok(Self::Open),
+      _ => Err(format!("invalid browser method '{}'", value)),
+    }
+  }
+}
+
+impl Display for BrowserMethod {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Instruct => write!(f, "instruct"),
+      Self::Open => write!(f, "open"),
+    }
+  }
+}
+
+impl Default for BrowserMethod {
+  fn default() -> Self {
+    Self::Instruct
+  }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Context {
+  authentication: AuthenticationMethod,
+  browser: BrowserMethod,
   csv_quote: Option<char>,
   csv_separator: String,
   dry_run: bool,
@@ -71,6 +111,8 @@ impl Context {
         return Err("csv separator string cannot contain quote character".to_string());
       }
     }
+    let authentication = Self::get_authentication(matches, &settings, stdin_is_terminal)?;
+    let browser = Self::get_browser(matches, &settings, stdin_is_terminal)?;
     let dry_run = Self::get_dry_run(matches, &settings);
     let (stderr_no_escape, stdout_no_escape) = if Self::get_no_escape(matches, &settings) { (true, true) } else { (!stderr_is_terminal, !stdout_is_terminal) };
 
@@ -110,6 +152,8 @@ impl Context {
       eprintln!("dry-run mode enabled");
     }
     Ok(Context {
+      authentication,
+      browser,
       csv_quote,
       csv_separator,
       dry_run,
@@ -166,6 +210,58 @@ impl Context {
 
   pub(crate) fn terminal_width(&self) -> Option<usize> {
     self.terminal_width
+  }
+
+  /// Gets authentication method
+  ///
+  /// 1. Try command line argument --authentication
+  /// 1. Try environment variable `DSH_CLI_AUTHENTICATION`
+  /// 1. Try settings file
+  /// 1. If stdin is a terminal, default to `AuthenticationMethod::SingleSignOn`
+  /// 1. Else default to `AuthenticationMethod::Robot`
+  fn get_authentication(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<AuthenticationMethod, String> {
+    match matches.get_one::<AuthenticationMethod>(AUTHENTICATION_ARGUMENT) {
+      Some(authentication_argument) => Ok(authentication_argument.to_owned()),
+      None => match environment_variable(ENV_VAR_DSH_CLI_AUTHENTICATION, matches)? {
+        Some(authentication_env_var) => AuthenticationMethod::try_from(authentication_env_var.as_str()),
+        None => match &settings.authentication_method {
+          Some(authentication_setting) => Ok(authentication_setting.to_owned()),
+          None => {
+            if stdin_is_terminal {
+              Ok(AuthenticationMethod::SingleSignOn)
+            } else {
+              Ok(AuthenticationMethod::Robot)
+            }
+          }
+        },
+      },
+    }
+  }
+
+  /// Gets browser method
+  ///
+  /// 1. Try command line argument --browser
+  /// 1. Try environment variable `DSH_CLI_BROWSER`
+  /// 1. Try settings file
+  /// 1. If stdin is a terminal, default to `BrowserMethod::Open`
+  /// 1. Else default to `BrowserMethod::Instruct`
+  fn get_browser(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<BrowserMethod, String> {
+    match matches.get_one::<BrowserMethod>(BROWSER_ARGUMENT) {
+      Some(browser_argument) => Ok(browser_argument.to_owned()),
+      None => match environment_variable(ENV_VAR_DSH_CLI_BROWSER, matches)? {
+        Some(browser_env_var) => BrowserMethod::try_from(browser_env_var.as_str()),
+        None => match &settings.browser_method {
+          Some(browser_setting) => Ok(browser_setting.to_owned()),
+          None => {
+            if stdin_is_terminal {
+              Ok(BrowserMethod::Open)
+            } else {
+              Ok(BrowserMethod::Instruct)
+            }
+          }
+        },
+      },
+    }
   }
 
   /// Ask for confirmation
@@ -488,13 +584,30 @@ impl Context {
   }
 
   /// Open the provided url in the system browser
-  pub(crate) fn open_url(&self, url: impl AsRef<OsStr>, opening_target: impl Display) -> DshCliResult {
+  pub(crate) fn open_url(&self, url: impl AsRef<OsStr> + Display, opening_target: impl Display) -> DshCliResult {
     if self.dry_run() {
       self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
+      self.print_warning(format!("{}", url));
       Ok(())
     } else {
-      self.print_explanation(format!("open {}", opening_target));
-      open::that(url).map_err(|error| format!("could not open browser ({})", error))
+      match self.browser {
+        BrowserMethod::Instruct => {
+          self.print_explanation("open this url in your browser:");
+          self.print(format!("{}", url));
+        }
+        BrowserMethod::Open => {
+          self.print_explanation(format!("open {}", opening_target));
+          match open::that(&url) {
+            Ok(()) => {}
+            Err(error) => {
+              self.print_error(format!("could not open browser ({})", error));
+              self.print_explanation("open this url in your browser:");
+              self.print(format!("{}", url));
+            }
+          }
+        }
+      }
+      Ok(())
     }
   }
 

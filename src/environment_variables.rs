@@ -11,6 +11,8 @@ use std::env;
 // Environment variable is defined in the dsh_api crate
 const ENV_VAR_DSH_API_PLATFORMS_FILE: &str = "DSH_API_PLATFORMS_FILE";
 
+pub(crate) const ENV_VAR_DSH_CLI_AUTHENTICATION: &str = "DSH_CLI_AUTHENTICATION";
+pub(crate) const ENV_VAR_DSH_CLI_BROWSER: &str = "DSH_CLI_BROWSER";
 pub(crate) const ENV_VAR_DSH_CLI_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
 pub(crate) const ENV_VAR_DSH_CLI_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
 pub(crate) const ENV_VAR_DSH_CLI_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
@@ -179,7 +181,7 @@ pub(crate) fn env_var_argument() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
+const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 35] = [
   (
     ENV_VAR_DSH_API_PLATFORMS_FILE,
     "Overrides the default list of available platforms.",
@@ -191,6 +193,25 @@ const ENVIRONMENT_VARIABLES: [(&str, &str, &str); 33] = [
      will not be included. If you need these too, make sure that you also \
      include the default platforms in your platforms file. \
      See the bottom of this page for more information.",
+  ),
+  (
+    ENV_VAR_DSH_CLI_AUTHENTICATION,
+    "Specifies the authentication method.",
+    "This environment variable specifies the authentication method that will be used \
+     to access the resource management api. The allowed values are 'robot' and \
+     'single-sign-on'. If this variable is not provided, the value from the settings file \
+     will be used, if it exists. Else, the default value will be `single-sign-on` when the \
+     cli tool is run interactive ('stdin' is a terminal) and 'robot' if not.",
+  ),
+  (
+    ENV_VAR_DSH_CLI_BROWSER,
+    "Specifies whether the tool will try to open a browser.",
+    "This environment variable specifies whether the cli tool will try to automatically open \
+     a browser (e.g. for authentication or to open the console) or will only instruct the \
+     user to open it. The allowed values are 'instruct' and 'open'. If this variable is not \
+     provided, the value from the settings file will be used, if it exists. Else, the default \
+     value will be 'open' when the cli tool is run interactive ('stdin' is a terminal) and \
+     'instruct' if not.",
   ),
   (
     ENV_VAR_DSH_CLI_CSV_QUOTE,

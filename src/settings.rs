@@ -1,3 +1,5 @@
+use crate::authentication::AuthenticationMethod;
+use crate::context::BrowserMethod;
 use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::style::{DshColor, DshStyle};
@@ -10,6 +12,10 @@ use std::path::PathBuf;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct Settings {
+  #[serde(rename = "authentication-method", skip_serializing_if = "Option::is_none")]
+  pub(crate) authentication_method: Option<AuthenticationMethod>,
+  #[serde(rename = "browser-method", skip_serializing_if = "Option::is_none")]
+  pub(crate) browser_method: Option<BrowserMethod>,
   #[serde(rename = "csv-quote", skip_serializing_if = "Option::is_none")]
   pub(crate) csv_quote: Option<char>,
   #[serde(rename = "csv-separator", skip_serializing_if = "Option::is_none")]
