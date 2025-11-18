@@ -78,6 +78,7 @@ mod authentication;
 mod autocomplete;
 mod capability;
 mod capability_builder;
+mod cipher;
 mod context;
 mod environment_variables;
 mod filter_flags;
@@ -89,6 +90,7 @@ mod limits_flags;
 mod log_arguments;
 mod log_level;
 mod modifier_flags;
+mod refresh_token_store;
 mod settings;
 mod style;
 mod subject;
@@ -125,6 +127,7 @@ const VERSION: &str = "0.7.4";
 
 const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const TARGETS_SUBDIRECTORY: &str = "targets";
+const REFRESH_TOKENS_SUBDIRECTORY: &str = "refresh-tokens";
 const DEFAULT_DSH_CLI_SETTINGS_FILENAME: &str = "settings.toml";
 const TOML_FILENAME_EXTENSION: &str = "toml";
 
@@ -246,6 +249,11 @@ async fn inner_main() -> DshCliExit {
     Err(msg) => return DshCliExit::Err(msg),
   };
 
+  subject_commands.push(login_command());
+  subject_commands.push(logout_command());
+
+  subject_commands.sort_by(|subject_command_a, subject_command_b| subject_command_a.get_name().cmp(subject_command_b.get_name()));
+
   let mut command = create_command(&subject_commands, &settings);
 
   let matches = match command.clone().try_get_matches() {
@@ -298,6 +306,18 @@ async fn inner_main() -> DshCliExit {
   }
 
   match matches.subcommand() {
+    Some(("login", _)) => {
+      return match authentication::login(&matches, context).await {
+        Ok(()) => DshCliExit::Ok,
+        Err(error) => DshCliExit::Err(error),
+      }
+    }
+    Some(("logout", _)) => {
+      return match authentication::logout(&matches, context).await {
+        Ok(()) => DshCliExit::Ok,
+        Err(error) => DshCliExit::Err(error),
+      }
+    }
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
@@ -355,6 +375,22 @@ async fn inner_main() -> DshCliExit {
     None => return DshCliExit::Err("unexpected error, no command provided".to_string()),
   }
   DshCliExit::Ok
+}
+
+fn login_command() -> Command {
+  Command::new("login").about("Login via single sign on").long_about(
+    "Login via single sign on. You will be directed to the login page for the currently \
+        selected platform where you must sign in using your credentials (using two-factor \
+        authentication). The platform is either the configured platform, or can be specified \
+        via the '--platform' argument.",
+  )
+}
+
+fn logout_command() -> Command {
+  Command::new("logout").about("Logout from single sign on").long_about(
+    "Logout from single sign on. You will be directed to the logout page for the currently \
+        selected platform where you must confirm.",
+  )
 }
 
 fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
@@ -618,7 +654,7 @@ fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings
 /// ## Returns
 /// `Ok<Platform>`  - target platform
 /// `Err<String>` - error message
-fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshPlatform, String> {
+pub(crate) fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshPlatform, String> {
   match get_target_platform_non_interactive(matches, settings)? {
     Some(platforms_non_interactive) => Ok(platforms_non_interactive),
     None => {
@@ -789,59 +825,51 @@ fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> Result<String,
   }
 }
 
-/// # Returns the `dsh` tool directory
+/// # Returns the `dsh` directory
 ///
-/// This function returns the `dsh` tool's directory.
-/// If it doesn't already exist the directory (and possibly its parent directories)
-/// will be created.
+/// This function creates and returns the `dsh` directory. In this directory the cli tool stores
+/// its settings, targets and tokens. If it doesn't already exist the directory (and if needed
+/// its parent directories) will be created.
 ///
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. If environment variable `DSH_CLI_HOME` exists:
-///    * If it is empty, return `Ok(None)`
-///    * Else return the specified directory.
+/// This function will try the potential directory names listed below, and returns at the
+/// first match.
+/// 1. If the environment variable `DSH_CLI_HOME` is set:
+///    * if the environment variable is the empty string, do not create any directories and
+///      return `Ok(None)`,
+///    * else create the specified directory (if needed) and return its [PathBuf].
+/// 1. If the environment variable `HOME` is set use its value concatenated with
+///    `/.dsh_cli`, create the directory (if needed), and return its [PathBuf].
+/// 1. Else return `Err`.
 ///
-///    Note that this environment variable must be a
-///    regular environment variable and cannot be specified via the command line.
-/// 1. If environment variable `HOME` exists, return its value concatenated with `/.dsh_cli`.
+/// Note that the environment variables must be regular environment variables and cannot
+/// be specified via the command line `--environment-variable` argument.
 fn dsh_directory() -> Result<Option<PathBuf>, String> {
-  let dsh_directory: Option<PathBuf> = match env::var(ENV_VAR_DSH_CLI_HOME) {
+  let dsh_directory: PathBuf = match env::var(ENV_VAR_DSH_CLI_HOME) {
     Ok(dsh_directory_from_env_var) => {
       if dsh_directory_from_env_var.is_empty() {
-        None
+        return Ok(None);
       } else {
-        Some(PathBuf::new().join(dsh_directory_from_env_var))
+        PathBuf::new().join(dsh_directory_from_env_var)
       }
     }
     Err(_) => match my_home() {
-      Ok(Some(user_home_directory)) => Some(user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY)),
+      Ok(Some(user_home_directory)) => user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY),
       _ => {
-        let message = format!("could not determine dsh cli directory name (check environment variable {})", ENV_VAR_DSH_CLI_HOME);
-        log::error!("{}", &message);
-        return Err(message);
+        return Err(format!(
+          "could not determine dsh cli directory (check environment variable '{}' or 'HOME')",
+          ENV_VAR_DSH_CLI_HOME
+        ))
       }
     },
   };
-  match dsh_directory {
-    Some(directory) => match fs::create_dir_all(&directory) {
-      Ok(_) => match fs::create_dir_all(directory.join(TARGETS_SUBDIRECTORY)) {
-        Ok(_) => Ok(Some(directory)),
-        Err(io_error) => {
-          let message = format!(
-            "could not create dsh targets directory '{}' ({})",
-            directory.join(TARGETS_SUBDIRECTORY).to_string_lossy(),
-            io_error
-          );
-          log::error!("{}", &message);
-          Err(message)
-        }
-      },
-      Err(io_error) => {
-        let message = format!("could not create dsh directory '{}' ({})", directory.to_string_lossy(), io_error);
-        log::error!("{}", &message);
-        Err(message)
+  match &fs::create_dir_all(&dsh_directory) {
+    Ok(_) => {
+      for subdirectory in [TARGETS_SUBDIRECTORY, REFRESH_TOKENS_SUBDIRECTORY] {
+        fs::create_dir_all(dsh_directory.join(subdirectory)).map_err(|io_error| format!("could not create dsh {} subdirectory ({})", subdirectory, io_error))?;
       }
-    },
-    None => Ok(None),
+      Ok(Some(dsh_directory))
+    }
+    Err(io_error) => Err(format!("could not create dsh directory '{}' ({})", dsh_directory.to_string_lossy(), io_error)),
   }
 }
 
