@@ -14,7 +14,7 @@ use crate::global_arguments::{
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
 use crate::verbosity::Verbosity;
-use crate::{environment_variable, environment_variable_specified, DshCliResult};
+use crate::{environment_variable, environment_variable_specified};
 use clap::builder::styling::Style;
 use clap::ArgMatches;
 use dsh_api::dsh_api_tenant::DshApiTenant;
@@ -584,30 +584,29 @@ impl Context {
   }
 
   /// Open the provided url in the system browser
-  pub(crate) fn open_url(&self, url: impl AsRef<OsStr> + Display, opening_target: impl Display) -> DshCliResult {
+  pub(crate) fn open_url(&self, url: impl AsRef<OsStr> + Display, opening_target: impl Display) {
     if self.dry_run() {
       self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
       self.print_warning(format!("{}", url));
-      Ok(())
     } else {
       match self.browser {
         BrowserMethod::Instruct => {
-          self.print_explanation("open this url in your browser:");
+          self.print_explanation(format!("opening {}", opening_target));
+          self.print_explanation("open url in your browser:");
           self.print(format!("{}", url));
         }
-        BrowserMethod::Open => {
-          self.print_explanation(format!("open {}", opening_target));
-          match open::that(&url) {
-            Ok(()) => {}
-            Err(error) => {
-              self.print_error(format!("could not open browser ({})", error));
-              self.print_explanation("open this url in your browser:");
-              self.print(format!("{}", url));
-            }
+        BrowserMethod::Open => match open::that(&url) {
+          Ok(()) => {
+            self.print_explanation(format!("opening {}", opening_target));
           }
-        }
+          Err(error) => {
+            self.print_error(format!("could not open {} in your browser", opening_target));
+            debug!("{}", error);
+            self.print_explanation("open url in your browser:");
+            self.print(format!("{}", url));
+          }
+        },
       }
-      Ok(())
     }
   }
 
