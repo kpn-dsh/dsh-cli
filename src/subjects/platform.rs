@@ -187,12 +187,14 @@ impl PlatformOpen {
     context.open_url(
       platform.tenant_app_console_url(&tenant_name, &app),
       format!("console for tenant '{}@{}' and app '{}'", tenant_name, platform, app),
-    )
+    );
+    Ok(())
   }
 
   fn open_console(matches: &ArgMatches, context: &Context) -> DshCliResult {
     let platform = get_target_platform(matches, context.settings())?;
-    context.open_url(platform.console_url(), format!("console for platform '{}'", platform))
+    context.open_url(platform.console_url(), format!("console for platform '{}'", platform));
+    Ok(())
   }
 
   fn open_monitoring(matches: &ArgMatches, context: &Context) -> DshCliResult {
@@ -201,7 +203,8 @@ impl PlatformOpen {
     context.open_url(
       format!("{}/dashboards", platform.tenant_monitoring_url(&tenant_name)),
       format!("monitoring application for tenant '{}@{}'", tenant_name, platform),
-    )
+    );
+    Ok(())
   }
 
   fn open_service(matches: &ArgMatches, context: &Context) -> DshCliResult {
@@ -211,7 +214,8 @@ impl PlatformOpen {
     context.open_url(
       platform.tenant_service_console_url(&tenant_name, &service),
       format!("console for tenant '{}@{}' and service '{}'", tenant_name, platform, service),
-    )
+    );
+    Ok(())
   }
 
   fn open_tenant(matches: &ArgMatches, context: &Context) -> DshCliResult {
@@ -220,7 +224,8 @@ impl PlatformOpen {
     context.open_url(
       platform.tenant_console_url(&tenant_name),
       format!("console for tenant '{}@{}'", tenant_name, platform),
-    )
+    );
+    Ok(())
   }
 
   async fn open_swagger(matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
@@ -251,12 +256,14 @@ impl PlatformOpen {
       },
       None => format!("swagger application for platform '{}'", platform),
     };
-    context.open_url(platform.swagger_url(), opening_target)
+    context.open_url(platform.swagger_url(), opening_target);
+    Ok(())
   }
 
   fn open_tracing(matches: &ArgMatches, context: &Context) -> DshCliResult {
     let platform = get_target_platform(matches, context.settings())?;
-    context.open_url(platform.tracing_url(), format!("tracing application for platform '{}'", platform))
+    context.open_url(platform.tracing_url(), format!("tracing application for platform '{}'", platform));
+    Ok(())
   }
 }
 
@@ -508,8 +515,8 @@ pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
   DshPlatformLabel::InternalServiceDomain,
 ];
 
-pub static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 5] =
-  [DshPlatformLabel::Name, DshPlatformLabel::Alias, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
+pub static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
+  [DshPlatformLabel::Name, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
 
 // Returns the required parameters
 // (app_id_required, bucket_id_required, service_id_required, tenant_required, vendor_id_required, vhost_required)

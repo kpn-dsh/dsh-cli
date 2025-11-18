@@ -345,11 +345,11 @@ impl CommandExecutor for AppOpen {
                       .tenant_private_vhost_domain(client.tenant().name(), captures.get(1).unwrap().as_str())?
                   ),
                   format!("private vhost for tenant '{}@{}' and app '{}'", tenant_name, platform, app_id),
-                )?,
+                ),
                 "public" => context.open_url(
                   format!("https://{}", client.platform().public_vhost_domain(captures.get(1).unwrap().as_str())),
                   format!("public vhost for tenant '{}@{}' and app '{}'", tenant_name, platform, app_id),
-                )?,
+                ),
                 illegal_zone => context.print_warning(format!("illegal zone in vhost resource {}", illegal_zone)),
               }
             }

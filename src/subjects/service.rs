@@ -532,12 +532,14 @@ impl CommandExecutor for ServiceOpen {
                     client.platform().tenant_private_vhost_domain(client.tenant().name(), vhost_string.vhost_name)?
                   ),
                   format!("private vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
-                )
+                );
+                Ok(())
               } else if zone == "public" {
                 context.open_url(
                   format!("https://{}", client.platform().public_vhost_domain(vhost_string.vhost_name)),
                   format!("public vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
-                )
+                );
+                Ok(())
               } else {
                 Err(format!("exposed port has illegal zone {}", zone))
               }
