@@ -39,6 +39,29 @@ An explanation of an environment variable can be printed via the commands:
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_AUTHENTICATION</code></td>
+        <td>
+            This environment variable specifies the authentication method that will be used
+            to access the resource management api. The allowed values are <code>robot</code> and 
+            <code>single-sign-on</code>. If this variable is not provided, the value from the 
+            settings file will be used, if it exists. Else, the default value will be 
+            <code>single-sign-on</code> when the cli tool is run interactive (<code>stdin</code> 
+            is a terminal) and <code>robot</code> if not.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_BROWSER</code></td>
+        <td>
+            This environment variable specifies whether the cli tool will try to automatically 
+            open a browser (e.g. for authentication or to open the console) or will only instruct 
+            the user to open it. The allowed values are <code>instruct</code> and 
+            <code>open</code>. If this variable is not provided, the value from the settings 
+            file will be used, if it exists. Else, the default value will be <code>open</code> 
+            when the cli tool is run interactive (<code>stdin</code> is a terminal) and
+            <code>instruct</code> if not.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_CSV_QUOTE</code></td>
         <td>
             This environment variable specifies the quote character that will be used 
