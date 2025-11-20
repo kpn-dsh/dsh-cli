@@ -9,15 +9,16 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
+use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_APPS, DEPENDANT_LABELS_LIST, DEPENDANT_LABELS_SERVICES};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::{Volume, VolumeStatus};
 use dsh_api::volume::VolumeInjection;
-use dsh_api::Dependant;
+use dsh_api::{Dependant, DependantApp, DependantApplication};
 use futures::future::try_join_all;
+use itertools::{Either, Itertools};
 use lazy_static::lazy_static;
 use serde::Serialize;
 
@@ -320,11 +321,24 @@ impl CommandExecutor for VolumeShowUsage {
     let start_instant = context.now();
     let (_, usages) = client.volume_with_dependants(&volume_id).await?;
     context.print_execution_time(start_instant);
-    if usages.is_empty() {
-      context.print_outcome("volume not used")
+    let (dependant_apps, dependant_services): (Vec<DependantApp>, Vec<DependantApplication<VolumeInjection>>) = usages.into_iter().partition_map(|dependant| match dependant {
+      Dependant::App(app) => Either::Left(app),
+      Dependant::Application(service) => Either::Right(service),
+    });
+    if dependant_services.is_empty() {
+      context.print_outcome("volume not used in services")
     } else {
-      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS, Some("volume id"), context);
-      formatter.push_values(&usages);
+      context.print_outcome("volume used in services");
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_SERVICES, Some("volume id"), context);
+      formatter.push_values(&dependant_services);
+      formatter.print(None)?;
+    }
+    if dependant_apps.is_empty() {
+      context.print_outcome("volume not used in apps")
+    } else {
+      context.print_outcome("volume used in apps");
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_APPS, Some("volume id"), context);
+      formatter.push_values(&dependant_apps);
       formatter.print(None)?;
     }
     Ok(())

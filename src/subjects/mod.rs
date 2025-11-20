@@ -77,31 +77,37 @@ pub static DEFAULT_ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub enum DependantLabel {
+  Dependencies,
+  Id,
   Injections,
   Instances,
   Kind,
-  _Resources,
+  Resources,
   Target,
 }
 
 impl Label for DependantLabel {
   fn as_str(&self) -> &str {
     match self {
-      DependantLabel::Injections => "injections",
-      DependantLabel::Instances => "instances",
-      DependantLabel::Kind => "app/service",
-      DependantLabel::_Resources => "app/resources",
-      DependantLabel::Target => "target id",
+      Self::Dependencies => "dependencies",
+      Self::Id => "id",
+      Self::Injections => "injections",
+      Self::Instances => "instances",
+      Self::Kind => "app/service",
+      Self::Resources => "app/resources",
+      Self::Target => "target id",
     }
   }
 
   fn as_str_for_list(&self) -> &str {
     match self {
-      DependantLabel::Injections => "injections",
-      DependantLabel::Instances => "#",
-      DependantLabel::Kind => "app/service",
-      DependantLabel::_Resources => "resources",
-      DependantLabel::Target => "target id",
+      Self::Dependencies => "dependencies",
+      Self::Id => "id",
+      Self::Injections => "injections",
+      Self::Instances => "#",
+      Self::Kind => "app/service",
+      Self::Resources => "resources",
+      Self::Target => "target id",
     }
   }
 
@@ -116,10 +122,12 @@ where
 {
   fn value(&self, label: &DependantLabel, target_id: &str) -> String {
     match label {
+      DependantLabel::Dependencies => self.injections.iter().map(|injection| injection.to_string()).collect_vec().join("\n"),
+      DependantLabel::Id => self.application_id.to_string(),
       DependantLabel::Injections => self.injections.iter().map(|injection| injection.to_string()).collect_vec().join("\n"),
       DependantLabel::Instances => self.instances.to_string(),
-      DependantLabel::Kind => "application".to_string(),
-      DependantLabel::_Resources => "".to_string(),
+      DependantLabel::Kind => "service".to_string(),
+      DependantLabel::Resources => "".to_string(),
       DependantLabel::Target => target_id.to_string(),
     }
   }
@@ -132,10 +140,12 @@ where
 impl SubjectFormatter<DependantLabel> for DependantApp {
   fn value(&self, label: &DependantLabel, target_id: &str) -> String {
     match label {
+      DependantLabel::Dependencies => self.resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
+      DependantLabel::Id => self.app_id.to_string(),
       DependantLabel::Injections => "".to_string(),
       DependantLabel::Instances => "".to_string(),
       DependantLabel::Kind => "app".to_string(),
-      DependantLabel::_Resources => self.resources.iter().join(", "),
+      DependantLabel::Resources => self.resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
       DependantLabel::Target => target_id.to_string(),
     }
   }
@@ -164,6 +174,10 @@ where
   }
 }
 
-pub static DEPENDANT_LABELS_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Instances, DependantLabel::Kind, DependantLabel::Injections];
+pub static DEPENDANT_LABELS_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
+pub static _DEPENDANT_LABELS_SERVICES_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
+pub static _DEPENDANT_LABELS_APPS_LIST: [DependantLabel; 3] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Resources];
 
-pub static DEPENDANT_LABELS: [DependantLabel; 3] = [DependantLabel::Kind, DependantLabel::Instances, DependantLabel::Injections];
+pub static DEPENDANT_LABELS: [DependantLabel; 3] = [DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
+pub static DEPENDANT_LABELS_SERVICES: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
+pub static DEPENDANT_LABELS_APPS: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Dependencies, DependantLabel::Resources];
