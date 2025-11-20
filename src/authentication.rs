@@ -130,7 +130,7 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> Result<(),
             context.print("you are not authorized for tenants");
           }
         }
-        Err(_) => {}
+        Err(error) => context.print_error(format!("could not authenticate and get access token: {}", error)),
       },
       Err(_) => {}
     }
@@ -256,8 +256,8 @@ fn get_access_token_and_exchanged_refresh_token(
   refresh_token: &RefreshToken,
   http_client: &BlockingClient,
 ) -> Result<Option<(AccessToken, RefreshToken)>, String> {
-  match get_openid_client(provider_metadata, &client_id(platform)).exchange_refresh_token(&refresh_token) {
-    Ok(refresh_token_request) => match refresh_token_request.request(http_client).into() {
+  match get_openid_client(provider_metadata, &client_id(platform)).exchange_refresh_token(refresh_token) {
+    Ok(refresh_token_request) => match refresh_token_request.request(http_client) {
       Ok(token_response) => match token_response.refresh_token() {
         Some(refresh_token) => Ok(Some((token_response.access_token().clone(), refresh_token.clone()))),
         None => Ok(None),
@@ -288,7 +288,7 @@ fn authenticate_and_get_access_and_refresh_tokens(
       open_login_page(&device_authorization_response, platform, context);
       let device_access_token_request: DeviceAccessTokenRequest<CoreTokenResponse, EmptyExtraDeviceAuthorizationFields> =
         openid_connect_client.exchange_device_access_token(&device_authorization_response).unwrap();
-      match device_access_token_request.request(http_client, std::thread::sleep, None).into() {
+      match device_access_token_request.request(http_client, std::thread::sleep, None) {
         Ok(token_response) => {
           if let Some(refresh_token) = token_response.refresh_token() {
             Ok((token_response.access_token().clone(), refresh_token.clone()))
@@ -324,7 +324,7 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
         context.print(format!("login page: {}", response.verification_uri()));
         context.print(format!("user code: {}", response.user_code().secret()));
       }
-      BrowserMethod::Open => match open::that(&response.verification_uri_complete().unwrap().secret()) {
+      BrowserMethod::Open => match open::that(response.verification_uri_complete().unwrap().secret()) {
         Ok(()) => {
           context.print_explanation(format!("opening login page for platform {}", platform));
         }

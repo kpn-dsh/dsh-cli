@@ -980,7 +980,7 @@ where
 /// * `Err(String)` - Something went wrong.
 async fn create_client(matches: &ArgMatches, context: &Context) -> Result<Option<DshApiClient>, String> {
   match context.authentication_method() {
-    AuthenticationMethod::Robot => create_client_robot_password(matches, context).await.map(|client| Some(client)),
+    AuthenticationMethod::Robot => create_client_robot_password(matches, context).await.map(Some),
     AuthenticationMethod::SingleSignOn => create_client_access_token(matches, context).await,
   }
 }

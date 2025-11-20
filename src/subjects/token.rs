@@ -88,7 +88,7 @@ impl CommandExecutor for TokenCopy {
           .not_before
           .map(|nbf| if nbf > 0 { format!(", not before: {}", nbf) } else { "".to_string() })
           .unwrap_or_default();
-        let expires_in = if &jwt.payload.expires_in() > &0 { format!(", expires in: {}", jwt.payload.expires_in()) } else { "".to_string() };
+        let expires_in = if jwt.payload.expires_in() > 0 { format!(", expires in: {}", jwt.payload.expires_in()) } else { "".to_string() };
         context.print_outcome(format!("token copied to clipboard (type: {}, expires: {}{})", jwt_type, not_before, expires_in))
       }
       Err(error) => {
