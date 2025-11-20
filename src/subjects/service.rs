@@ -388,7 +388,12 @@ impl CommandExecutor for ServiceExport {
     let start_instant = context.now();
     let service = client.get_application_configuration(&service_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(service_id, &SERVICE_LABELS_SHOW, Some("service id"), context).print(&service, Some(OutputFormat::Json))
+    match context.output_format(None) {
+      OutputFormat::Json => context.print_serializable(service, Some(OutputFormat::Json)),
+      OutputFormat::JsonCompact => context.print_serializable(&service, Some(OutputFormat::JsonCompact)),
+      _ => context.print_serializable(service, Some(OutputFormat::Json)),
+    }
+    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
