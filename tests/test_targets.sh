@@ -22,6 +22,7 @@ PWUT_NE=nope
 export DSH_CLI_OUTPUT_FORMAT=quiet
 export DSH_CLI_LOG_LEVEL=info
 export DSH_CLI_VERBOSITY=high
+export DSH_CLI_AUTHENTICATION=robot
 
 function set_environment {
   rm -rf $DUT
