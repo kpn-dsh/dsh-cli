@@ -140,7 +140,7 @@ struct VhostListUsage {}
 impl CommandExecutor for VhostListUsage {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_warning("only vhosts that are actually used in service configurations will be listed here");
-    context.print_explanation("list services with a vhost configuration");
+    context.print_explanation("list vhosts with services and apps that use them");
     let start_instant = context.now();
     let vhosts_with_usage: Vec<(String, Vec<Dependant<VhostInjection>>)> = client.vhosts_with_dependants().await?;
     context.print_execution_time(start_instant);
