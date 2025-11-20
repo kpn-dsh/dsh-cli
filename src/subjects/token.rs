@@ -78,16 +78,18 @@ impl CommandExecutor for TokenCopy {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("fetch dsh api token");
     let start_instant = context.now();
-    let access_token = client.token_fetcher().fetch_access_token_from_server().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
     context.print_execution_time(start_instant);
-    match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(access_token.access_token)) {
+    match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(jwt.token.secret())) {
       Ok(_) => {
-        let not_before = if access_token.not_before_policy > 0 { format!(", not before: {}", access_token.not_before_policy) } else { "".to_string() };
-        let expires_in = if access_token.refresh_expires_in > 0 { format!(", expires in: {}", access_token.refresh_expires_in) } else { "".to_string() };
-        context.print_outcome(format!(
-          "token copied to clipboard (type: {}, expires: {}{}{})",
-          access_token.token_type, access_token.expires_in, not_before, expires_in
-        ))
+        let jwt_type = jwt.payload.token_type.clone().unwrap_or("unknown".to_string());
+        let not_before = &jwt
+          .payload
+          .not_before
+          .map(|nbf| if nbf > 0 { format!(", not before: {}", nbf) } else { "".to_string() })
+          .unwrap_or_default();
+        let expires_in = if &jwt.payload.expires_in() > &0 { format!(", expires in: {}", jwt.payload.expires_in()) } else { "".to_string() };
+        context.print_outcome(format!("token copied to clipboard (type: {}, expires: {}{})", jwt_type, not_before, expires_in))
       }
       Err(error) => {
         debug!("clipboard error {}", error);
@@ -109,9 +111,9 @@ impl CommandExecutor for TokenFetch {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("fetch dsh api token");
     let start_instant = context.now();
-    let access_token = client.token_fetcher().fetch_access_token_from_server().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
     context.print_execution_time(start_instant);
-    context.print(access_token.access_token);
+    context.print(jwt.token.secret());
     Ok(())
   }
 
@@ -127,10 +129,9 @@ impl CommandExecutor for TokenShow {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let complete = matches.get_flag(FilterFlagType::Complete.id());
     let start_instant = context.now();
-    let access_token = client.token_fetcher().fetch_access_token_from_server().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
     context.print_execution_time(start_instant);
-
-    let parts: Vec<&str> = access_token.access_token.split('.').collect();
+    let parts: Vec<&str> = jwt.token.secret().split('.').collect();
     if parts.len() != 3 {
       return Err("".to_string());
     }
