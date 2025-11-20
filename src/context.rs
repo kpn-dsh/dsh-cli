@@ -72,8 +72,8 @@ impl Default for BrowserMethod {
 
 #[derive(Debug, Default)]
 pub(crate) struct Context {
-  authentication: AuthenticationMethod,
-  browser: BrowserMethod,
+  authentication_method: AuthenticationMethod,
+  browser_method: BrowserMethod,
   csv_quote: Option<char>,
   csv_separator: String,
   dry_run: bool,
@@ -111,8 +111,8 @@ impl Context {
         return Err("csv separator string cannot contain quote character".to_string());
       }
     }
-    let authentication = Self::get_authentication(matches, &settings, stdin_is_terminal)?;
-    let browser = Self::get_browser(matches, &settings, stdin_is_terminal)?;
+    let authentication_method = Self::get_authentication_method(matches, &settings, stdin_is_terminal)?;
+    let browser_method = Self::get_browser_method(matches, &settings, stdin_is_terminal)?;
     let dry_run = Self::get_dry_run(matches, &settings);
     let (stderr_no_escape, stdout_no_escape) = if Self::get_no_escape(matches, &settings) { (true, true) } else { (!stderr_is_terminal, !stdout_is_terminal) };
 
@@ -152,8 +152,8 @@ impl Context {
       eprintln!("dry-run mode enabled");
     }
     Ok(Context {
-      authentication,
-      browser,
+      authentication_method,
+      browser_method,
       csv_quote,
       csv_separator,
       dry_run,
@@ -178,6 +178,14 @@ impl Context {
       verbosity,
       warning_style,
     })
+  }
+
+  pub(crate) fn authentication_method(&self) -> &AuthenticationMethod {
+    &self.authentication_method
+  }
+
+  pub(crate) fn browser_method(&self) -> &BrowserMethod {
+    &self.browser_method
   }
 
   pub(crate) fn csv_quote(&self) -> &Option<char> {
@@ -216,15 +224,15 @@ impl Context {
   ///
   /// 1. Try command line argument --authentication
   /// 1. Try environment variable `DSH_CLI_AUTHENTICATION`
-  /// 1. Try settings file
+  /// 1. Try value `authentication-method` in settings file
   /// 1. If stdin is a terminal, default to `AuthenticationMethod::SingleSignOn`
   /// 1. Else default to `AuthenticationMethod::Robot`
-  fn get_authentication(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<AuthenticationMethod, String> {
+  fn get_authentication_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<AuthenticationMethod, String> {
     match matches.get_one::<AuthenticationMethod>(AUTHENTICATION_ARGUMENT) {
       Some(authentication_argument) => Ok(authentication_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_AUTHENTICATION, matches)? {
         Some(authentication_env_var) => AuthenticationMethod::try_from(authentication_env_var.as_str()),
-        None => match &settings.authentication_method {
+        None => match &settings.authentication {
           Some(authentication_setting) => Ok(authentication_setting.to_owned()),
           None => {
             if stdin_is_terminal {
@@ -245,12 +253,12 @@ impl Context {
   /// 1. Try settings file
   /// 1. If stdin is a terminal, default to `BrowserMethod::Open`
   /// 1. Else default to `BrowserMethod::Instruct`
-  fn get_browser(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<BrowserMethod, String> {
+  fn get_browser_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<BrowserMethod, String> {
     match matches.get_one::<BrowserMethod>(BROWSER_ARGUMENT) {
       Some(browser_argument) => Ok(browser_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_BROWSER, matches)? {
         Some(browser_env_var) => BrowserMethod::try_from(browser_env_var.as_str()),
-        None => match &settings.browser_method {
+        None => match &settings.browser {
           Some(browser_setting) => Ok(browser_setting.to_owned()),
           None => {
             if stdin_is_terminal {
@@ -589,7 +597,7 @@ impl Context {
       self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
       self.print_warning(format!("{}", url));
     } else {
-      match self.browser {
+      match self.browser_method() {
         BrowserMethod::Instruct => {
           self.print_explanation(format!("opening {}", opening_target));
           self.print_explanation("open url in your browser:");

@@ -6,6 +6,7 @@
 )]
 extern crate core;
 
+use crate::authentication::{get_access_token, AuthenticationMethod};
 use crate::environment_variables::{
   env_var_argument, env_vars_argument, get_set_environment_variables, print_environment_variable, print_environment_variables, ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
   ENV_VAR_DSH_CLI_HOME, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
@@ -307,16 +308,18 @@ async fn inner_main() -> DshCliExit {
 
   match matches.subcommand() {
     Some(("login", _)) => {
-      return match authentication::login(&matches, context).await {
+      let platform = get_target_platform(&matches, context.settings()).unwrap();
+      return match authentication::login(platform, context).await {
         Ok(()) => DshCliExit::Ok,
         Err(error) => DshCliExit::Err(error),
-      }
+      };
     }
     Some(("logout", _)) => {
-      return match authentication::logout(&matches, context).await {
+      let platform = get_target_platform(&matches, context.settings()).unwrap();
+      return match authentication::logout(&platform, &context).await {
         Ok(()) => DshCliExit::Ok,
         Err(error) => DshCliExit::Err(error),
-      }
+      };
     }
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
@@ -324,7 +327,8 @@ async fn inner_main() -> DshCliExit {
         debug!("{:?}", requirements);
         if requirements.needs_dsh_api_client() {
           let client = match create_client(&matches, &context).await {
-            Ok(client) => client,
+            Ok(Some(client)) => client,
+            Ok(None) => return DshCliExit::ErrContext("user is not authenticated".to_string(), Box::new(context)),
             Err(error) => return DshCliExit::ErrContext(error.clone(), Box::new(context)),
           };
           match subject.execute_subject_command_with_client(sub_matches, &client, &context).await {
@@ -348,7 +352,8 @@ async fn inner_main() -> DshCliExit {
           debug!("{:?}", requirements);
           if requirements.needs_dsh_api_client() {
             let client = match create_client(&matches, &context).await {
-              Ok(client) => client,
+              Ok(Some(client)) => client,
+              Ok(None) => return DshCliExit::ErrContext("user is not authenticated".to_string(), Box::new(context)),
               Err(error) => return DshCliExit::ErrContext(error.clone(), Box::new(context)),
             };
             match subject_list_shortcut
@@ -484,6 +489,9 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
       command = command.after_long_help(format!("{}\n\n{}\n\n{}", settings_table, environment_variables_table, AFTER_HELP));
     }
   }
+
+  // TODO Show autjentications
+
   command
 }
 
@@ -960,16 +968,72 @@ where
   }
 }
 
-async fn create_client(matches: &ArgMatches, context: &Context) -> Result<DshApiClient, String> {
+/// Create client
+///
+/// # Parameters
+/// * `matches`
+/// * `context`
+///
+/// Returns
+/// * `Ok(Some(Client))` - Client was successfully created.
+/// * `Ok(None)` - User needs to log in.
+/// * `Err(String)` - Something went wrong.
+async fn create_client(matches: &ArgMatches, context: &Context) -> Result<Option<DshApiClient>, String> {
+  match context.authentication_method() {
+    AuthenticationMethod::Robot => create_client_robot_password(matches, context).await.map(|client| Some(client)),
+    AuthenticationMethod::SingleSignOn => create_client_access_token(matches, context).await,
+  }
+}
+
+/// Create client from robot password
+///
+/// # Parameters
+/// * `matches`
+/// * `context`
+///
+/// Returns
+/// * `Ok(Client)` - Client was successfully created.
+/// * `Err(String)` - Something went wrong.
+async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -> Result<DshApiClient, String> {
   let target_platform = get_target_platform(matches, context.settings())?;
   let target_tenant_name = get_target_tenant(matches, context.settings())?;
-  debug!("create client for target '{}@{}'", target_tenant_name, target_platform);
-  let dsh_api_tenant = DshApiTenant::new(target_tenant_name.clone(), target_platform.clone());
-  let password = get_target_password(matches, &dsh_api_tenant)?;
-  let dsh_api_client_factory = DshApiClientFactory::create(dsh_api_tenant, password)?;
+  debug!("create client with token fetcher for target '{}@{}'", target_tenant_name, target_platform);
+  let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
+  let robot_password = get_target_password(matches, &dsh_api_tenant)?;
+  let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_password);
   let dsh_api_client = dsh_api_client_factory.client().await?;
   debug!("api client created");
   Ok(dsh_api_client)
+}
+
+/// Create client from single sign on
+///
+/// # Parameters
+/// * `matches`
+/// * `context`
+///
+/// Returns
+/// * `Ok(Some(Client))` - Client was successfully created.
+/// * `Ok(None)` - User needs to log in.
+/// * `Err(String)` - Something went wrong.
+async fn create_client_access_token(matches: &ArgMatches, context: &Context) -> Result<Option<DshApiClient>, String> {
+  let target_platform = get_target_platform(matches, context.settings())?;
+  let target_tenant_name = get_target_tenant(matches, context.settings())?;
+  debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
+  match get_access_token(target_platform.clone()).await {
+    Ok(Some(access_token)) => {
+      let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
+      let dsh_api_client_factory = DshApiClientFactory::create_from_access_token(dsh_api_tenant, access_token.token.secret().clone());
+      let dsh_api_client = dsh_api_client_factory.client().await?;
+      debug!("api client created");
+      Ok(Some(dsh_api_client))
+    }
+    Ok(None) => {
+      context.print_warning(format!("please log in to platform {} using the 'dsh login' command", target_platform));
+      Ok(None)
+    }
+    Err(error) => Err(error),
+  }
 }
 
 // Method will panic if rows vector is empty
