@@ -6,9 +6,26 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [0.7.4] - YYYY-MM-DD
 
+### Added
+
+* Single sign on authentication.
+* Deploy and undeploy app catalog apps.
+* Show manual pages for apps from the app catalog manifest.
+* Environment variables can be set/overridden with command line arguments.
+* Added `k8s-dev-aws-lz-dsh` (development platform for Klarrio) to default platform list.
+* Capability to open app and service web applications.
+* Show token content.
+* Option to disable opening of browser.
+
 ### Changed
 
+* Capability to list images improved.
+* Upgraded dependency `dsh_api` to version `0.8.0` and open api specification `1.10.0`,
+* Upgraded dependencies from `crates.io`.
+* Removed `prod-aws-lz-laas` from default platform list.
+* Improved error messages when illegal arguments are provided.
 * Confirmation doesn't require the enter key to be pressed.
+* Show latest versions for manifests or all with a flag.
 
 ## [0.7.3] - 2025-05-09
 

@@ -186,7 +186,7 @@ impl CommandExecutor for CertificateListUsage {
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no certificate found in apps or services");
+      context.print_outcome("no certificates found in apps or services");
     } else {
       formatter.print(None)?;
     }
