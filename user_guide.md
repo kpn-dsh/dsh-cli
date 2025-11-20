@@ -17,43 +17,37 @@ Subjects/commands:
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
   image        Show image usage.
+  login        Login via single sign on
+  logout       Logout from single sign on
   manifest     Show App Catalog manifests.
   metric       Show metric exports.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
   secret       Show, manage and list DSH secrets.
   service      Show, manage and list services deployed on the DSH.
+  setting      Show, manage and list dsh settings.
+  stream       Show, manage and list internal and public managed streams.
+  target       Show, manage and list dsh target configurations.
+  tenant       Show and manage tenants on the DSH.
   token        Request DSH tokens.
-  topic        Show, manage and list DSH topics.
+  topic        Show, manage and list DSH scratch topics.
   vhost        Show vhost usage.
   volume       Show, manage and list DSH volumes.
-  setting      Show, manage and list dsh settings.
-  target       Show, manage and list dsh target configurations.
 
 Options:
-  -p, --platform <PLATFORM>   Provide target platform [possible values: np-aws-lz-dsh, poc-aws-dsh, prod-aws-dsh,
-                              prod-aws-lz-dsh, prod-aws-lz-laas, prod-azure-dsh]
-  -t, --tenant <TENANT>       Provide target tenant
-      --password-file <FILE>  Provide target password file name
       --dry-run               Execute in dry-run mode
       --force                 Force changes without confirmation
+      --password-file <FILE>  Provide target password file name
+  -p, --platform <PLATFORM>   Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
+                              prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
+  -t, --tenant <TENANT>       Provide target tenant
   -h, --help                  Print help (see more with '--help')
-  -V, --version               Print version
 
 Output options:
   -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,
                                 table-no-border, toml, toml-compact, yaml]
   -q, --quiet                   Run in quiet mode
   -v, --verbosity <VERBOSITY>   Set verbosity level [possible values: off, low, medium, high]
-
-Settings:
-  default platform  np-aws-lz-dsh / nplz
-  default tenant    greenbox
-  settings file     /Users/wilbert/Workspaces/dsh/dcli/.dsh_cli/settings.toml
-
-Environment variables:
-  DSH_CLI_HOME           /Users/wilbert/Workspaces/dsh/dcli/.dsh_cli
-  DSH_CLI_PASSWORD_FILE  /Users/wilbert/Workspaces/dsh/dcli/np-aws-lz-dsh.greenbox.pwd
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.
@@ -103,9 +97,9 @@ Functions that do not need to access the web service do not require these target
 
 ### Command line arguments
 
-* `--platform` - Specify the target platform by either the full name
+* `--platform` or `-p` - Specify the target platform by either the full name
   or the alias (e.g. `np-aws-lz-dsh` or `nplz`).
-* `--tenant` - Specify the target tenant name.
+* `--tenant` or `-t` - Specify the target tenant name.
 * `--password-file` - Specify the name of a file containing the target password.
   This can either be an absolute file name
   or a file name relative to the working directory.

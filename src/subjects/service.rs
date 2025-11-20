@@ -1,7 +1,8 @@
+use crate::argument_parsers::RangedValueParser;
 use crate::arguments::service_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, EXPORT_COMMAND_ALIAS, LIST_COMMAND,
-  LIST_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS,
+  OPEN_COMMAND, OPEN_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -14,20 +15,23 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
-use crate::{edit_configuration, include_started_stopped, read_single_line, DshCliResult};
+use crate::{edit_configuration, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use chrono::DateTime;
-use clap::{builder, Arg, ArgAction, ArgMatches};
-use dsh_api::application::parse_image_string;
+use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::parse::ImageString;
 use dsh_api::types::{Application, TaskState};
 use dsh_api::types::{Task, TaskStatus};
+use dsh_api::vhost::VhostString;
 use dsh_api::DshApiError;
 use futures::future::try_join_all;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::thread::sleep;
+use std::str::FromStr;
 use std::time::Duration;
+use tokio::time::sleep;
 
 pub(crate) struct ServiceSubject {}
 
@@ -42,7 +46,7 @@ lazy_static! {
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &ServiceCreate {}, "Create service")
       .set_long_about("Create a new service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(instances_flag())
   );
   static ref SERVICE_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, None, &ServiceDelete {}, "Delete service")
@@ -61,7 +65,7 @@ lazy_static! {
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(EXPORT_COMMAND, Some(EXPORT_COMMAND_ALIAS), &ServiceExport {}, "Export service configuration")
+    CapabilityBuilder::new(EXPORT_COMMAND, None, &ServiceExport {}, "Export service configuration")
       .set_long_about("Export the service configuration file.")
       .add_target_argument(service_id_argument().required(true))
   );
@@ -82,6 +86,11 @@ lazy_static! {
         (FilterFlagType::Stopped, Some("List all stopped services.".to_string()))
       ])
   );
+  static ref SERVICE_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), &ServiceOpen {}, "Open service vhost")
+      .set_long_about("Open the vhost of a DSH service.")
+      .add_target_argument(service_id_argument().required(true))
+  );
   static ref SERVICE_RESTART_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(RESTART_COMMAND, None, &ServiceRestart {}, "Restart service")
       .set_long_about("Restarts an already running service.")
@@ -100,7 +109,7 @@ lazy_static! {
     CapabilityBuilder::new(START_COMMAND, None, &ServiceStart {}, "Start service")
       .set_long_about("Start a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(instances_flag().help_heading(COMMAND_OPTIONS_HEADING))
   );
   static ref SERVICE_STOP_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(STOP_COMMAND, None, &ServiceStop {}, "Stop service")
@@ -111,9 +120,9 @@ lazy_static! {
     CapabilityBuilder::new(UPDATE_COMMAND, None, &ServiceUpdate {}, "Update service")
       .set_long_about("Update a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(cpus_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(instances_flag().help_heading(HELP_HEADING))
-      .add_extra_argument(mem_flag().help_heading(HELP_HEADING))
+      .add_extra_argument(cpus_flag().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(instances_flag().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(mem_flag().help_heading(COMMAND_OPTIONS_HEADING))
   );
   static ref SERVICE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     SERVICE_CREATE_CAPABILITY.as_ref(),
@@ -122,6 +131,7 @@ lazy_static! {
     SERVICE_EDIT_CAPABILITY.as_ref(),
     SERVICE_EXPORT_CAPABILITY.as_ref(),
     SERVICE_LIST_CAPABILITY.as_ref(),
+    SERVICE_OPEN_CAPABILITY.as_ref(),
     SERVICE_RESTART_CAPABILITY.as_ref(),
     SERVICE_SHOW_CAPABILITY.as_ref(),
     SERVICE_START_CAPABILITY.as_ref(),
@@ -152,6 +162,7 @@ impl Subject for ServiceSubject {
       EXPORT_COMMAND => Some(SERVICE_EXPORT_CAPABILITY.as_ref()),
       DUPLICATE_COMMAND => Some(SERVICE_DUPLICATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SERVICE_LIST_CAPABILITY.as_ref()),
+      OPEN_COMMAND => Some(SERVICE_OPEN_CAPABILITY.as_ref()),
       RESTART_COMMAND => Some(SERVICE_RESTART_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(SERVICE_SHOW_CAPABILITY.as_ref()),
       START_COMMAND => Some(SERVICE_START_CAPABILITY.as_ref()),
@@ -166,18 +177,21 @@ impl Subject for ServiceSubject {
   }
 }
 
-const HELP_HEADING: &str = "Service options";
-
 const CPUS_FLAG: &str = "cpus";
 
 fn cpus_flag() -> Arg {
   Arg::new(CPUS_FLAG)
     .long(CPUS_FLAG)
     .action(ArgAction::Set)
-    .value_parser(clap::value_parser!(f64))
+    .value_parser(RangedValueParser::<f64>::new(0.01, 16.0))
     .value_name("CPUS")
     .help("Number of cpus")
-    .long_help("Set number of cpus for the service.")
+    .long_help(
+      "Set the maximum number of cpus available for the service \
+       (factions of a vCPU core, 1.0 equals 1 vCPU). \
+       The value must be greater than or equal to 0.01 \
+       and lower than or equal to 16.0.",
+    )
 }
 
 const INSTANCES_FLAG: &str = "instances";
@@ -186,11 +200,13 @@ fn instances_flag() -> Arg {
   Arg::new(INSTANCES_FLAG)
     .long("instances")
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..))
+    .value_parser(RangedValueParser::<u64>::with_lower(0))
     .value_name("INSTANCES")
     .help("Number of instances")
-    .long_help("Number of service instances that will be started.")
-    .help_heading(HELP_HEADING)
+    .long_help(
+      "Set the number of service instances that will be started. \
+       Setting this value to 0 will deploy the service without starting it.",
+    )
 }
 
 const MEM_FLAG: &str = "mem";
@@ -199,10 +215,13 @@ fn mem_flag() -> Arg {
   Arg::new(MEM_FLAG)
     .long(MEM_FLAG)
     .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<u64>::new().range(1..=131072))
+    .value_parser(RangedValueParser::<u64>::new(1, 131072))
     .value_name("MEM")
     .help("Amount of memory")
-    .long_help("Set amount of memory available for the service (MiB).")
+    .long_help(
+      "Set the amount of memory available for the service (MiB). \
+       The value must be greater than or equal to 1 and lower than or equal to 131072.",
+    )
 }
 
 struct ServiceCreate {}
@@ -241,7 +260,6 @@ struct ServiceDelete {}
 impl CommandExecutor for ServiceDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete service '{}'", service_id));
     if client.get_application_configuration(&service_id).await.is_err() {
       return Err(format!("service '{}' does not exist", service_id));
     }
@@ -282,6 +300,7 @@ impl CommandExecutor for ServiceDuplicate {
           match edit_configuration(
             &application,
             &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
+            matches,
           )
           .await?
           {
@@ -318,7 +337,7 @@ struct ServiceEdit {}
 
 #[async_trait]
 impl CommandExecutor for ServiceEdit {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("edit service '{}' configuration", service_id));
     match client.get_application_configuration(&service_id).await {
@@ -326,6 +345,7 @@ impl CommandExecutor for ServiceEdit {
         match edit_configuration(
           &application,
           &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
+          matches,
         )
         .await?
         {
@@ -368,7 +388,12 @@ impl CommandExecutor for ServiceExport {
     let start_instant = context.now();
     let service = client.get_application_configuration(&service_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(service_id, &SERVICE_LABELS_SHOW, Some("service id"), context).print(&service, Some(OutputFormat::Json))
+    match context.output_format(None) {
+      OutputFormat::Json => context.print_serializable(service, Some(OutputFormat::Json)),
+      OutputFormat::JsonCompact => context.print_serializable(&service, Some(OutputFormat::JsonCompact)),
+      _ => context.print_serializable(service, Some(OutputFormat::Json)),
+    }
+    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -385,7 +410,7 @@ impl CommandExecutor for ServiceListAll {
     let start_instant = context.now();
     let services = client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-    let mut service_ids = services.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+    let mut service_ids = services.keys().map(|k| k.to_string()).collect_vec();
     service_ids.sort();
     let (include_started, include_stopped) = include_started_stopped(matches);
     let mut formatter = ListFormatter::new(&SERVICE_LABELS_LIST, None, context);
@@ -412,7 +437,7 @@ impl CommandExecutor for ServiceListAllocationStatus {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all services with their allocation status");
     let start_instant = context.now();
-    let service_ids = client.list_application_ids().await?;
+    let service_ids = client.application_ids().await?;
     let allocation_statuses = try_join_all(service_ids.iter().map(|service_id| client.get_application_status(service_id))).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("service id"), context);
@@ -433,7 +458,7 @@ impl CommandExecutor for ServiceListIds {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all service ids");
     let start_instant = context.now();
-    let ids = client.list_application_ids().await?;
+    let ids = client.application_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("service id", context);
     formatter.push_target_ids(ids.as_slice());
@@ -453,11 +478,11 @@ impl CommandExecutor for ServiceListTasks {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     fn tasks_to_string(tasks: Vec<String>) -> String {
       if tasks.len() <= 4 {
-        tasks.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")
+        tasks.iter().map(|t| t.to_string()).collect_vec().join(", ")
       } else {
         format!(
           "{}, plus {} more",
-          tasks.iter().take(4).map(|t| t.to_string()).collect::<Vec<_>>().join(", "),
+          tasks.iter().take(4).map(|t| t.to_string()).collect_vec().join(", "),
           tasks.len() - 4,
         )
       }
@@ -471,11 +496,65 @@ impl CommandExecutor for ServiceListTasks {
       .iter()
       .zip(tasks)
       .map(|(id, tasks)| (id.to_string(), tasks_to_string(tasks)))
-      .collect::<Vec<_>>();
+      .collect_vec();
     let mut formatter: ListFormatter<ServiceLabel, (String, String)> = ListFormatter::new(&[ServiceLabel::Target, ServiceLabel::Tasks], None, context);
     formatter.push_values(&service_id_tasks_pairs);
     formatter.print(None)?;
     Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct ServiceOpen {}
+
+#[async_trait]
+impl CommandExecutor for ServiceOpen {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant_name = get_target_tenant(matches, context.settings())?;
+    let service_id = target.unwrap_or_else(|| unreachable!());
+    let start_instant = context.now();
+    let service = client.get_application_configuration(&service_id).await?;
+    context.print_execution_time(start_instant);
+    if service.exposed_ports.is_empty() {
+      Err("service has no exposed ports".to_string())
+    } else if service.exposed_ports.len() > 1 {
+      Err("service has more than one exposed port".to_string())
+    } else {
+      let (_, port_mapping) = service.exposed_ports.iter().next().unwrap();
+      match &port_mapping.vhost {
+        Some(vhost) => {
+          let vhost_string = VhostString::from_str(vhost)?;
+          match vhost_string.zone {
+            Some(zone) => {
+              if zone == "private" {
+                context.open_url(
+                  format!(
+                    "https://{}",
+                    client.platform().tenant_private_vhost_domain(client.tenant().name(), vhost_string.vhost_name)?
+                  ),
+                  format!("private vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                );
+                Ok(())
+              } else if zone == "public" {
+                context.open_url(
+                  format!("https://{}", client.platform().public_vhost_domain(vhost_string.vhost_name)),
+                  format!("public vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                );
+                Ok(())
+              } else {
+                Err(format!("exposed port has illegal zone {}", zone))
+              }
+            }
+            None => Err("exposed port has no zone".to_string()),
+          }
+        }
+        None => Err("port mapping has no vhost".to_string()),
+      }
+    }
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -505,7 +584,7 @@ impl CommandExecutor for ServiceRestart {
             .zip(task_statuses)
             .filter(|(_, task_status)| task_status.actual.clone().is_some_and(|t| t.state == TaskState::Running))
             .map(|(task_id, _)| task_id)
-            .collect::<Vec<_>>();
+            .collect_vec();
           configuration.instances = 0;
           if running_task_ids.len() == 1 {
             context.print_outcome(format!("stop service '{}'", service_id));
@@ -515,7 +594,7 @@ impl CommandExecutor for ServiceRestart {
           client.put_application_configuration(&service_id, &configuration).await?;
           loop {
             context.print_progress_step();
-            sleep(Duration::from_millis(1000));
+            sleep(Duration::from_millis(1000)).await;
             let poll_tasks = try_join_all(running_task_ids.iter().map(|running_task_id| client.get_task(&service_id, running_task_id))).await?;
             if poll_tasks
               .iter()
@@ -858,18 +937,20 @@ impl SubjectFormatter<ServiceLabel> for Application {
     match label {
       ServiceLabel::Cpus => self.cpus.to_string(),
       ServiceLabel::Env => hashmap_to_table(&self.env),
-      ServiceLabel::ExposedPorts => self.exposed_ports.keys().map(|port| port.to_string()).collect::<Vec<_>>().join(","),
-      ServiceLabel::HealthCheck => match self.health_check {
-        Some(ref health_check) => match health_check.protocol {
-          Some(protocol) => format!("{}:{}/{}", protocol.to_string(), health_check.port, health_check.path),
-          None => format!("{}/{}", health_check.port, health_check.path),
-        },
-        None => "".to_string(),
-      },
-      ServiceLabel::Image => match parse_image_string(&self.image) {
-        Ok((kind, image)) => format!("{}:{}", kind, image),
-        Err(_) => self.image.clone(),
-      },
+      ServiceLabel::ExposedPorts => self
+        .exposed_ports
+        .iter()
+        .map(|(port, port_mapping)| {
+          format!(
+            "{} : {}",
+            port,
+            VhostString::try_from(port_mapping).map(|vhost_string| vhost_string.to_string()).unwrap_or_default()
+          )
+        })
+        .collect_vec()
+        .join("\n"),
+      ServiceLabel::HealthCheck => self.health_check.clone().map(|health_check| health_check.to_string()).unwrap_or_default(),
+      ServiceLabel::Image => ImageString::from(self.image.as_str()).to_string(),
       ServiceLabel::Instances => self.instances.to_string(),
       ServiceLabel::Mem => self.mem.to_string(),
       ServiceLabel::Metrics => self
@@ -883,22 +964,22 @@ impl SubjectFormatter<ServiceLabel> for Application {
         .clone()
         .into_iter()
         .map(|readable_stream| readable_stream.to_string())
-        .collect::<Vec<_>>()
+        .collect_vec()
         .join(", "),
-      ServiceLabel::Secrets => self.secrets.clone().into_iter().map(|secret| secret.name).collect::<Vec<_>>().join(", "),
+      ServiceLabel::Secrets => self.secrets.clone().into_iter().map(|secret| secret.name).collect_vec().join(", "),
       ServiceLabel::SingleInstance => self.single_instance.to_string(),
       ServiceLabel::SpreadGroup => self.spread_group.clone().unwrap_or_default(),
       ServiceLabel::Target => service_id.to_string(),
       ServiceLabel::Tasks => "".to_string(),
-      ServiceLabel::Topics => self.topics.clone().into_iter().map(|topic| topic.to_string()).collect::<Vec<_>>().join(", "),
+      ServiceLabel::Topics => self.topics.clone().into_iter().map(|topic| topic.to_string()).collect_vec().join(", "),
       ServiceLabel::User => self.user.clone(),
-      ServiceLabel::Volumes => self.volumes.keys().map(|k| k.to_string()).collect::<Vec<_>>().join(","),
+      ServiceLabel::Volumes => self.volumes.keys().map(|k| k.to_string()).collect_vec().join(","),
       ServiceLabel::WritableStreams => self
         .writable_streams
         .clone()
         .into_iter()
         .map(|writable_stream| writable_stream.to_string())
-        .collect::<Vec<_>>()
+        .collect_vec()
         .join(", "),
     }
   }

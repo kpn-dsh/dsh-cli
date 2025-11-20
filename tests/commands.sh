@@ -1,16 +1,17 @@
 #!/bin/bash
 
-export APP_UNDER_TEST=kafdrop
-export BUCKET_UNDER_TEST=cpr
+export APP_NON_EXISTING=non_existing_app
+export APP_UNDER_TEST=eavesdropper
+export BUCKET_UNDER_TEST=schema-registry
 export CERTIFICATE_UNDER_TEST=broker
 export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="^info$"
 export ENV_VAR_QUERY_UNDER_TEST=password
 export ENV_VAR_UNDER_TEST=DSH_CLI_HOME
-export IMAGE_UNDER_TEST=registry:eavesdropper:0.9.2
+export IMAGE_UNDER_TEST=registry:eavesdropper:0.10.0
 export IMAGE_UNDER_TEST_REGEX=registry
-export MANIFEST_UNDER_TEST=dsh-ollama
-export MANIFEST_UNDER_TEST_VERSION=0.5.0-all
+export MANIFEST_UNDER_TEST=kpn/eavesdropper
+export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
 export PROXY_UNDER_TEST=broker
 export SECRET_NON_EXISTING=non-existing-secret
@@ -39,9 +40,13 @@ export SAFE_COMMANDS=(
   "api put secret $SECRET_UNDER_TEST --dry-run < /dev/null"
   "api show > /dev/null"
 
-  "app list --ids"
+  "app deploy $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION $APP_NON_EXISTING --implicit-defaults --dry-run"
+  "app explain $MANIFEST_UNDER_TEST"
+  "app explain $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "app list"
+  "app list --ids"
   "app show $APP_UNDER_TEST"
+  "app undeploy $APP_UNDER_TEST --force --dry-run"
 
   "bucket list --ids"
   "bucket list"
@@ -73,8 +78,12 @@ export SAFE_COMMANDS=(
   "image list --stopped"
   "image list"
 
+  "manifest explain $MANIFEST_UNDER_TEST"
+  "manifest explain $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
+  "manifest export $MANIFEST_UNDER_TEST"
   "manifest export $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "manifest list"
+  "manifest list --all-versions"
   "manifest list --ids"
   "manifest show $MANIFEST_UNDER_TEST"
   "manifest show $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
@@ -118,8 +127,6 @@ export SAFE_COMMANDS=(
 
   "secret create $SECRET_NON_EXISTING --dry-run < /dev/null"
   "secret delete $SECRET_UNDER_TEST --force --dry-run"
-  "secret list --app"
-  "secret list --service"
   "secret list --status"
   "secret list --system"
   "secret list --usage"
@@ -151,19 +158,23 @@ export SAFE_COMMANDS=(
 
   "token copy --dry-run"
   "token fetch"
+  "token show"
+  "token show --output-format json"
+  "token show --output-format json-compact"
+  "token show --complete"
+  "token show --complete --output-format json"
+  "token show --complete --output-format json-compact"
 
   "topic create $TOPIC_NON_EXISTING --dry-run"
   "topic create $TOPIC_NON_EXISTING --cleanup-policy compact --dry-run"
   "topic create $TOPIC_NON_EXISTING --compression-type gzip --dry-run"
   "topic create $TOPIC_NON_EXISTING --delete-retention-ms 10000 --dry-run"
   "topic create $TOPIC_NON_EXISTING --max-message-bytes 2048 --dry-run"
-  "topic create $TOPIC_NON_EXISTING --max-message-size 2048 --dry-run"
   "topic create $TOPIC_NON_EXISTING --message-timestamp-type create-time --dry-run"
   "topic create $TOPIC_NON_EXISTING --partitions 2 --dry-run"
   "topic create $TOPIC_NON_EXISTING --retention-bytes 1000 --dry-run"
   "topic create $TOPIC_NON_EXISTING --retention-ms 3600000 --dry-run"
   "topic create $TOPIC_NON_EXISTING --segment-bytes 52428800 --dry-run"
-  "topic create $TOPIC_NON_EXISTING --segment-size 52428800 --dry-run"
   "topic list --ids"
   "topic list --status"
   "topic list --usage"
@@ -181,8 +192,6 @@ export SAFE_COMMANDS=(
 
   "volume create $VOLUME_NON_EXISTING --size 2 --dry-run"
   "volume delete $VOLUME_UNDER_TEST --force --dry-run"
-  "volume list --app"
-  "volume list --service"
   "volume list --configuration"
   "volume list --ids"
   "volume list --status"

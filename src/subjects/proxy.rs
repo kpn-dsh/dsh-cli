@@ -4,11 +4,12 @@ use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::KafkaProxy;
 use futures::future::try_join_all;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::arguments::proxy_id_argument;
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, SHOW_COMMAND};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
@@ -62,12 +63,14 @@ lazy_static! {
       .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, None, &ProxyListAll {}, "List proxies")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyListAll {}, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
   );
-  static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
-    Box::new(CapabilityBuilder::new(SHOW_COMMAND, None, &ProxyShowConfiguration {}, "Show Kafka proxy configuration").add_target_argument(proxy_id_argument().required(true)));
+  static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShowConfiguration {}, "Show Kafka proxy configuration")
+      .add_target_argument(proxy_id_argument().required(true))
+  );
   static ref PROXY_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref()];
 }
@@ -78,7 +81,6 @@ struct ProxyDelete {}
 impl CommandExecutor for ProxyDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("delete proxy '{}'", proxy_id));
     if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
       return Err(format!("proxy '{}' does not exists", proxy_id));
     }
@@ -161,49 +163,49 @@ impl CommandExecutor for ProxyShowConfiguration {
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub enum ProxyLabel {
+  AclGroupsEnabled,
+  CaChainSecretName,
   Certificate,
   Cpus,
   Instances,
-  KafkaProxyZone,
   Mem,
   Name,
   SchemaStore,
-  SchemaStoreEnabled,
-  SecretNameCaChain,
   Target,
   Validations,
+  Zone,
 }
 
 impl Label for ProxyLabel {
   fn as_str(&self) -> &str {
     match self {
+      ProxyLabel::AclGroupsEnabled => "acl groups",
+      ProxyLabel::CaChainSecretName => "ca chain secret name",
       ProxyLabel::Certificate => "certificate",
-      ProxyLabel::Cpus => "number of cpus",
-      ProxyLabel::Instances => "number of instances",
-      ProxyLabel::KafkaProxyZone => "kafka proxy zone",
-      ProxyLabel::Mem => "available memory",
-      ProxyLabel::Name => "certificate name",
+      ProxyLabel::Cpus => "cpus",
+      ProxyLabel::Instances => "instances",
+      ProxyLabel::Mem => "memory",
+      ProxyLabel::Name => "certificate",
       ProxyLabel::SchemaStore => "schema store",
-      ProxyLabel::SchemaStoreEnabled => "schema store enabled",
-      ProxyLabel::SecretNameCaChain => "secret name ca chain",
       ProxyLabel::Target => "proxy id",
       ProxyLabel::Validations => "validation",
+      ProxyLabel::Zone => "zone",
     }
   }
 
   fn as_str_for_list(&self) -> &str {
     match self {
+      ProxyLabel::AclGroupsEnabled => "acl groups",
+      ProxyLabel::CaChainSecretName => "secret name",
       ProxyLabel::Certificate => "certificate",
       ProxyLabel::Cpus => "cpus",
       ProxyLabel::Instances => "instances",
-      ProxyLabel::KafkaProxyZone => "zone",
       ProxyLabel::Mem => "memory",
       ProxyLabel::Name => "certificate name",
       ProxyLabel::SchemaStore => "schema store",
-      ProxyLabel::SchemaStoreEnabled => "schema store",
-      ProxyLabel::SecretNameCaChain => "secret name",
       ProxyLabel::Target => "proxy id",
       ProxyLabel::Validations => "validation",
+      ProxyLabel::Zone => "zone",
     }
   }
 
@@ -215,25 +217,27 @@ impl Label for ProxyLabel {
 impl SubjectFormatter<ProxyLabel> for KafkaProxy {
   fn value(&self, label: &ProxyLabel, target_id: &str) -> String {
     match label {
+      ProxyLabel::AclGroupsEnabled => self.enable_kafka_acl_groups.map(|enabled| enabled.to_string()).unwrap_or_default(),
+      ProxyLabel::CaChainSecretName => self.secret_name_ca_chain.to_string(),
       ProxyLabel::Certificate => self.certificate.clone(),
       ProxyLabel::Cpus => self.cpus.to_string(),
       ProxyLabel::Instances => self.instances.to_string(),
-      ProxyLabel::KafkaProxyZone => self.zone.to_string(),
       ProxyLabel::Mem => self.mem.to_string(),
       ProxyLabel::Name => self.name.clone().unwrap_or_default(),
-      ProxyLabel::SchemaStore => {
-        if self.schema_store.is_some_and(|enabled| enabled) {
-          format!(
-            "cpus: {}, mem: {}",
-            self.schema_store_cpus.unwrap_or_default(),
-            self.schema_store_mem.unwrap_or_default()
-          )
-        } else {
-          "NA".to_string()
-        }
-      }
-      ProxyLabel::SchemaStoreEnabled => self.schema_store.map(|enabled| enabled.to_string()).unwrap_or("NA".to_string()),
-      ProxyLabel::SecretNameCaChain => self.secret_name_ca_chain.to_string(),
+      ProxyLabel::SchemaStore => self
+        .schema_store
+        .map(|enabled| {
+          if enabled {
+            format!(
+              "true (cpus: {}, mem: {})",
+              self.schema_store_cpus.map(|cpus| cpus.to_string()).unwrap_or("NA".to_string()),
+              self.schema_store_mem.map(|mem| mem.to_string()).unwrap_or("NA".to_string())
+            )
+          } else {
+            "false".to_string()
+          }
+        })
+        .unwrap_or("NA".to_string()),
       ProxyLabel::Target => target_id.to_string(),
       ProxyLabel::Validations => {
         if self.validations.is_empty() {
@@ -243,27 +247,27 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
             .validations
             .iter()
             .map(|validation| validation.common_name.clone().unwrap_or_default())
-            .collect::<Vec<_>>()
+            .collect_vec()
             .join("\n")
         }
       }
+      ProxyLabel::Zone => self.zone.to_string(),
     }
   }
 }
 
-pub static PROXY_LABELS_LIST: [ProxyLabel; 6] =
-  [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::KafkaProxyZone, ProxyLabel::SchemaStoreEnabled];
+pub static PROXY_LABELS_LIST: [ProxyLabel; 6] = [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore];
 
 pub static PROXY_LABELS_SHOW: [ProxyLabel; 11] = [
   ProxyLabel::Target,
   ProxyLabel::Certificate,
   ProxyLabel::Cpus,
   ProxyLabel::Instances,
-  ProxyLabel::KafkaProxyZone,
+  ProxyLabel::Zone,
   ProxyLabel::Mem,
   ProxyLabel::Name,
-  ProxyLabel::SchemaStoreEnabled,
   ProxyLabel::SchemaStore,
-  ProxyLabel::SecretNameCaChain,
+  ProxyLabel::CaChainSecretName,
   ProxyLabel::Validations,
+  ProxyLabel::AclGroupsEnabled,
 ];

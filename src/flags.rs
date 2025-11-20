@@ -4,6 +4,7 @@ use clap::{Arg, ArgAction};
 pub(crate) enum FlagType {
   _Actual,
   AllocationStatus,
+  AllVersions,
   Configuration,
   Ids,
   Properties,
@@ -20,6 +21,7 @@ impl FlagType {
     match &self {
       Self::_Actual => "actual-flag",
       Self::AllocationStatus => "status-flag",
+      Self::AllVersions => "all-versions-flag",
       Self::Configuration => "configuration-flag",
       Self::Ids => "ids-flag",
       Self::Properties => "properties-flag",
@@ -36,6 +38,7 @@ impl FlagType {
     match &self {
       Self::_Actual => "actual",
       Self::AllocationStatus => "status",
+      Self::AllVersions => "all-versions",
       Self::Configuration => "configuration",
       Self::Ids => "ids",
       Self::Properties => "properties",
@@ -53,6 +56,7 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
   match flag_type {
     FlagType::_Actual => create_clap_flag(FlagType::_Actual, format!("Use the 'actual' {} configuration", subject), long_help),
     FlagType::AllocationStatus => create_clap_flag(FlagType::AllocationStatus, format!("Include the {}'s allocation status", subject), long_help),
+    FlagType::AllVersions => create_clap_flag(FlagType::AllVersions, format!("List all {} versions", subject), long_help),
     FlagType::Configuration => create_clap_flag(FlagType::Configuration, format!("Include the {}'s initial configuration", subject), long_help),
     FlagType::Ids => create_clap_flag(FlagType::Ids, format!("Include the {}'s ids", subject), long_help),
     FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties", subject), long_help),

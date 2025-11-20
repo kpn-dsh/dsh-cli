@@ -9,6 +9,12 @@ export DSH_CLI_PLATFORM=nplz
 export DSH_CLI_TENANT=greenbox-dev
 export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
 
+# For this test to run the following is expected:
+#
+# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
+# * Password file $DSH_CLI_PASSWORD_FILE exists and contains the password
+#   for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
+
 ENV_VAR_QUERY=level
 IMAGE_QUERY=keyring-service
 NON_EXISTING_SERVICE=non-existing-service
@@ -102,7 +108,7 @@ do
     for LABEL_STYLE in "${MATCHING_STYLES[@]}"
     do
       unset_all
-      CMD=`echo "dsh $COMMAND" | envsubst`
+      CMD=$(echo "dsh $COMMAND" | envsubst)
       echo "$CMD"
       echo "$STDOUT_STYLE"
       echo "$LABEL_STYLE"
@@ -128,7 +134,7 @@ do
     for ERROR_STYLE in "${ERROR_STYLES[@]}"
     do
       unset_all
-      CMD=`echo "dsh $COMMAND" | envsubst`
+      CMD=$(echo "dsh $COMMAND" | envsubst)
       echo "$CMD"
       echo "$STDERR_STYLE"
       echo "$ERROR_STYLE"
@@ -154,7 +160,7 @@ do
     for WARNING_STYLE in "${WARNING_STYLES[@]}"
     do
       unset_all
-      CMD=`echo "dsh $COMMAND" | envsubst`
+      CMD=$(echo "dsh $COMMAND" | envsubst)
       echo "$CMD"
       echo "$STDERR_STYLE"
       echo "$WARNING_STYLE"

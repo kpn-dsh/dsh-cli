@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -76,16 +77,14 @@ impl CommandExecutor for EnvFind {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
-      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&query)? } else { &ExactMatchQueryProcessor::create(&query)? };
+      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*query)? } else { &ExactMatchQueryProcessor::create(&query)? };
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation(format!("find environment variables in services that {}", query_processor.describe()));
     let start_instant = context.now();
     let services = &client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
-
-    let mut service_pairs = services.iter().collect::<Vec<_>>();
+    let mut service_pairs = services.iter().collect_vec();
     service_pairs.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
-
     let mut matching_services: Vec<(String, HashMap<ServiceEnvLabel, String>)> = vec![];
     for (service_id, service) in service_pairs {
       if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {
@@ -95,9 +94,9 @@ impl CommandExecutor for EnvFind {
           .filter_map(|(key, value)| {
             query_processor
               .matching_parts(value)
-              .map(|ps| (key.to_string(), context.parts_to_string_for_stdout(ps.as_slice(), None)))
+              .map(|matching| (key.to_string(), context.parts_to_string_for_stdout(matching.as_slice(), None)))
           })
-          .collect();
+          .collect_vec();
         envs.sort_by_key(|env| env.0.clone());
         for (key, value) in envs {
           let mut env_map: HashMap<ServiceEnvLabel, String> = HashMap::new();

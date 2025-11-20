@@ -6,13 +6,46 @@
 
 When the `dsh` tool is installed properly, you can run it by simply typing a command and
 the tool will prompt you for the required parameters.
-To get a list of the configured secrets for `my-tenant` on `my-platform`, just type:
+To get a list of the configured secrets for `my-tenant` on platform `nplz`, just type:
 
 ```bash
 > dsh secret list
-target platform: np-aws-lz-dsh
+target platform: nplz
 target tenant: my-tenant
-password for tenant my-tenant@np-aws-lz-dsh: ********
+please log in to platform np-aws-lz-dsh using the 'dsh login' command
+user is not authenticated
+```
+
+To login, just type the following command:
+
+```bash
+dcli> dsh login
+target platform: nplz
+login to platform np-aws-lz-dsh
+opening login page for platform np-aws-lz-dsh
+```
+
+Your browser will open automatically, and you are requested to login using the 2 fase
+authentication process. When login succeeded, you will be notified on the console and the
+tenants that you have access to on this platform will be listed.
+
+```bash
+dcli> dsh login
+target platform: nplz
+login to platform np-aws-lz-dsh
+opening login page for platform np-aws-lz-dsh
+you are logged in as schel104
+authorized tenants: my-tenant, ...
+```
+
+No try again, to finally see the results.
+
+```bash
+> dsh secret list
+target platform: nplz
+target tenant: my-tenant
+target my-tenant@np-aws-lz-dsh
+list all services with their parameters
 ┌─────────────────────────────────────────┐
 │ secret ids (1)                          │
 ├─────────────────────────────────────────┤
@@ -21,27 +54,24 @@ password for tenant my-tenant@np-aws-lz-dsh: ********
 └─────────────────────────────────────────┘
 ```
 
-The password can be obtained by logging in to the DSH console web application for `np-aws-lz-dsh`
-and selecting `my-tenant`. Then go to the `Resources > Secrets` menu.
-The password will be listed as `system/rest-api-client`.
-
 ### Command line arguments
 
 In most cases, especially when the `dsh` tool is not run from a terminal,
 it is more convenient to provide the required parameters explicitly via the command line.
-For security reasons, the password cannot be provided directly from the command line,
-therefor you have to create a password file containing the password.
 
-```bash
-> touch .password
-> edit .password
-```
-
-Now you can get the list of all secrets for tenant `my-tenant`
+You can get the above list of all secrets for tenant `my-tenant`
 on platform `np-aws-lz-dsh` by typing the following command:
 
 ```bash
-> dsh secret list --platform np-aws-lz-dsh --tenant my-tenant --password-file .password
+> dsh secret list --platform np-aws-lz-dsh --tenant my-tenant
+...
+```
+
+For the most used arguments there are shortcuts defined. The above command can
+also be run as follows:
+
+```bash
+> dsh secret list -p np-aws-lz-dsh -t my-tenant
 ...
 ```
 
@@ -52,7 +82,6 @@ Even more convenient is providing the required parameters via environment variab
 ```bash
 > export DSH_CLI_PLATFORM=np-aws-lz-dsh
 > export DSH_CLI_TENANT=my-tenant
-> export DSH_CLI_PASSWORD="..."
 ```
 
 Now you can get the same list of secrets by just typing:
@@ -62,39 +91,12 @@ Now you can get the same list of secrets by just typing:
 ...
 ```
 
-In this case the password can be provided by an environment variable directly,
-but you can also provide it in a file as with the command line arguments:
-
-```bash
-> export DSH_CLI_PASSWORD_FILE=.password
-```
-
 ### Settings and targets
 
 If you work with more than one platform and/or tenant,
 providing the parameters and passwords via prompts, command line arguments or
 environment variables quickly becomes tedious.
-It might be easier to use the `dsh` tool's capabilities to manage target platforms and tenants
-and to define default settings.
-
-To create a new target, type:
-
-```bash
-> dsh target create np-aws-lz-dsh my-tenant
-create new target configuration
-enter password:
-target my-tenant@np-aws-lz-dsh created
-```
-
-This will store the password in your platform's keyring.
-Once it is stored there, you don't have to provide it with each invocation:
-
-```bash
-> dsh secret list --platform np-aws-lz-dsh --tenant my-tenant
-...
-```
-
-Finally, you can also set a default platform and default tenant:
+Luckily, you can also set a default platform and default tenant:
 
 ```bash
 > dsh setting set default-platform np-aws-lz-dsh

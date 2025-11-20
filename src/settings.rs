@@ -1,3 +1,5 @@
+use crate::authentication::AuthenticationMethod;
+use crate::context::BrowserMethod;
 use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::style::{DshColor, DshStyle};
@@ -10,6 +12,10 @@ use std::path::PathBuf;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct Settings {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) authentication: Option<AuthenticationMethod>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) browser: Option<BrowserMethod>,
   #[serde(rename = "csv-quote", skip_serializing_if = "Option::is_none")]
   pub(crate) csv_quote: Option<char>,
   #[serde(rename = "csv-separator", skip_serializing_if = "Option::is_none")]
@@ -42,7 +48,7 @@ pub(crate) struct Settings {
   pub(crate) no_headers: Option<bool>,
   #[serde(rename = "output-format", skip_serializing_if = "Option::is_none")]
   pub(crate) output_format: Option<OutputFormat>,
-  #[serde(rename = "quiet", skip_serializing_if = "Option::is_none")]
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) quiet: Option<bool>,
   #[serde(rename = "show-execution-time", skip_serializing_if = "Option::is_none")]
   pub(crate) show_execution_time: Option<bool>,

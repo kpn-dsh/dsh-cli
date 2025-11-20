@@ -1,4 +1,5 @@
 use dsh_api::types::Notification;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -79,7 +80,7 @@ impl TryFrom<&str> for OutputFormat {
 }
 
 pub(crate) fn notifications_to_string(notifications: &[Notification]) -> String {
-  notifications.iter().map(notification_to_string).collect::<Vec<_>>().join(", ")
+  notifications.iter().map(notification_to_string).collect_vec().join(", ")
 }
 
 pub(crate) fn notification_to_string(notification: &Notification) -> String {
@@ -87,11 +88,6 @@ pub(crate) fn notification_to_string(notification: &Notification) -> String {
     "{}, {}, {}",
     if notification.remove { "remove".to_string() } else { "create/update".to_string() },
     notification.message,
-    notification
-      .args
-      .iter()
-      .map(|(key, value)| format!("{}:{}", key, value))
-      .collect::<Vec<_>>()
-      .join(", "),
+    notification.args.iter().map(|(key, value)| format!("{}:{}", key, value)).collect_vec().join(", "),
   )
 }

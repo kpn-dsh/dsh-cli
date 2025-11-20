@@ -1,11 +1,18 @@
+use crate::authentication::AuthenticationMethod;
+use crate::context::BrowserMethod;
 use crate::formatters::OutputFormat;
 use crate::verbosity::Verbosity;
+use crate::{OUTPUT_OPTIONS_HEADING, TOOL_OPTIONS_HEADING};
 use builder::EnumValueParser;
 use clap::builder::{PossibleValue, ValueParser};
 use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
+use itertools::Itertools;
 
+pub(crate) const AUTHENTICATION_ARGUMENT: &str = "authentication";
+pub(crate) const BROWSER_ARGUMENT: &str = "browser";
 pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
+pub(crate) const ENVIRONMENT_VARIABLE_ARGUMENT: &str = "environment-variable-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
 // pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
@@ -22,7 +29,44 @@ pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
 pub(crate) const VERSION_ARGUMENT: &str = "version-argument";
 
-pub(crate) const OUTPUT_OPTIONS_HEADING: &str = "Output options";
+pub(crate) fn authentication_argument() -> Arg {
+  Arg::new(AUTHENTICATION_ARGUMENT)
+    .long("authentication")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<AuthenticationMethod>::new())
+    .value_name("METHOD")
+    .help("Set authentication method")
+    .long_help(
+      "This option specifies the authentication method that will be used \
+          to access the resource management api. If this argument is not provided, the value \
+          from the environment variable 'DSH_CLI_AUTHENTICATION' or the value from the \
+          settings file will be used. By default, when stdout is a terminal 'single-sign-on' \
+          will be used, while if stdout is not a terminal 'robot' will be used.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
+}
+
+pub(crate) fn browser_argument() -> Arg {
+  Arg::new(BROWSER_ARGUMENT)
+    .long("browser")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<BrowserMethod>::new())
+    .value_name("METHOD")
+    .help("Specifies whether the tool may try to open a browser")
+    .long_help(
+      "This option specifies whether the cli tool will try to automatically open a browser \
+     (e.g. for authentication or to open the console) or will only instruct the user to open it. \
+     If this variable is not provided, the value from the environment variable 'DSH_CLI_BROWSER' \
+     or the value from the settings file will be used, if it exists. Else, the default value \
+     will be 'open' when the cli tool is run interactive ('stdin' is a terminal) and \
+     'instruct' if not.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
+}
 
 pub(crate) fn dry_run_argument() -> Arg {
   Arg::new(DRY_RUN_ARGUMENT)
@@ -36,6 +80,23 @@ pub(crate) fn dry_run_argument() -> Arg {
           environment variable DSH_CLI_DRY_RUN or in the settings file. \
           Dry-run mode will take precedence over the --force flag.",
     )
+    .global(true)
+}
+
+pub(crate) fn environment_variable_argument() -> Arg {
+  Arg::new(ENVIRONMENT_VARIABLE_ARGUMENT)
+    .long("environment-variable")
+    .short('e')
+    .action(ArgAction::Append)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("ENV_VAR=value")
+    .help("Set environment variable")
+    .long_help(
+      "This option allows setting environment variables from the command line. \
+          The environment variable must be specified as \"VAR=value\". \
+          This option can be provided multiple times.",
+    )
+    .hide_short_help(true)
     .global(true)
 }
 
@@ -63,6 +124,7 @@ pub(crate) fn force_argument() -> Arg {
 //           instead of being read from the terminal, pipes or redirects.",
 //     )
 //     .global(true)
+//     .help_heading(MAIN_OPTIONS_HEADING)
 // }
 
 pub(crate) fn no_escape_argument() -> Arg {
@@ -108,7 +170,7 @@ pub(crate) fn output_format_argument() -> Arg {
     .long_help(
       "This option specifies the format used when printing the output. \
           If this argument is not provided, the value from the environment variable \
-          DSH_CLI_OUTPUT_FORMAT of the value from the settings file will be used. \
+          DSH_CLI_OUTPUT_FORMAT or the value from the settings file will be used. \
           By default, when stdout is a terminal 'table' will be used, \
           while if stdout is not a terminal 'json' will be used.",
     )
@@ -170,7 +232,7 @@ pub(crate) fn suppress_exit_status_argument() -> Arg {
     )
     .hide_short_help(true)
     .global(true)
-    .help_heading(OUTPUT_OPTIONS_HEADING)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
 pub(crate) fn target_password_file_argument() -> Arg {
@@ -198,7 +260,7 @@ pub(crate) fn target_platform_argument() -> Arg {
         .alias(platform.alias())
         .help(format!("{} ({})", platform.description(), platform.alias()))
     })
-    .collect::<Vec<_>>();
+    .collect_vec();
   Arg::new(TARGET_PLATFORM_ARGUMENT)
     .long("platform")
     .short('p')
@@ -259,6 +321,7 @@ pub(crate) fn terminal_width_argument() -> Arg {
 //           instead of being printed to the terminal.",
 //     )
 //     .global(true)
+//     .help_heading(MAIN_OPTIONS_HEADING)
 // }
 
 pub(crate) fn version_argument() -> Arg {
@@ -271,4 +334,5 @@ pub(crate) fn version_argument() -> Arg {
     )
     .exclusive(true)
     .hide_short_help(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }

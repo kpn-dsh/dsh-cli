@@ -1,5 +1,5 @@
-use crate::global_arguments::OUTPUT_OPTIONS_HEADING;
 use crate::log_level::LogLevel;
+use crate::TOOL_OPTIONS_HEADING;
 use builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction};
 
@@ -19,7 +19,7 @@ pub(crate) fn log_level_api_argument() -> Arg {
     .hide_short_help(true)
     .hide_possible_values(true)
     .global(true)
-    .help_heading(OUTPUT_OPTIONS_HEADING)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
 pub(crate) fn log_level_argument() -> Arg {
@@ -34,5 +34,5 @@ pub(crate) fn log_level_argument() -> Arg {
     )
     .hide_short_help(true)
     .global(true)
-    .help_heading(OUTPUT_OPTIONS_HEADING)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }

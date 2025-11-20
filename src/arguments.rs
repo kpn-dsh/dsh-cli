@@ -1,6 +1,7 @@
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
+use itertools::Itertools;
 
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
@@ -18,7 +19,7 @@ pub(crate) const SERVICE_ID_ARGUMENT: &str = "service-id-argument";
 pub(crate) const TENANT_NAME_ARGUMENT: &str = "tenant-name-argument";
 pub(crate) const TOPIC_ID_ARGUMENT: &str = "topic-id-argument";
 pub(crate) const VENDOR_NAME_ARGUMENT: &str = "vendor-name-argument";
-pub(crate) const VERSION_ARGUMENT: &str = "version-argument";
+pub(crate) const MANIFEST_VERSION_ARGUMENT: &str = "version-argument";
 pub(crate) const VHOST_ID_ARGUMENT: &str = "vhost-id-argument";
 pub(crate) const VOLUME_ID_ARGUMENT: &str = "volume-id-argument";
 
@@ -75,7 +76,7 @@ pub(crate) fn manifest_id_argument() -> Arg {
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("MANIFEST")
     .help("Manifest identifier")
-    .long_help("Identifies a manifest from the app catalog.")
+    .long_help("Identifies an app manifest from the app catalog.")
 }
 
 pub(crate) fn platform_name_argument() -> Arg {
@@ -86,7 +87,7 @@ pub(crate) fn platform_name_argument() -> Arg {
         .alias(platform.alias())
         .help(format!("{} ({})", platform.description(), platform.alias()))
     })
-    .collect::<Vec<_>>();
+    .collect_vec();
   Arg::new(PLATFORM_NAME_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(possible_values)
@@ -161,13 +162,13 @@ pub(crate) fn vendor_name_argument() -> Arg {
     .long_help("This option specifies the name of an app vendor. Allowed values are \"kpn\".")
 }
 
-pub(crate) fn version_argument() -> Arg {
-  Arg::new(VERSION_ARGUMENT)
+pub(crate) fn manifest_version_argument() -> Arg {
+  Arg::new(MANIFEST_VERSION_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("VERSION")
-    .help("Version string")
-    .long_help("Identifies a version.")
+    .help("App manifest version")
+    .long_help("Identifies the version of an app manifest from the app catalog.")
 }
 
 pub(crate) fn vhost_id_argument() -> Arg {

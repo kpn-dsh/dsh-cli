@@ -71,41 +71,39 @@ impl Subject for StreamSubject {
   }
 }
 
-const STREAM_OPTIONS_HEADING: &str = "Stream options";
-
-const INTERNAL_FLAG: &str = "internal-flag";
-const PUBLIC_FLAG: &str = "public-flag";
+const CREATE_INTERNAL_FLAG: &str = "create-internal-flag";
+const CREATE_PUBLIC_FLAG: &str = "create-public-flag";
 
 lazy_static! {
   static ref STREAM_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, None, &StreamCreate {}, "Create stream")
       .add_extra_argument(
-        Arg::new(INTERNAL_FLAG)
+        Arg::new(CREATE_INTERNAL_FLAG)
           .long("internal")
           .action(ArgAction::SetTrue)
           .help("Create internal managed stream")
       )
       .add_extra_argument(
-        Arg::new(PUBLIC_FLAG)
+        Arg::new(CREATE_PUBLIC_FLAG)
           .long("public")
           .action(ArgAction::SetTrue)
           .help("Create public managed stream")
-          .conflicts_with(INTERNAL_FLAG)
+          .conflicts_with(CREATE_INTERNAL_FLAG)
       )
       .add_target_argument(managed_stream_argument())
       .add_extra_arguments(vec![
-        can_be_retained_flag(STREAM_OPTIONS_HEADING),
-        cleanup_policy_flag(STREAM_OPTIONS_HEADING),
-        compression_type_flag(STREAM_OPTIONS_HEADING),
-        delete_retention_ms_flag(STREAM_OPTIONS_HEADING),
-        kafka_default_partitioner_flag(STREAM_OPTIONS_HEADING),
-        max_message_size_flag(STREAM_OPTIONS_HEADING),
-        message_timestamp_type_flag(STREAM_OPTIONS_HEADING),
-        partitions_flag(STREAM_OPTIONS_HEADING),
-        retention_bytes_flag(STREAM_OPTIONS_HEADING),
-        retention_ms_flag(STREAM_OPTIONS_HEADING),
-        segment_bytes_flag(STREAM_OPTIONS_HEADING),
-        topic_level_partitioner_arg(STREAM_OPTIONS_HEADING),
+        can_be_retained_flag(),
+        cleanup_policy_flag(),
+        compression_type_flag(),
+        delete_retention_ms_flag(),
+        kafka_default_partitioner_flag(),
+        max_message_size_flag(),
+        message_timestamp_type_flag(),
+        partitions_flag(),
+        retention_bytes_flag(),
+        retention_ms_flag(),
+        segment_bytes_flag(),
+        topic_level_partitioner_arg(),
       ])
       .set_long_about("Create an internal or public managed stream.")
   );
@@ -133,7 +131,7 @@ lazy_static! {
 
 const CAN_BE_RETAINED_FLAG: &str = "can-be-retained";
 
-fn can_be_retained_flag(heading: &'static str) -> Arg {
+fn can_be_retained_flag() -> Arg {
   Arg::new(CAN_BE_RETAINED_FLAG)
     .long("can-be-retained")
     .action(ArgAction::SetTrue)
@@ -142,12 +140,11 @@ fn can_be_retained_flag(heading: &'static str) -> Arg {
       "Whether MQTT records can have the 'retained' flag. \
     This option is only meaningful for public managed streams.",
     )
-    .help_heading(heading)
 }
 
 const KAFKA_DEFAULT_PARTITIONER: &str = "kafka-default-partitioner";
 
-fn kafka_default_partitioner_flag(heading: &'static str) -> Arg {
+fn kafka_default_partitioner_flag() -> Arg {
   Arg::new(KAFKA_DEFAULT_PARTITIONER)
     .long("kafka-default-partitioner")
     .action(ArgAction::SetTrue)
@@ -156,12 +153,11 @@ fn kafka_default_partitioner_flag(heading: &'static str) -> Arg {
       "Use the kafka default partitioner to partition messages across different kafka partitions. \
       This option is only meaningful for public managed streams.",
     )
-    .help_heading(heading)
 }
 
 const TOPIC_LEVEL_PARTITIONER: &str = "topic-level-partitioner";
 
-fn topic_level_partitioner_arg(heading: &'static str) -> Arg {
+fn topic_level_partitioner_arg() -> Arg {
   Arg::new(TOPIC_LEVEL_PARTITIONER)
     .long("topic-level-partitioner")
     .action(ArgAction::Set)
@@ -172,7 +168,6 @@ fn topic_level_partitioner_arg(heading: &'static str) -> Arg {
       "Use the topic level partitioner to partition messages across different kafka partitions. \
       This option is only meaningful for public managed streams.",
     )
-    .help_heading(heading)
     .conflicts_with(KAFKA_DEFAULT_PARTITIONER)
 }
 
@@ -182,14 +177,14 @@ struct StreamCreate {}
 impl CommandExecutor for StreamCreate {
   async fn execute_with_client(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
-    if let Some(managed_stream) = client.get_stream_configuration(&managed_stream_id).await? {
+    if let Some(managed_stream) = client.managed_stream_configuration(&managed_stream_id).await? {
       match managed_stream {
         Stream::Internal(_) => return Err(format!("internal managed stream '{}' already exists", managed_stream_id)),
         Stream::Public(_) => return Err(format!("public managed stream '{}' already exists", managed_stream_id)),
       }
     }
     let topic = create_topic(matches)?;
-    if matches.get_flag(PUBLIC_FLAG) {
+    if matches.get_flag(CREATE_PUBLIC_FLAG) {
       let partitioner = match matches.get_one::<i64>(TOPIC_LEVEL_PARTITIONER) {
         Some(topic_level) => PublicManagedStreamContractPartitioner::TopicLevelPartitioner(PublicManagedStreamTopicLevelPartitioner {
           kind: PublicManagedStreamTopicLevelPartitionerKind::TopicLevel,
@@ -234,9 +229,8 @@ struct StreamDelete {}
 impl CommandExecutor for StreamDelete {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
-    match client.get_stream_configuration(&managed_stream_id).await? {
+    match client.managed_stream_configuration(&managed_stream_id).await? {
       Some(Stream::Internal(_)) => {
-        context.print_explanation(format!("delete internal managed stream '{}'", managed_stream_id));
         if context.confirmed(format!("delete internal managed stream '{}'?", managed_stream_id))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, internal managed stream not deleted");
@@ -250,7 +244,6 @@ impl CommandExecutor for StreamDelete {
         Ok(())
       }
       Some(Stream::Public(_)) => {
-        context.print_explanation(format!("delete public managed stream '{}'", managed_stream_id));
         if context.confirmed(format!("delete public managed stream '{}'?", managed_stream_id))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, public managed stream not deleted");
@@ -277,11 +270,11 @@ struct StreamListAll {}
 #[async_trait]
 impl CommandExecutor for StreamListAll {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    match (matches.get_flag(INTERNAL_FLAG), matches.get_flag(PUBLIC_FLAG)) {
+    match (matches.get_flag(FilterFlagType::Internal.id()), matches.get_flag(FilterFlagType::Public.id())) {
       (false, false) | (true, true) => {
         context.print_explanation("list all internal and public managed streams");
         let start_instant = context.now();
-        let streams = client.get_stream_configurations().await?;
+        let streams = client.managed_stream_configurations().await?;
         context.print_execution_time(start_instant);
         let mut formatter = if streams.iter().any(|(_, stream)| matches!(stream, Stream::Public(_))) {
           ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, None, context)
@@ -296,7 +289,7 @@ impl CommandExecutor for StreamListAll {
       (true, false) => {
         context.print_explanation("list all internal managed streams");
         let start_instant = context.now();
-        let internal_streams = client.get_internal_stream_configurations().await?;
+        let internal_streams = client.managed_stream_configurations_internal().await?;
         context.print_execution_time(start_instant);
         let mut formatter = ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, None, context);
         for (internal_stream_id, internal_stream) in internal_streams.iter() {
@@ -307,7 +300,7 @@ impl CommandExecutor for StreamListAll {
       (false, true) => {
         context.print_explanation("list all public managed streams");
         let start_instant = context.now();
-        let public_streams = client.get_public_stream_configurations().await?;
+        let public_streams = client.managed_stream_configurations_public().await?;
         context.print_execution_time(start_instant);
         let mut formatter = ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, None, context);
         for (public_stream_id, public_stream) in public_streams.iter() {
@@ -329,7 +322,7 @@ struct StreamListIds {}
 impl CommandExecutor for StreamListIds {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let start_instant = context.now();
-    let stream_ids = match (matches.get_flag(INTERNAL_FLAG), matches.get_flag(PUBLIC_FLAG)) {
+    let stream_ids = match (matches.get_flag(FilterFlagType::Internal.id()), matches.get_flag(FilterFlagType::Public.id())) {
       (false, false) | (true, true) => {
         context.print_explanation("list all internal and public managed stream ids");
         let (mut stream_ids, mut public_ids) = try_join!(client.get_stream_internals(), client.get_stream_publics())?;
@@ -346,7 +339,7 @@ impl CommandExecutor for StreamListIds {
       }
     };
     context.print_execution_time(start_instant);
-    let mut stream_ids = stream_ids.iter().map(|msi| msi.to_string()).collect::<Vec<_>>();
+    let mut stream_ids = stream_ids.iter().map(|msi| msi.to_string()).collect_vec();
     stream_ids.sort();
     let mut formatter = IdsFormatter::new("stream id", context);
     formatter.push_target_ids(&stream_ids);
@@ -368,8 +361,8 @@ impl CommandExecutor for StreamShowAll {
     context.print_explanation(format!("show configuration for managed stream '{}'", managed_stream_id));
     let start_instant = context.now();
     match try_join!(
-      client.get_stream_configuration(&managed_stream_id),
-      client.get_tenants_with_access_rights(&managed_stream_id)
+      client.managed_stream_configuration(&managed_stream_id),
+      client.managed_stream_tenants_with_access_rights(&managed_stream_id)
     )? {
       (Some(Stream::Internal(internal_managed_stream)), access_rights) => {
         context.print_execution_time(start_instant);

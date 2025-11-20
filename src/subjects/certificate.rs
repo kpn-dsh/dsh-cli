@@ -9,15 +9,16 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, USED_BY_LABELS, USED_BY_LABELS_LIST};
+use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::CertificateStatus;
 use dsh_api::types::{ActualCertificate, Certificate};
-use dsh_api::UsedBy;
+use dsh_api::DependantApp;
 use futures::future::try_join_all;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
@@ -95,7 +96,7 @@ impl CommandExecutor for CertificateListAll {
     let certificates_statuses_unwrapped = certificate_statuses
       .iter()
       .map(|certificate_status| certificate_status.as_ref().unwrap().to_owned().actual.unwrap())
-      .collect::<Vec<_>>();
+      .collect_vec();
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, None, context);
     formatter.push_target_ids_and_values(certificate_ids.as_slice(), certificates_statuses_unwrapped.as_slice());
     formatter.print(None)?;
@@ -176,16 +177,16 @@ impl CommandExecutor for CertificateListUsage {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     context.print_explanation("list all certificates with the services where they are used");
     let start_instant = context.now();
-    let certificates_with_usage: Vec<(String, CertificateStatus, Vec<UsedBy>)> = client.list_certificates_with_usage().await?;
+    let certificates_with_dependant_apps: Vec<(String, CertificateStatus, Vec<DependantApp>)> = client.certificates_with_dependant_apps().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("certificate id"), context);
-    for (certificate_id, _certificate, used_bys) in &certificates_with_usage {
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("certificate id"), context);
+    for (certificate_id, _, used_bys) in &certificates_with_dependant_apps {
       for used_by in used_bys {
         formatter.push_target_id_value(certificate_id.clone(), used_by);
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no certificate found in apps or services");
+      context.print_outcome("no certificates found in apps or services");
     } else {
       formatter.print(None)?;
     }
@@ -244,13 +245,13 @@ impl CommandExecutor for CertificateShowUsage {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all services and apps that use certificate '{}'", certificate_id));
     let start_instant = context.now();
-    let (_, usages) = client.get_certificate_with_usage(&certificate_id).await?;
+    let (_certificate_status, dependant_apps) = client.certificate_with_dependant_apps(&certificate_id).await?;
     context.print_execution_time(start_instant);
-    if usages.is_empty() {
+    if dependant_apps.is_empty() {
       context.print_outcome("certificate not used")
     } else {
-      let mut formatter = ListFormatter::new(&USED_BY_LABELS, None, context);
-      formatter.push_values(&usages);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS, None, context);
+      formatter.push_values(&dependant_apps);
       formatter.print(None)?;
     }
     Ok(())
@@ -312,7 +313,7 @@ impl SubjectFormatter<CertificateLabel> for ActualCertificate {
   fn value(&self, label: &CertificateLabel, target_id: &str) -> String {
     match label {
       CertificateLabel::CertChainSecret => self.cert_chain_secret.to_string(),
-      CertificateLabel::DistinguishedName => self.distinguished_name.clone().split(",").collect::<Vec<_>>().join("\n"),
+      CertificateLabel::DistinguishedName => self.distinguished_name.clone().split(",").collect_vec().join("\n"),
       CertificateLabel::DnsNames => self.dns_names.join("\n"),
       CertificateLabel::KeySecret => self.key_secret.to_string(),
       CertificateLabel::NotAfter => self.not_after.to_string(),

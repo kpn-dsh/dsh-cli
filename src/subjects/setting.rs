@@ -8,9 +8,10 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 
 use crate::arguments::{platform_name_argument, tenant_name_argument};
+use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
-use crate::context::Context;
+use crate::context::{BrowserMethod, Context};
 use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -22,7 +23,7 @@ use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::{get_target_password_from_keyring, read_target};
 use crate::verbosity::Verbosity;
-use crate::{get_set_environment_variables, DshCliResult, ENV_VAR_PASSWORD};
+use crate::{get_set_environment_variables, DshCliResult, ENV_VAR_DSH_CLI_PASSWORD};
 
 pub(crate) struct SettingSubject {}
 
@@ -57,6 +58,8 @@ impl Subject for SettingSubject {
   }
 }
 
+const SETTING_AUTHENTICATION: &str = "authentication";
+const SETTING_BROWSER: &str = "browser";
 const SETTING_CSV_QUOTE: &str = "csv-quote";
 const SETTING_CSV_SEPARATOR: &str = "csv-separator";
 const SETTING_DEFAULT_PLATFORM: &str = "default-platform";
@@ -87,6 +90,22 @@ const SETTING_WARNING_STYLE: &str = "warning-style";
 
 fn set_unset_commands(required: bool) -> Vec<Command> {
   vec![
+    Command::new(SETTING_AUTHENTICATION)
+      .arg(
+        Arg::new(SETTING_AUTHENTICATION)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<AuthenticationMethod>::new())
+          .required(required),
+      )
+      .about("Authentication method"),
+    Command::new(SETTING_BROWSER)
+      .arg(
+        Arg::new(SETTING_BROWSER)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<BrowserMethod>::new())
+          .required(required),
+      )
+      .about("Specifies whether the tool may try to open a browser"),
     Command::new(SETTING_CSV_QUOTE)
       .arg(
         Arg::new(SETTING_CSV_QUOTE)
@@ -340,7 +359,7 @@ impl CommandExecutor for SettingList {
       let mut formatter = ListFormatter::new(&ENVIRONMENT_VARIABLE_LABELS, None, context);
       let hide_password = HIDE_PASSWORD.to_string();
       for (env_var, value) in &env_vars {
-        if env_var == ENV_VAR_PASSWORD {
+        if env_var == ENV_VAR_DSH_CLI_PASSWORD {
           formatter.push_target_id_value(env_var.clone(), &hide_password);
         } else {
           formatter.push_target_id_value(env_var.clone(), value);
@@ -363,6 +382,16 @@ impl CommandExecutor for SettingSet {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (target_setting, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
+      SETTING_AUTHENTICATION => {
+        let authentication = matches.get_one::<AuthenticationMethod>(SETTING_AUTHENTICATION).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { authentication: Some(authentication.clone()), ..settings }))?;
+        context.print_outcome(format!("authentication method set to {}", authentication));
+      }
+      SETTING_BROWSER => {
+        let browser = matches.get_one::<BrowserMethod>(SETTING_BROWSER).unwrap();
+        upsert_settings(None, |settings| Ok(Settings { browser: Some(browser.clone()), ..settings }))?;
+        context.print_outcome(format!("browser method set to {}", browser));
+      }
       SETTING_CSV_QUOTE => {
         let mut csv_quote_chars = matches.get_one::<String>(SETTING_CSV_QUOTE).unwrap().chars();
         let csv_quote = csv_quote_chars.next().unwrap();
@@ -518,6 +547,14 @@ impl CommandExecutor for SettingUnset {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
     let (target_setting, _) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
+      SETTING_AUTHENTICATION => {
+        upsert_settings(None, |settings| Ok(Settings { authentication: None, ..settings }))?;
+        context.print_outcome("authentication method unset");
+      }
+      SETTING_BROWSER => {
+        upsert_settings(None, |settings| Ok(Settings { browser: None, ..settings }))?;
+        context.print_outcome("browser method unset");
+      }
       SETTING_CSV_QUOTE => {
         upsert_settings(None, |settings| Ok(Settings { csv_quote: None, ..settings }))?;
         context.print_outcome("csv quote unset");
@@ -638,6 +675,8 @@ impl CommandExecutor for SettingUnset {
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum SettingLabel {
+  Authentication,
+  Browser,
   CsvQuote,
   CsvSeparator,
   DefaultPlatform,
@@ -672,6 +711,8 @@ pub(crate) enum SettingLabel {
 impl Label for SettingLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::Authentication => SETTING_AUTHENTICATION,
+      Self::Browser => SETTING_BROWSER,
       Self::CsvQuote => SETTING_CSV_QUOTE,
       Self::CsvSeparator => SETTING_CSV_SEPARATOR,
       Self::DefaultPlatform => SETTING_DEFAULT_PLATFORM,
@@ -712,6 +753,8 @@ impl Label for SettingLabel {
 impl SubjectFormatter<SettingLabel> for Settings {
   fn value(&self, label: &SettingLabel, target_id: &str) -> String {
     match label {
+      SettingLabel::Authentication => self.authentication.clone().map(|authentication| authentication.to_string()).unwrap_or_default(),
+      SettingLabel::Browser => self.browser.clone().map(|browser| browser.to_string()).unwrap_or_default(),
       SettingLabel::CsvQuote => self.csv_quote.map(|csv_quote| csv_quote.to_string()).unwrap_or_default(),
       SettingLabel::CsvSeparator => self.csv_separator.clone().unwrap_or_default(),
       SettingLabel::DefaultPlatform => match self.default_platform.clone().map(|platform| DshPlatform::try_from(platform.as_str())) {
@@ -751,7 +794,9 @@ impl SubjectFormatter<SettingLabel> for Settings {
   }
 }
 
-pub static SETTING_LABELS: [SettingLabel; 29] = [
+pub static SETTING_LABELS: [SettingLabel; 31] = [
+  SettingLabel::Authentication,
+  SettingLabel::Browser,
   SettingLabel::CsvQuote,
   SettingLabel::CsvSeparator,
   SettingLabel::DefaultPlatform,

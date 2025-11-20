@@ -23,3 +23,9 @@ Usage is rendered strange
 ```
 
 Injection fields start with a capital
+
+```bash
+> dsh bucket show schema-registry
+```
+
+Doesn't show dependants

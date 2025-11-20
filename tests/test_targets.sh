@@ -8,6 +8,12 @@ TUT=greenbox-dev
 PFUT="../$PUT.$TUT.pwd"
 DUT=.dsh_cli_under_test
 
+# For this test to run the following is expected:
+#
+# * Tenant $TUT exists at platform $PUT
+# * Password file $PFUT exists and contains the password for tenant $TUT at platform $PUT
+# * You will be asked to enter your keychain password (use "Always Allow" or you'll have to provide it multiple times)
+
 PUT_NA=prod-azure-dsh
 TUT_NE=nope
 PFUT_NAE="../$PUT_NA.nope.pwd"
@@ -16,6 +22,7 @@ PWUT_NE=nope
 export DSH_CLI_OUTPUT_FORMAT=quiet
 export DSH_CLI_LOG_LEVEL=info
 export DSH_CLI_VERBOSITY=high
+export DSH_CLI_AUTHENTICATION=robot
 
 function set_environment {
   rm -rf $DUT
@@ -39,7 +46,7 @@ function set_default_tenant {
 }
 
 function create_target {
-  dsh --suppress-exit-status target create $1 $2 < "../$1.$2.pwd"
+  dsh --suppress-exit-status target create "$1" "$2" < "../$1.$2.pwd"
 }
 
 echo "target platform from argument"
