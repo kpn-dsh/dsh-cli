@@ -2,16 +2,16 @@
 
 export APP_NON_EXISTING=non_existing_app
 export APP_UNDER_TEST=eavesdropper
-export BUCKET_UNDER_TEST=cpr
+export BUCKET_UNDER_TEST=schema-registry
 export CERTIFICATE_UNDER_TEST=broker
 export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="^info$"
 export ENV_VAR_QUERY_UNDER_TEST=password
 export ENV_VAR_UNDER_TEST=DSH_CLI_HOME
-export IMAGE_UNDER_TEST=registry:eavesdropper:0.9.2
+export IMAGE_UNDER_TEST=registry:eavesdropper:0.10.0
 export IMAGE_UNDER_TEST_REGEX=registry
 export MANIFEST_UNDER_TEST=kpn/eavesdropper
-export MANIFEST_UNDER_TEST_VERSION=0.9.2
+export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
 export PROXY_UNDER_TEST=broker
 export SECRET_NON_EXISTING=non-existing-secret
