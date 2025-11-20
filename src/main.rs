@@ -1058,10 +1058,10 @@ fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> String {
       "  {bold_blue}{}{bold_blue:#}{}  {}",
       key,
       " ".repeat(first_column_width - len),
-      values.get(0).map(|s| s.to_string()).unwrap_or_default()
+      values.first().map(|s| s.to_string()).unwrap_or_default()
     ));
     for v in values[1..].iter() {
-      pairs.push(format!("  {}  {}", " ".repeat(first_column_width.clone()), v));
+      pairs.push(format!("  {}  {}", " ".repeat(*first_column_width), v));
     }
   }
   format!("{bold_green}{}{bold_green:#}\n{}", header, pairs.join("\n"))
