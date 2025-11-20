@@ -11,7 +11,7 @@ use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::query_processor::{ExactMatchQueryProcessor, Match, QueryProcessor, RegexQueryProcessor};
+use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -91,15 +91,12 @@ impl CommandExecutor for EnvFind {
         let mut envs: Vec<(String, String)> = service
           .env
           .iter()
-          .filter_map(|(key, value)| match query_processor.matching(value) {
-            Some(matching) => match matching {
-              Match::Expression(_, _, _) => None,
-              Match::Parts(parts) => Some((key.to_string(), context.parts_to_string_for_stdout(parts.as_slice(), None))),
-              Match::Simple => None,
-            },
-            None => None,
+          .filter_map(|(key, value)| {
+            query_processor
+              .matching_parts(value)
+              .map(|matching| (key.to_string(), context.parts_to_string_for_stdout(matching.as_slice(), None)))
           })
-          .collect();
+          .collect_vec();
         envs.sort_by_key(|env| env.0.clone());
         for (key, value) in envs {
           let mut env_map: HashMap<ServiceEnvLabel, String> = HashMap::new();
