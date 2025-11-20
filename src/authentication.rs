@@ -2,6 +2,9 @@ use crate::context::{BrowserMethod, Context};
 use crate::refresh_token_store::{delete_stored_refresh_token, get_stored_refresh_token, store_refresh_token};
 use dsh_api::dsh_jwt::DshJwt;
 use dsh_api::platform::DshPlatform;
+use futures::future::try_join_all;
+use futures::FutureExt;
+use itertools::Itertools;
 use log::{debug, trace};
 use openidconnect::core::{
   CoreAuthDisplay, CoreAuthPrompt, CoreClaimName, CoreClaimType, CoreClient, CoreClientAuthMethod, CoreErrorResponseType, CoreGenderClaim, CoreGrantType, CoreJsonWebKey,
@@ -186,6 +189,22 @@ pub(crate) async fn logout(platform: &DshPlatform, context: &Context) -> Result<
       Ok(())
     }
   }
+}
+
+/// Get access tokens for all current authentications
+///
+/// Returns
+/// `Vec` of tuples containing
+/// * `DshPlatform` - Platform for which the user is currently authenticated.
+/// * `DshJwt` - Permissions for this authentication.
+pub(crate) async fn get_access_tokens() -> Result<Vec<(DshPlatform, DshJwt)>, String> {
+  try_join_all(
+    DshPlatform::all()
+      .iter()
+      .map(|platform| get_access_token(platform.clone()).map(|access_token| access_token.map(|jwt| (platform.clone(), jwt)))),
+  )
+  .await
+  .map(|hh| hh.into_iter().filter_map(|(platform, jwt)| jwt.map(|dsh_jwt| (platform, dsh_jwt))).collect_vec())
 }
 
 fn client_id(platform: &DshPlatform) -> ClientId {

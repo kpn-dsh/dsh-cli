@@ -6,7 +6,7 @@
 )]
 extern crate core;
 
-use crate::authentication::{get_access_token, AuthenticationMethod};
+use crate::authentication::{get_access_token, get_access_tokens, AuthenticationMethod};
 use crate::environment_variables::{
   env_var_argument, env_vars_argument, get_set_environment_variables, print_environment_variable, print_environment_variables, ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
   ENV_VAR_DSH_CLI_HOME, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
@@ -255,7 +255,7 @@ async fn inner_main() -> DshCliExit {
 
   subject_commands.sort_by(|subject_command_a, subject_command_b| subject_command_a.get_name().cmp(subject_command_b.get_name()));
 
-  let mut command = create_command(&subject_commands, &settings);
+  let mut command = create_command(&subject_commands, &settings).await;
 
   let matches = match command.clone().try_get_matches() {
     Ok(matches) => matches,
@@ -398,7 +398,7 @@ fn logout_command() -> Command {
   )
 }
 
-fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
+async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
   let long_about = match enabled_features() {
     Some(enabled_features) => format!("{} Enabled features: {}.", LONG_ABOUT, enabled_features.join(", ")),
     None => LONG_ABOUT.to_string(),
@@ -470,27 +470,36 @@ fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command 
     }
   }
 
-  if default_settings.is_empty() {
-    if environment_variables.is_empty() {
-      command = command.after_long_help(AFTER_HELP);
-    } else {
-      let environment_variables_table = to_table("Environment variables:", environment_variables);
-      command = command.after_help(&environment_variables_table);
-      command = command.after_long_help(format!("{}\n\n{}", environment_variables_table, AFTER_HELP));
-    }
-  } else {
-    let settings_table = to_table("Settings:", default_settings);
-    if environment_variables.is_empty() {
-      command = command.after_help(&settings_table);
-      command = command.after_long_help(format!("{}\n\n{}", settings_table, AFTER_HELP));
-    } else {
-      let environment_variables_table = to_table("Environment variables:", environment_variables);
-      command = command.after_help(format!("{}\n\n{}", settings_table, environment_variables_table));
-      command = command.after_long_help(format!("{}\n\n{}\n\n{}", settings_table, environment_variables_table, AFTER_HELP));
-    }
+  let mut after_help: Vec<String> = vec![];
+  if !environment_variables.is_empty() {
+    let environment_variables_table = to_help_items("Environment variables:", environment_variables);
+    after_help.push(environment_variables_table);
+  }
+  if !default_settings.is_empty() {
+    let settings_table = to_help_items("Settings:", default_settings);
+    after_help.push(settings_table);
   }
 
-  // TODO Show autjentications
+  if let Ok(access_tokens) = get_access_tokens().await {
+    if !access_tokens.is_empty() {
+      let access_tokensss: Vec<(&str, String)> = access_tokens
+        .iter()
+        .map(|(platform, access_token)| {
+          (platform.name(), {
+            let a = access_token.tenant_permissions.iter().map(|s| s.tenant.to_string()).collect_vec();
+            let aa = a.chunks(6).collect_vec();
+            let aaa = aa.iter().map(|a| a.join(", ")).collect_vec();
+            aaa.iter().join(",\n")
+          })
+        })
+        .collect_vec();
+      let authentications = to_help_items("Authentications:", access_tokensss);
+      after_help.push(authentications);
+    }
+  }
+  command = command.after_help(after_help.join("\n\n"));
+  after_help.push(AFTER_HELP.to_string());
+  command = command.after_long_help(after_help.join("\n\n"));
 
   command
 }
@@ -1037,20 +1046,25 @@ async fn create_client_access_token(matches: &ArgMatches, context: &Context) -> 
 }
 
 // Method will panic if rows vector is empty
-fn to_table(header: &str, rows: Vec<(&str, String)>) -> String {
+fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> String {
   let bold_green = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
   let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
   let key_value_length_pairs: Vec<(&str, &str, usize)> = rows.iter().map(|(key, value)| (*key, value.as_ref(), key.len())).collect_vec();
   let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap().clone();
-  format!(
-    "{bold_green}{}{bold_green:#}\n{}",
-    header,
-    key_value_length_pairs
-      .into_iter()
-      .map(|(key, value, len)| format!("  {bold_blue}{}{bold_blue:#}{}  {}", key, " ".repeat(first_column_width - len), value))
-      .collect_vec()
-      .join("\n")
-  )
+  let mut pairs = vec![];
+  for (key, value, len) in key_value_length_pairs {
+    let values = value.split("\n").collect_vec().iter().map(|s| s.to_string()).collect_vec();
+    pairs.push(format!(
+      "  {bold_blue}{}{bold_blue:#}{}  {}",
+      key,
+      " ".repeat(first_column_width - len),
+      values.get(0).map(|s| s.to_string()).unwrap_or_default()
+    ));
+    for v in values[1..].iter() {
+      pairs.push(format!("  {}  {}", " ".repeat(first_column_width.clone()), v));
+    }
+  }
+  format!("{bold_green}{}{bold_green:#}\n{}", header, pairs.join("\n"))
 }
 
 fn enabled_features() -> Option<Vec<&'static str>> {
