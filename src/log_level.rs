@@ -1,12 +1,15 @@
+use crate::context::Context;
 use crate::environment_variable;
-use crate::environment_variables::{ENV_VAR_DSH_CLI_LOG_LEVEL, ENV_VAR_DSH_CLI_LOG_LEVEL_API};
+use crate::environment_variables::{ENV_VAR_DSH_CLI_LOG_COLOR, ENV_VAR_DSH_CLI_LOG_LEVEL, ENV_VAR_DSH_CLI_LOG_LEVEL_API, ENV_VAR_DSH_CLI_LOG_STYLE};
 use crate::log_arguments::{LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT};
 use crate::settings::Settings;
+use crate::style::{style_from, DshColor, DshStyle};
 use clap::ArgMatches;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
+use std::io::Write;
 use std::io::{stdout, IsTerminal};
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
@@ -32,6 +35,10 @@ pub(crate) enum LogLevel {
 }
 
 pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Result<(), String> {
+  let log_style = style_from(
+    &Context::get_style(ENV_VAR_DSH_CLI_LOG_STYLE, matches, &settings.log_style, DshStyle::Dim)?,
+    &Context::get_color(ENV_VAR_DSH_CLI_LOG_COLOR, matches, &settings.log_color, DshColor::Cyan)?,
+  );
   let log_level_dsh = match matches.get_one::<LogLevel>(LOG_LEVEL_ARGUMENT) {
     Some(log_level_from_argument) => log_level_from_argument.clone(),
     None => match environment_variable(ENV_VAR_DSH_CLI_LOG_LEVEL, matches)? {
@@ -52,6 +59,18 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Re
       .filter_module("dsh_api", LevelFilter::from(log_level_dsh_api))
       .format_target(false)
       .format_timestamp(None)
+      .format(move |buf, record| {
+        writeln!(
+          buf,
+          "{log_style}[{}{}] {}{log_style:#}",
+          record.level(),
+          record
+            .module_path()
+            .map(|mp| if mp.starts_with("dsh_api") { ":API" } else { ":DSH" })
+            .unwrap_or_default(),
+          record.args()
+        )
+      })
       .init();
   } else {
     env_logger::builder()

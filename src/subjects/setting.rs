@@ -1,36 +1,36 @@
-use crate::formatters::formatter::{Label, SubjectFormatter};
-use crate::settings::{upsert_settings, Settings};
-use async_trait::async_trait;
-use clap::builder::EnumValueParser;
-use clap::{builder, Arg, ArgAction, ArgMatches, Command};
-use dsh_api::platform::DshPlatform;
-use lazy_static::lazy_static;
-use serde::Serialize;
-
 use crate::arguments::{platform_name_argument, tenant_name_argument};
 use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{BrowserMethod, Context};
-use crate::formatters::formatter::ENVIRONMENT_VARIABLE_LABELS;
+use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::log_level::LogLevel;
 use crate::settings::get_settings;
+use crate::settings::{upsert_settings, Settings};
 use crate::style::{DshColor, DshStyle};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::{get_target_password_from_keyring, read_target};
 use crate::verbosity::Verbosity;
 use crate::{get_set_environment_variables, DshCliResult, ENV_VAR_DSH_CLI_PASSWORD};
+use async_trait::async_trait;
+use clap::builder::EnumValueParser;
+use clap::{builder, Arg, ArgAction, ArgMatches, Command};
+use dsh_api::platform::DshPlatform;
+use lazy_static::lazy_static;
+use serde::Serialize;
+use std::fmt::Display;
 
-pub(crate) struct SettingSubject {}
+struct SettingSubject {}
 
 const SETTING_SUBJECT_TARGET: &str = "setting";
 
 lazy_static! {
-  pub static ref SETTING_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SettingSubject {});
+  pub(crate) static ref SETTING_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SettingSubject {});
 }
 
 #[async_trait]
@@ -69,8 +69,10 @@ const SETTING_ERROR_COLOR: &str = "error-color";
 const SETTING_ERROR_STYLE: &str = "error-style";
 const SETTING_LABEL_COLOR: &str = "label-color";
 const SETTING_LABEL_STYLE: &str = "label-style";
+const SETTING_LOG_COLOR: &str = "log-color";
 const SETTING_LOG_LEVEL: &str = "log-level";
 const SETTING_LOG_LEVEL_API: &str = "log-level-api";
+const SETTING_LOG_STYLE: &str = "log-style";
 const SETTING_MATCHING_COLOR: &str = "matching-color";
 const SETTING_MATCHING_STYLE: &str = "matching-style";
 const SETTING_NO_ESCAPE: &str = "no-escape";
@@ -171,6 +173,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Styling to be used when printing table headers and labels"),
+    Command::new(SETTING_LOG_COLOR)
+      .arg(
+        Arg::new(SETTING_LOG_COLOR)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshColor>::new())
+          .required(required),
+      )
+      .about("Color to be used when printing logging information"),
     Command::new(SETTING_LOG_LEVEL)
       .arg(
         Arg::new(SETTING_LOG_LEVEL)
@@ -187,6 +197,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Log level for the 'dsh_api' library functions"),
+    Command::new(SETTING_LOG_STYLE)
+      .arg(
+        Arg::new(SETTING_LOG_STYLE)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshStyle>::new())
+          .required(required),
+      )
+      .about("Styling to be used when printing logging information"),
     Command::new(SETTING_MATCHING_COLOR)
       .arg(
         Arg::new(SETTING_MATCHING_COLOR)
@@ -375,6 +393,20 @@ impl CommandExecutor for SettingList {
   }
 }
 
+fn get_some<T>(setting: &str, matches: &ArgMatches, context: &Context) -> Result<Option<T>, DshCliError>
+where
+  T: Clone + Display + Send + Sync + 'static,
+{
+  match matches.get_one::<T>(SETTING_AUTHENTICATION) {
+    Some(one) => {
+      let cloned = one.clone();
+      context.print_outcome(format!("{} set to {}", setting, &cloned));
+      Ok(Some(cloned))
+    }
+    None => Err(DshCliError::from(setting)),
+  }
+}
+
 struct SettingSet {}
 
 #[async_trait]
@@ -383,83 +415,112 @@ impl CommandExecutor for SettingSet {
     let (target_setting, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
       SETTING_AUTHENTICATION => {
-        let authentication = matches.get_one::<AuthenticationMethod>(SETTING_AUTHENTICATION).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { authentication: Some(authentication.clone()), ..settings }))?;
-        context.print_outcome(format!("authentication method set to {}", authentication));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { authentication: get_some(SETTING_AUTHENTICATION, matches, context)?, ..settings })
+        })?;
       }
       SETTING_BROWSER => {
-        let browser = matches.get_one::<BrowserMethod>(SETTING_BROWSER).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { browser: Some(browser.clone()), ..settings }))?;
-        context.print_outcome(format!("browser method set to {}", browser));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { browser: get_some(SETTING_BROWSER, matches, context)?, ..settings })
+        })?;
       }
-      SETTING_CSV_QUOTE => {
-        let mut csv_quote_chars = matches.get_one::<String>(SETTING_CSV_QUOTE).unwrap().chars();
-        let csv_quote = csv_quote_chars.next().unwrap();
-        if csv_quote_chars.next().is_some() {
-          return Err("csv quote must be a single character".to_string());
-        } else {
-          upsert_settings(None, |settings| Ok(Settings { csv_quote: Some(csv_quote), ..settings }))?;
-          context.print_outcome(format!("csv quote character set to '{}'", csv_quote));
+      SETTING_CSV_QUOTE => match matches.get_one::<String>(SETTING_CSV_QUOTE) {
+        Some(csv_quote_argument) => {
+          let mut csv_quote_chars = csv_quote_argument.chars();
+          match csv_quote_chars.next() {
+            Some(csv_quote) => {
+              if csv_quote_chars.next().is_some() {
+                return Err("csv quote must be a single character".to_string());
+              } else {
+                upsert_settings(None, |settings| Ok(Settings { csv_quote: Some(csv_quote), ..settings }))?;
+                context.print_outcome(format!("csv quote character set to '{}'", csv_quote));
+              }
+            }
+            None => unreachable!(),
+          }
         }
-      }
+        None => unreachable!(),
+      },
       SETTING_CSV_SEPARATOR => {
-        let csv_separator = matches.get_one::<String>(SETTING_CSV_SEPARATOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { csv_separator: Some(csv_separator.to_string()), ..settings }))?;
-        context.print_outcome(format!("csv separator set to \"{}\"", csv_separator));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { csv_separator: get_some(SETTING_CSV_SEPARATOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_DEFAULT_PLATFORM => {
-        let platform = DshPlatform::try_from(matches.get_one::<String>(SETTING_DEFAULT_PLATFORM).unwrap().as_str())?;
-        upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
-        context.print_outcome(format!("default platform set to {}", platform));
+        match matches.get_one::<String>(SETTING_DEFAULT_PLATFORM) {
+          Some(platform_name) => match DshPlatform::try_from(platform_name.as_str()) {
+            Ok(platform) => {
+              upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
+              context.print_outcome(format!("default platform set to {}", platform));
+            }
+            Err(_) => unreachable!(),
+          },
+          None => unreachable!(),
+        }
+        //
+        // let platform = DshPlatform::try_from(get_one(SETTING_DEFAULT_PLATFORM, matches, context)?.unwrap_or_else(|| unreachable!()))?;
+        // let platform = DshPlatform::try_from(get_some(SETTING_DEFAULT_PLATFORM, matches, context)?.unwrap_or_else(|| unreachable!()))?;
+        // upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
+        // context.print_outcome(format!("default platform set to {}", platform));
       }
       SETTING_DEFAULT_TENANT => {
-        let tenant = matches.get_one::<String>(SETTING_DEFAULT_TENANT).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { default_tenant: Some(tenant.to_string()), ..settings }))?;
-        context.print_outcome(format!("default tenant set to {}", tenant));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { default_tenant: get_some(SETTING_DEFAULT_TENANT, matches, context)?, ..settings })
+        })?;
       }
       SETTING_DRY_RUN => {
         upsert_settings(None, |settings| Ok(Settings { dry_run: Some(true), ..settings }))?;
         context.print_outcome("dry run mode enabled");
       }
       SETTING_ERROR_COLOR => {
-        let color = matches.get_one::<DshColor>(SETTING_ERROR_COLOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { error_color: Some(color.clone()), ..settings }))?;
-        context.print_outcome(format!("error color set to {}", color));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { error_color: get_some(SETTING_ERROR_COLOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_ERROR_STYLE => {
-        let style = matches.get_one::<DshStyle>(SETTING_ERROR_STYLE).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { error_style: Some(style.clone()), ..settings }))?;
-        context.print_outcome(format!("error style set to {}", style));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { error_style: get_some(SETTING_ERROR_STYLE, matches, context)?, ..settings })
+        })?;
       }
       SETTING_LABEL_COLOR => {
-        let color = matches.get_one::<DshColor>(SETTING_LABEL_COLOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { label_color: Some(color.clone()), ..settings }))?;
-        context.print_outcome(format!("label color set to {}", color));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { label_color: get_some(SETTING_LABEL_COLOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_LABEL_STYLE => {
-        let style = matches.get_one::<DshStyle>(SETTING_LABEL_STYLE).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { label_style: Some(style.clone()), ..settings }))?;
-        context.print_outcome(format!("label style set to {}", style));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { label_style: get_some(SETTING_LABEL_STYLE, matches, context)?, ..settings })
+        })?;
+      }
+      SETTING_LOG_COLOR => {
+        upsert_settings(None, move |settings| {
+          Ok(Settings { log_color: get_some(SETTING_LOG_COLOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_LOG_LEVEL => {
-        let log_level = matches.get_one::<LogLevel>(SETTING_LOG_LEVEL).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { log_level: Some(log_level.clone()), ..settings }))?;
-        context.print_outcome(format!("log level set to {}", log_level));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { log_level: get_some(SETTING_LOG_LEVEL, matches, context)?, ..settings })
+        })?;
       }
       SETTING_LOG_LEVEL_API => {
-        let log_level_api = matches.get_one::<LogLevel>(SETTING_LOG_LEVEL_API).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { log_level_api: Some(log_level_api.clone()), ..settings }))?;
-        context.print_outcome(format!("log level for api set to {}", log_level_api));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { log_level_api: get_some(SETTING_LOG_LEVEL_API, matches, context)?, ..settings })
+        })?;
+      }
+      SETTING_LOG_STYLE => {
+        upsert_settings(None, move |settings| {
+          Ok(Settings { log_style: get_some(SETTING_LOG_STYLE, matches, context)?, ..settings })
+        })?;
       }
       SETTING_MATCHING_COLOR => {
-        let color = matches.get_one::<DshColor>(SETTING_MATCHING_COLOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { matching_color: Some(color.clone()), ..settings }))?;
-        context.print_outcome(format!("matching color set to {}", color));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { matching_color: get_some(SETTING_MATCHING_COLOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_MATCHING_STYLE => {
-        let style = matches.get_one::<DshStyle>(SETTING_MATCHING_STYLE).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { matching_style: Some(style.clone()), ..settings }))?;
-        context.print_outcome(format!("matching style set to {}", style));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { matching_style: get_some(SETTING_MATCHING_STYLE, matches, context)?, ..settings })
+        })?;
       }
       SETTING_NO_ESCAPE => {
         upsert_settings(None, |settings| Ok(Settings { no_escape: Some(true), ..settings }))?;
@@ -470,9 +531,9 @@ impl CommandExecutor for SettingSet {
         context.print_outcome("no headers mode enabled");
       }
       SETTING_OUTPUT_FORMAT => {
-        let output_format = matches.get_one::<OutputFormat>(SETTING_OUTPUT_FORMAT).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { output_format: Some(output_format.clone()), ..settings }))?;
-        context.print_outcome(format!("output format set to {}", output_format));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { output_format: get_some(SETTING_OUTPUT_FORMAT, matches, context)?, ..settings })
+        })?;
       }
       SETTING_QUIET => {
         upsert_settings(None, |settings| Ok(Settings { quiet: Some(true), ..settings }))?;
@@ -483,31 +544,31 @@ impl CommandExecutor for SettingSet {
         context.print_outcome("show execution time enabled");
       }
       SETTING_STDERR_COLOR => {
-        let color = matches.get_one::<DshColor>(SETTING_STDERR_COLOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { stderr_color: Some(color.clone()), ..settings }))?;
-        context.print_outcome(format!("stderr color set to {}", color));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { stderr_color: get_some(SETTING_STDERR_COLOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_STDERR_STYLE => {
-        let style = matches.get_one::<DshStyle>(SETTING_STDERR_STYLE).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { stderr_style: Some(style.clone()), ..settings }))?;
-        context.print_outcome(format!("stderr style set to {}", style));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { stderr_style: get_some(SETTING_STDERR_STYLE, matches, context)?, ..settings })
+        })?;
       }
       SETTING_STDOUT_COLOR => {
-        let color = matches.get_one::<DshColor>(SETTING_STDOUT_COLOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { stdout_color: Some(color.clone()), ..settings }))?;
-        context.print_outcome(format!("stdout color set to {}", color));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { stdout_color: get_some(SETTING_STDOUT_COLOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_STDOUT_STYLE => {
-        let style = matches.get_one::<DshStyle>(SETTING_STDOUT_STYLE).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { stdout_style: Some(style.clone()), ..settings }))?;
-        context.print_outcome(format!("stdout style set to {}", style));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { stdout_style: get_some(SETTING_STDOUT_STYLE, matches, context)?, ..settings })
+        })?;
       }
       SETTING_SUPPRESS_EXIT_STATUS => {
         upsert_settings(None, |settings| Ok(Settings { suppress_exit_status: Some(true), ..settings }))?;
         context.print_outcome("suppress exit status enabled");
       }
       SETTING_TERMINAL_WIDTH => {
-        let terminal_width = matches.get_one::<usize>(SETTING_TERMINAL_WIDTH).unwrap();
+        let terminal_width = matches.get_one::<usize>(SETTING_TERMINAL_WIDTH).unwrap_or_else(|| unreachable!());
         if *terminal_width < 40 {
           return Err("terminal width must be greater than or equal to 40".to_string());
         } else {
@@ -516,19 +577,19 @@ impl CommandExecutor for SettingSet {
         }
       }
       SETTING_VERBOSITY => {
-        let verbosity = matches.get_one::<Verbosity>(SETTING_VERBOSITY).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { verbosity: Some(verbosity.clone()), ..settings }))?;
-        context.print_outcome(format!("verbosity level set to {}", verbosity));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { verbosity: get_some(SETTING_VERBOSITY, matches, context)?, ..settings })
+        })?;
       }
       SETTING_WARNING_COLOR => {
-        let color = matches.get_one::<DshColor>(SETTING_WARNING_COLOR).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { warning_color: Some(color.clone()), ..settings }))?;
-        context.print_outcome(format!("warning color set to {}", color));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { warning_color: get_some(SETTING_WARNING_COLOR, matches, context)?, ..settings })
+        })?;
       }
       SETTING_WARNING_STYLE => {
-        let style = matches.get_one::<DshStyle>(SETTING_WARNING_STYLE).unwrap();
-        upsert_settings(None, |settings| Ok(Settings { warning_style: Some(style.clone()), ..settings }))?;
-        context.print_outcome(format!("warning style set to {}", style));
+        upsert_settings(None, move |settings| {
+          Ok(Settings { warning_style: get_some(SETTING_WARNING_STYLE, matches, context)?, ..settings })
+        })?;
       }
       _ => unreachable!(),
     }
@@ -591,6 +652,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(None, |settings| Ok(Settings { label_style: None, ..settings }))?;
         context.print_outcome("label style unset");
       }
+      SETTING_LOG_COLOR => {
+        upsert_settings(None, |settings| Ok(Settings { log_color: None, ..settings }))?;
+        context.print_outcome("log color unset");
+      }
       SETTING_LOG_LEVEL => {
         upsert_settings(None, |settings| Ok(Settings { log_level: None, ..settings }))?;
         context.print_outcome("log level unset");
@@ -598,6 +663,10 @@ impl CommandExecutor for SettingUnset {
       SETTING_LOG_LEVEL_API => {
         upsert_settings(None, |settings| Ok(Settings { log_level_api: None, ..settings }))?;
         context.print_outcome("log level for api unset");
+      }
+      SETTING_LOG_STYLE => {
+        upsert_settings(None, |settings| Ok(Settings { log_style: None, ..settings }))?;
+        context.print_outcome("log style unset");
       }
       SETTING_MATCHING_COLOR => {
         upsert_settings(None, |settings| Ok(Settings { matching_color: None, ..settings }))?;
@@ -674,7 +743,7 @@ impl CommandExecutor for SettingUnset {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum SettingLabel {
+enum SettingLabel {
   Authentication,
   Browser,
   CsvQuote,
@@ -687,8 +756,10 @@ pub(crate) enum SettingLabel {
   FileName,
   LabelColor,
   LabelStyle,
+  LogColor,
   LogLevel,
   LogLevelApi,
+  LogStyle,
   MatchingColor,
   MatchingStyle,
   NoEscape,
@@ -719,12 +790,14 @@ impl Label for SettingLabel {
       Self::DefaultTenant => SETTING_DEFAULT_TENANT,
       Self::DryRun => SETTING_DRY_RUN,
       Self::ErrorColor => SETTING_ERROR_COLOR,
-      Self::ErrorStyle => SETTING_ERROR_COLOR,
+      Self::ErrorStyle => SETTING_ERROR_STYLE,
       Self::FileName => "settings file name",
       Self::LabelColor => SETTING_LABEL_COLOR,
       Self::LabelStyle => SETTING_LABEL_STYLE,
+      Self::LogColor => SETTING_LOG_COLOR,
       Self::LogLevel => SETTING_LOG_LEVEL,
       Self::LogLevelApi => SETTING_LOG_LEVEL_API,
+      Self::LogStyle => SETTING_LOG_STYLE,
       Self::MatchingColor => SETTING_MATCHING_COLOR,
       Self::MatchingStyle => SETTING_MATCHING_STYLE,
       Self::NoEscape => SETTING_NO_ESCAPE,
@@ -768,8 +841,10 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
       SettingLabel::LabelColor => self.label_color.clone().map(|color| color.to_string()).unwrap_or_default(),
       SettingLabel::LabelStyle => self.label_style.clone().map(|style| style.to_string()).unwrap_or_default(),
+      SettingLabel::LogColor => self.log_color.clone().map(|color| color.to_string()).unwrap_or_default(),
       SettingLabel::LogLevel => self.log_level.clone().map(|log_level| log_level.to_string()).unwrap_or_default(),
       SettingLabel::LogLevelApi => self.log_level_api.clone().map(|log_level_api| log_level_api.to_string()).unwrap_or_default(),
+      SettingLabel::LogStyle => self.log_style.clone().map(|style| style.to_string()).unwrap_or_default(),
       SettingLabel::MatchingColor => self.matching_color.clone().map(|color| color.to_string()).unwrap_or_default(),
       SettingLabel::MatchingStyle => self.matching_style.clone().map(|style| style.to_string()).unwrap_or_default(),
       SettingLabel::NoEscape => self.no_escape.map(|no_escape| no_escape.to_string()).unwrap_or_default(),
@@ -794,7 +869,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
   }
 }
 
-pub static SETTING_LABELS: [SettingLabel; 31] = [
+static SETTING_LABELS: [SettingLabel; 33] = [
   SettingLabel::Authentication,
   SettingLabel::Browser,
   SettingLabel::CsvQuote,
@@ -809,6 +884,8 @@ pub static SETTING_LABELS: [SettingLabel; 31] = [
   SettingLabel::LabelStyle,
   SettingLabel::LogLevel,
   SettingLabel::LogLevelApi,
+  SettingLabel::LogColor,
+  SettingLabel::LogStyle,
   SettingLabel::MatchingColor,
   SettingLabel::MatchingStyle,
   SettingLabel::NoEscape,
@@ -827,3 +904,24 @@ pub static SETTING_LABELS: [SettingLabel; 31] = [
   SettingLabel::WarningColor,
   SettingLabel::WarningStyle,
 ];
+
+#[derive(Eq, Hash, PartialEq, Serialize)]
+enum EnvironmentVariableLabel {
+  Variable,
+  Value,
+}
+
+impl Label for EnvironmentVariableLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      EnvironmentVariableLabel::Variable => "environment variable",
+      EnvironmentVariableLabel::Value => "value",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::Variable)
+  }
+}
+
+static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [EnvironmentVariableLabel::Variable, EnvironmentVariableLabel::Value];
