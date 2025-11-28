@@ -4,12 +4,12 @@ use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMM
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{hashmap_to_table, PROPERTY_LABELS};
-use crate::formatters::formatter::{Label, SubjectFormatter};
+use crate::formatters::hashmap_to_table;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{notifications_to_string, OutputFormat};
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_LIST};
 use crate::DshCliResult;
@@ -26,12 +26,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 
-pub(crate) struct TopicSubject {}
+struct TopicSubject {}
 
 const TOPIC_SUBJECT_TARGET: &str = "topic";
 
 lazy_static! {
-  pub static ref TOPIC_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TopicSubject {});
+  pub(crate) static ref TOPIC_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TopicSubject {});
 }
 
 #[async_trait]
@@ -110,7 +110,7 @@ lazy_static! {
     vec![TOPIC_CREATE_CAPABILITY.as_ref(), TOPIC_DELETE_CAPABILITY.as_ref(), TOPIC_LIST_CAPABILITY.as_ref(), TOPIC_SHOW_CAPABILITY.as_ref()];
 }
 
-pub(crate) const CLEANUP_POLICY_FLAG: &str = "cleanup-policy";
+const CLEANUP_POLICY_FLAG: &str = "cleanup-policy";
 
 pub(crate) fn cleanup_policy_flag() -> Arg {
   Arg::new(CLEANUP_POLICY_FLAG)
@@ -122,7 +122,7 @@ pub(crate) fn cleanup_policy_flag() -> Arg {
     .long_help("Cleanup policy for the new scratch topic.")
 }
 
-pub(crate) const COMPRESSION_TYPE_FLAG: &str = "compression-type";
+const COMPRESSION_TYPE_FLAG: &str = "compression-type";
 
 pub(crate) fn compression_type_flag() -> Arg {
   Arg::new(COMPRESSION_TYPE_FLAG)
@@ -141,7 +141,7 @@ pub(crate) fn compression_type_flag() -> Arg {
     .long_help("Compression type for the new scratch topic.")
 }
 
-pub(crate) const DELETE_RETENTION_MS_FLAG: &str = "delete-retention-ms";
+const DELETE_RETENTION_MS_FLAG: &str = "delete-retention-ms";
 
 pub(crate) fn delete_retention_ms_flag() -> Arg {
   Arg::new(DELETE_RETENTION_MS_FLAG)
@@ -153,7 +153,7 @@ pub(crate) fn delete_retention_ms_flag() -> Arg {
     .long_help("Delete retention time in milliseconds.")
 }
 
-pub(crate) const MAX_MESSAGE_BYTES_FLAG: &str = "max-message-bytes";
+const MAX_MESSAGE_BYTES_FLAG: &str = "max-message-bytes";
 
 pub(crate) fn max_message_size_flag() -> Arg {
   Arg::new(MAX_MESSAGE_BYTES_FLAG)
@@ -168,7 +168,7 @@ pub(crate) fn max_message_size_flag() -> Arg {
     )
 }
 
-pub(crate) const MESSAGE_TIMESTAMP_TYPE_FLAG: &str = "message-timestamp-type";
+const MESSAGE_TIMESTAMP_TYPE_FLAG: &str = "message-timestamp-type";
 const TIMESTAMP_CREATE_TIME: &str = "create-time";
 const TIMESTAMP_LOG_APPEND_TIME: &str = "log-append-time";
 
@@ -188,7 +188,7 @@ pub(crate) fn message_timestamp_type_flag() -> Arg {
     )
 }
 
-pub(crate) const PARTITIONS_FLAG: &str = "partitions";
+const PARTITIONS_FLAG: &str = "partitions";
 
 pub(crate) fn partitions_flag() -> Arg {
   Arg::new(PARTITIONS_FLAG)
@@ -203,7 +203,7 @@ pub(crate) fn partitions_flag() -> Arg {
     )
 }
 
-pub(crate) const RETENTION_BYTES_FLAG: &str = "retention-bytes";
+const RETENTION_BYTES_FLAG: &str = "retention-bytes";
 
 pub(crate) fn retention_bytes_flag() -> Arg {
   Arg::new(RETENTION_BYTES_FLAG)
@@ -218,7 +218,7 @@ pub(crate) fn retention_bytes_flag() -> Arg {
     )
 }
 
-pub(crate) const RETENTION_MS_FLAG: &str = "retention-ms";
+const RETENTION_MS_FLAG: &str = "retention-ms";
 
 pub(crate) fn retention_ms_flag() -> Arg {
   Arg::new(RETENTION_MS_FLAG)
@@ -234,7 +234,7 @@ pub(crate) fn retention_ms_flag() -> Arg {
     )
 }
 
-pub(crate) const SEGMENT_BYTES_FLAG: &str = "segment-bytes";
+const SEGMENT_BYTES_FLAG: &str = "segment-bytes";
 
 pub(crate) fn segment_bytes_flag() -> Arg {
   Arg::new(SEGMENT_BYTES_FLAG)
@@ -486,12 +486,17 @@ impl CommandExecutor for TopicShowProperties {
     let start_instant = context.now();
     let topic_status = client.get_topic(&topic_id).await?;
     context.print_execution_time(start_instant);
-    let mut pairs: Vec<(String, String)> = topic_status.actual.unwrap().kafka_properties.into_iter().collect_vec();
-    pairs.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
-    let (properties, values): (Vec<String>, Vec<String>) = pairs.into_iter().unzip();
-    let mut formatter = ListFormatter::new(&PROPERTY_LABELS, Some("property"), context);
-    formatter.push_target_ids_and_values(&properties, &values);
-    formatter.print(None)?;
+    match topic_status.actual {
+      Some(actual_topic) => {
+        let mut pairs: Vec<(String, String)> = actual_topic.kafka_properties.into_iter().collect_vec();
+        pairs.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+        let (properties, values): (Vec<String>, Vec<String>) = pairs.into_iter().unzip();
+        let mut formatter = ListFormatter::new(&PROPERTY_LABELS, Some("property"), context);
+        formatter.push_target_ids_and_values(&properties, &values);
+        formatter.print(None)?;
+      }
+      None => context.print_outcome("no actual topics"),
+    }
     Ok(())
   }
 
@@ -532,7 +537,7 @@ impl CommandExecutor for TopicShowUsage {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum TopicLabel {
+pub(crate) enum TopicLabel {
   CleanupPolicy,
   CompressionType,
   DeleteRetentionMs,
@@ -702,7 +707,7 @@ impl SubjectFormatter<TopicLabel> for TopicStatus {
   }
 }
 
-pub static TOPIC_STATUS_LABELS: [TopicLabel; 14] = [
+static TOPIC_STATUS_LABELS: [TopicLabel; 14] = [
   TopicLabel::Target,
   TopicLabel::Partitions,
   TopicLabel::ReplicationFactor,
@@ -719,7 +724,7 @@ pub static TOPIC_STATUS_LABELS: [TopicLabel; 14] = [
   TopicLabel::KafkaProperties,
 ];
 
-pub static TOPIC_LABELS: [TopicLabel; 10] = [
+pub(crate) static TOPIC_LABELS: [TopicLabel; 10] = [
   TopicLabel::Target,
   TopicLabel::Partitions,
   TopicLabel::ReplicationFactor,
@@ -731,3 +736,24 @@ pub static TOPIC_LABELS: [TopicLabel; 10] = [
   TopicLabel::Provisioned,
   TopicLabel::KafkaProperties,
 ];
+
+#[derive(Eq, Hash, PartialEq, Serialize)]
+enum PropertyLabel {
+  Property,
+  Value,
+}
+
+impl Label for PropertyLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      PropertyLabel::Property => "property",
+      PropertyLabel::Value => "value",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::Property)
+  }
+}
+
+static PROPERTY_LABELS: [PropertyLabel; 2] = [PropertyLabel::Property, PropertyLabel::Value];

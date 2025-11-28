@@ -6,11 +6,12 @@ use crate::capability::{
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{hashmap_to_table, Label, SubjectFormatter};
+use crate::formatters::hashmap_to_table;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::bucket::BUCKET_LABELS;
@@ -37,12 +38,12 @@ use serde_json::de::from_str;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-pub(crate) struct AppSubject {}
+struct AppSubject {}
 
 const APP_SUBJECT_TARGET: &str = "app";
 
 lazy_static! {
-  pub static ref APP_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(AppSubject {});
+  pub(crate) static ref APP_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(AppSubject {});
 }
 
 #[async_trait]
@@ -133,7 +134,7 @@ struct AppDeploy {}
 impl CommandExecutor for AppDeploy {
   async fn execute_with_client(&self, target: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
-    let manifest_version = Version::from_str(sub_argument.unwrap().as_str())?;
+    let manifest_version = Version::from_str(sub_argument.unwrap_or_else(|| unreachable!()).as_str())?;
     let app_id = matches.get_one::<String>(APP_ID_ARGUMENT).unwrap_or_else(|| unreachable!());
     if client.get_appcatalog_app_configuration(app_id).await.is_ok() {
       return Err(format!("app '{}' already exists", app_id));
@@ -250,7 +251,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
       }
       PropertyKind::Number => {
         lazy_static! {
-          static ref NUMBER_REGEX: Regex = Regex::new(r"^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$").unwrap();
+          static ref NUMBER_REGEX: Regex = Regex::new(r"^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$").unwrap_or_else(|_| unreachable!());
         }
         match NUMBER_REGEX.captures(parameter) {
           Some(_) => Ok(parameter.clone()),
@@ -264,10 +265,13 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
 
 fn parse_app_parameter(app_parameter: &str) -> Result<(String, String), String> {
   lazy_static! {
-    static ref APP_PARAMETER_REGEX: Regex = Regex::new(r"^([A-Z][a-zA-Z0-9_]+)=(.*)$").unwrap();
+    static ref APP_PARAMETER_REGEX: Regex = Regex::new(r"^([A-Z][a-zA-Z0-9_]+)=(.*)$").unwrap_or_else(|_| unreachable!());
   }
   match APP_PARAMETER_REGEX.captures(app_parameter) {
-    Some(captures) => Ok((captures.get(1).unwrap().as_str().to_string(), captures.get(2).unwrap().as_str().to_string())),
+    Some(captures) => Ok((
+      captures.get(1).unwrap_or_else(|| unreachable!()).as_str().to_string(),
+      captures.get(2).unwrap_or_else(|| unreachable!()).as_str().to_string(),
+    )),
     None => Err(format!("illegal app parameter {}", app_parameter)),
   }
 }
@@ -285,7 +289,7 @@ impl CommandExecutor for AppListConfiguration {
     app_ids.sort();
     let mut formatter = ListFormatter::new(&APP_CATALOG_APP_LABELS, Some("app id"), context);
     for app_id in app_ids {
-      let app = apps.get(&app_id).unwrap();
+      let app = apps.get(&app_id).unwrap_or_else(|| unreachable!());
       formatter.push_target_id_value(app_id, app);
     }
     formatter.print(None)?;
@@ -331,7 +335,7 @@ impl CommandExecutor for AppOpen {
     for resource in app.resources.values() {
       if let AppCatalogAppResourcesValue::Vhost(vhost) = resource {
         lazy_static! {
-          static ref VHOST_REGEX: Regex = Regex::new(r"^([a-zA-Z0-9_-]+)\.([a-zA-Z0-9_-]+)@([a-zA-Z0-9_-]+)$").unwrap();
+          static ref VHOST_REGEX: Regex = Regex::new(r"^([a-zA-Z0-9_-]+)\.([a-zA-Z0-9_-]+)@([a-zA-Z0-9_-]+)$").unwrap_or_else(|_| unreachable!());
         }
         match VHOST_REGEX.captures(vhost.value.as_str()) {
           Some(captures) => {
@@ -342,12 +346,15 @@ impl CommandExecutor for AppOpen {
                     "https://{}",
                     client
                       .platform()
-                      .tenant_private_vhost_domain(client.tenant().name(), captures.get(1).unwrap().as_str())?
+                      .tenant_private_vhost_domain(client.tenant().name(), captures.get(1).unwrap_or_else(|| unreachable!()).as_str())?
                   ),
                   format!("private vhost for tenant '{}@{}' and app '{}'", tenant_name, platform, app_id),
                 ),
                 "public" => context.open_url(
-                  format!("https://{}", client.platform().public_vhost_domain(captures.get(1).unwrap().as_str())),
+                  format!(
+                    "https://{}",
+                    client.platform().public_vhost_domain(captures.get(1).unwrap_or_else(|| unreachable!()).as_str())
+                  ),
                   format!("public vhost for tenant '{}@{}' and app '{}'", tenant_name, platform, app_id),
                 ),
                 illegal_zone => context.print_warning(format!("illegal zone in vhost resource {}", illegal_zone)),
@@ -439,7 +446,7 @@ impl CommandExecutor for AppUndeploy {
 
 const APP_PARAMETER_ARGUMENT: &str = "app-parameter-argument";
 
-pub(crate) fn app_parameter_argument() -> Arg {
+fn app_parameter_argument() -> Arg {
   Arg::new(APP_PARAMETER_ARGUMENT)
     .long("app-parameter")
     .short('a')
@@ -457,7 +464,7 @@ pub(crate) fn app_parameter_argument() -> Arg {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum AppCatalogAppLabel {
+enum AppCatalogAppLabel {
   Configuration,
   ManifestUrn,
   Target,
@@ -493,10 +500,10 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
   }
 }
 
-pub static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
+static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum AppCatalogAppConfigurationLabel {
+enum AppCatalogAppConfigurationLabel {
   Configuration,
   ManifestUrn,
   Name,
@@ -529,7 +536,7 @@ impl SubjectFormatter<AppCatalogAppConfigurationLabel> for AppCatalogAppConfigur
   }
 }
 
-pub static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
+static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
   [AppCatalogAppConfigurationLabel::Name, AppCatalogAppConfigurationLabel::ManifestUrn, AppCatalogAppConfigurationLabel::Stopped, AppCatalogAppConfigurationLabel::Configuration];
 
 const DEPLOY_LONG_ABOUT: &str = "Deploy an app from the app catalog. \

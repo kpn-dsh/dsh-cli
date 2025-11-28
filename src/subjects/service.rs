@@ -8,11 +8,11 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{hashmap_to_table, Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{edit_configuration, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
@@ -33,12 +33,12 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 
-pub(crate) struct ServiceSubject {}
+struct ServiceSubject {}
 
 const SERVICE_SUBJECT_TARGET: &str = "service";
 
 lazy_static! {
-  pub static ref SERVICE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ServiceSubject {});
+  pub(crate) static ref SERVICE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ServiceSubject {});
 }
 
 lazy_static! {
@@ -519,40 +519,40 @@ impl CommandExecutor for ServiceOpen {
     let start_instant = context.now();
     let service = client.get_application_configuration(&service_id).await?;
     context.print_execution_time(start_instant);
-    if service.exposed_ports.is_empty() {
-      Err("service has no exposed ports".to_string())
-    } else if service.exposed_ports.len() > 1 {
+    if service.exposed_ports.len() > 1 {
       Err("service has more than one exposed port".to_string())
     } else {
-      let (_, port_mapping) = service.exposed_ports.iter().next().unwrap();
-      match &port_mapping.vhost {
-        Some(vhost) => {
-          let vhost_string = VhostString::from_str(vhost)?;
-          match vhost_string.zone {
-            Some(zone) => {
-              if zone == "private" {
-                context.open_url(
-                  format!(
-                    "https://{}",
-                    client.platform().tenant_private_vhost_domain(client.tenant().name(), vhost_string.vhost_name)?
-                  ),
-                  format!("private vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
-                );
-                Ok(())
-              } else if zone == "public" {
-                context.open_url(
-                  format!("https://{}", client.platform().public_vhost_domain(vhost_string.vhost_name)),
-                  format!("public vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
-                );
-                Ok(())
-              } else {
-                Err(format!("exposed port has illegal zone {}", zone))
+      match service.exposed_ports.iter().next() {
+        Some((_, port_mapping)) => match &port_mapping.vhost {
+          Some(vhost) => {
+            let vhost_string = VhostString::from_str(vhost)?;
+            match vhost_string.zone {
+              Some(zone) => {
+                if zone == "private" {
+                  context.open_url(
+                    format!(
+                      "https://{}",
+                      client.platform().tenant_private_vhost_domain(client.tenant().name(), vhost_string.vhost_name)?
+                    ),
+                    format!("private vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                  );
+                  Ok(())
+                } else if zone == "public" {
+                  context.open_url(
+                    format!("https://{}", client.platform().public_vhost_domain(vhost_string.vhost_name)),
+                    format!("public vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                  );
+                  Ok(())
+                } else {
+                  Err(format!("exposed port has illegal zone {}", zone))
+                }
               }
+              None => Err("exposed port has no zone".to_string()),
             }
-            None => Err("exposed port has no zone".to_string()),
           }
-        }
-        None => Err("port mapping has no vhost".to_string()),
+          None => Err("port mapping has no vhost".to_string()),
+        },
+        None => Err("service has no exposed ports".to_string()),
       }
     }
   }
@@ -674,6 +674,12 @@ struct ServiceShowTasks {}
 #[async_trait]
 impl CommandExecutor for ServiceShowTasks {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+    fn timestamp(task_status: &TaskStatus) -> i64 {
+      match task_status.actual {
+        None => 0,
+        Some(ref task) => task.staged_at.timestamp_millis(),
+      }
+    }
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all tasks for service '{}'", service_id));
     let start_instant = context.now();
@@ -681,7 +687,7 @@ impl CommandExecutor for ServiceShowTasks {
     let task_statuses = try_join_all(task_ids.iter().map(|task_id| client.get_task(&service_id, task_id))).await?;
     context.print_execution_time(start_instant);
     let mut tasks: Vec<(String, TaskStatus)> = task_ids.into_iter().zip(task_statuses).collect();
-    tasks.sort_by(|first, second| second.1.actual.clone().unwrap().staged_at.cmp(&first.1.actual.clone().unwrap().staged_at));
+    tasks.sort_by(|(_, task_a), (_, task_b)| timestamp(task_b).cmp(&timestamp(task_a)));
     let mut formatter = ListFormatter::new(&TASK_LABELS_LIST, None, context);
     formatter.push_target_id_value_pairs(tasks.as_slice());
     formatter.print(None)?;
@@ -985,7 +991,7 @@ impl SubjectFormatter<ServiceLabel> for Application {
   }
 }
 
-pub static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
+static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
   ServiceLabel::Target,
   ServiceLabel::NeedsToken,
   ServiceLabel::Instances,
@@ -996,7 +1002,7 @@ pub static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
   ServiceLabel::Image,
 ];
 
-pub static SERVICE_LABELS_SHOW: [ServiceLabel; 18] = [
+pub(crate) static SERVICE_LABELS_SHOW: [ServiceLabel; 18] = [
   ServiceLabel::Target,
   ServiceLabel::NeedsToken,
   ServiceLabel::Instances,
@@ -1018,7 +1024,7 @@ pub static SERVICE_LABELS_SHOW: [ServiceLabel; 18] = [
 ];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum TaskLabel {
+enum TaskLabel {
   Healthy,
   HostIpAddress,
   _LastestLog,
@@ -1090,5 +1096,5 @@ impl SubjectFormatter<TaskLabel> for TaskStatus {
   }
 }
 
-pub static TASK_LABELS_LIST: [TaskLabel; 8] =
+static TASK_LABELS_LIST: [TaskLabel; 8] =
   [TaskLabel::StartedAt, TaskLabel::State, TaskLabel::Healthy, TaskLabel::Target, TaskLabel::HostIpAddress, TaskLabel::LastUpdateAt, TaskLabel::StagedAt, TaskLabel::StoppedAt];

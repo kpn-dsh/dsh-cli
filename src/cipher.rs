@@ -1,6 +1,6 @@
 use homedir::my_home;
-use itertools::Itertools;
 use std::fs;
+use std::fs::DirEntry;
 use std::time::UNIX_EPOCH;
 
 use sha2::Digest;
@@ -19,55 +19,42 @@ use aes_gcm::{Aes256Gcm, AesGcm};
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 
-pub fn encrypt(plain_text: &String) -> Result<String, String> {
-  let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key());
-
+pub(crate) fn encrypt(plain_text: &String) -> Result<String, String> {
+  let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
   let nonce: Nonce<Aes256Gcm> = Aes256Gcm::generate_nonce(&mut OsRng);
-
   let encoded_nonce: String = STANDARD_NO_PAD.encode(nonce);
-
   let ciphertext: Vec<u8> = cipher
     .encrypt(&nonce, plain_text.as_bytes())
     .map_err(|error| format!("could not encrypt: {}", error))?;
-
   let encoded_cyphertext: String = STANDARD_NO_PAD.encode(ciphertext);
-
   Ok(format!("{}.{}", encoded_cyphertext, encoded_nonce))
 }
 
-pub fn decrypt(encoded_ciphertext_nonce: &str) -> Result<String, String> {
+pub(crate) fn decrypt(encoded_ciphertext_nonce: &str) -> Result<String, String> {
   let parts: Vec<&str> = encoded_ciphertext_nonce.split(".").collect();
-
   if parts.len() == 2 {
     let encoded_ciphertext: &[u8] = parts[0].as_bytes();
-
     let encoded_nonce = parts[1].as_bytes();
-
     let ciphertext: Vec<u8> = STANDARD_NO_PAD
       .decode(encoded_ciphertext)
       .map_err(|error| format!("could not decode ciphertext: {}", error))?;
-
     let decoded_nonce: Vec<u8> = STANDARD_NO_PAD
       .decode(encoded_nonce)
       .map_err(|error| format!("could not decode nonce: {}", error))?;
-
     #[allow(deprecated)] // TODO
     let nonce = Nonce::<Aes256Gcm>::clone_from_slice(&decoded_nonce);
-
-    let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key());
-
+    let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
     let plaintext: Vec<u8> = cipher
       .decrypt(&nonce, ciphertext.as_ref())
       .map_err(|error| format!("could not decrypt: {}", error))?;
-
     Ok(String::from_utf8(plaintext).map_err(|error| format!("could not create string: {}", error))?)
   } else {
     Err("illegal ciphertext nonce pair".to_string())
   }
 }
 
-pub fn get_key() -> Key<Aes256Gcm> {
-  get_system_hash().unwrap().finalize()
+fn get_key() -> Result<Key<Aes256Gcm>, String> {
+  get_system_hash().map(|hash| hash.finalize())
 }
 
 /// Compute a hash based on unique system characteristics
@@ -79,33 +66,39 @@ pub fn get_key() -> Key<Aes256Gcm> {
 /// Note that this algorithm does not guarantee that the computed has will be the same every
 /// time the function is executed. Typically, if a new entry was added to the users home
 /// directory or when an entry has been deleted, the computed hash will change.
-pub fn get_system_hash() -> Result<Sha256, String> {
+fn get_system_hash() -> Result<Sha256, String> {
   match my_home() {
     Ok(Some(user_home_directory)) => match fs::read_dir(user_home_directory) {
       Ok(dir) => {
-        let mut representations = dir
+        let mut representations: Vec<String> = dir
           .into_iter()
-          .filter_map(|dir_entry| {
-            dir_entry.ok().map(|entry| {
-              // Representation is the concatenation file name and the creation timestamp
-              format!(
-                "{}:{}",
-                entry.file_name().to_str().unwrap(),
-                entry.metadata().unwrap().created().unwrap().duration_since(UNIX_EPOCH).unwrap().as_millis()
-              )
-            })
-          })
-          .collect_vec();
+          .map(|dir_entry| dir_entry.map_err(|error| error.to_string()).and_then(|entry| entry_representation(&entry)))
+          .collect::<Result<Vec<_>, _>>()?;
         representations.sort();
         let mut hasher = Sha256::new();
-        for dd in &representations {
-          hasher.update(dd.as_bytes());
+        for representation in &representations {
+          hasher.update(representation.as_bytes());
         }
         Ok(hasher)
       }
-
       Err(_) => Err("could not determine user home directory".to_string()),
     },
     _ => Err("could not determine user home directory".to_string()),
   }
+}
+
+// Representation is the concatenation file name and the creation timestamp
+fn entry_representation(entry: &DirEntry) -> Result<String, String> {
+  Ok(format!(
+    "{}:{}",
+    entry.file_name().to_str().ok_or("invalid unicode in filename".to_string())?,
+    entry
+      .metadata()
+      .map_err(|error| error.to_string())?
+      .created()
+      .map_err(|error| error.to_string())?
+      .duration_since(UNIX_EPOCH)
+      .map_err(|error| error.to_string())?
+      .as_millis()
+  ))
 }

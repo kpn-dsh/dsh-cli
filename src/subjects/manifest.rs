@@ -4,11 +4,12 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{hashmap_to_table, hashmap_to_vec, vec_to_table, Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{hashmap_to_table, hashmap_to_vec, vec_to_table};
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 use async_trait::async_trait;
@@ -23,12 +24,12 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-pub(crate) struct ManifestSubject {}
+struct ManifestSubject {}
 
 const MANIFEST_SUBJECT_TARGET: &str = "manifest";
 
 lazy_static! {
-  pub static ref MANIFEST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ManifestSubject {});
+  pub(crate) static ref MANIFEST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ManifestSubject {});
 }
 
 #[async_trait]
@@ -165,8 +166,9 @@ impl CommandExecutor for ManifestExplain {
       property_ids.sort();
       let mut formatter = ListFormatter::new(&PROPERTY_LABELS_LIST, None, context);
       for property_id in property_ids {
-        let property = configuration.properties.get(&property_id).unwrap();
-        formatter.push_target_id_value(property_id, property);
+        if let Some(property) = configuration.properties.get(&property_id) {
+          formatter.push_target_id_value(property_id, property);
+        }
       }
       formatter.print(None)?;
     }
@@ -370,7 +372,7 @@ impl CommandExecutor for ManifestShowAllVersions {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum ManifestLabel {
+enum ManifestLabel {
   ApiVersion,
   Configuration,
   Contact,
@@ -411,7 +413,7 @@ impl Label for ManifestLabel {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum PropertyLabel {
+enum PropertyLabel {
   Default,
   Description,
   Id,
@@ -464,7 +466,7 @@ impl SubjectFormatter<PropertyLabel> for Property {
   }
 }
 
-pub static PROPERTY_LABELS_LIST: [PropertyLabel; 4] = [PropertyLabel::Id, PropertyLabel::ValueExplanation, PropertyLabel::Default, PropertyLabel::Description];
+static PROPERTY_LABELS_LIST: [PropertyLabel; 4] = [PropertyLabel::Id, PropertyLabel::ValueExplanation, PropertyLabel::Default, PropertyLabel::Description];
 
 fn property_dns_zone_explanation() -> String {
   "private *\npublic".to_string()
@@ -617,12 +619,12 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
   }
 }
 
-pub static MANIFEST_LABELS_LIST: [ManifestLabel; 5] = [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Vendor, ManifestLabel::LastModified];
+static MANIFEST_LABELS_LIST: [ManifestLabel; 5] = [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Vendor, ManifestLabel::LastModified];
 
-pub static MANIFEST_LABELS_LIST_INCLUDE_DRAFT: [ManifestLabel; 6] =
+static MANIFEST_LABELS_LIST_INCLUDE_DRAFT: [ManifestLabel; 6] =
   [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Draft, ManifestLabel::Vendor, ManifestLabel::LastModified];
 
-pub static MANIFEST_LABELS_SHOW: [ManifestLabel; 9] = [
+static MANIFEST_LABELS_SHOW: [ManifestLabel; 9] = [
   ManifestLabel::Id,
   ManifestLabel::Name,
   ManifestLabel::Draft,
@@ -634,7 +636,7 @@ pub static MANIFEST_LABELS_SHOW: [ManifestLabel; 9] = [
   ManifestLabel::Resources,
 ];
 
-pub static MANIFEST_LABELS_SHOW_FULL: [ManifestLabel; 13] = [
+static MANIFEST_LABELS_SHOW_FULL: [ManifestLabel; 13] = [
   ManifestLabel::Id,
   ManifestLabel::Name,
   ManifestLabel::Kind,
