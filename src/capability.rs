@@ -38,7 +38,7 @@ pub(crate) const UNSET_COMMAND: &str = "unset";
 pub(crate) const UPDATE_COMMAND: &str = "update";
 
 #[async_trait]
-pub trait Capability {
+pub(crate) trait Capability {
   fn clap_capability_command(&self, subject_command: &str) -> Command;
 
   fn clap_flags(&self, subject: &str) -> Vec<Arg>;

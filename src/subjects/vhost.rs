@@ -3,8 +3,8 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS_LIST;
 use crate::{include_started_stopped, DshCliResult};
@@ -20,12 +20,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::str::FromStr;
 
-pub(crate) struct VhostSubject {}
+struct VhostSubject {}
 
 const VHOST_SUBJECT_TARGET: &str = "vhost";
 
 lazy_static! {
-  pub static ref VHOST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(VhostSubject {});
+  pub(crate) static ref VHOST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(VhostSubject {});
 }
 
 #[async_trait]
@@ -160,7 +160,7 @@ impl CommandExecutor for VhostListUsage {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum VhostListLabel {
+enum VhostListLabel {
   Auth,
   Instances,
   KafkaFlag,
@@ -232,7 +232,7 @@ impl SubjectFormatter<VhostListLabel> for VhostListValue {
   }
 }
 
-pub static VHOST_LIST_LABELS: [VhostListLabel; 11] = [
+static VHOST_LIST_LABELS: [VhostListLabel; 11] = [
   VhostListLabel::Vhost,
   VhostListLabel::Zone,
   VhostListLabel::ServiceId,
@@ -247,7 +247,7 @@ pub static VHOST_LIST_LABELS: [VhostListLabel; 11] = [
 ];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum VhostLabel {
+pub(crate) enum VhostLabel {
   Target,
   Value,
 }
@@ -274,4 +274,4 @@ impl SubjectFormatter<VhostLabel> for Vhost {
   }
 }
 
-pub static VHOST_LABELS: [VhostLabel; 2] = [VhostLabel::Target, VhostLabel::Value];
+pub(crate) static VHOST_LABELS: [VhostLabel; 2] = [VhostLabel::Target, VhostLabel::Value];

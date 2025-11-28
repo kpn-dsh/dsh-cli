@@ -18,11 +18,11 @@ use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMM
 use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{hashmap_to_table, Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
 use crate::subject::Subject;
 use crate::subjects::topic::{
   cleanup_policy_flag, compression_type_flag, create_topic, delete_retention_ms_flag, get_implicit_properties, max_message_size_flag, message_timestamp_type_flag, partitions_flag,
@@ -34,12 +34,12 @@ use dsh_api::types::{PublicManagedStream, PublicManagedStreamContractPartitioner
 use itertools::Itertools;
 use serde::Serialize;
 
-pub(crate) struct StreamSubject {}
+struct StreamSubject {}
 
 const STREAM_SUBJECT_TARGET: &str = "stream";
 
 lazy_static! {
-  pub static ref STREAM_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(StreamSubject {});
+  pub(crate) static ref STREAM_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(StreamSubject {});
 }
 
 #[async_trait]
@@ -121,7 +121,7 @@ lazy_static! {
       ])
       .add_command_executor(FlagType::Ids, &StreamListIds {}, None)
   );
-  pub static ref STREAM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref STREAM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &StreamShowAll {}, "Show managed stream configuration")
       .add_target_argument(managed_stream_argument().required(true))
   );
@@ -385,7 +385,7 @@ impl CommandExecutor for StreamShowAll {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum ManagedStreamLabel {
+enum ManagedStreamLabel {
   CanBeRetained,
   CleanupPolicy,
   CompressionType,

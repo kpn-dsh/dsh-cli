@@ -3,8 +3,8 @@ use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::formatter::Label;
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::Label;
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
@@ -18,12 +18,12 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-pub(crate) struct EnvSubject {}
+struct EnvSubject {}
 
 const ENV_SUBJECT_TARGET: &str = "env";
 
 lazy_static! {
-  pub static ref ENV_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(EnvSubject {});
+  pub(crate) static ref ENV_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(EnvSubject {});
 }
 
 #[async_trait]

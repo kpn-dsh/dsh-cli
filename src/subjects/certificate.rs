@@ -3,11 +3,11 @@ use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::DshCliResult;
@@ -22,12 +22,12 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-pub(crate) struct CertificateSubject {}
+struct CertificateSubject {}
 
 const CERTIFICATE_SUBJECT_TARGET: &str = "certificate";
 
 lazy_static! {
-  pub static ref CERTIFICATE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(CertificateSubject {});
+  pub(crate) static ref CERTIFICATE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(CertificateSubject {});
 }
 
 #[async_trait]
@@ -91,14 +91,14 @@ impl CommandExecutor for CertificateListAll {
     context.print_explanation("list all certificates with their parameters");
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
-    let certificate_statuses = futures::future::join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate(certificate_id))).await;
+    let certificate_statuses = futures::future::try_join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate(certificate_id))).await?;
     context.print_execution_time(start_instant);
-    let certificates_statuses_unwrapped = certificate_statuses
+    let actual_certificates = certificate_statuses
       .iter()
-      .map(|certificate_status| certificate_status.as_ref().unwrap().to_owned().actual.unwrap())
+      .filter_map(|certificate_status| certificate_status.clone().actual)
       .collect_vec();
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, None, context);
-    formatter.push_target_ids_and_values(certificate_ids.as_slice(), certificates_statuses_unwrapped.as_slice());
+    formatter.push_target_ids_and_values(certificate_ids.as_slice(), actual_certificates.as_slice());
     formatter.print(None)?;
     Ok(())
   }
@@ -263,7 +263,7 @@ impl CommandExecutor for CertificateShowUsage {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum CertificateLabel {
+pub(crate) enum CertificateLabel {
   CertChainSecret,
   DistinguishedName,
   DnsNames,
@@ -337,13 +337,12 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
   }
 }
 
-pub static CERTIFICATE_CONFIGURATION_LABELS: [CertificateLabel; 4] =
+static CERTIFICATE_CONFIGURATION_LABELS: [CertificateLabel; 4] =
   [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
 
-pub static CERTIFICATE_LABELS_LIST: [CertificateLabel; 4] =
-  [CertificateLabel::Target, CertificateLabel::DistinguishedName, CertificateLabel::NotBefore, CertificateLabel::NotAfter];
+static CERTIFICATE_LABELS_LIST: [CertificateLabel; 4] = [CertificateLabel::Target, CertificateLabel::DistinguishedName, CertificateLabel::NotBefore, CertificateLabel::NotAfter];
 
-pub static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
+pub(crate) static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
   CertificateLabel::Target,
   CertificateLabel::CertChainSecret,
   CertificateLabel::KeySecret,

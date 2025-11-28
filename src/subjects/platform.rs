@@ -5,9 +5,9 @@ use crate::arguments::{
 use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::{get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
 use arboard::Clipboard;
@@ -21,7 +21,7 @@ use lazy_static::lazy_static;
 use log::{debug, warn};
 use serde::Serialize;
 
-pub(crate) struct PlatformSubject {}
+struct PlatformSubject {}
 
 const PLATFORM_SUBJECT_TARGET: &str = "platform";
 
@@ -34,7 +34,7 @@ const OPEN_TENANT: &str = "tenant";
 const OPEN_TRACING: &str = "tracing";
 
 lazy_static! {
-  pub static ref PLATFORM_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(PlatformSubject {});
+  pub(crate) static ref PLATFORM_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(PlatformSubject {});
 }
 
 #[async_trait]
@@ -345,7 +345,7 @@ fn get_service_argument_or_prompt(matches: &ArgMatches) -> Result<String, String
 }
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Debug)]
-pub(crate) enum DshPlatformLabel {
+enum DshPlatformLabel {
   AccessTokenEndpoint,
   Alias,
   BucketName,
@@ -477,7 +477,7 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
   }
 }
 
-pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
+static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
   // Items from platform configuration file
   DshPlatformLabel::Name,
   DshPlatformLabel::Description,
@@ -515,7 +515,7 @@ pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
   DshPlatformLabel::InternalServiceDomain,
 ];
 
-pub static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
+static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
   [DshPlatformLabel::Name, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
 
 // Returns the required parameters

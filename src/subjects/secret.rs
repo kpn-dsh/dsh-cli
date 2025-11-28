@@ -23,12 +23,12 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
-pub(crate) struct SecretSubject {}
+struct SecretSubject {}
 
 const SECRET_SUBJECT_TARGET: &str = "secret";
 
 lazy_static! {
-  pub static ref SECRET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SecretSubject {});
+  pub(crate) static ref SECRET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(SecretSubject {});
 }
 
 #[async_trait]

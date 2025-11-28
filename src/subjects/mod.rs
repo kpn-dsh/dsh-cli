@@ -21,8 +21,8 @@ pub(crate) mod topic;
 pub(crate) mod vhost;
 pub(crate) mod volume;
 
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::notifications_to_string;
+use crate::formatters::{Label, SubjectFormatter};
 use dsh_api::types::AllocationStatus;
 use dsh_api::{Dependant, DependantApp, DependantApplication};
 use itertools::Itertools;
@@ -30,7 +30,7 @@ use serde::Serialize;
 use std::fmt::Display;
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum AllocationStatusLabel {
+enum AllocationStatusLabel {
   DerivedFrom,
   Notifications,
   Provisioned,
@@ -69,14 +69,14 @@ impl SubjectFormatter<AllocationStatusLabel> for AllocationStatus {
   }
 }
 
-pub static _ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
+static _ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
   [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::Notifications, AllocationStatusLabel::DerivedFrom];
 
-pub static DEFAULT_ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
+static DEFAULT_ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
   [AllocationStatusLabel::Target, AllocationStatusLabel::Provisioned, AllocationStatusLabel::Notifications, AllocationStatusLabel::DerivedFrom];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum DependantLabel {
+enum DependantLabel {
   Dependencies,
   Id,
   Injections,
@@ -174,10 +174,10 @@ where
   }
 }
 
-pub static DEPENDANT_LABELS_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
-pub static _DEPENDANT_LABELS_SERVICES_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
-pub static _DEPENDANT_LABELS_APPS_LIST: [DependantLabel; 3] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Resources];
+static DEPENDANT_LABELS_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
+static _DEPENDANT_LABELS_SERVICES_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
+static _DEPENDANT_LABELS_APPS_LIST: [DependantLabel; 3] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Resources];
 
-pub static DEPENDANT_LABELS: [DependantLabel; 3] = [DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
-pub static DEPENDANT_LABELS_SERVICES: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
-pub static DEPENDANT_LABELS_APPS: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Dependencies, DependantLabel::Resources];
+static DEPENDANT_LABELS: [DependantLabel; 3] = [DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
+static DEPENDANT_LABELS_SERVICES: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
+static DEPENDANT_LABELS_APPS: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Dependencies, DependantLabel::Resources];

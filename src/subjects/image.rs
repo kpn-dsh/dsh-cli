@@ -3,8 +3,8 @@ use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
@@ -19,12 +19,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 
-pub(crate) struct ImageSubject {}
+struct ImageSubject {}
 
 const IMAGE_SUBJECT_TARGET: &str = "image";
 
 lazy_static! {
-  pub static ref IMAGE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ImageSubject {});
+  pub(crate) static ref IMAGE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ImageSubject {});
 }
 
 #[async_trait]

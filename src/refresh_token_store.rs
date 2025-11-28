@@ -14,7 +14,7 @@ use std::path::PathBuf;
 /// # Returns
 /// `Ok(Some(RefreshToken))`
 /// `Ok(None)`
-pub fn get_stored_refresh_token(platform: &DshPlatform) -> Result<Option<RefreshToken>, String> {
+pub(crate) fn get_stored_refresh_token(platform: &DshPlatform) -> Result<Option<RefreshToken>, String> {
   let refresh_token_file = refresh_token_pathbuf(platform)?;
   match fs::read_to_string(&refresh_token_file) {
     Ok(encrypted_refresh_token) => match decrypt(encrypted_refresh_token.as_str()) {
@@ -34,7 +34,7 @@ pub fn get_stored_refresh_token(platform: &DshPlatform) -> Result<Option<Refresh
   }
 }
 
-pub fn store_refresh_token(refresh_token: &RefreshToken, platform: &DshPlatform) -> Result<(), String> {
+pub(crate) fn store_refresh_token(refresh_token: &RefreshToken, platform: &DshPlatform) -> Result<(), String> {
   let refresh_token_file = refresh_token_pathbuf(platform)?;
   let encrypted_refresh_token = encrypt(refresh_token.secret())?;
   match fs::write(&refresh_token_file, encrypted_refresh_token) {
@@ -43,7 +43,7 @@ pub fn store_refresh_token(refresh_token: &RefreshToken, platform: &DshPlatform)
   }
 }
 
-pub fn delete_stored_refresh_token(platform: &DshPlatform) -> Result<(), String> {
+pub(crate) fn delete_stored_refresh_token(platform: &DshPlatform) -> Result<(), String> {
   let refresh_token_file = refresh_token_pathbuf(platform)?;
   match fs::remove_file(&refresh_token_file) {
     Ok(_) => Ok(()),

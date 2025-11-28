@@ -10,7 +10,7 @@ use clap::{Arg, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 use itertools::Itertools;
 
-pub struct CapabilityBuilder<'a> {
+pub(crate) struct CapabilityBuilder<'a> {
   capability_command_name: String,
   capability_command_alias: Option<String>,
   about: String,
@@ -30,7 +30,7 @@ impl<'a> CapabilityBuilder<'a> {
   /// ## Parameters
   /// * `capability_type` -
   /// * `about` - help text printed when -h flag is provided
-  pub fn new(command: &str, alias: Option<&str>, default_executor: &'a (dyn CommandExecutor + Send + Sync), about: impl Into<String>) -> Self {
+  pub(crate) fn new(command: &str, alias: Option<&str>, default_executor: &'a (dyn CommandExecutor + Send + Sync), about: impl Into<String>) -> Self {
     Self {
       capability_command_name: command.to_string(),
       capability_command_alias: alias.map(|alias| alias.to_string()),
@@ -52,74 +52,74 @@ impl<'a> CapabilityBuilder<'a> {
   ///
   /// ## Parameters
   /// * `long_about` - long help text
-  pub fn set_long_about(mut self, long_about: impl Into<String>) -> Self {
+  pub(crate) fn set_long_about(mut self, long_about: impl Into<String>) -> Self {
     self.long_about = Some(long_about.into());
     self
   }
 
-  pub fn _add_subcommand(mut self, subcommand: Command) -> Self {
+  pub(crate) fn _add_subcommand(mut self, subcommand: Command) -> Self {
     self.subcommands.push(subcommand);
     self
   }
 
-  pub fn add_subcommands(mut self, subcommands: Vec<Command>) -> Self {
+  pub(crate) fn add_subcommands(mut self, subcommands: Vec<Command>) -> Self {
     for subcommand in subcommands {
       self.subcommands.push(subcommand);
     }
     self
   }
 
-  pub fn add_command_executor(mut self, flag_type: FlagType, executor: &'a (dyn CommandExecutor + Send + Sync), long_help: Option<String>) -> Self {
+  pub(crate) fn add_command_executor(mut self, flag_type: FlagType, executor: &'a (dyn CommandExecutor + Send + Sync), long_help: Option<String>) -> Self {
     self.executors.push((flag_type, executor, long_help));
     self
   }
 
-  pub fn add_command_executors(mut self, executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<String>)>) -> Self {
+  pub(crate) fn add_command_executors(mut self, executors: Vec<(FlagType, &'a (dyn CommandExecutor + Send + Sync), Option<String>)>) -> Self {
     for (flag_type, executor, long_help) in executors {
       self.executors.push((flag_type, executor, long_help))
     }
     self
   }
 
-  pub fn add_target_argument(mut self, argument: Arg) -> Self {
+  pub(crate) fn add_target_argument(mut self, argument: Arg) -> Self {
     self.target_arguments.push(argument);
     self
   }
 
-  pub fn _add_target_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
+  pub(crate) fn _add_target_arguments(mut self, mut arguments: Vec<Arg>) -> Self {
     self.target_arguments.append(&mut arguments);
     self
   }
 
-  pub fn add_extra_argument(mut self, argument: Arg) -> Self {
+  pub(crate) fn add_extra_argument(mut self, argument: Arg) -> Self {
     self.extra_arguments.push(argument.help_heading(COMMAND_OPTIONS_HEADING));
     self
   }
 
-  pub fn add_extra_arguments(mut self, arguments: Vec<Arg>) -> Self {
+  pub(crate) fn add_extra_arguments(mut self, arguments: Vec<Arg>) -> Self {
     let mut args = arguments.into_iter().map(move |arg| arg.help_heading(COMMAND_OPTIONS_HEADING)).collect_vec();
     self.extra_arguments.append(&mut args);
     self
   }
 
-  pub fn add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
+  pub(crate) fn add_filter_flag(mut self, flag_type: FilterFlagType, long_help: Option<String>) -> Self {
     self.filter_flags.push((flag_type, long_help));
     self
   }
 
-  pub fn add_filter_flags(mut self, flags: Vec<(FilterFlagType, Option<String>)>) -> Self {
+  pub(crate) fn add_filter_flags(mut self, flags: Vec<(FilterFlagType, Option<String>)>) -> Self {
     for (flag_type, long_help) in flags {
       self.filter_flags.push((flag_type, long_help))
     }
     self
   }
 
-  pub fn add_modifier_flag(mut self, flag_type: ModifierFlagType, long_help: Option<String>) -> Self {
+  pub(crate) fn add_modifier_flag(mut self, flag_type: ModifierFlagType, long_help: Option<String>) -> Self {
     self.modifier_flags.push((flag_type, long_help));
     self
   }
 
-  pub fn _add_modifier_flags(mut self, flags: Vec<(ModifierFlagType, Option<String>)>) -> Self {
+  pub(crate) fn _add_modifier_flags(mut self, flags: Vec<(ModifierFlagType, Option<String>)>) -> Self {
     for (flag_type, long_help) in flags {
       self.modifier_flags.push((flag_type, long_help))
     }

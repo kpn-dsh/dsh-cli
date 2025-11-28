@@ -34,7 +34,7 @@ use terminal_size::{terminal_size, Height, Width};
 use OutputFormat::Csv;
 
 #[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
-pub enum BrowserMethod {
+pub(crate) enum BrowserMethod {
   /// User will be instructed to open the browser
   #[serde(rename = "instruct")]
   Instruct,
@@ -425,7 +425,7 @@ impl Context {
   /// 1. Try environment variable `env_var`
   /// 1. Try settings file value
   /// 1. Default to `default_color`
-  fn get_color(env_var: &str, matches: &ArgMatches, settings_color: &Option<DshColor>, default_color: DshColor) -> Result<DshColor, String> {
+  pub(crate) fn get_color(env_var: &str, matches: &ArgMatches, settings_color: &Option<DshColor>, default_color: DshColor) -> Result<DshColor, String> {
     match environment_variable(env_var, matches)? {
       Some(color_from_env_var) => DshColor::try_from(color_from_env_var.as_str()),
       None => match settings_color {
@@ -440,7 +440,7 @@ impl Context {
   /// 1. Try environment variable `env_var`
   /// 1. Try settings file value
   /// 1. Default to `default_style`
-  fn get_style(env_var: &str, matches: &ArgMatches, settings_style: &Option<DshStyle>, default_style: DshStyle) -> Result<DshStyle, String> {
+  pub(crate) fn get_style(env_var: &str, matches: &ArgMatches, settings_style: &Option<DshStyle>, default_style: DshStyle) -> Result<DshStyle, String> {
     match environment_variable(env_var, matches)? {
       Some(style_from_env_var) => DshStyle::try_from(style_from_env_var.as_str()),
       None => match settings_style {

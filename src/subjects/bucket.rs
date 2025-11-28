@@ -4,11 +4,11 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{notifications_to_string, OutputFormat};
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS;
 use crate::{DshCliResult, COMMAND_OPTIONS_HEADING};
@@ -23,12 +23,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use tokio::try_join;
 
-pub(crate) struct BucketSubject {}
+struct BucketSubject {}
 
 const BUCKET_SUBJECT_TARGET: &str = "bucket";
 
 lazy_static! {
-  pub static ref BUCKET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(BucketSubject {});
+  pub(crate) static ref BUCKET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(BucketSubject {});
 }
 
 #[async_trait]
@@ -90,9 +90,9 @@ lazy_static! {
     vec![BUCKET_CREATE_CAPABILITY.as_ref(), BUCKET_DELETE_CAPABILITY.as_ref(), BUCKET_LIST_CAPABILITY.as_ref(), BUCKET_SHOW_CAPABILITY.as_ref()];
 }
 
-pub(crate) const VERSIONED_FLAG: &str = "versioned";
+const VERSIONED_FLAG: &str = "versioned";
 
-pub(crate) fn versioned_flag(heading: &'static str) -> Arg {
+fn versioned_flag(heading: &'static str) -> Arg {
   Arg::new(VERSIONED_FLAG)
     .long("versioned")
     .action(ArgAction::SetTrue)
@@ -340,4 +340,4 @@ static BUCKET_STATUS_LABELS_ALL: [BucketLabel; 8] = [
   BucketLabel::DerivedFrom,
 ];
 
-pub static BUCKET_LABELS: [BucketLabel; 3] = [BucketLabel::Target, BucketLabel::Encrypted, BucketLabel::Versioned];
+pub(crate) static BUCKET_LABELS: [BucketLabel; 3] = [BucketLabel::Target, BucketLabel::Encrypted, BucketLabel::Versioned];

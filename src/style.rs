@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum DshColor {
+pub(crate) enum DshColor {
   /// Displayed in the default terminal color
   #[serde(rename = "normal")]
   Normal,
@@ -68,7 +68,7 @@ impl TryFrom<&str> for DshColor {
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum DshStyle {
+pub(crate) enum DshStyle {
   /// Default terminal font
   #[serde(rename = "normal")]
   Normal,

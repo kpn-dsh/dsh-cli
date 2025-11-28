@@ -1,6 +1,6 @@
 use crate::context::Context;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
 use itertools::Itertools;
 use serde::Serialize;
 use std::marker::PhantomData;
@@ -8,7 +8,7 @@ use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style};
 
-pub struct ListFormatter<'a, L: Label, V: SubjectFormatter<L>> {
+pub(crate) struct ListFormatter<'a, L: Label, V: SubjectFormatter<L>> {
   labels: &'a [L],
   target_label: Option<&'a str>,
   values: Vec<(String, &'a V)>,
@@ -22,7 +22,7 @@ where
   V: SubjectFormatter<L> + Serialize,
 {
   /// # Creates a new `ListFormatter`
-  pub fn new(labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
+  pub(crate) fn new(labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
     Self { labels, target_label, values: vec![], context, phantom: PhantomData }
   }
 
@@ -31,7 +31,7 @@ where
   /// This method expects two slices containing target ids and corresponding values.
   /// It is assumed that both slices contain the same number of values
   /// and that target ids and values with the same index belong to each other.
-  pub fn push_target_ids_and_values(&mut self, target_ids: &[String], values: &'a [V]) -> &Self {
+  pub(crate) fn push_target_ids_and_values(&mut self, target_ids: &[String], values: &'a [V]) -> &Self {
     for (target_id, value) in target_ids.iter().zip(values).collect_vec() {
       self.values.push((target_id.clone(), value));
     }
@@ -41,14 +41,14 @@ where
   /// # Pushes target id/value pairs
   ///
   /// This method expects a slice containing target id/value pairs.
-  pub fn push_target_id_value_pairs(&mut self, values: &'a [(String, V)]) -> &Self {
+  pub(crate) fn push_target_id_value_pairs(&mut self, values: &'a [(String, V)]) -> &Self {
     for (target_id, value) in values {
       self.values.push((target_id.clone(), value));
     }
     self
   }
 
-  pub fn _push_value(&mut self, value: &'a V) -> &Self {
+  pub(crate) fn _push_value(&mut self, value: &'a V) -> &Self {
     match value.target_id() {
       Some(target_id) => self.values.push((target_id, value)),
       None => self.values.push(("".to_string(), value)),
@@ -56,7 +56,7 @@ where
     self
   }
 
-  pub fn push_values(&mut self, values: &'a [V]) -> &Self {
+  pub(crate) fn push_values(&mut self, values: &'a [V]) -> &Self {
     for value in values {
       match value.target_id() {
         Some(target_id) => self.values.push((target_id, value)),
@@ -66,12 +66,12 @@ where
     self
   }
 
-  pub fn push_target_id_value(&mut self, target_id: String, value: &'a V) -> &Self {
+  pub(crate) fn push_target_id_value(&mut self, target_id: String, value: &'a V) -> &Self {
     self.values.push((target_id, value));
     self
   }
 
-  pub fn is_empty(&self) -> bool {
+  pub(crate) fn is_empty(&self) -> bool {
     self.values.is_empty()
   }
 
@@ -90,7 +90,7 @@ where
     }
   }
 
-  pub fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => {
         if self.context.show_headers() {

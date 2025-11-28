@@ -1,4 +1,4 @@
-use crate::formatters::formatter::{Label, SubjectFormatter};
+use crate::formatters::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -20,12 +20,12 @@ use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
 use crate::DshCliResult;
 
-pub(crate) struct ProxySubject {}
+struct ProxySubject {}
 
 const PROXY_SUBJECT_TARGET: &str = "proxy";
 
 lazy_static! {
-  pub static ref PROXY_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ProxySubject {});
+  pub(crate) static ref PROXY_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ProxySubject {});
 }
 
 #[async_trait]
@@ -162,7 +162,7 @@ impl CommandExecutor for ProxyShowConfiguration {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum ProxyLabel {
+enum ProxyLabel {
   AclGroupsEnabled,
   CaChainSecretName,
   Certificate,
@@ -256,9 +256,9 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
   }
 }
 
-pub static PROXY_LABELS_LIST: [ProxyLabel; 6] = [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore];
+static PROXY_LABELS_LIST: [ProxyLabel; 6] = [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore];
 
-pub static PROXY_LABELS_SHOW: [ProxyLabel; 11] = [
+static PROXY_LABELS_SHOW: [ProxyLabel; 11] = [
   ProxyLabel::Target,
   ProxyLabel::Certificate,
   ProxyLabel::Cpus,

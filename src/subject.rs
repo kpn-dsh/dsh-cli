@@ -6,24 +6,24 @@ use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 
 #[derive(Debug, PartialEq)]
-pub struct Requirements {
+pub(crate) struct Requirements {
   needs_dsh_api_client: bool,
 }
 
 impl Requirements {
-  pub fn new(needs_dsh_api_client: bool) -> Self {
+  pub(crate) fn new(needs_dsh_api_client: bool) -> Self {
     Self { needs_dsh_api_client }
   }
 
-  pub fn standard_with_api() -> Self {
+  pub(crate) fn standard_with_api() -> Self {
     Self::new(true)
   }
 
-  pub fn standard_without_api() -> Self {
+  pub(crate) fn standard_without_api() -> Self {
     Self::new(false)
   }
 
-  pub fn needs_dsh_api_client(&self) -> bool {
+  pub(crate) fn needs_dsh_api_client(&self) -> bool {
     self.needs_dsh_api_client
   }
 }
@@ -32,7 +32,7 @@ impl Requirements {
 // a Secret, a Target or the API itself.
 // The subject is always selected by the first command on the command line.
 #[async_trait]
-pub trait Subject {
+pub(crate) trait Subject {
   fn subject(&self) -> &'static str;
 
   fn subject_command_about(&self) -> String;

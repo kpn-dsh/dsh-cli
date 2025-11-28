@@ -22,7 +22,7 @@ where
   /// # Parameters
   /// * `lower_bound` - lower bound, values must be greater than or equal to this value
   /// * `upper_bound` - upper bound, values must be lower than or equal to this value
-  pub fn new(lower_bound: T, upper_bound: T) -> RangedValueParser<T> {
+  pub(crate) fn new(lower_bound: T, upper_bound: T) -> RangedValueParser<T> {
     RangedValueParser { lower_bound: Some(lower_bound), upper_bound: Some(upper_bound) }
   }
 
@@ -30,7 +30,7 @@ where
   ///
   /// # Parameters
   /// * `lower_bound` - lower bound, values must be greater than or equal to this value
-  pub fn with_lower(lower_bound: T) -> RangedValueParser<T> {
+  pub(crate) fn with_lower(lower_bound: T) -> RangedValueParser<T> {
     RangedValueParser { lower_bound: Some(lower_bound), upper_bound: None }
   }
 
@@ -38,7 +38,7 @@ where
   ///
   /// # Parameters
   /// * `upper_bound` - upper bound, values must be lower than or equal to this value
-  pub fn _with_upper(upper_bound: T) -> RangedValueParser<T> {
+  pub(crate) fn _with_upper(upper_bound: T) -> RangedValueParser<T> {
     RangedValueParser { lower_bound: None, upper_bound: Some(upper_bound) }
   }
 

@@ -2,8 +2,8 @@ use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
@@ -15,12 +15,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 
-pub(crate) struct MetricSubject {}
+struct MetricSubject {}
 
 const METRIC_SUBJECT_TARGET: &str = "metric";
 
 lazy_static! {
-  pub static ref METRIC_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(MetricSubject {});
+  pub(crate) static ref METRIC_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(MetricSubject {});
 }
 
 #[async_trait]

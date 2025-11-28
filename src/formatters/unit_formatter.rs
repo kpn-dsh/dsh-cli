@@ -1,13 +1,13 @@
 use crate::context::Context;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
 use itertools::Itertools;
 use serde::Serialize;
 use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style, Table};
 
-pub struct UnitFormatter<'a, L: Label> {
+pub(crate) struct UnitFormatter<'a, L: Label> {
   target_id: String,
   labels: &'a [L],
   target_label: Option<&'a str>,
@@ -18,11 +18,11 @@ impl<'a, L> UnitFormatter<'a, L>
 where
   L: Label,
 {
-  pub fn new<T: Into<String>>(target_id: T, labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
+  pub(crate) fn new<T: Into<String>>(target_id: T, labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
     Self { target_id: target_id.into(), labels, target_label, context }
   }
 
-  pub fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => self.print_json(value),
@@ -37,7 +37,7 @@ where
     }
   }
 
-  pub fn _print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn _print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => Err("serialization to json is not supported for this type".to_string()),

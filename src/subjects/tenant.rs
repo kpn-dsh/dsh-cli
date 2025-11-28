@@ -6,11 +6,11 @@ use crate::capability::{
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::limits_flags::{
   certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
   stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_FLAG, CONSUMER_RATE_FLAG, CPU_FLAG, KAFKA_ACL_GROUP_COUNT_FLAG,
@@ -32,12 +32,12 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-pub(crate) struct TenantSubject {}
+struct TenantSubject {}
 
 const TENANT_SUBJECT_TARGET: &str = "tenant";
 
 lazy_static! {
-  pub static ref TENANT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TenantSubject {});
+  pub(crate) static ref TENANT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TenantSubject {});
 }
 
 lazy_static! {
@@ -545,7 +545,7 @@ fn tenant_limits_try_from_matches(matches: &ArgMatches) -> Result<TenantLimits, 
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum TenantLabel {
+enum TenantLabel {
   CertificateCount,
   ConsumerRate,
   Cpu,
@@ -628,7 +628,7 @@ impl SubjectFormatter<TenantLabel> for TenantLimits {
   }
 }
 
-pub static TENANT_LABELS: [TenantLabel; 15] = [
+static TENANT_LABELS: [TenantLabel; 15] = [
   TenantLabel::Tenant,
   TenantLabel::Manager,
   TenantLabel::Monitoring,
@@ -668,7 +668,7 @@ impl SubjectFormatter<TenantLabel> for (ManagedTenant, TenantLimits) {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum StreamAccessLabel {
+enum StreamAccessLabel {
   ReadAccess,
   StreamId,
   StreamKind,
@@ -755,7 +755,7 @@ impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRig
   }
 }
 
-pub static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
+static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
   StreamAccessLabel::StreamId,
   StreamAccessLabel::StreamKind,
   StreamAccessLabel::ReadAccess,
@@ -764,7 +764,7 @@ pub static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
   StreamAccessLabel::ReplicationFactor,
 ];
 
-pub static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
+static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
   StreamAccessLabel::Tenant,
   StreamAccessLabel::StreamId,
   StreamAccessLabel::StreamKind,

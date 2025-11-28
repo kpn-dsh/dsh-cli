@@ -3,11 +3,11 @@ use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMM
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_APPS, DEPENDANT_LABELS_LIST, DEPENDANT_LABELS_SERVICES};
 use crate::DshCliResult;
@@ -22,12 +22,12 @@ use itertools::{Either, Itertools};
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-pub(crate) struct VolumeSubject {}
+struct VolumeSubject {}
 
 const VOLUME_SUBJECT_TARGET: &str = "volume";
 
 lazy_static! {
-  pub static ref VOLUME_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(VolumeSubject {});
+  pub(crate) static ref VOLUME_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(VolumeSubject {});
 }
 
 #[async_trait]
@@ -350,7 +350,7 @@ impl CommandExecutor for VolumeShowUsage {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum VolumeLabel {
+pub(crate) enum VolumeLabel {
   ActualSize,
   ConfigurationSize,
   Size,
@@ -402,6 +402,6 @@ impl SubjectFormatter<VolumeLabel> for VolumeStatus {
   }
 }
 
-pub static VOLUME_LABELS: [VolumeLabel; 2] = [VolumeLabel::Target, VolumeLabel::Size];
+pub(crate) static VOLUME_LABELS: [VolumeLabel; 2] = [VolumeLabel::Target, VolumeLabel::Size];
 
-pub static VOLUME_STATUS_LABELS: [VolumeLabel; 4] = [VolumeLabel::Target, VolumeLabel::Size, VolumeLabel::ConfigurationSize, VolumeLabel::ActualSize];
+static VOLUME_STATUS_LABELS: [VolumeLabel; 4] = [VolumeLabel::Target, VolumeLabel::Size, VolumeLabel::ConfigurationSize, VolumeLabel::ActualSize];

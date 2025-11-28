@@ -1,4 +1,4 @@
-use crate::formatters::formatter::{Label, SubjectFormatter};
+use crate::formatters::{Label, SubjectFormatter};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::platform::DshPlatform;
@@ -15,12 +15,12 @@ use crate::subject::{Requirements, Subject};
 use crate::targets::{all_targets, delete_target, read_target, upsert_target, Target};
 use crate::{read_single_line, DshCliResult};
 
-pub(crate) struct TargetSubject {}
+struct TargetSubject {}
 
 const TARGET_SUBJECT_TARGET: &str = "target";
 
 lazy_static! {
-  pub static ref TARGET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TargetSubject {});
+  pub(crate) static ref TARGET_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TargetSubject {});
 }
 
 #[async_trait]
@@ -210,7 +210,7 @@ pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<Stri
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum TargetFormatterLabel {
+enum TargetFormatterLabel {
   Default,
   Platform,
   Tenant,
@@ -253,4 +253,4 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
   }
 }
 
-pub static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Platform, TargetFormatterLabel::Tenant, TargetFormatterLabel::Default];
+static TARGET_LABELS: [TargetFormatterLabel; 3] = [TargetFormatterLabel::Platform, TargetFormatterLabel::Tenant, TargetFormatterLabel::Default];

@@ -5,7 +5,7 @@ use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style};
 
-pub struct IdsFormatter<'a> {
+pub(crate) struct IdsFormatter<'a> {
   label: &'a str,
   ids: Vec<&'a str>,
   context: &'a Context,
@@ -13,30 +13,30 @@ pub struct IdsFormatter<'a> {
 
 impl<'a> IdsFormatter<'a> {
   /// # Creates a new `TargetIdFormatter`
-  pub fn new<T: AsRef<str> + ?Sized>(label: &'a T, context: &'a Context) -> Self {
+  pub(crate) fn new<T: AsRef<str> + ?Sized>(label: &'a T, context: &'a Context) -> Self {
     Self { label: label.as_ref(), ids: vec![], context }
   }
 
   /// # Pushes target ids
   ///
   /// This method expects a slice containing target ids.
-  pub fn push_target_ids<T: AsRef<str>>(&mut self, target_ids: &'a [T]) -> &Self {
+  pub(crate) fn push_target_ids<T: AsRef<str>>(&mut self, target_ids: &'a [T]) -> &Self {
     for target_id in target_ids {
       self.ids.push(target_id.as_ref());
     }
     self
   }
 
-  pub fn _push_target_id<T: AsRef<str>>(&mut self, target_id: &'a T) -> &Self {
+  pub(crate) fn _push_target_id<T: AsRef<str>>(&mut self, target_id: &'a T) -> &Self {
     self.ids.push(target_id.as_ref());
     self
   }
 
-  pub fn _is_empty(&self) -> bool {
+  pub(crate) fn _is_empty(&self) -> bool {
     self.ids.is_empty()
   }
 
-  pub fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => {
         self.context.print(self.ids.join(","));
