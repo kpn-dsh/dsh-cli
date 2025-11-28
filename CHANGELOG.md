@@ -4,6 +4,17 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1] - yyyy-mm-dd
+
+### Added
+
+* Added default values to explanation of environment variables.
+* Set color and styling for logging information.
+
+### Changed
+
+* Improved rendering of token payload.
+
 ## [0.8.0] - 2025-11-20
 
 ### Added
