@@ -38,7 +38,7 @@ where
     }
   }
 
-  pub(crate) fn _print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
+  pub(crate) fn print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => Err(error!("serialization to json is not supported for this type")),

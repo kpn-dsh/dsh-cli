@@ -318,7 +318,7 @@ impl CommandExecutor for PlatformShow {
       })
       .map(|label| label.to_owned())
       .collect_vec();
-    UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print(
+    UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print_non_serializable(
       &(
         platform.clone(),
         app_id.unwrap_or_default(),

@@ -16,6 +16,10 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Improved rendering of token payload.
 * Improved error handling.
 
+### Fixes
+
+* Fixed bug with `dsh platform show` command for json output.
+
 ## [0.8.0] - 2025-11-20
 
 ### Added
