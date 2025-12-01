@@ -18,7 +18,9 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Fixes
 
+* Fixed bug with `dsh bucket show`.
 * Fixed bug with `dsh platform show` command for json output.
+* Fixed bug with `dsh service list --tasks` command for json output.
 
 ## [0.8.0] - 2025-11-20
 

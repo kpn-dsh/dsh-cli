@@ -500,7 +500,7 @@ impl CommandExecutor for ServiceListTasks {
       .collect_vec();
     let mut formatter: ListFormatter<ServiceLabel, (String, String)> = ListFormatter::new(&[ServiceLabel::Target, ServiceLabel::Tasks], None, context);
     formatter.push_values(&service_id_tasks_pairs);
-    formatter.print(None)?;
+    formatter.print_non_serializable(None)?;
     Ok(())
   }
 

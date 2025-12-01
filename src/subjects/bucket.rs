@@ -213,13 +213,13 @@ impl CommandExecutor for BucketShowAll {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for bucket '{}'", bucket_id));
     let start_instant = context.now();
-    let (bucket, (access_key_id, _)) = try_join!(client.get_bucket(&bucket_id), client.bucket_secrets())?;
+    let ((bucket, dependants), (access_key_id, _)) = try_join!(client.bucket_with_dependants(&bucket_id), client.bucket_secrets())?;
     context.print_execution_time(start_instant);
     let bucket_name = client
       .platform()
       .bucket_name(client.tenant().name(), &bucket_id, Some(access_key_id))
       .unwrap_or_default();
-    UnitFormatter::new(bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&(bucket, bucket_name), None)
+    UnitFormatter::new(&bucket_id, &BUCKET_STATUS_LABELS, None, context).print(&(bucket_id, bucket, bucket_name, dependants), None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
