@@ -14,6 +14,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 ### Changed
 
 * Improved rendering of token payload.
+* Improved error handling.
 
 ## [0.8.0] - 2025-11-20
 

@@ -1,9 +1,11 @@
 use crate::capability::{Capability, CommandExecutor, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+#[cfg(feature = "manage")]
+use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -249,7 +251,7 @@ struct ApiDelete {}
 
 #[async_trait]
 impl CommandExecutor for ApiDelete {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
     let parameters = parameters_from_matches(matches, method_descriptor)?;
@@ -278,7 +280,7 @@ struct ApiGet {}
 
 #[async_trait]
 impl CommandExecutor for ApiGet {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("get", selector).unwrap_or_else(|| unreachable!());
     let parameters = parameters_from_matches(matches, method_descriptor)?;
@@ -301,7 +303,7 @@ struct ApiHead {}
 #[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiHead {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
     let parameters = parameters_from_matches(matches, method_descriptor)?;
@@ -324,7 +326,7 @@ struct ApiPatch {}
 #[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiPatch {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("patch", selector).unwrap_or_else(|| unreachable!());
     let parameters = parameters_from_matches(matches, method_descriptor)?;
@@ -343,7 +345,7 @@ impl CommandExecutor for ApiPatch {
         }
         Err(error) => {
           log::debug!("{:#?}", error);
-          Err(error.to_string())
+          Err(DshCliError::from(error))
         }
       }
     }
@@ -358,7 +360,7 @@ struct ApiPost {}
 
 #[async_trait]
 impl CommandExecutor for ApiPost {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("post", selector).unwrap_or_else(|| unreachable!());
     let parameters = parameters_from_matches(matches, method_descriptor)?;
@@ -385,7 +387,7 @@ struct ApiPut {}
 
 #[async_trait]
 impl CommandExecutor for ApiPut {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("put", selector).unwrap_or_else(|| unreachable!());
     let parameters = parameters_from_matches(matches, method_descriptor)?;
@@ -408,14 +410,14 @@ impl CommandExecutor for ApiPut {
   }
 }
 
-fn parameters_from_matches<'a>(matches: &'a ArgMatches, method_descriptor: &MethodDescriptor) -> Result<Vec<&'a str>, String> {
+fn parameters_from_matches<'a>(matches: &'a ArgMatches, method_descriptor: &MethodDescriptor) -> DshCliResult<Vec<&'a str>> {
   method_descriptor
     .parameters
     .iter()
     .map(|(parameter_name, _, _)| {
       matches
         .get_one::<String>(parameter_name)
-        .ok_or(format!("missing parameter {}", parameter_name))
+        .ok_or(error!("missing parameter {}", parameter_name))
         .map(|parameter| parameter.as_str())
     })
     .collect::<Result<Vec<_>, _>>()
@@ -425,7 +427,7 @@ struct ApiShow {}
 
 #[async_trait]
 impl CommandExecutor for ApiShow {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("print the open api specification");
     context.print(DshApiClient::openapi_spec());
     Ok(())

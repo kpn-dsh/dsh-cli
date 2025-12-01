@@ -102,7 +102,7 @@ pub(crate) trait Subject {
     self.capability(LIST_COMMAND).unwrap_or_else(|| unreachable!()).requirements(matches)
   }
 
-  async fn execute_subject_command_with_client<'a>(&self, subject_matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_subject_command_with_client<'a>(&self, subject_matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!());
     let capability = self.capability(capability_command_id).unwrap_or_else(|| unreachable!());
     let arguments = capability.command_target_argument_ids();
@@ -113,7 +113,7 @@ pub(crate) trait Subject {
       .await
   }
 
-  async fn execute_subject_command_without_client<'a>(&self, subject_matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_subject_command_without_client<'a>(&self, subject_matches: &'a ArgMatches, context: &Context) -> DshCliResult<()> {
     let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!());
     let capability = self.capability(capability_command_id).unwrap_or_else(|| unreachable!());
     let arguments = capability.command_target_argument_ids();
@@ -124,7 +124,7 @@ pub(crate) trait Subject {
       .await
   }
 
-  async fn execute_subject_list_shortcut_with_client<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_subject_list_shortcut_with_client<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     self
       .capability(LIST_COMMAND)
       .unwrap_or_else(|| unreachable!())
@@ -132,7 +132,7 @@ pub(crate) trait Subject {
       .await
   }
 
-  async fn execute_subject_list_shortcut_without_client<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_subject_list_shortcut_without_client<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult<()> {
     self
       .capability(LIST_COMMAND)
       .unwrap_or_else(|| unreachable!())

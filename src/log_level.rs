@@ -1,9 +1,10 @@
 use crate::context::Context;
-use crate::environment_variable;
 use crate::environment_variables::{ENV_VAR_DSH_CLI_LOG_COLOR, ENV_VAR_DSH_CLI_LOG_LEVEL, ENV_VAR_DSH_CLI_LOG_LEVEL_API, ENV_VAR_DSH_CLI_LOG_STYLE};
+use crate::error::DshCliError;
 use crate::log_arguments::{LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT};
 use crate::settings::Settings;
 use crate::style::{style_from, DshColor, DshStyle};
+use crate::{environment_variable, error, DshCliResult};
 use clap::ArgMatches;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
@@ -34,7 +35,7 @@ pub(crate) enum LogLevel {
   Trace,
 }
 
-pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Result<(), String> {
+pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> DshCliResult<()> {
   let log_style = style_from(
     &Context::get_style(ENV_VAR_DSH_CLI_LOG_STYLE, matches, &settings.log_style, DshStyle::Dim)?,
     &Context::get_color(ENV_VAR_DSH_CLI_LOG_COLOR, matches, &settings.log_color, DshColor::Cyan)?,
@@ -87,9 +88,9 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Re
 }
 
 impl TryFrom<&str> for LogLevel {
-  type Error = String;
+  type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, String> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "off" => Ok(Self::Off),
       "error" => Ok(Self::Error),
@@ -97,7 +98,7 @@ impl TryFrom<&str> for LogLevel {
       "info" => Ok(Self::Info),
       "debug" => Ok(Self::Debug),
       "trace" => Ok(Self::Trace),
-      _ => Err(format!("invalid log level value '{}'", value)),
+      _ => Err(error!("invalid log level value '{}'", value)),
     }
   }
 }

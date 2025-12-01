@@ -6,7 +6,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error_map, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use chrono::Local;
@@ -74,10 +74,10 @@ struct TokenCopy {}
 
 #[async_trait]
 impl CommandExecutor for TokenCopy {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("fetch dsh api token and copy to clipboard");
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
     match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(jwt.token().secret())) {
       Ok(_) => {
@@ -107,10 +107,10 @@ struct TokenFetch {}
 
 #[async_trait]
 impl CommandExecutor for TokenFetch {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("fetch dsh api token");
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
     context.print(jwt.token().secret());
     Ok(())
@@ -125,10 +125,10 @@ struct TokenShow {}
 
 #[async_trait]
 impl CommandExecutor for TokenShow {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let complete = matches.get_flag(FilterFlagType::Complete.id());
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
     if complete {
       context.print_explanation("dsh api token header");

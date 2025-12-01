@@ -74,7 +74,7 @@ struct EnvFind {}
 
 #[async_trait]
 impl CommandExecutor for EnvFind {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*query)? } else { &ExactMatchQueryProcessor::create(&query)? };

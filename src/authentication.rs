@@ -1,5 +1,7 @@
 use crate::context::{BrowserMethod, Context};
+use crate::error::DshCliError;
 use crate::refresh_token_store::{delete_stored_refresh_token, get_stored_refresh_token, store_refresh_token};
+use crate::{error, DshCliResult};
 use dsh_api::dsh_jwt::DshJwt;
 use dsh_api::platform::DshPlatform;
 use futures::future::try_join_all;
@@ -34,13 +36,13 @@ pub(crate) enum AuthenticationMethod {
 }
 
 impl TryFrom<&str> for AuthenticationMethod {
-  type Error = String;
+  type Error = DshCliError;
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
       "robot" => Ok(Self::Robot),
       "single-sign-on" => Ok(Self::SingleSignOn),
-      _ => Err(format!("invalid authentication method '{}'", value)),
+      _ => Err(error!("invalid authentication method '{}'", value)),
     }
   }
 }
@@ -68,25 +70,30 @@ impl Default for AuthenticationMethod {
 /// Returns
 /// * `Ok(Some(access_token))` - Access token was successfully obtained.
 /// * `Ok(None)` - User needs to log in.
-/// * `Err(String)` - Something went wrong.
-pub(crate) async fn get_access_token(platform: DshPlatform) -> Result<Option<DshJwt>, String> {
+pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Option<DshJwt>> {
   spawn_blocking(move || {
-    let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string()).map_err(|error| error.to_string()).unwrap();
-    let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build().unwrap();
-    let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client).map_err(|e| e.to_string()).unwrap();
-    match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client) {
-      Ok(Some(access_token)) => {
+    let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string())?;
+    let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
+    let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
+    match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
+      Some(access_token) => {
         let access_token_jwt = DshJwt::from_token(access_token.secret().clone())?;
         debug!("get access token: {}", access_token_jwt);
         trace!("{:#}", access_token_jwt);
         Ok(Some(access_token_jwt))
       }
-      Ok(None) => Ok(None),
-      Err(error) => Err(error),
+      None => Ok(None),
     }
   })
-  .await
-  .unwrap()
+  .await?
+}
+
+fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
+  if !&access_token_jwt.tenant_permissions().is_empty() {
+    context.print(format!("authorized tenants: {}", access_token_jwt.authorized_tenants().join(", ")));
+  } else {
+    context.print("you are not authorized for tenants");
+  }
 }
 
 /// Let the user log in
@@ -97,50 +104,40 @@ pub(crate) async fn get_access_token(platform: DshPlatform) -> Result<Option<Dsh
 ///
 /// Returns
 /// * `Ok(())` - Log in was successful.
-/// * `Err(String)` - Something went wrong.
-pub(crate) async fn login(platform: DshPlatform, context: Context) -> Result<(), String> {
+pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResult<()> {
   context.print_explanation(format!("login to platform {}", platform));
+  let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string())?;
   spawn_blocking(move || {
-    let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string()).map_err(|error| error.to_string()).unwrap();
-    let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build().unwrap();
-    let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client).map_err(|e| e.to_string()).unwrap();
-    match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client) {
-      Ok(Some(access_token)) => {
-        let access_token_jwt = DshJwt::from_token(access_token.secret().clone()).map_err(|e| e.to_string()).unwrap();
+    let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
+    let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
+    match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
+      Some(access_token) => {
+        let access_token_jwt = DshJwt::from_token(access_token.secret().clone())?;
         debug!("get access token from stored refresh token: {}", access_token_jwt);
         trace!("{:#}", access_token_jwt);
-        match &access_token_jwt.payload.preferred_username {
+        match &access_token_jwt.payload().preferred_username {
           Some(preferred_username) => context.print(format!("you are already logged in as {}", preferred_username)),
           None => context.print("you are already logged in"),
         }
-        if !&access_token_jwt.tenant_permissions.is_empty() {
-          context.print(format!("authorized tenants: {}", access_token_jwt.authorized_tenants().join(", ")));
-        } else {
-          context.print("you are not authorized for tenants");
-        }
+        print_authorizations(&context, &access_token_jwt);
+        Ok(())
       }
-      Ok(None) => match authenticate_and_get_access_and_refresh_tokens(&provider_metadata, &platform, &http_client, &context) {
+      None => match authenticate_and_get_access_and_refresh_tokens(&provider_metadata, &platform, &http_client, &context) {
         Ok((access_token, refresh_token)) => {
           let _ = store_refresh_token(&refresh_token, &platform);
-          let access_token_jwt = DshJwt::from_token(access_token.secret().to_string()).unwrap();
-          match &access_token_jwt.payload.preferred_username {
+          let access_token_jwt = DshJwt::from_token(access_token.secret().to_string())?;
+          match &access_token_jwt.payload().preferred_username {
             Some(preferred_username) => context.print(format!("you are logged in as {}", preferred_username)),
             None => context.print("you are already logged in"),
           }
-          if !&access_token_jwt.tenant_permissions.is_empty() {
-            context.print(format!("authorized tenants: {}", access_token_jwt.authorized_tenants().join(", ")));
-          } else {
-            context.print("you are not authorized for tenants");
-          }
+          print_authorizations(&context, &access_token_jwt);
+          Ok(())
         }
-        Err(error) => context.print_error(format!("could not authenticate and get access token: {}", error)),
+        Err(error) => Err(error!("could not authenticate and get access token: {}", error)),
       },
-      Err(_) => {}
     }
   })
-  .await
-  .unwrap();
-  Ok(())
+  .await?
 }
 
 /// Let the user log out
@@ -151,53 +148,38 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> Result<(),
 ///
 /// Returns
 /// * `Ok(())` - Log out was successful.
-/// * `Err(String)` - Something went wrong.
-pub(crate) async fn logout(platform: &DshPlatform, context: &Context) -> Result<(), String> {
-  let url = format!("{}/.well-known/openid-configuration", platform.issuer_endpoint());
+pub(crate) async fn logout(platform: DshPlatform, context: Context) -> DshCliResult<()> {
   context.print_explanation(format!("logout from platform {}", platform));
-  match spawn_blocking(move || {
-    let api_response = BlockingClientBuilder::new()
-      .redirect(Policy::none())
-      .build()
-      .and_then(|http_client| http_client.get(url).send())
-      .map_err(|_| "")?;
-    if api_response.status().is_success() {
-      match api_response
-        .text()
-        .map_err(|_| ())
-        .and_then(|body| serde_json::from_str::<Value>(&body).map_err(|_| ()))
-        .map_err(|_| "illegal response from provider metadata")?
-        .get("end_session_endpoint")
-        .and_then(|end_session_endpoint_value| end_session_endpoint_value.as_str())
-      {
-        Some(endpoint) => Ok(endpoint.to_string()),
-        None => Err("provider metadata does not contain end session endpoint"),
+  spawn_blocking(move || {
+    let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
+    let provider_metadata_response = http_client.get(format!("{}/.well-known/openid-configuration", platform.issuer_endpoint())).send()?;
+    if provider_metadata_response.status().is_success() {
+      let response_body = provider_metadata_response.text()?;
+      let json_value = serde_json::from_str::<Value>(&response_body)?;
+      match json_value.get("end_session_endpoint") {
+        Some(end_session_endpoint) => match end_session_endpoint.as_str() {
+          Some(endpoint) => {
+            context.open_url(endpoint, format!("logout page for platform {}", platform));
+            Ok(())
+          }
+          None => Err(error!("response from provider metadata request has illegal format")),
+        },
+        None => Err(error!("provider metadata does not contain a end-session endpoint")),
       }
     } else {
-      Err("illegal response from provider metadata")
+      Err(error!("illegal response from provider metadata request"))
     }
   })
-  .await
-  .unwrap()
-  {
-    Ok(endpoint) => {
-      context.open_url(endpoint, format!("logout page for platform {}", platform));
-      Ok(())
-    }
-    Err(error) => {
-      context.print_error(format!("logout error: {}", error));
-      Ok(())
-    }
-  }
+  .await?
 }
 
 /// Get access tokens for all current authentications
 ///
 /// Returns
-/// `Vec` of tuples containing
+/// `Ok(Vec)` of tuples containing
 /// * `DshPlatform` - Platform for which the user is currently authenticated.
 /// * `DshJwt` - Permissions for this authentication.
-pub(crate) async fn get_access_tokens() -> Result<Vec<(DshPlatform, DshJwt)>, String> {
+pub(crate) async fn get_access_tokens() -> DshCliResult<Vec<(DshPlatform, DshJwt)>> {
   try_join_all(
     DshPlatform::all()
       .iter()
@@ -227,12 +209,11 @@ fn client_id(platform: &DshPlatform) -> ClientId {
 /// * `Ok(Some(AccessToken))` - Access token was successfully obtained.
 /// * `Ok(None)` - If refresh toked does not exist or is expired. This typically means that
 ///   the user needs to log in (again).
-/// * `Err(String)` - Something went wrong.
 fn get_access_token_from_stored_refresh_token(
   provider_metadata: &DeviceProviderMetadata,
   platform: &DshPlatform,
   http_client: &BlockingClient,
-) -> Result<Option<AccessToken>, String> {
+) -> DshCliResult<Option<AccessToken>> {
   match get_stored_refresh_token(platform)? {
     Some(stored_refresh_token) => {
       let refresh_jwt = DshJwt::from_token(stored_refresh_token.secret().clone())?;
@@ -240,16 +221,15 @@ fn get_access_token_from_stored_refresh_token(
         delete_stored_refresh_token(platform)?;
         Ok(None)
       } else {
-        match get_access_token_and_exchanged_refresh_token(provider_metadata, platform, &stored_refresh_token, http_client) {
-          Ok(Some((access_token, new_refresh_token))) => {
+        match get_access_token_and_exchanged_refresh_token(provider_metadata, platform, &stored_refresh_token, http_client)? {
+          Some((access_token, new_refresh_token)) => {
             store_refresh_token(&new_refresh_token, platform)?;
             Ok(Some(access_token))
           }
-          Ok(None) => {
+          None => {
             delete_stored_refresh_token(platform)?;
             Ok(None)
           }
-          Err(error) => Err(error),
         }
       }
     }
@@ -268,13 +248,12 @@ fn get_access_token_from_stored_refresh_token(
 /// Returns
 /// * `Ok(Some((access token, refresh token)))` - Successfully retrieved access token and refresh token.
 /// * `Ok(None)` - Refresh token was expired.
-/// * `Err(message)` - Could not process request.
 fn get_access_token_and_exchanged_refresh_token(
   provider_metadata: &DeviceProviderMetadata,
   platform: &DshPlatform,
   refresh_token: &RefreshToken,
   http_client: &BlockingClient,
-) -> Result<Option<(AccessToken, RefreshToken)>, String> {
+) -> DshCliResult<Option<(AccessToken, RefreshToken)>> {
   match get_openid_client(provider_metadata, &client_id(platform)).exchange_refresh_token(refresh_token) {
     Ok(refresh_token_request) => match refresh_token_request.request(http_client) {
       Ok(token_response) => match token_response.refresh_token() {
@@ -283,10 +262,10 @@ fn get_access_token_and_exchanged_refresh_token(
       },
       Err(error) => match error {
         RequestTokenError::ServerResponse(_) => Ok(None),
-        _ => Err(format!("refresh token request error: {}", error)),
+        _ => Err(error!("refresh token request error: {}", error)),
       },
     },
-    Err(error) => Err(format!("error exchanging token: {}", error)),
+    Err(error) => Err(error!("error exchanging token: {}", error)),
   }
 }
 
@@ -295,7 +274,7 @@ fn authenticate_and_get_access_and_refresh_tokens(
   platform: &DshPlatform,
   http_client: &BlockingClient,
   context: &Context,
-) -> Result<(AccessToken, RefreshToken), String> {
+) -> DshCliResult<(AccessToken, RefreshToken)> {
   let openid_connect_client = get_openid_client(provider_metadata, &client_id(platform));
   let device_authorization_request = openid_connect_client
     .exchange_device_code()
@@ -306,19 +285,19 @@ fn authenticate_and_get_access_and_refresh_tokens(
     Ok(device_authorization_response) => {
       open_login_page(&device_authorization_response, platform, context);
       let device_access_token_request: DeviceAccessTokenRequest<CoreTokenResponse, EmptyExtraDeviceAuthorizationFields> =
-        openid_connect_client.exchange_device_access_token(&device_authorization_response).unwrap();
+        openid_connect_client.exchange_device_access_token(&device_authorization_response)?;
       match device_access_token_request.request(http_client, std::thread::sleep, None) {
         Ok(token_response) => {
           if let Some(refresh_token) = token_response.refresh_token() {
             Ok((token_response.access_token().clone(), refresh_token.clone()))
           } else {
-            Err("device access token does not contain refresh token".to_string())
+            Err(error!("device access token does not contain refresh token"))
           }
         }
-        Err(error) => Err(format!("authentication request failed: {}", error)),
+        Err(error) => Err(error!("authentication request failed: {}", error)),
       }
     }
-    Err(error) => Err(format!("authentication request failed: {}", error)),
+    Err(error) => Err(error!("authentication request failed: {}", error)),
   }
 }
 
@@ -343,26 +322,29 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
         context.print(format!("login page: {}", response.verification_uri()));
         context.print(format!("user code: {}", response.user_code().secret()));
       }
-      BrowserMethod::Open => match open::that(response.verification_uri_complete().unwrap().secret()) {
-        Ok(()) => {
-          context.print_explanation(format!("opening login page for platform {}", platform));
-        }
-        Err(_) => {
-          context.print_error("could not open your browser");
-          context.print_explanation(format!(
-            "open login page for platform {} in your browser and enter the provided user code",
-            platform
-          ));
-          context.print(format!("login page: {}", response.verification_uri()));
-          context.print(format!("user code: {}", response.user_code().secret()));
-        }
+      BrowserMethod::Open => match response.verification_uri_complete() {
+        Some(verification_uri) => match open::that(verification_uri.secret()) {
+          Ok(()) => {
+            context.print_explanation(format!("opening login page for platform {}", platform));
+          }
+          Err(_) => {
+            context.print_error("could not open your browser");
+            context.print_explanation(format!(
+              "open login page for platform {} in your browser and enter the provided user code",
+              platform
+            ));
+            context.print(format!("login page: {}", response.verification_uri()));
+            context.print(format!("user code: {}", response.user_code().secret()));
+          }
+        },
+        None => unreachable!(),
       },
     }
   }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct DeviceEndpointProviderMetadata {
+struct DeviceEndpointProviderMetadata {
   device_authorization_endpoint: DeviceAuthorizationUrl,
 }
 

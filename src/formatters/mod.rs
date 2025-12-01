@@ -1,3 +1,5 @@
+use crate::error;
+use crate::error::DshCliError;
 use dsh_api::types::Notification;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -211,7 +213,7 @@ impl Display for OutputFormat {
 }
 
 impl TryFrom<&str> for OutputFormat {
-  type Error = String;
+  type Error = DshCliError;
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
@@ -225,7 +227,7 @@ impl TryFrom<&str> for OutputFormat {
       "toml" => Ok(Self::Toml),
       "toml-compact" => Ok(Self::TomlCompact),
       "yaml" => Ok(Self::Yaml),
-      _ => Err(format!("invalid output format '{}'", value)),
+      _ => Err(error!("invalid output format '{}'", value)),
     }
   }
 }

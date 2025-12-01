@@ -1,3 +1,5 @@
+use crate::error;
+use crate::error::DshCliError;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -24,7 +26,7 @@ impl Default for Verbosity {
 }
 
 impl TryFrom<&str> for Verbosity {
-  type Error = String;
+  type Error = DshCliError;
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
@@ -32,7 +34,7 @@ impl TryFrom<&str> for Verbosity {
       "low" => Ok(Self::Low),
       "medium" => Ok(Self::Medium),
       "high" => Ok(Self::High),
-      _ => Err(format!("invalid verbosity value '{}'", value)),
+      _ => Err(error!("invalid verbosity value '{}'", value)),
     }
   }
 }

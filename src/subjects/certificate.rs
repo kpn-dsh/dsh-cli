@@ -87,7 +87,7 @@ struct CertificateListAll {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificates with their parameters");
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
@@ -112,7 +112,7 @@ struct CertificateListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListAllocationStatus {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificates with their allocation status");
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
@@ -133,7 +133,7 @@ struct CertificateListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListConfiguration {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificates with their configuration");
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
@@ -154,7 +154,7 @@ struct CertificateListIds {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificate ids");
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
@@ -174,7 +174,7 @@ struct CertificateListUsage {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListUsage {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificates with the services where they are used");
     let start_instant = context.now();
     let certificates_with_dependant_apps: Vec<(String, CertificateStatus, Vec<DependantApp>)> = client.certificates_with_dependant_apps().await?;
@@ -202,7 +202,7 @@ struct CertificateShowAll {}
 
 #[async_trait]
 impl CommandExecutor for CertificateShowAll {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let start_instant = context.now();
@@ -223,7 +223,7 @@ struct CertificateShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for CertificateShowAllocationStatus {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for certificate '{}'", certificate_id));
     let start_instant = context.now();
@@ -241,7 +241,7 @@ struct CertificateShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for CertificateShowUsage {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all services and apps that use certificate '{}'", certificate_id));
     let start_instant = context.now();

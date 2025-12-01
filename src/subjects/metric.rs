@@ -66,7 +66,14 @@ struct MetricList {}
 
 #[async_trait]
 impl CommandExecutor for MetricList {
-  async fn execute_with_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(
+    &self,
+    _argument: Option<String>,
+    _sub_argument: Option<String>,
+    matches: &ArgMatches,
+    client: &DshApiClient,
+    context: &Context,
+  ) -> DshCliResult<()> {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation("find exported metrics in services");
     let start_instant = context.now();

@@ -6,6 +6,7 @@ use crate::environment_variables::{
   ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR, ENV_VAR_DSH_CLI_STDOUT_STYLE, ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TERMINAL_WIDTH,
   ENV_VAR_DSH_CLI_VERBOSITY, ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
 };
+use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::global_arguments::{
   AUTHENTICATION_ARGUMENT, BROWSER_ARGUMENT, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
@@ -14,7 +15,7 @@ use crate::global_arguments::{
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
 use crate::verbosity::Verbosity;
-use crate::{environment_variable, environment_variable_specified};
+use crate::{environment_variable, environment_variable_specified, error, error_append, DshCliResult};
 use clap::builder::styling::Style;
 use clap::ArgMatches;
 use dsh_api::dsh_api_tenant::DshApiTenant;
@@ -44,13 +45,13 @@ pub(crate) enum BrowserMethod {
 }
 
 impl TryFrom<&str> for BrowserMethod {
-  type Error = String;
+  type Error = DshCliError;
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
       "instruct" => Ok(Self::Instruct),
       "open" => Ok(Self::Open),
-      _ => Err(format!("invalid browser method '{}'", value)),
+      _ => Err(error!("invalid browser method '{}'", value)),
     }
   }
 }
@@ -100,7 +101,7 @@ pub(crate) struct Context {
 }
 
 impl Context {
-  pub(crate) fn create(matches: &ArgMatches, settings: Settings) -> Result<Context, String> {
+  pub(crate) fn create(matches: &ArgMatches, settings: Settings) -> DshCliResult<Context> {
     let stderr_is_terminal = stderr().is_terminal();
     let stdin_is_terminal = stdin().is_terminal();
     let stdout_is_terminal = stdout().is_terminal();
@@ -108,7 +109,7 @@ impl Context {
     let csv_separator = Self::get_csv_separator(matches, &settings)?;
     if let Some(quote) = csv_quote {
       if csv_separator.contains(quote) {
-        return Err("csv separator string cannot contain quote character".to_string());
+        return Err(error!("csv separator string cannot contain quote character"));
       }
     }
     let authentication_method = Self::get_authentication_method(matches, &settings, stdin_is_terminal)?;
@@ -227,7 +228,7 @@ impl Context {
   /// 1. Try value `authentication-method` in settings file
   /// 1. If stdin is a terminal, default to `AuthenticationMethod::SingleSignOn`
   /// 1. Else default to `AuthenticationMethod::Robot`
-  fn get_authentication_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<AuthenticationMethod, String> {
+  fn get_authentication_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> DshCliResult<AuthenticationMethod> {
     match matches.get_one::<AuthenticationMethod>(AUTHENTICATION_ARGUMENT) {
       Some(authentication_argument) => Ok(authentication_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_AUTHENTICATION, matches)? {
@@ -253,7 +254,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. If stdin is a terminal, default to `BrowserMethod::Open`
   /// 1. Else default to `BrowserMethod::Instruct`
-  fn get_browser_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> Result<BrowserMethod, String> {
+  fn get_browser_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> DshCliResult<BrowserMethod> {
     match matches.get_one::<BrowserMethod>(BROWSER_ARGUMENT) {
       Some(browser_argument) => Ok(browser_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_BROWSER, matches)? {
@@ -277,7 +278,7 @@ impl Context {
   /// 1. If `force` is enabled, confirmation is always `true`.
   /// 1. Else, if run from a terminal the user will be prompted for confirmation.
   /// 1. When not run from a terminal confirmation is always false.
-  pub(crate) fn confirmed(&self, prompt: impl Display) -> Result<bool, String> {
+  pub(crate) fn confirmed(&self, prompt: impl Display) -> DshCliResult<bool> {
     if self.force {
       self.eprintln(format!("{}, confirmed by --force option", prompt));
       Ok(true)
@@ -299,7 +300,7 @@ impl Context {
             Ok(false)
           }
         },
-        Err(error) => Err(format!("\nerror getting key event ({})", error)),
+        Err(error) => Err(error!("\nerror getting key event ({})", error)),
       }
     } else {
       Ok(false)
@@ -311,13 +312,13 @@ impl Context {
   /// 1. Try environment variable `DSH_CLI_CSV_QUOTE`
   /// 1. Try settings file
   /// 1. Default to `None`
-  fn get_csv_quote(matches: &ArgMatches, settings: &Settings) -> Result<Option<char>, String> {
+  fn get_csv_quote(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<char>> {
     match environment_variable(ENV_VAR_DSH_CLI_CSV_QUOTE, matches)? {
       Some(csv_quote_env_var) => {
         if csv_quote_env_var.len() == 1 {
           Ok(csv_quote_env_var.chars().next())
         } else {
-          Err("csv quote must one character".to_string())
+          Err(error!("csv quote must one character"))
         }
       }
       None => Ok(settings.csv_quote),
@@ -329,13 +330,13 @@ impl Context {
   /// 1. Try environment variable `DSH_CLI_CSV_SEPARATOR`
   /// 1. Try settings file
   /// 1. Default to `","` (comma)
-  fn get_csv_separator(matches: &ArgMatches, settings: &Settings) -> Result<String, String> {
+  fn get_csv_separator(matches: &ArgMatches, settings: &Settings) -> DshCliResult<String> {
     match environment_variable(ENV_VAR_DSH_CLI_CSV_SEPARATOR, matches)? {
       Some(csv_separator_env_var) => {
         if !csv_separator_env_var.is_empty() {
           Ok(csv_separator_env_var)
         } else {
-          Err("seperator cannot be empty".to_string())
+          Err(error!("seperator cannot be empty"))
         }
       }
       None => match settings.csv_separator.clone() {
@@ -343,7 +344,7 @@ impl Context {
           if !csv_separator_setting.is_empty() {
             Ok(csv_separator_setting)
           } else {
-            Err("seperator cannot be empty".to_string())
+            Err(error!("seperator cannot be empty"))
           }
         }
         None => Ok(",".to_string()),
@@ -425,7 +426,7 @@ impl Context {
   /// 1. Try environment variable `env_var`
   /// 1. Try settings file value
   /// 1. Default to `default_color`
-  pub(crate) fn get_color(env_var: &str, matches: &ArgMatches, settings_color: &Option<DshColor>, default_color: DshColor) -> Result<DshColor, String> {
+  pub(crate) fn get_color(env_var: &str, matches: &ArgMatches, settings_color: &Option<DshColor>, default_color: DshColor) -> DshCliResult<DshColor> {
     match environment_variable(env_var, matches)? {
       Some(color_from_env_var) => DshColor::try_from(color_from_env_var.as_str()),
       None => match settings_color {
@@ -440,7 +441,7 @@ impl Context {
   /// 1. Try environment variable `env_var`
   /// 1. Try settings file value
   /// 1. Default to `default_style`
-  pub(crate) fn get_style(env_var: &str, matches: &ArgMatches, settings_style: &Option<DshStyle>, default_style: DshStyle) -> Result<DshStyle, String> {
+  pub(crate) fn get_style(env_var: &str, matches: &ArgMatches, settings_style: &Option<DshStyle>, default_style: DshStyle) -> DshCliResult<DshStyle> {
     match environment_variable(env_var, matches)? {
       Some(style_from_env_var) => DshStyle::try_from(style_from_env_var.as_str()),
       None => match settings_style {
@@ -480,12 +481,12 @@ impl Context {
   /// 1. Try environment variable `DSH_CLI_OUTPUT_FORMAT`
   /// 1. Try settings file
   /// 1. Else default to `None`
-  fn get_output_format_specification(matches: &ArgMatches, settings: &Settings) -> Result<Option<OutputFormat>, String> {
+  fn get_output_format_specification(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<OutputFormat>> {
     match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
       Some(output_format_argument) => Ok(Some(output_format_argument.to_owned())),
       None => match environment_variable(ENV_VAR_DSH_CLI_OUTPUT_FORMAT, matches)? {
         Some(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str())
-          .map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_DSH_CLI_OUTPUT_FORMAT))
+          .map_err(error_append!("{} in environment variable: ", ENV_VAR_DSH_CLI_OUTPUT_FORMAT))
           .map(Some),
         None => match settings.output_format.clone() {
           Some(output_format_from_settings) => Ok(Some(output_format_from_settings)),
@@ -535,14 +536,14 @@ impl Context {
   /// 1. Try if environment variable `DSH_CLI_TERMINAL_WIDTH` exists
   /// 1. Try settings file
   /// 1. If stdout is a terminal use actual terminal width, else default to `None`
-  fn get_terminal_width(matches: &ArgMatches, settings: &Settings) -> Result<Option<usize>, String> {
+  fn get_terminal_width(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<usize>> {
     match matches.get_one::<usize>(TERMINAL_WIDTH_ARGUMENT) {
       Some(terminal_width_argument) => Ok(Some(terminal_width_argument.to_owned())),
       None => match environment_variable(ENV_VAR_DSH_CLI_TERMINAL_WIDTH, matches)? {
         Some(terminal_width_env_var) => match terminal_width_env_var.parse::<usize>() {
           Ok(terminal_width) => {
             if terminal_width < 40 {
-              Err(format!(
+              Err(error!(
                 "terminal width in environment variable {} must be greater than or equal to 40",
                 ENV_VAR_DSH_CLI_TERMINAL_WIDTH
               ))
@@ -550,7 +551,7 @@ impl Context {
               Ok(Some(terminal_width))
             }
           }
-          Err(_) => Err(format!(
+          Err(_) => Err(error!(
             "non-numerical value '{}' in environment variable {}",
             terminal_width_env_var, ENV_VAR_DSH_CLI_TERMINAL_WIDTH
           )),
@@ -578,11 +579,11 @@ impl Context {
   /// 1. Try environment variable `DSH_CLI_VERBOSITY`
   /// 1. Try settings file
   /// 1. Default to `Verbosity::Low`
-  fn get_verbosity(matches: &ArgMatches, settings: &Settings) -> Result<Verbosity, String> {
+  fn get_verbosity(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Verbosity> {
     match matches.get_one::<Verbosity>(VERBOSITY_ARGUMENT) {
       Some(verbosity_argument) => Ok(verbosity_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_VERBOSITY, matches)? {
-        Some(verbosity_env_var) => Verbosity::try_from(verbosity_env_var.as_str()).map_err(|error| format!("{} in environment variable {}", error, ENV_VAR_DSH_CLI_VERBOSITY)),
+        Some(verbosity_env_var) => Verbosity::try_from(verbosity_env_var.as_str()).map_err(error_append!("error in environment variable {}: ", ENV_VAR_DSH_CLI_VERBOSITY)),
         None => match settings.verbosity.clone() {
           Some(verbosity_from_settings) => Ok(verbosity_from_settings),
           None => Ok(Verbosity::Low),
@@ -792,7 +793,7 @@ impl Context {
     }
   }
 
-  pub(crate) fn read_multi_line(&self, prompt: impl Display) -> Result<String, String> {
+  pub(crate) fn read_multi_line(&self, prompt: impl Display) -> DshCliResult<String> {
     if self.stdin_is_terminal {
       self.print_prompt(prompt);
     }
@@ -802,13 +803,13 @@ impl Context {
       match stdin.read_line(&mut multi_line) {
         Ok(0) => break,
         Ok(_) => continue,
-        Err(_) => return Err("error reading line".to_string()),
+        Err(_) => return Err(error!("error reading line")),
       }
     }
     Ok(multi_line)
   }
 
-  pub(crate) fn read_single_line(&self, prompt: impl Display) -> Result<String, String> {
+  pub(crate) fn read_single_line(&self, prompt: impl Display) -> DshCliResult<String> {
     if self.stdin_is_terminal {
       self.print_prompt(format!("{}: ", prompt));
     }
@@ -818,7 +819,7 @@ impl Context {
     Ok(line.trim().to_string())
   }
 
-  pub(crate) fn read_single_line_with_default(&self, prompt: impl Display, default: impl Display) -> Result<String, String> {
+  pub(crate) fn read_single_line_with_default(&self, prompt: impl Display, default: impl Display) -> DshCliResult<String> {
     if self.stdin_is_terminal {
       self.print_prompt(format!("{} [{}]: ", prompt, default));
     }
@@ -833,11 +834,11 @@ impl Context {
     }
   }
 
-  pub(crate) fn read_single_line_password(&self, prompt: impl Display) -> Result<String, String> {
+  pub(crate) fn read_single_line_password(&self, prompt: impl Display) -> DshCliResult<String> {
     if self.stdin_is_terminal {
       match prompt_password(prompt) {
         Ok(line) => Ok(line.trim().to_string()),
-        Err(_) => Err("empty input".to_string()),
+        Err(_) => Err(error!("empty input")),
       }
     } else {
       self.read_single_line(prompt)
@@ -896,14 +897,14 @@ impl Context {
   ///
   /// This method converts a value to a `String`, formatted to be printed as csv.
   /// It will perform some checks to see if conversion is allowed and add quotes if necessary.
-  pub(crate) fn csv_value(&self, value: &str) -> Result<String, String> {
+  pub(crate) fn csv_value(&self, value: &str) -> DshCliResult<String> {
     if value.contains(self.csv_separator.as_str()) {
-      Err("csv value contains separator character".to_string())
+      Err(error!("csv value contains separator character"))
     } else if value.contains("\n") {
-      Err("csv value contains new line".to_string())
+      Err(error!("csv value contains new line"))
     } else if let Some(csv_quote) = self.csv_quote {
       if value.contains(csv_quote) {
-        Err("csv value contains quote character".to_string())
+        Err(error!("csv value contains quote character"))
       } else {
         Ok(format!("{}{}{}", csv_quote, value, csv_quote))
       }

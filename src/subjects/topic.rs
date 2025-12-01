@@ -12,7 +12,7 @@ use crate::formatters::{notifications_to_string, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_LIST};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction, ArgMatches};
@@ -253,11 +253,11 @@ struct TopicCreate {}
 
 #[async_trait]
 impl CommandExecutor for TopicCreate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     const REPLICATION_FACTOR: u32 = 3;
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if client.get_topic_configuration(&topic_id).await.is_ok() {
-      return Err(format!("scratch topic '{}' already exists", topic_id));
+      return Err(error!("scratch topic '{}' already exists", topic_id));
     }
     let topic = create_topic(matches)?;
     context.print_explanation(format!(
@@ -287,7 +287,7 @@ pub(crate) const RETENTION_BYTES_PROPERTY: &str = "retention.bytes";
 pub(crate) const RETENTION_MS_PROPERTY: &str = "retention.ms";
 pub(crate) const SEGMENT_BYTES_PROPERTY: &str = "segment.bytes";
 
-pub(crate) fn create_topic(matches: &ArgMatches) -> Result<Topic, String> {
+pub(crate) fn create_topic(matches: &ArgMatches) -> DshCliResult<Topic> {
   const REPLICATION_FACTOR: u32 = 3;
   let replication_factor = REPLICATION_FACTOR as i64;
   let partitions = matches.get_one::<u32>(PARTITIONS_FLAG).cloned().unwrap_or(1) as i64;
@@ -327,10 +327,10 @@ struct TopicDelete {}
 
 #[async_trait]
 impl CommandExecutor for TopicDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if client.get_topic(&topic_id).await.is_err() {
-      return Err(format!("scratch topic '{}' does not exists", topic_id));
+      return Err(error!("scratch topic '{}' does not exists", topic_id));
     }
     if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
       if context.dry_run() {
@@ -354,7 +354,7 @@ struct TopicListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for TopicListAllocationStatus {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all scratch topics with their allocation status");
     let start_instant = context.now();
     let topic_ids = client.get_topic_ids().await?;
@@ -375,7 +375,7 @@ struct TopicListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for TopicListConfiguration {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all scratch topics with their configurations");
     let start_instant = context.now();
     let topic_ids = client.get_topic_ids().await?;
@@ -396,7 +396,7 @@ struct TopicListIds {}
 
 #[async_trait]
 impl CommandExecutor for TopicListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all scratch topic ids");
     let start_instant = context.now();
     let topic_ids = client.get_topic_ids().await?;
@@ -416,7 +416,7 @@ struct TopicListUsage {}
 
 #[async_trait]
 impl CommandExecutor for TopicListUsage {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all scratch topics with the services and apps that use them");
     let start_instant = context.now();
     let topics_with_dependants: Vec<(String, Vec<Dependant<TopicInjection>>)> = client.topics_with_dependants().await?;
@@ -444,7 +444,7 @@ struct TopicShow {}
 
 #[async_trait]
 impl CommandExecutor for TopicShow {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the configuration for scratch topic '{}'", topic_id));
     let start_instant = context.now();
@@ -462,7 +462,7 @@ struct TopicShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowAllocationStatus {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for scratch topic '{}'", topic_id));
     let start_instant = context.now();
@@ -480,7 +480,7 @@ struct TopicShowProperties {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowProperties {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the properties for scratch topic '{}'", topic_id));
     let start_instant = context.now();
@@ -509,7 +509,7 @@ struct TopicShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for TopicShowUsage {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the services that use scratch topic '{}'", topic_id));
     let start_instant = context.now();

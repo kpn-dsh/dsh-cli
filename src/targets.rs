@@ -1,6 +1,9 @@
-use crate::{dsh_directory, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, APPLICATION_NAME, TARGETS_SUBDIRECTORY, TOML_FILENAME_EXTENSION};
+use crate::error::DshCliError;
+use crate::{
+  dsh_directory, error, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult, APPLICATION_NAME, TARGETS_SUBDIRECTORY, TOML_FILENAME_EXTENSION,
+};
 use dsh_api::platform::DshPlatform;
-use log::{debug, error};
+use log::debug;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display, Formatter};
@@ -23,8 +26,8 @@ pub(crate) struct Target {
 }
 
 impl Target {
-  pub(crate) fn new(platform: DshPlatform, tenant: String, password: Option<String>) -> Result<Self, String> {
-    Ok(Self { platform, tenant, password })
+  pub(crate) fn new(platform: DshPlatform, tenant: String, password: Option<String>) -> Self {
+    Self { platform, tenant, password }
   }
 }
 
@@ -34,19 +37,19 @@ impl Display for Target {
   }
 }
 
-pub(crate) fn all_targets() -> Result<Vec<Target>, String> {
+pub(crate) fn all_targets() -> DshCliResult<Vec<Target>> {
   match targets_directory()? {
     Some(targets_directory) => {
       let mut targets = vec![];
-      for target_file in fs::read_dir(targets_directory).map_err(|error| error.to_string())? {
-        if let Ok(Some(target)) = read_and_deserialize_from_toml_file(target_file.map_err(|error| error.to_string())?.path()) {
+      for target_file in fs::read_dir(targets_directory)? {
+        if let Ok(Some(target)) = read_and_deserialize_from_toml_file(target_file?.path()) {
           targets.push(target);
         }
       }
       targets.sort();
       Ok(targets)
     }
-    None => Err("targets directory could not be determined".to_string()),
+    None => Err(error!("targets directory could not be determined")),
   }
 }
 
@@ -68,8 +71,7 @@ pub(crate) fn all_targets() -> Result<Vec<Target>, String> {
 ///
 /// ## Returns
 /// * `Ok(())` - indicates that deleting the target's settings file and the password was successful
-/// * `Err(message)` - if an error occurred
-pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), String> {
+pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> DshCliResult<()> {
   let target_file = target_file(platform, tenant)?;
   match delete_file(&target_file) {
     Ok(_) => match delete_target_password_from_keyring(platform, tenant) {
@@ -100,7 +102,7 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
           "deleting the target file resulted in an error ({}), as well as deleting the password from the keyring ({})",
           target_file_error, keyring_error
         );
-        Err(format!("{} / {}", target_file_error, keyring_error))
+        Err(error!("{} / {}", target_file_error, keyring_error))
       }
     },
   }
@@ -118,8 +120,7 @@ pub(crate) fn delete_target(platform: &DshPlatform, tenant: &str) -> Result<(), 
 /// ## Returns
 /// * `Ok(Some(target))` - if the target setting was available a `Target` will be returned.
 /// * `Ok(None)` - if the target setting was not available
-/// * `Err(message)` - if an error occurred
-pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option<Target>, String> {
+pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> DshCliResult<Option<Target>> {
   let target_file = target_file(platform, tenant)?;
   match read_and_deserialize_from_toml_file::<Target>(&target_file)? {
     Some(target) => {
@@ -151,7 +152,7 @@ pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> Result<Option
 /// * `Ok(())` - if the target's setting file was successfully created or updated
 /// * `Err(message)` - if an error occurred in either upserting the target's settings file
 ///   or the password in the keyring
-pub(crate) fn upsert_target(target: &Target) -> Result<(), String> {
+pub(crate) fn upsert_target(target: &Target) -> DshCliResult<()> {
   let target_file = target_file(&target.platform, &target.tenant)?;
   serialize_and_write_to_toml_file(&target_file, target)?;
   match target.password {
@@ -181,24 +182,24 @@ pub(crate) fn upsert_target(target: &Target) -> Result<(), String> {
   }
 }
 
-fn targets_directory() -> Result<Option<PathBuf>, String> {
+fn targets_directory() -> DshCliResult<Option<PathBuf>> {
   Ok(dsh_directory()?.map(|dsh_directory| dsh_directory.join(TARGETS_SUBDIRECTORY)))
 }
 
-fn target_file(platform: &DshPlatform, tenant: &str) -> Result<PathBuf, String> {
+fn target_file(platform: &DshPlatform, tenant: &str) -> DshCliResult<PathBuf> {
   match targets_directory()? {
     Some(targets_directory) => Ok(targets_directory.join(format!("{}.{}.{}", platform, tenant, TOML_FILENAME_EXTENSION))),
-    None => Err("targets directory could not be determined".to_string()),
+    None => Err(error!("targets directory could not be determined")),
   }
 }
 
-fn delete_file(toml_file: &PathBuf) -> Result<(), String> {
+fn delete_file(toml_file: &PathBuf) -> DshCliResult<()> {
   match fs::remove_file(toml_file) {
     Ok(_) => Ok(()),
     Err(io_error) => {
       let message = format!("could not delete file '{}' ({})", toml_file.to_string_lossy(), io_error);
       log::error!("{}", &message);
-      Err(message)
+      Err(DshCliError::from(message))
     }
   }
 }
@@ -212,21 +213,18 @@ fn delete_file(toml_file: &PathBuf) -> Result<(), String> {
 /// ## Returns
 /// * `Ok(Some(password))` - if the password entry was found in the keyring
 /// * `Ok(None)` - if the password entry could not be found in the keyring
-/// * `Err<String>` - if an error occurred
-pub(crate) fn get_target_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<Option<String>, String> {
+pub(crate) fn get_target_password_from_keyring(platform: &DshPlatform, tenant: &str) -> DshCliResult<Option<String>> {
   let user = format!("{}.{}", platform, tenant);
-  match keyring::Entry::new(APPLICATION_NAME, &user) {
-    Ok(entry) => match entry.get_password() {
-      Ok(password) => {
-        debug!("target password for '{}@{}' read from keyring", tenant, platform);
-        Ok(Some(password))
-      }
-      Err(_) => {
-        debug!("target password for '{}@{}' could not be read from keyring", tenant, platform);
-        Ok(None)
-      }
-    },
-    Err(keyring_error) => Err(keyring_error.to_string()),
+  let entry = keyring::Entry::new(APPLICATION_NAME, &user)?;
+  match entry.get_password() {
+    Ok(password) => {
+      debug!("target password for '{}@{}' read from keyring", tenant, platform);
+      Ok(Some(password))
+    }
+    Err(_) => {
+      debug!("target password for '{}@{}' could not be read from keyring", tenant, platform);
+      Ok(None)
+    }
   }
 }
 
@@ -239,25 +237,12 @@ pub(crate) fn get_target_password_from_keyring(platform: &DshPlatform, tenant: &
 ///
 /// ## Returns
 /// * `Ok(())` - if the password entry was successfully written to the keyring
-/// * `Err<String>` - if an error occurred
-pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform, tenant: &str) -> Result<(), String> {
+pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform, tenant: &str) -> DshCliResult<()> {
   let user = format!("{}.{}", platform, tenant);
-  match keyring::Entry::new(APPLICATION_NAME, &user) {
-    Ok(entry) => match entry.set_password(password) {
-      Ok(_) => {
-        debug!("target password for '{}@{}' written to keyring", tenant, platform);
-        Ok(())
-      }
-      Err(keyring_error) => {
-        error!("could not set password for '{}@{}': {}", tenant, platform, keyring_error);
-        Err(keyring_error.to_string())
-      }
-    },
-    Err(keyring_error) => {
-      error!("could not get keyring entry for '{}@{}': {}", tenant, platform, keyring_error);
-      Err(keyring_error.to_string())
-    }
-  }
+  let entry = keyring::Entry::new(APPLICATION_NAME, &user)?;
+  entry.set_password(password)?;
+  debug!("target password for '{}@{}' written to keyring", tenant, platform);
+  Ok(())
 }
 
 /// # Delete target password from the keyring
@@ -268,19 +253,12 @@ pub(crate) fn upsert_password_to_keyring(password: &str, platform: &DshPlatform,
 ///
 /// ## Returns
 /// * `Ok(())` - if the password entry was successfully deleted from the keyring
-/// * `Err<String>` - if an error occurred
-pub(crate) fn delete_target_password_from_keyring(platform: &DshPlatform, tenant: &str) -> Result<(), String> {
+pub(crate) fn delete_target_password_from_keyring(platform: &DshPlatform, tenant: &str) -> DshCliResult<()> {
   let user = format!("{}.{}", platform, tenant);
-  match keyring::Entry::new(APPLICATION_NAME, &user) {
-    Ok(entry) => match entry.delete_credential() {
-      Ok(_) => {
-        debug!("password for target '{}@{}' deleted from keyring", tenant, platform);
-        Ok(())
-      }
-      Err(keyring_error) => Err(keyring_error.to_string()),
-    },
-    Err(keyring_error) => Err(keyring_error.to_string()),
-  }
+  let entry = keyring::Entry::new(APPLICATION_NAME, &user)?;
+  entry.delete_credential()?;
+  debug!("password for target '{}@{}' deleted from keyring", tenant, platform);
+  Ok(())
 }
 
 fn dsh_platform_from_name<'de, D>(deserializer: D) -> Result<DshPlatform, D::Error>

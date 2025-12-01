@@ -4,7 +4,7 @@ use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::style::{DshColor, DshStyle};
 use crate::verbosity::Verbosity;
-use crate::{dsh_directory, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DEFAULT_DSH_CLI_SETTINGS_FILENAME};
+use crate::{dsh_directory, error, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult, DEFAULT_DSH_CLI_SETTINGS_FILENAME};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -78,14 +78,14 @@ pub(crate) struct Settings {
   pub(crate) warning_style: Option<DshStyle>,
 }
 
-pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> Result<(Settings, String), String> {
+pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> DshCliResult<(Settings, String)> {
   match explicit_settings_filename {
     Some(explicit_name) => match read_and_deserialize_from_toml_file::<Settings>(PathBuf::new().join(explicit_name))? {
       Some(settings_from_explicit_file) => Ok((
         Settings { file_name: Some(explicit_name.to_string()), ..settings_from_explicit_file },
         format!("read settings (explicit file '{}')", explicit_name),
       )),
-      None => Err(format!("explicit settings file '{}' does not exist", explicit_name)),
+      None => Err(error!("explicit settings file '{}' does not exist", explicit_name)),
     },
     None => match dsh_directory()? {
       Some(dsh_directory) => {
@@ -103,7 +103,7 @@ pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> Result<(
   }
 }
 
-pub(crate) fn write_settings(explicit_settings_filename: Option<&str>, settings: Settings) -> Result<(), String> {
+pub(crate) fn write_settings(explicit_settings_filename: Option<&str>, settings: Settings) -> DshCliResult<()> {
   match explicit_settings_filename {
     Some(explicit_name) => {
       debug!("write settings to explicit file '{}'", explicit_name);
@@ -115,12 +115,12 @@ pub(crate) fn write_settings(explicit_settings_filename: Option<&str>, settings:
         debug!("write settings to default file '{}'", default_settings_file.to_string_lossy());
         serialize_and_write_to_toml_file(default_settings_file, &settings)
       }
-      None => Err("could not write settings file, dsh cli directory is set to none".to_string()),
+      None => Err(error!("could not write settings file, dsh cli directory is set to none")),
     },
   }
 }
 
-pub(crate) fn upsert_settings<F>(explicit_settings_filename: Option<&str>, upsert: F) -> Result<(), String>
+pub(crate) fn upsert_settings<F>(explicit_settings_filename: Option<&str>, upsert: F) -> DshCliResult<()>
 where
   F: FnOnce(Settings) -> Result<Settings, String>,
 {
@@ -129,6 +129,6 @@ where
       debug!("updated settings");
       write_settings(explicit_settings_filename, upserted_settings)
     }
-    Err(error) => Err(format!("unable to update settings ({})", error)),
+    Err(error) => Err(error!("unable to update settings ({})", error)),
   }
 }

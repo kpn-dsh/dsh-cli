@@ -5,6 +5,7 @@ use crate::capability::{
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
@@ -18,7 +19,7 @@ use crate::limits_flags::{
   VPN_FLAG,
 };
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -148,10 +149,10 @@ struct TenantCreate {}
 
 #[async_trait]
 impl CommandExecutor for TenantCreate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     if client.get_tenant_configuration(&tenant_id).await.is_ok() {
-      return Err(format!("managed tenant '{}' already exists", tenant_id));
+      return Err(error!("managed tenant '{}' already exists", tenant_id));
     }
     let enable_tracing = matches.get_one::<bool>(TRACING_FLAG);
     let enable_vpn = matches.get_one::<bool>(VPN_FLAG);
@@ -185,10 +186,10 @@ struct TenantDelete {}
 
 #[async_trait]
 impl CommandExecutor for TenantDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     if client.get_tenant_configuration(&tenant_id).await.is_err() {
-      return Err(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
+      return Err(error!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
     }
     if context.confirmed(format!("delete tenant '{}'?", tenant_id))? {
       if context.dry_run() {
@@ -212,7 +213,7 @@ struct TenantGrant {}
 
 #[async_trait]
 impl CommandExecutor for TenantGrant {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_tenant_id = target.unwrap_or_else(|| unreachable!());
     let (managed_stream_id, access_rights) = get_managed_stream_id(matches, client.tenant_name())?;
     context.print_explanation(format!(
@@ -235,7 +236,7 @@ struct TenantListAll {}
 
 #[async_trait]
 impl CommandExecutor for TenantListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all tenants with their limits");
     let start_instant = context.now();
     let tenant_ids: Vec<String> = client.get_tenant_ids().await?;
@@ -266,7 +267,7 @@ struct TenantListIds {}
 
 #[async_trait]
 impl CommandExecutor for TenantListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all tenant ids");
     let start_instant = context.now();
     let tenant_ids: Vec<String> = client.get_tenant_ids().await?;
@@ -290,7 +291,7 @@ struct TenantListStreams {}
 
 #[async_trait]
 impl CommandExecutor for TenantListStreams {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all tenants with the managed streams that they are granted access");
     let start_instant = context.now();
 
@@ -321,7 +322,7 @@ struct TenantRevoke {}
 
 #[async_trait]
 impl CommandExecutor for TenantRevoke {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_tenant_id = target.unwrap_or_else(|| unreachable!());
     let (managed_stream_id, rights) = get_managed_stream_id(matches, client.tenant_name())?;
     context.print_explanation(format!(
@@ -342,7 +343,7 @@ struct TenantShowAll {}
 
 #[async_trait]
 impl CommandExecutor for TenantShowAll {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all limits for tenant '{}'", tenant_id));
     let start_instant = context.now();
@@ -356,7 +357,7 @@ impl CommandExecutor for TenantShowAll {
           context.print_error(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
           Ok(())
         }
-        error => Err(String::from(error)),
+        error => Err(DshCliError::from(error)),
       },
     }
   }
@@ -370,7 +371,7 @@ struct TenantShowStreams {}
 
 #[async_trait]
 impl CommandExecutor for TenantShowStreams {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all streams that tenant '{}' has access to", tenant_id));
     let start_instant = context.now();
@@ -390,7 +391,7 @@ struct TenantUpdateLimit {}
 
 #[async_trait]
 impl CommandExecutor for TenantUpdateLimit {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     let enable_tracing_argument = matches.get_one::<bool>(TRACING_FLAG);
     let enable_vpn_argument = matches.get_one::<bool>(VPN_FLAG);
@@ -400,7 +401,7 @@ impl CommandExecutor for TenantUpdateLimit {
       enable_tracing_argument.is_some() || enable_vpn_argument.is_some(),
       !tenant_limits_from_arguments.is_empty(),
     ) {
-      (false, false) => Err("at least one limit or capability argument must be provided".to_string()),
+      (false, false) => Err(error!("at least one limit or capability argument must be provided")),
 
       (false, true) => {
         context.print_explanation(format!("update limits of managed tenant '{}'", tenant_id));
@@ -426,7 +427,7 @@ impl CommandExecutor for TenantUpdateLimit {
               context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
               Ok(())
             }
-            error => Err(String::from(error)),
+            error => Err(DshCliError::from(error)),
           },
         }
       }
@@ -485,12 +486,12 @@ impl CommandExecutor for TenantUpdateLimit {
               context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
               Ok(())
             }
-            error => Err(String::from(error)),
+            error => Err(DshCliError::from(error)),
           },
         }
       }
 
-      (true, true) => Err("provide either limit arguments or capability arguments, but not both".to_string()),
+      (true, true) => Err(error!("provide either limit arguments or capability arguments, but not both")),
     }
   }
 
@@ -499,7 +500,7 @@ impl CommandExecutor for TenantUpdateLimit {
   }
 }
 
-fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<(ManagedStreamId, AccessRights), String> {
+fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> DshCliResult<(ManagedStreamId, AccessRights)> {
   Ok(match matches.get_one::<String>(STREAM_READ_FLAG) {
     Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Read),
     None => match matches.get_one::<String>(STREAM_RW_FLAG) {
@@ -512,15 +513,15 @@ fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<
   })
 }
 
-fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> Result<ManagedStreamId, String> {
+fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> DshCliResult<ManagedStreamId> {
   if stream_argument.starts_with(&format!("{}---", managing_tenant)) {
-    ManagedStreamId::try_from(stream_argument).map_err(|error| error.to_string())
+    ManagedStreamId::try_from(stream_argument).map_err(DshCliError::from)
   } else {
-    Err(format!("managed stream id must start with '{}---'", managing_tenant))
+    Err(error!("managed stream id must start with '{}---'", managing_tenant))
   }
 }
 
-fn tenant_limits_try_from_matches(matches: &ArgMatches) -> Result<TenantLimits, String> {
+fn tenant_limits_try_from_matches(matches: &ArgMatches) -> DshCliResult<TenantLimits> {
   Ok(TenantLimits {
     certificate_count: matches.get_one::<i64>(CERTIFICATE_COUNT_FLAG).cloned(),
     consumer_rate: matches.get_one::<i64>(CONSUMER_RATE_FLAG).cloned(),
@@ -529,7 +530,7 @@ fn tenant_limits_try_from_matches(matches: &ArgMatches) -> Result<TenantLimits, 
         if (0.01..=16.0).contains(&cpus) {
           Some(cpus)
         } else {
-          return Err("number of cpus should be greater than or equal to 0.01 and lower than or equal to 16.0".to_string());
+          return Err(error!("number of cpus should be greater than or equal to 0.01 and lower than or equal to 16.0"));
         }
       }
       None => None,

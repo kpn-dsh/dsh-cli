@@ -18,7 +18,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 
 struct ProxySubject {}
 
@@ -79,10 +79,10 @@ struct ProxyDelete {}
 
 #[async_trait]
 impl CommandExecutor for ProxyDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
-      return Err(format!("proxy '{}' does not exists", proxy_id));
+      return Err(error!("proxy '{}' does not exists", proxy_id));
     }
     if context.confirmed(format!("delete proxy '{}'?", proxy_id))? {
       if context.dry_run() {
@@ -106,7 +106,7 @@ struct ProxyListAll {}
 
 #[async_trait]
 impl CommandExecutor for ProxyListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all proxies with parameters");
     let start_instant = context.now();
     let proxy_ids = client.get_kafkaproxy_ids().await?;
@@ -127,7 +127,7 @@ struct ProxyListIds {}
 
 #[async_trait]
 impl CommandExecutor for ProxyListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all proxy ids");
     let start_instant = context.now();
     let proxy_ids = client.get_kafkaproxy_ids().await?;
@@ -147,7 +147,7 @@ struct ProxyShowConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for ProxyShowConfiguration {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
     let start_instant = context.now();

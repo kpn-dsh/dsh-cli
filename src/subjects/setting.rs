@@ -3,7 +3,6 @@ use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{BrowserMethod, Context};
-use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
@@ -16,7 +15,7 @@ use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::{get_target_password_from_keyring, read_target};
 use crate::verbosity::Verbosity;
-use crate::{get_set_environment_variables, DshCliResult, ENV_VAR_DSH_CLI_PASSWORD};
+use crate::{error, get_set_environment_variables, DshCliResult, ENV_VAR_DSH_CLI_PASSWORD};
 use async_trait::async_trait;
 use clap::builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
@@ -334,15 +333,15 @@ struct SettingDefault {}
 
 #[async_trait]
 impl CommandExecutor for SettingDefault {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("set default platform and tenant");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
     if read_target(&platform, &tenant)?.is_none() {
-      return Err(format!("target '{}@{}' does not exist", tenant, platform));
+      return Err(error!("target '{}@{}' does not exist", tenant, platform));
     };
     if get_target_password_from_keyring(&platform, &tenant)?.is_none() {
-      return Err(format!("keyring contains no password for target '{}@{}'", tenant, platform));
+      return Err(error!("keyring contains no password for target '{}@{}'", tenant, platform));
     }
     upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
     context.print_outcome(format!("default platform set to {}", platform));
@@ -362,7 +361,7 @@ const HIDE_PASSWORD: &str = "********";
 
 #[async_trait]
 impl CommandExecutor for SettingList {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let (settings, _) = get_settings(None)?;
     if let Some(ref settings_file) = settings.file_name {
       context.print_explanation(format!("list settings from settings file '{}'", settings_file));
@@ -393,7 +392,7 @@ impl CommandExecutor for SettingList {
   }
 }
 
-fn get_some<T>(setting: &str, matches: &ArgMatches, context: &Context) -> Result<Option<T>, DshCliError>
+fn get_some<T>(setting: &str, matches: &ArgMatches, context: &Context) -> DshCliResult<Option<T>>
 where
   T: Clone + Display + Send + Sync + 'static,
 {
@@ -403,7 +402,7 @@ where
       context.print_outcome(format!("{} set to {}", setting, &cloned));
       Ok(Some(cloned))
     }
-    None => Err(DshCliError::from(setting)),
+    None => Err(error!("{}", setting)),
   }
 }
 
@@ -411,7 +410,7 @@ struct SettingSet {}
 
 #[async_trait]
 impl CommandExecutor for SettingSet {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let (target_setting, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
       SETTING_AUTHENTICATION => {
@@ -430,7 +429,7 @@ impl CommandExecutor for SettingSet {
           match csv_quote_chars.next() {
             Some(csv_quote) => {
               if csv_quote_chars.next().is_some() {
-                return Err("csv quote must be a single character".to_string());
+                return Err(error!("csv quote must be a single character"));
               } else {
                 upsert_settings(None, |settings| Ok(Settings { csv_quote: Some(csv_quote), ..settings }))?;
                 context.print_outcome(format!("csv quote character set to '{}'", csv_quote));
@@ -446,23 +445,16 @@ impl CommandExecutor for SettingSet {
           Ok(Settings { csv_separator: get_some(SETTING_CSV_SEPARATOR, matches, context)?, ..settings })
         })?;
       }
-      SETTING_DEFAULT_PLATFORM => {
-        match matches.get_one::<String>(SETTING_DEFAULT_PLATFORM) {
-          Some(platform_name) => match DshPlatform::try_from(platform_name.as_str()) {
-            Ok(platform) => {
-              upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
-              context.print_outcome(format!("default platform set to {}", platform));
-            }
-            Err(_) => unreachable!(),
-          },
-          None => unreachable!(),
-        }
-        //
-        // let platform = DshPlatform::try_from(get_one(SETTING_DEFAULT_PLATFORM, matches, context)?.unwrap_or_else(|| unreachable!()))?;
-        // let platform = DshPlatform::try_from(get_some(SETTING_DEFAULT_PLATFORM, matches, context)?.unwrap_or_else(|| unreachable!()))?;
-        // upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
-        // context.print_outcome(format!("default platform set to {}", platform));
-      }
+      SETTING_DEFAULT_PLATFORM => match matches.get_one::<String>(SETTING_DEFAULT_PLATFORM) {
+        Some(platform_name) => match DshPlatform::try_from(platform_name.as_str()) {
+          Ok(platform) => {
+            upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
+            context.print_outcome(format!("default platform set to {}", platform));
+          }
+          Err(_) => unreachable!(),
+        },
+        None => unreachable!(),
+      },
       SETTING_DEFAULT_TENANT => {
         upsert_settings(None, move |settings| {
           Ok(Settings { default_tenant: get_some(SETTING_DEFAULT_TENANT, matches, context)?, ..settings })
@@ -570,7 +562,7 @@ impl CommandExecutor for SettingSet {
       SETTING_TERMINAL_WIDTH => {
         let terminal_width = matches.get_one::<usize>(SETTING_TERMINAL_WIDTH).unwrap_or_else(|| unreachable!());
         if *terminal_width < 40 {
-          return Err("terminal width must be greater than or equal to 40".to_string());
+          return Err(error!("terminal width must be greater than or equal to 40"));
         } else {
           upsert_settings(None, |settings| Ok(Settings { terminal_width: Some(*terminal_width), ..settings }))?;
           context.print_outcome(format!("terminal width set to {}", terminal_width));
@@ -605,7 +597,7 @@ struct SettingUnset {}
 
 #[async_trait]
 impl CommandExecutor for SettingUnset {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let (target_setting, _) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
       SETTING_AUTHENTICATION => {

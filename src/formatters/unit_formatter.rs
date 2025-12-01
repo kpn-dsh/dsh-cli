@@ -1,6 +1,7 @@
 use crate::context::Context;
 use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
+use crate::{error, error_map, DshCliResult};
 use itertools::Itertools;
 use serde::Serialize;
 use tabled::settings::peaker::PriorityMax;
@@ -22,12 +23,12 @@ where
     Self { target_id: target_id.into(), labels, target_label, context }
   }
 
-  pub(crate) fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => self.print_json(value),
       OutputFormat::JsonCompact => self.print_json_compact(value),
-      OutputFormat::Plain => Err("plain unit print not yet implemented".to_string()),
+      OutputFormat::Plain => Err(error!("plain unit print not yet implemented")),
       OutputFormat::Quiet => Ok(()),
       OutputFormat::Table => self.print_table(value),
       OutputFormat::TableNoBorder => self.print_table_no_borders(value),
@@ -37,22 +38,22 @@ where
     }
   }
 
-  pub(crate) fn _print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn _print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
-      OutputFormat::Json => Err("serialization to json is not supported for this type".to_string()),
-      OutputFormat::JsonCompact => Err("serialization to compact json is not supported for this type".to_string()),
-      OutputFormat::Plain => Err("plain unit print not yet implemented".to_string()),
+      OutputFormat::Json => Err(error!("serialization to json is not supported for this type")),
+      OutputFormat::JsonCompact => Err(error!("serialization to compact json is not supported for this type")),
+      OutputFormat::Plain => Err(error!("plain unit print not yet implemented")),
       OutputFormat::Quiet => Ok(()),
       OutputFormat::Table => self.print_table(value),
       OutputFormat::TableNoBorder => self.print_table_no_borders(value),
-      OutputFormat::Toml => Err("serialization to toml is not supported for this type".to_string()),
-      OutputFormat::TomlCompact => Err("serialization to compact toml is not supported for this type".to_string()),
-      OutputFormat::Yaml => Err("serialization to yaml is not supported for this type".to_string()),
+      OutputFormat::Toml => Err(error!("serialization to toml is not supported for this type")),
+      OutputFormat::TomlCompact => Err(error!("serialization to compact toml is not supported for this type")),
+      OutputFormat::Yaml => Err(error!("serialization to yaml is not supported for this type")),
     }
   }
 
-  fn print_csv<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
+  fn print_csv<V: SubjectFormatter<L>>(&self, value: &V) -> DshCliResult<()> {
     if self.context.show_headers() {
       self.context.print(
         self
@@ -103,57 +104,37 @@ where
     table
   }
 
-  fn print_json<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
-    match serde_json::to_string_pretty(value) {
-      Ok(json) => {
-        self.context.print(json);
-        Ok(())
-      }
-      Err(error) => Err(format!("could not convert value to json ({})", error)),
-    }
+  fn print_json<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
+    let json = serde_json::to_string_pretty(value).map_err(error_map!("could not convert value to json ({})"))?;
+    self.context.print(json);
+    Ok(())
   }
 
-  fn print_json_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
-    match serde_json::to_string(value) {
-      Ok(json) => {
-        self.context.print(json);
-        Ok(())
-      }
-      Err(error) => Err(format!("could not convert value to compact json ({})", error)),
-    }
+  fn print_json_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
+    let json = serde_json::to_string(value).map_err(error_map!("could not convert value to compact json ({})"))?;
+    self.context.print(json);
+    Ok(())
   }
 
-  fn print_toml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
-    match toml::to_string_pretty(value) {
-      Ok(toml) => {
-        self.context.print(toml);
-        Ok(())
-      }
-      Err(error) => Err(format!("could not convert value to compact toml ({})", error)),
-    }
+  fn print_toml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
+    let toml = toml::to_string_pretty(value).map_err(error_map!("could not convert value to compact toml ({})"))?;
+    self.context.print(toml);
+    Ok(())
   }
 
-  fn print_toml_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
-    match toml::to_string(value) {
-      Ok(toml) => {
-        self.context.print(toml);
-        Ok(())
-      }
-      Err(error) => Err(format!("could not convert value to compact toml ({})", error)),
-    }
+  fn print_toml_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
+    let toml = toml::to_string(value).map_err(error_map!("could not convert value to compact toml ({})"))?;
+    self.context.print(toml);
+    Ok(())
   }
 
-  fn print_yaml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> Result<(), String> {
-    match serde_yaml::to_string(value) {
-      Ok(yaml) => {
-        self.context.print(yaml);
-        Ok(())
-      }
-      Err(error) => Err(format!("could not convert value to yaml ({})", error)),
-    }
+  fn print_yaml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
+    let yaml = serde_yaml::to_string(value).map_err(error_map!("could not convert value to yaml ({})"))?;
+    self.context.print(yaml);
+    Ok(())
   }
 
-  fn print_table<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
+  fn print_table<V: SubjectFormatter<L>>(&self, value: &V) -> DshCliResult<()> {
     let mut table = self.create_table(value);
     table.with(Padding::new(1, 1, 0, 0));
     table.with(Style::sharp());
@@ -161,7 +142,7 @@ where
     Ok(())
   }
 
-  fn print_table_no_borders<V: SubjectFormatter<L>>(&self, value: &V) -> Result<(), String> {
+  fn print_table_no_borders<V: SubjectFormatter<L>>(&self, value: &V) -> DshCliResult<()> {
     let mut table = self.create_table(value);
     table.with(Padding::new(0, 2, 0, 0));
     table.with(Style::empty());

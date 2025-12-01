@@ -1,6 +1,7 @@
 use crate::context::Context;
 use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
+use crate::{error, DshCliResult};
 use itertools::Itertools;
 use serde::Serialize;
 use std::marker::PhantomData;
@@ -90,7 +91,7 @@ where
     }
   }
 
-  pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => {
         if self.context.show_headers() {
@@ -120,14 +121,14 @@ where
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert simplified values to json ({})", error)),
+          Err(error) => Err(error!("could not convert simplified values to json ({})", error)),
         },
         None => match serde_json::to_string_pretty(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert values to json ({})", error)),
+          Err(error) => Err(error!("could not convert values to json ({})", error)),
         },
       },
 
@@ -137,14 +138,14 @@ where
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert simplified values to json compact ({})", error)),
+          Err(error) => Err(error!("could not convert simplified values to json compact ({})", error)),
         },
         None => match serde_json::to_string(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert values to json compact ({})", error)),
+          Err(error) => Err(error!("could not convert values to json compact ({})", error)),
         },
       },
 
@@ -226,14 +227,14 @@ where
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert simplified values to toml ({})", error)),
+          Err(error) => Err(error!("could not convert simplified values to toml ({})", error)),
         },
         None => match toml::to_string_pretty(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert values to toml ({})", error)),
+          Err(error) => Err(error!("could not convert values to toml ({})", error)),
         },
       },
 
@@ -243,14 +244,14 @@ where
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert simplified values to toml compact ({})", error)),
+          Err(error) => Err(error!("could not convert simplified values to toml compact ({})", error)),
         },
         None => match toml::to_string(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert values to toml compact ({})", error)),
+          Err(error) => Err(error!("could not convert values to toml compact ({})", error)),
         },
       },
 
@@ -260,14 +261,14 @@ where
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert simplified values to yaml ({})", error)),
+          Err(error) => Err(error!("could not convert simplified values to yaml ({})", error)),
         },
         None => match serde_yaml::to_string(&self.values) {
           Ok(json) => {
             self.context.print(json);
             Ok(())
           }
-          Err(error) => Err(format!("could not convert values to yaml ({})", error)),
+          Err(error) => Err(error!("could not convert values to yaml ({})", error)),
         },
       },
     }

@@ -16,44 +16,37 @@ use aes_gcm::aes::Aes256;
 use aes_gcm::Key;
 use aes_gcm::{Aes256Gcm, AesGcm};
 
+use crate::{error, DshCliResult};
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 
-pub(crate) fn encrypt(plain_text: &String) -> Result<String, String> {
+pub(crate) fn encrypt(plain_text: &String) -> DshCliResult<String> {
   let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
   let nonce: Nonce<Aes256Gcm> = Aes256Gcm::generate_nonce(&mut OsRng);
   let encoded_nonce: String = STANDARD_NO_PAD.encode(nonce);
-  let ciphertext: Vec<u8> = cipher
-    .encrypt(&nonce, plain_text.as_bytes())
-    .map_err(|error| format!("could not encrypt: {}", error))?;
+  let ciphertext: Vec<u8> = cipher.encrypt(&nonce, plain_text.as_bytes())?;
   let encoded_cyphertext: String = STANDARD_NO_PAD.encode(ciphertext);
   Ok(format!("{}.{}", encoded_cyphertext, encoded_nonce))
 }
 
-pub(crate) fn decrypt(encoded_ciphertext_nonce: &str) -> Result<String, String> {
+pub(crate) fn decrypt(encoded_ciphertext_nonce: &str) -> DshCliResult<String> {
   let parts: Vec<&str> = encoded_ciphertext_nonce.split(".").collect();
   if parts.len() == 2 {
     let encoded_ciphertext: &[u8] = parts[0].as_bytes();
     let encoded_nonce = parts[1].as_bytes();
-    let ciphertext: Vec<u8> = STANDARD_NO_PAD
-      .decode(encoded_ciphertext)
-      .map_err(|error| format!("could not decode ciphertext: {}", error))?;
-    let decoded_nonce: Vec<u8> = STANDARD_NO_PAD
-      .decode(encoded_nonce)
-      .map_err(|error| format!("could not decode nonce: {}", error))?;
+    let ciphertext: Vec<u8> = STANDARD_NO_PAD.decode(encoded_ciphertext)?;
+    let decoded_nonce: Vec<u8> = STANDARD_NO_PAD.decode(encoded_nonce)?;
     #[allow(deprecated)] // TODO
     let nonce = Nonce::<Aes256Gcm>::clone_from_slice(&decoded_nonce);
     let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
-    let plaintext: Vec<u8> = cipher
-      .decrypt(&nonce, ciphertext.as_ref())
-      .map_err(|error| format!("could not decrypt: {}", error))?;
-    Ok(String::from_utf8(plaintext).map_err(|error| format!("could not create string: {}", error))?)
+    let plaintext: Vec<u8> = cipher.decrypt(&nonce, ciphertext.as_ref())?;
+    Ok(String::from_utf8(plaintext)?)
   } else {
-    Err("illegal ciphertext nonce pair".to_string())
+    Err(error!("illegal ciphertext nonce pair"))
   }
 }
 
-fn get_key() -> Result<Key<Aes256Gcm>, String> {
+fn get_key() -> DshCliResult<Key<Aes256Gcm>> {
   get_system_hash().map(|hash| hash.finalize())
 }
 
@@ -66,14 +59,11 @@ fn get_key() -> Result<Key<Aes256Gcm>, String> {
 /// Note that this algorithm does not guarantee that the computed has will be the same every
 /// time the function is executed. Typically, if a new entry was added to the users home
 /// directory or when an entry has been deleted, the computed hash will change.
-fn get_system_hash() -> Result<Sha256, String> {
+fn get_system_hash() -> DshCliResult<Sha256> {
   match my_home() {
     Ok(Some(user_home_directory)) => match fs::read_dir(user_home_directory) {
       Ok(dir) => {
-        let mut representations: Vec<String> = dir
-          .into_iter()
-          .map(|dir_entry| dir_entry.map_err(|error| error.to_string()).and_then(|entry| entry_representation(&entry)))
-          .collect::<Result<Vec<_>, _>>()?;
+        let mut representations: Vec<String> = dir.into_iter().map(|dir_entry| entry_representation(&dir_entry?)).collect::<Result<Vec<_>, _>>()?;
         representations.sort();
         let mut hasher = Sha256::new();
         for representation in &representations {
@@ -81,24 +71,17 @@ fn get_system_hash() -> Result<Sha256, String> {
         }
         Ok(hasher)
       }
-      Err(_) => Err("could not determine user home directory".to_string()),
+      Err(_) => Err(error!("could not determine user home directory")),
     },
-    _ => Err("could not determine user home directory".to_string()),
+    _ => Err(error!("could not determine user home directory")),
   }
 }
 
 // Representation is the concatenation file name and the creation timestamp
-fn entry_representation(entry: &DirEntry) -> Result<String, String> {
+fn entry_representation(entry: &DirEntry) -> DshCliResult<String> {
   Ok(format!(
     "{}:{}",
     entry.file_name().to_str().ok_or("invalid unicode in filename".to_string())?,
-    entry
-      .metadata()
-      .map_err(|error| error.to_string())?
-      .created()
-      .map_err(|error| error.to_string())?
-      .duration_since(UNIX_EPOCH)
-      .map_err(|error| error.to_string())?
-      .as_millis()
+    entry.metadata()?.created()?.duration_since(UNIX_EPOCH)?.as_millis()
   ))
 }

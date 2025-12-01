@@ -194,7 +194,7 @@ impl Capability for CapabilityBuilder<'_> {
     matches: &ArgMatches,
     dsh_api_client: &DshApiClient,
     context: &Context,
-  ) -> DshCliResult {
+  ) -> DshCliResult<()> {
     context.print_target(dsh_api_client.tenant());
     for (flag_type, executor, _) in &self.executors {
       if matches.get_flag(flag_type.id()) {
@@ -211,7 +211,7 @@ impl Capability for CapabilityBuilder<'_> {
       .await
   }
 
-  async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     for (flag_type, executor, _) in &self.executors {
       if matches.get_flag(flag_type.id()) {
         return executor.execute_without_client(argument.clone(), sub_argument.clone(), matches, context).await;

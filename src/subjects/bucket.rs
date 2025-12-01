@@ -11,7 +11,7 @@ use crate::formatters::{notifications_to_string, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS;
-use crate::{DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::{error, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::bucket::BucketInjection;
@@ -105,11 +105,11 @@ struct BucketCreate {}
 
 #[async_trait]
 impl CommandExecutor for BucketCreate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     let versioned = matches.get_flag(VERSIONED_FLAG);
     if client.get_bucket_configuration(&bucket_id).await.is_ok() {
-      return Err(format!("bucket '{}' already exists", bucket_id));
+      return Err(error!("bucket '{}' already exists", bucket_id));
     }
     context.print_explanation(format!("create new bucket '{}'", bucket_id));
     if context.dry_run() {
@@ -131,10 +131,10 @@ struct BucketDelete {}
 
 #[async_trait]
 impl CommandExecutor for BucketDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     if client.get_bucket_configuration(&bucket_id).await.is_err() {
-      return Err(format!("bucket '{}' does not exists", bucket_id));
+      return Err(error!("bucket '{}' does not exists", bucket_id));
     }
     if context.confirmed(format!("delete bucket '{}'?", bucket_id))? {
       if context.dry_run() {
@@ -158,7 +158,7 @@ struct BucketListAll {}
 
 #[async_trait]
 impl CommandExecutor for BucketListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let complete = matches.get_flag(FilterFlagType::Complete.id());
     context.print_explanation("list all buckets with their parameters");
     let start_instant = context.now();
@@ -189,7 +189,7 @@ struct BucketListIds {}
 
 #[async_trait]
 impl CommandExecutor for BucketListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all bucket ids");
     let start_instant = context.now();
     let bucket_ids = client.get_bucket_ids().await?;
@@ -209,7 +209,7 @@ struct BucketShowAll {}
 
 #[async_trait]
 impl CommandExecutor for BucketShowAll {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for bucket '{}'", bucket_id));
     let start_instant = context.now();
@@ -231,7 +231,7 @@ struct BucketShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for BucketShowUsage {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show services that use bucket '{}'", bucket_id));
     let start_instant = context.now();

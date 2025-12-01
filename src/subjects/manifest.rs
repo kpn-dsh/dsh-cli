@@ -11,7 +11,7 @@ use crate::formatters::OutputFormat;
 use crate::formatters::{hashmap_to_table, hashmap_to_vec, vec_to_table};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -126,7 +126,7 @@ pub(crate) struct ManifestExplain {}
 
 #[async_trait]
 impl CommandExecutor for ManifestExplain {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     let version_argument = matches
       .get_one::<String>(MANIFEST_VERSION_ARGUMENT)
@@ -141,11 +141,11 @@ impl CommandExecutor for ManifestExplain {
       Some(version) => client
         .manifest(manifest_id.as_str(), &version)
         .await
-        .map_err(|_| format!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
+        .map_err(|_| error!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
       None => client
         .manifest_latest_version(manifest_id.as_str(), false)
         .await
-        .map_err(|_| format!("app catalog manifest '{}' does not exist", manifest_id))?,
+        .map_err(|_| error!("app catalog manifest '{}' does not exist", manifest_id))?,
     };
     context.print_execution_time(start_instant);
     context.print(manifest.name);
@@ -184,7 +184,7 @@ struct ManifestExport {}
 
 #[async_trait]
 impl CommandExecutor for ManifestExport {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     let version_argument = matches
       .get_one::<String>(MANIFEST_VERSION_ARGUMENT)
@@ -201,12 +201,12 @@ impl CommandExecutor for ManifestExport {
         .await
         .map(|(raw_manifest, draft)| (version.clone(), raw_manifest, draft))
         .map_err(|error| match error {
-          DshApiError::NotFound(_) => format!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
-          _ => error.to_string(),
+          DshApiError::NotFound(_) => error!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
+          _ => error!("{}", error),
         })?,
       None => client.manifest_raw_latest(manifest_id.as_str(), false).await.map_err(|error| match error {
-        DshApiError::NotFound(_) => format!("app catalog manifest '{}' does not exist", manifest_id),
-        _ => error.to_string(),
+        DshApiError::NotFound(_) => error!("app catalog manifest '{}' does not exist", manifest_id),
+        _ => error!("{}", error),
       })?,
     };
     context.print_execution_time(start_instant);
@@ -226,7 +226,7 @@ struct ManifestListLatest {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListLatest {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let include_draft = matches.get_flag(FilterFlagType::Draft.id());
     if include_draft {
       context.print_explanation("list all latest versions of app catalog manifests (draft and final)");
@@ -254,7 +254,7 @@ struct ManifestListAllVersions {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListAllVersions {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let include_draft = matches.get_flag(FilterFlagType::Draft.id());
     if include_draft {
       context.print_explanation("list all versions of all app catalog manifests (draft and final)");
@@ -286,7 +286,7 @@ struct ManifestListIds {}
 
 #[async_trait]
 impl CommandExecutor for ManifestListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all app catalog manifest ids");
     let start_instant = context.now();
     let manifest_ids: Vec<String> = client.manifest_ids().await?;
@@ -306,7 +306,7 @@ struct ManifestShow {}
 
 #[async_trait]
 impl CommandExecutor for ManifestShow {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     let version_argument = matches
       .get_one::<String>(MANIFEST_VERSION_ARGUMENT)
@@ -344,7 +344,7 @@ struct ManifestShowAllVersions {}
 
 #[async_trait]
 impl CommandExecutor for ManifestShowAllVersions {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
     let include_draft = matches.get_flag(FilterFlagType::Draft.id());
     if include_draft {

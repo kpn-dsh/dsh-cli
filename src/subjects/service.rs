@@ -6,6 +6,7 @@ use crate::capability::{
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
@@ -15,7 +16,7 @@ use crate::formatters::OutputFormat;
 use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
-use crate::{edit_configuration, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::{edit_configuration, error, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use chrono::DateTime;
 use clap::{Arg, ArgAction, ArgMatches};
@@ -228,10 +229,10 @@ struct ServiceCreate {}
 
 #[async_trait]
 impl CommandExecutor for ServiceCreate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     if client.get_application_configuration(&service_id).await.is_ok() {
-      return Err(format!("service '{}' already exists", service_id));
+      return Err(error!("service '{}' already exists", service_id));
     }
     context.print_explanation(format!("create new service '{}'", service_id));
     let configuration = context.read_multi_line("enter json configuration (terminate input with ctrl-d after last line)")?;
@@ -245,7 +246,7 @@ impl CommandExecutor for ServiceCreate {
         }
         Ok(())
       }
-      Err(error) => Err(format!("invalid json configuration ({})", error)),
+      Err(error) => Err(error!("invalid json configuration ({})", error)),
     }
   }
 
@@ -258,10 +259,10 @@ struct ServiceDelete {}
 
 #[async_trait]
 impl CommandExecutor for ServiceDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     if client.get_application_configuration(&service_id).await.is_err() {
-      return Err(format!("service '{}' does not exist", service_id));
+      return Err(error!("service '{}' does not exist", service_id));
     }
     if context.confirmed(format!("delete service '{}'?", service_id))? {
       if context.dry_run() {
@@ -285,7 +286,7 @@ struct ServiceDuplicate {}
 
 #[async_trait]
 impl CommandExecutor for ServiceDuplicate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("create new service from service '{}'", service_id));
     let verbatim = matches.get_flag("verbatim-flag");
@@ -323,7 +324,7 @@ impl CommandExecutor for ServiceDuplicate {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
-        error => Err(String::from(error)),
+        error => Err(DshCliError::from(error)),
       },
     }
   }
@@ -337,7 +338,7 @@ struct ServiceEdit {}
 
 #[async_trait]
 impl CommandExecutor for ServiceEdit {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("edit service '{}' configuration", service_id));
     match client.get_application_configuration(&service_id).await {
@@ -368,7 +369,7 @@ impl CommandExecutor for ServiceEdit {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
-        error => Err(String::from(error)),
+        error => Err(DshCliError::from(error)),
       },
     }
   }
@@ -382,7 +383,7 @@ struct ServiceExport {}
 
 #[async_trait]
 impl CommandExecutor for ServiceExport {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("export configuration file for service '{}'", service_id));
     let start_instant = context.now();
@@ -405,7 +406,7 @@ struct ServiceListAll {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all services with their parameters");
     let start_instant = context.now();
     let services = client.get_application_configuration_map().await?;
@@ -434,7 +435,7 @@ struct ServiceListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListAllocationStatus {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all services with their allocation status");
     let start_instant = context.now();
     let service_ids = client.application_ids().await?;
@@ -455,7 +456,7 @@ struct ServiceListIds {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all service ids");
     let start_instant = context.now();
     let ids = client.application_ids().await?;
@@ -475,7 +476,7 @@ struct ServiceListTasks {}
 
 #[async_trait]
 impl CommandExecutor for ServiceListTasks {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     fn tasks_to_string(tasks: Vec<String>) -> String {
       if tasks.len() <= 4 {
         tasks.iter().map(|t| t.to_string()).collect_vec().join(", ")
@@ -512,7 +513,7 @@ struct ServiceOpen {}
 
 #[async_trait]
 impl CommandExecutor for ServiceOpen {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant_name = get_target_tenant(matches, context.settings())?;
     let service_id = target.unwrap_or_else(|| unreachable!());
@@ -520,7 +521,7 @@ impl CommandExecutor for ServiceOpen {
     let service = client.get_application_configuration(&service_id).await?;
     context.print_execution_time(start_instant);
     if service.exposed_ports.len() > 1 {
-      Err("service has more than one exposed port".to_string())
+      Err(error!("service has more than one exposed port"))
     } else {
       match service.exposed_ports.iter().next() {
         Some((_, port_mapping)) => match &port_mapping.vhost {
@@ -544,15 +545,15 @@ impl CommandExecutor for ServiceOpen {
                   );
                   Ok(())
                 } else {
-                  Err(format!("exposed port has illegal zone {}", zone))
+                  Err(error!("exposed port has illegal zone {}", zone))
                 }
               }
-              None => Err("exposed port has no zone".to_string()),
+              None => Err(error!("exposed port has no zone")),
             }
           }
-          None => Err("port mapping has no vhost".to_string()),
+          None => Err(error!("port mapping has no vhost")),
         },
-        None => Err("service has no exposed ports".to_string()),
+        None => Err(error!("service has no exposed ports")),
       }
     }
   }
@@ -566,7 +567,7 @@ struct ServiceRestart {}
 
 #[async_trait]
 impl CommandExecutor for ServiceRestart {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("restart service '{}'", service_id));
     match client.get_application_configuration(&service_id).await {
@@ -623,7 +624,7 @@ impl CommandExecutor for ServiceRestart {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
-        error => Err(String::from(error)),
+        error => Err(DshCliError::from(error)),
       },
     }
   }
@@ -637,7 +638,7 @@ struct ServiceShowAll {}
 
 #[async_trait]
 impl CommandExecutor for ServiceShowAll {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for service '{}'", service_id));
     let start_instant = context.now();
@@ -655,7 +656,7 @@ struct ServiceShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for ServiceShowAllocationStatus {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show allocation status for service '{}'", service_id));
     let start_instant = context.now();
@@ -673,7 +674,7 @@ struct ServiceShowTasks {}
 
 #[async_trait]
 impl CommandExecutor for ServiceShowTasks {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     fn timestamp(task_status: &TaskStatus) -> i64 {
       match task_status.actual {
         None => 0,
@@ -703,7 +704,7 @@ struct ServiceStart {}
 
 #[async_trait]
 impl CommandExecutor for ServiceStart {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     let instances: u64 = matches.get_one::<u64>(INSTANCES_FLAG).cloned().unwrap_or(1);
     if instances == 1 {
@@ -733,7 +734,7 @@ impl CommandExecutor for ServiceStart {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
-        error => Err(String::from(error)),
+        error => Err(DshCliError::from(error)),
       },
     }
   }
@@ -747,7 +748,7 @@ struct ServiceStop {}
 
 #[async_trait]
 impl CommandExecutor for ServiceStop {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("stop service '{}'", service_id));
     match client.get_application_configuration(&service_id).await {
@@ -773,7 +774,7 @@ impl CommandExecutor for ServiceStop {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
-        error => Err(String::from(error)),
+        error => Err(DshCliError::from(error)),
       },
     }
   }
@@ -787,14 +788,14 @@ struct ServiceUpdate {}
 
 #[async_trait]
 impl CommandExecutor for ServiceUpdate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     let cpus: Option<f64> = match matches.get_one::<f64>(CPUS_FLAG).cloned() {
       Some(cpus) => {
         if cpus >= 0.1 {
           Some(cpus)
         } else {
-          return Err("cpus should be greater than or equal to 0.1".to_string());
+          return Err(error!("cpus should be greater than or equal to 0.1"));
         }
       }
       None => None,
@@ -842,7 +843,7 @@ impl CommandExecutor for ServiceUpdate {
               }
               Ok(())
             }
-            Err(error) => Err(format!("invalid json configuration ({})", error)),
+            Err(error) => Err(error!("invalid json configuration ({})", error)),
           }
         }
       }
@@ -851,7 +852,7 @@ impl CommandExecutor for ServiceUpdate {
           context.print_error(format!("service '{}' does not exist", service_id));
           Ok(())
         }
-        error => Err(String::from(error)),
+        error => Err(DshCliError::from(error)),
       },
     }
   }

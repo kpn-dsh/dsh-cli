@@ -29,7 +29,7 @@ use crate::subjects::topic::{
   retention_bytes_flag, retention_ms_flag, segment_bytes_flag, CLEANUP_POLICY_PROPERTY, COMPRESSION_TYPE_PROPERTY, DELETE_RETENTION_MS_PROPERTY, MAX_MESSAGE_BYTES_PROPERTY,
   MESSAGE_TIMESTAMP_PROPERTY, RETENTION_BYTES_PROPERTY, RETENTION_MS_PROPERTY, SEGMENT_BYTES_PROPERTY,
 };
-use crate::{read_single_line, Context, DshCliResult};
+use crate::{error, error_map, read_single_line, Context, DshCliResult};
 use dsh_api::types::{PublicManagedStream, PublicManagedStreamContractPartitioner};
 use itertools::Itertools;
 use serde::Serialize;
@@ -175,12 +175,12 @@ struct StreamCreate {}
 
 #[async_trait]
 impl CommandExecutor for StreamCreate {
-  async fn execute_with_client(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     if let Some(managed_stream) = client.managed_stream_configuration(&managed_stream_id).await? {
       match managed_stream {
-        Stream::Internal(_) => return Err(format!("internal managed stream '{}' already exists", managed_stream_id)),
-        Stream::Public(_) => return Err(format!("public managed stream '{}' already exists", managed_stream_id)),
+        Stream::Internal(_) => return Err(error!("internal managed stream '{}' already exists", managed_stream_id)),
+        Stream::Public(_) => return Err(error!("public managed stream '{}' already exists", managed_stream_id)),
       }
     }
     let topic = create_topic(matches)?;
@@ -227,7 +227,7 @@ struct StreamDelete {}
 
 #[async_trait]
 impl CommandExecutor for StreamDelete {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     match client.managed_stream_configuration(&managed_stream_id).await? {
       Some(Stream::Internal(_)) => {
@@ -256,7 +256,7 @@ impl CommandExecutor for StreamDelete {
         }
         Ok(())
       }
-      None => Err(format!("managed stream '{}' does not exist", managed_stream_id)),
+      None => Err(error!("managed stream '{}' does not exist", managed_stream_id)),
     }
   }
 
@@ -269,7 +269,7 @@ struct StreamListAll {}
 
 #[async_trait]
 impl CommandExecutor for StreamListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     match (matches.get_flag(FilterFlagType::Internal.id()), matches.get_flag(FilterFlagType::Public.id())) {
       (false, false) | (true, true) => {
         context.print_explanation("list all internal and public managed streams");
@@ -320,7 +320,7 @@ struct StreamListIds {}
 
 #[async_trait]
 impl CommandExecutor for StreamListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let start_instant = context.now();
     let stream_ids = match (matches.get_flag(FilterFlagType::Internal.id()), matches.get_flag(FilterFlagType::Public.id())) {
       (false, false) | (true, true) => {
@@ -356,7 +356,7 @@ struct StreamShowAll {}
 
 #[async_trait]
 impl CommandExecutor for StreamShowAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     context.print_explanation(format!("show configuration for managed stream '{}'", managed_stream_id));
     let start_instant = context.now();
@@ -374,7 +374,7 @@ impl CommandExecutor for StreamShowAll {
       }
       (None, _) => {
         context.print_execution_time(start_instant);
-        Err(format!("managed stream '{}' does not exist", managed_stream_id))
+        Err(error!("managed stream '{}' does not exist", managed_stream_id))
       }
     }
   }
@@ -595,13 +595,13 @@ static LIST_PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 10] = [
   ManagedStreamLabel::CanBeRetained,
 ];
 
-fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<ManagedStreamId, String> {
+fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> DshCliResult<ManagedStreamId> {
   match matches.get_one::<String>(MANAGED_STREAM_ARGUMENT) {
-    Some(managed_stream_argument) => Ok(ManagedStreamId::try_from(managed_stream_argument).map_err(|error| error.to_string())?),
+    Some(managed_stream_argument) => Ok(ManagedStreamId::try_from(managed_stream_argument).map_err(error_map!("{}"))?),
     None => {
       let line = read_single_line(format!("enter managed stream id: {}---", managing_tenant))?;
       let managed_stream_id = format!("{}---{}", managing_tenant, line);
-      let managed_stream_id = ManagedStreamId::try_from(managed_stream_id).map_err(|error| error.to_string())?;
+      let managed_stream_id = ManagedStreamId::try_from(managed_stream_id).map_err(error_map!("{}"))?;
       Ok(managed_stream_id)
     }
   }

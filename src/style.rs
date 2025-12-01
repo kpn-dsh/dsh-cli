@@ -1,3 +1,5 @@
+use crate::error;
+use crate::error::DshCliError;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -49,7 +51,7 @@ impl Display for DshColor {
 }
 
 impl TryFrom<&str> for DshColor {
-  type Error = String;
+  type Error = DshCliError;
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
@@ -62,7 +64,7 @@ impl TryFrom<&str> for DshColor {
       "red" => Ok(Self::Red),
       "white" => Ok(Self::White),
       "yellow" => Ok(Self::Yellow),
-      _ => Err(format!("invalid matching color '{}'", value)),
+      _ => Err(error!("invalid matching color '{}'", value)),
     }
   }
 }
@@ -104,7 +106,7 @@ impl Display for DshStyle {
 }
 
 impl TryFrom<&str> for DshStyle {
-  type Error = String;
+  type Error = DshCliError;
 
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
@@ -114,7 +116,7 @@ impl TryFrom<&str> for DshStyle {
       "italic" => Ok(Self::Italic),
       "underline" => Ok(Self::Underline),
       "reverse" => Ok(Self::Reverse),
-      _ => Err(format!("invalid matching style '{}'", value)),
+      _ => Err(error!("invalid matching style '{}'", value)),
     }
   }
 }

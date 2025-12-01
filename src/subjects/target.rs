@@ -13,7 +13,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::{get_settings, write_settings, Settings};
 use crate::subject::{Requirements, Subject};
 use crate::targets::{all_targets, delete_target, read_target, upsert_target, Target};
-use crate::{read_single_line, DshCliResult};
+use crate::{error, read_single_line, DshCliResult};
 
 struct TargetSubject {}
 
@@ -92,18 +92,18 @@ struct TargetCreate {}
 
 #[async_trait]
 impl CommandExecutor for TargetCreate {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("create new target configuration");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
     if let Some(existing_target) = read_target(&platform, &tenant)? {
-      return Err(format!(
+      return Err(error!(
         "target configuration '{}' already exists (first delete the existing target configuration)",
         existing_target
       ));
     };
     let password = context.read_single_line_password("enter password")?;
-    let target = Target::new(platform, tenant, Some(password))?;
+    let target = Target::new(platform, tenant, Some(password));
     if context.dry_run() {
       context.print_warning(format!("dry-run mode, target '{}' not created", target));
     } else {
@@ -122,7 +122,7 @@ struct TargetDelete {}
 
 #[async_trait]
 impl CommandExecutor for TargetDelete {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("delete existing target");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
@@ -152,7 +152,7 @@ impl CommandExecutor for TargetDelete {
           context.print_outcome("cancelled");
         }
       }
-      None => return Err(format!("target '{}@{}' does not exist", tenant, platform)),
+      None => return Err(error!("target '{}@{}' does not exist", tenant, platform)),
     }
     Ok(())
   }
@@ -166,7 +166,7 @@ struct TargetList {}
 
 #[async_trait]
 impl CommandExecutor for TargetList {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all target configurations");
     let (settings, _) = get_settings(None)?;
     let targets = all_targets()?;
@@ -195,14 +195,14 @@ impl CommandExecutor for TargetList {
   }
 }
 
-pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> Result<DshPlatform, String> {
+pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<DshPlatform> {
   match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
     Some(dsh_platform) => Ok(DshPlatform::try_from(dsh_platform.as_str())?),
     None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
   }
 }
 
-pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<String> {
   match matches.get_one::<String>(TENANT_NAME_ARGUMENT) {
     Some(tenant_argument) => Ok(tenant_argument.to_string()),
     None => Ok(read_single_line("enter tenant: ")?),

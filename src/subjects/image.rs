@@ -88,7 +88,7 @@ struct ImageFind {}
 
 #[async_trait]
 impl CommandExecutor for ImageFind {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let image_query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*image_query)? } else { &ExactMatchQueryProcessor::create(&image_query)? };
@@ -109,7 +109,7 @@ struct ImageListAll {}
 
 #[async_trait]
 impl CommandExecutor for ImageListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all images used in services");
     let start_instant = context.now();
     let services = client.get_application_configuration_map().await?;
@@ -123,7 +123,7 @@ impl CommandExecutor for ImageListAll {
   }
 }
 
-fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> Result<(), String> {
+fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
   let (include_started, include_stopped) = include_started_stopped(matches);
   let mut services = services.iter().collect_vec();
   services.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));

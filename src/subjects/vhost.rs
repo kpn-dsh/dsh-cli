@@ -90,7 +90,7 @@ struct VhostList {}
 
 #[async_trait]
 impl CommandExecutor for VhostList {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_warning("only vhosts that are actually used in service configurations will be listed here");
     context.print_explanation("list configured vhosts");
     let start_instant = context.now();
@@ -138,7 +138,7 @@ struct VhostListUsage {}
 
 #[async_trait]
 impl CommandExecutor for VhostListUsage {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_warning("only vhosts that are actually used in service configurations will be listed here");
     context.print_explanation("list vhosts with services and apps that use them");
     let start_instant = context.now();

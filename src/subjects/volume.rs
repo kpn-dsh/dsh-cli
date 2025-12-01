@@ -10,7 +10,7 @@ use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_APPS, DEPENDANT_LABELS_LIST, DEPENDANT_LABELS_SERVICES};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -109,17 +109,17 @@ struct VolumeCreate {}
 
 #[async_trait]
 impl CommandExecutor for VolumeCreate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("create new volume '{}'", volume_id));
     if client.get_volume(&volume_id).await.is_ok() {
-      return Err(format!("volume '{}' already exists", volume_id));
+      return Err(error!("volume '{}' already exists", volume_id));
     }
     let size_gi_b: i64 = match matches.get_one::<i64>(SIZE_FLAG) {
       Some(size) => *size,
       None => {
         let line = context.read_single_line("enter size in gigabytes")?;
-        line.parse::<i64>().map_err(|_| format!("could not parse '{}' as a valid integer", line))?
+        line.parse::<i64>().map_err(|_| error!("could not parse '{}' as a valid integer", line))?
       }
     };
     let volume = Volume { size_gi_b };
@@ -141,10 +141,10 @@ struct VolumeDelete {}
 
 #[async_trait]
 impl CommandExecutor for VolumeDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     if client.get_volume(&volume_id).await.is_err() {
-      return Err(format!("volume '{}' does not exists", volume_id));
+      return Err(error!("volume '{}' does not exists", volume_id));
     }
     if context.confirmed(format!("delete volume '{}'?", volume_id))? {
       if context.dry_run() {
@@ -168,7 +168,7 @@ struct VolumeListAll {}
 
 #[async_trait]
 impl CommandExecutor for VolumeListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all volumes with their parameters");
     let start_instant = context.now();
     let volume_ids = client.get_volume_ids().await?;
@@ -189,7 +189,7 @@ struct VolumeListAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for VolumeListAllocationStatus {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all volumes with their allocation status");
     let start_instant = context.now();
     let volume_ids = client.get_volume_ids().await?;
@@ -210,7 +210,7 @@ struct VolumeListConfiguration {}
 
 #[async_trait]
 impl CommandExecutor for VolumeListConfiguration {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all volumes with their configurations");
     let start_instant = context.now();
     let volume_ids = client.get_volume_ids().await?;
@@ -231,7 +231,7 @@ struct VolumeListIds {}
 
 #[async_trait]
 impl CommandExecutor for VolumeListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list volume ids");
     let start_instant = context.now();
     let volume_ids = client.get_volume_ids().await?;
@@ -251,7 +251,7 @@ struct VolumeListUsage {}
 
 #[async_trait]
 impl CommandExecutor for VolumeListUsage {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all volumes that are used in apps or services");
     let start_instant = context.now();
     let volumes_with_usage: Vec<(String, Vec<Dependant<VolumeInjection>>)> = client.volumes_with_dependants().await?;
@@ -279,7 +279,7 @@ struct VolumeShowAll {}
 
 #[async_trait]
 impl CommandExecutor for VolumeShowAll {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for volume '{}'", volume_id));
     let start_instant = context.now();
@@ -297,7 +297,7 @@ struct VolumeShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for VolumeShowAllocationStatus {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the allocation status for volume '{}'", volume_id));
     let start_instant = context.now();
@@ -315,7 +315,7 @@ struct VolumeShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for VolumeShowUsage {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the apps and services that use volume '{}'", volume_id));
     let start_instant = context.now();

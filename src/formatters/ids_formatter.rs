@@ -1,5 +1,6 @@
 use crate::context::Context;
 use crate::formatters::OutputFormat;
+use crate::{error, DshCliResult};
 use std::collections::HashMap;
 use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
@@ -36,7 +37,7 @@ impl<'a> IdsFormatter<'a> {
     self.ids.is_empty()
   }
 
-  pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> Result<(), String> {
+  pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => {
         self.context.print(self.ids.join(","));
@@ -48,7 +49,7 @@ impl<'a> IdsFormatter<'a> {
           self.context.print(json);
           Ok(())
         }
-        Err(error) => Err(format!("could not convert target ids to json ({})", error)),
+        Err(error) => Err(error!("could not convert target ids to json ({})", error)),
       },
 
       OutputFormat::JsonCompact => match serde_json::to_string(&self.ids) {
@@ -56,7 +57,7 @@ impl<'a> IdsFormatter<'a> {
           self.context.print(json);
           Ok(())
         }
-        Err(error) => Err(format!("could not convert target ids to json compact ({})", error)),
+        Err(error) => Err(error!("could not convert target ids to json compact ({})", error)),
       },
 
       OutputFormat::Plain => {
@@ -103,7 +104,7 @@ impl<'a> IdsFormatter<'a> {
           self.context.print(toml);
           Ok(())
         }
-        Err(error) => Err(format!("could not convert target ids to toml ({})", error)),
+        Err(error) => Err(error!("could not convert target ids to toml ({})", error)),
       },
 
       OutputFormat::TomlCompact => match toml::to_string(&HashMap::from([(&self.label, &self.ids)])) {
@@ -111,7 +112,7 @@ impl<'a> IdsFormatter<'a> {
           self.context.print(toml);
           Ok(())
         }
-        Err(error) => Err(format!("could not convert target ids to toml compact ({})", error)),
+        Err(error) => Err(error!("could not convert target ids to toml compact ({})", error)),
       },
 
       OutputFormat::Yaml => match serde_yaml::to_string(&self.ids) {
@@ -119,7 +120,7 @@ impl<'a> IdsFormatter<'a> {
           self.context.print(yaml);
           Ok(())
         }
-        Err(error) => Err(format!("could not convert target ids to yaml ({})", error)),
+        Err(error) => Err(error!("could not convert target ids to yaml ({})", error)),
       },
     }
   }
