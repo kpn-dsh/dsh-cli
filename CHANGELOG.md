@@ -10,11 +10,13 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 * Added default values to explanation of environment variables.
 * Set color and styling for logging information.
+* Capability to set environment variables from file.
 
 ### Changed
 
 * Improved rendering of token payload.
 * Improved error handling.
+* Improved handling of environment variables.
 
 ### Fixes
 

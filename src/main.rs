@@ -8,11 +8,11 @@ extern crate core;
 
 use crate::authentication::{get_access_token, get_access_tokens, AuthenticationMethod};
 use crate::environment_variables::{
-  env_var_argument, env_vars_argument, get_set_environment_variables, print_environment_variable, print_environment_variables, ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
-  ENV_VAR_DSH_CLI_HOME, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
+  env_var_argument, env_var_file_argument, env_vars_argument, environment_variable, get_configured_environment_variables, print_environment_variable, print_environment_variables,
+  ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT, ENV_VAR_DSH_CLI_HOME, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
 };
 use crate::error::DshCliError;
-use crate::global_arguments::{authentication_argument, browser_argument, environment_variable_argument, ENVIRONMENT_VARIABLE_ARGUMENT};
+use crate::global_arguments::{authentication_argument, browser_argument, environment_variable_argument};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -48,7 +48,7 @@ use std::io::ErrorKind::NotFound;
 use std::io::{stdin, stdout, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
-use std::{env, fs, process};
+use std::{fs, process};
 use subject::Subject;
 use subjects::api::API_SUBJECT;
 use subjects::app::APP_SUBJECT;
@@ -354,7 +354,7 @@ async fn inner_main() -> DshCliExit {
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
-        debug!("{:?}", requirements);
+        debug!("{}", requirements);
         if requirements.needs_dsh_api_client() {
           let client = match create_client(&matches, &context).await {
             Ok(Some(client)) => client,
@@ -379,7 +379,7 @@ async fn inner_main() -> DshCliExit {
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject_list_shortcut) => {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
-          debug!("{:?}", requirements);
+          debug!("{}", requirements);
           if requirements.needs_dsh_api_client() {
             let client = match create_client(&matches, &context).await {
               Ok(Some(client)) => client,
@@ -459,6 +459,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       terminal_width_argument(),
       // Tool options
       env_var_argument(),
+      env_var_file_argument(),
       env_vars_argument(),
       generate_autocomplete_file_argument(),
       log_level_argument(),
@@ -488,19 +489,9 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
     default_settings.push(("dry run mode", if dry_run { "enabled".to_string() } else { "disabled".to_string() }));
   }
 
-  let mut environment_variables: Vec<(&str, String)> = vec![];
-  let env_vars = get_set_environment_variables();
-  if !env_vars.is_empty() {
-    for (env_var, value) in &env_vars {
-      if env_var == ENV_VAR_DSH_CLI_PASSWORD {
-        environment_variables.push((env_var, "********".to_string()));
-      } else {
-        environment_variables.push((env_var, value.to_string()));
-      }
-    }
-  }
-
   let mut after_help: Vec<String> = vec![];
+
+  let environment_variables: Vec<(&str, String)> = get_configured_environment_variables();
   if !environment_variables.is_empty() {
     let environment_variables_table = to_help_items("Environment variables:", environment_variables);
     after_help.push(environment_variables_table);
@@ -540,71 +531,6 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
   command = command.after_long_help(after_help.join("\n\n"));
 
   command
-}
-
-/// # Get an environment variable value
-///
-/// 1. Try if `env_var_name` is specified as a command line environment variable argument
-/// 1. Try if `env_var_name` is specified as a regular environment variable
-/// 1. Default to `None`
-///
-/// # Parameters
-/// * `env_var_name` - name of the environment variable
-/// * `matches` - parsed command line arguments
-///
-/// # Returns
-/// * `Err<message>` - when the command line specifies the environment variable `env_var_name`
-///   more than once.
-/// * `Ok<Some<value>>` - when the environment variable `env_var_name` is specified either
-///   via the command line or as a regular environment variable.
-/// * `Ok<None>` - when the environment variable `env_var_name` is not specified.
-fn environment_variable(env_var_name: &str, matches: &ArgMatches) -> DshCliResult<Option<String>> {
-  match matches.get_many::<String>(ENVIRONMENT_VARIABLE_ARGUMENT) {
-    Some(env_var_arguments) => {
-      let matching_env_var_arguments = env_var_arguments
-        .filter_map(|env_var_argument| env_var_argument.strip_prefix(env_var_name).and_then(|rest| rest.strip_prefix("=")))
-        .collect_vec();
-      match matching_env_var_arguments.len() {
-        0 => match env::var(env_var_name) {
-          Ok(env_var_value) => Ok(Some(env_var_value)),
-          Err(_) => Ok(None),
-        },
-        1 => {
-          if env::var(env_var_name).is_ok() {
-            log::warn!("command line argument overrides environment variable {}", env_var_name);
-          }
-          Ok(matching_env_var_arguments.first().map(|env_var_value| env_var_value.to_string()))
-        }
-        _ => Err(error!("environment variable {} is specified more than once on the command line", env_var_name)),
-      }
-    }
-    None => match env::var(env_var_name) {
-      Ok(env_var_value) => Ok(Some(env_var_value)),
-      Err(_) => Ok(None),
-    },
-  }
-}
-
-/// # Check if an environment variable is specified
-///
-/// 1. Try if `env_var_name` is specified as a command line environment variable argument
-/// 1. Try if `env_var_name` is specified as a regular environment variable
-/// 1. Default to `false`
-///
-/// # Parameters
-/// * `env_var_name` - name of the environment variable
-/// * `matches` - parsed command line arguments
-///
-/// # Returns
-/// * `true` - when the environment variable `env_var_name` is specified either
-///   via the command line or as a regular environment variable. Note that the function also
-///   returns `true` when `env_var_name` is specified on the command line more than once.
-/// * `false` - when the environment variable `env_var_name` is not specified.
-fn environment_variable_specified(env_var_name: &str, matches: &ArgMatches) -> bool {
-  match environment_variable(env_var_name, matches) {
-    Ok(env_var_value) => env_var_value.is_some(),
-    Err(_) => true,
-  }
 }
 
 fn read_single_line(prompt: impl AsRef<str>) -> DshCliResult<String> {
@@ -647,11 +573,11 @@ fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
 /// `Ok(None)` - when no implicit platform is available
 /// `Err<String>` - when invalid platform name was found
 fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
-  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, matches)? {
+  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, Some(matches))? {
     Some(platform_name_from_env_var) => {
       debug!(
         "target platform '{}' (environment variable '{}')",
-        platform_name_from_env_var, ENV_VAR_DSH_CLI_PASSWORD
+        platform_name_from_env_var, ENV_VAR_DSH_CLI_PLATFORM
       );
       DshPlatform::try_from(platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
     }
@@ -741,7 +667,7 @@ fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> DshCliResul
 /// `Some<String>` - containing the tenant name
 /// `None` - when no implicit tenant name is available
 fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
-  match environment_variable(ENV_VAR_DSH_CLI_TENANT, matches)? {
+  match environment_variable(ENV_VAR_DSH_CLI_TENANT, Some(matches))? {
     Some(tenant_name_from_env_var) => {
       debug!("target tenant '{}' (environment variable '{}')", tenant_name_from_env_var, ENV_VAR_DSH_CLI_TENANT);
       Ok(Some(tenant_name_from_env_var))
@@ -841,14 +767,14 @@ fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> DshCliResult<
 fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> DshCliResult<String> {
   match matches.get_one::<PathBuf>(TARGET_PASSWORD_FILE_ARGUMENT) {
     Some(password_file_from_arg) => read_target_password_file(password_file_from_arg),
-    None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD_FILE, matches)? {
+    None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD_FILE, Some(matches))? {
       Some(password_file_from_env) => read_target_password_file(password_file_from_env),
-      None => match env::var(ENV_VAR_DSH_CLI_PASSWORD) {
-        Ok(password_from_env_var) => {
+      None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD, None)? {
+        Some(password_from_env_var) => {
           debug!("target password (environment variable '{}')", ENV_VAR_DSH_CLI_PASSWORD);
           Ok(password_from_env_var)
         }
-        Err(_) => match (
+        None => match (
           read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
           get_target_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
         ) {
@@ -903,15 +829,15 @@ fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> DshCliResult<S
 /// Note that the environment variables must be regular environment variables and cannot
 /// be specified via the command line `--environment-variable` argument.
 fn dsh_directory() -> DshCliResult<Option<PathBuf>> {
-  let dsh_directory: PathBuf = match env::var(ENV_VAR_DSH_CLI_HOME) {
-    Ok(dsh_directory_from_env_var) => {
+  let dsh_directory: PathBuf = match environment_variable(ENV_VAR_DSH_CLI_HOME, None)? {
+    Some(dsh_directory_from_env_var) => {
       if dsh_directory_from_env_var.is_empty() {
         return Ok(None);
       } else {
         PathBuf::new().join(dsh_directory_from_env_var)
       }
     }
-    Err(_) => match my_home()? {
+    None => match my_home()? {
       Some(user_home_directory) => user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY),
       None => {
         return Err(error!(
@@ -982,7 +908,7 @@ async fn edit_configuration<C>(configuration: &C, temporary_configuration_file_n
 where
   C: for<'de> Deserialize<'de> + Serialize,
 {
-  match environment_variable("EDITOR", matches)? {
+  match environment_variable("EDITOR", Some(matches))? {
     Some(editor_from_env_var) => {
       let editor = editor_from_env_var.split(" ").collect_vec();
       let editor_command = editor.first().ok_or("".to_string())?;

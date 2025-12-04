@@ -3,6 +3,7 @@ use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{BrowserMethod, Context};
+use crate::environment_variables::get_configured_environment_variables;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
@@ -15,7 +16,7 @@ use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::{get_target_password_from_keyring, read_target};
 use crate::verbosity::Verbosity;
-use crate::{error, get_set_environment_variables, DshCliResult, ENV_VAR_DSH_CLI_PASSWORD};
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
@@ -357,8 +358,6 @@ impl CommandExecutor for SettingDefault {
 
 struct SettingList {}
 
-const HIDE_PASSWORD: &str = "********";
-
 #[async_trait]
 impl CommandExecutor for SettingList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
@@ -370,17 +369,12 @@ impl CommandExecutor for SettingList {
       context.print_explanation("list default settings");
       UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings, None)?
     }
-    let env_vars = get_set_environment_variables();
-    if !env_vars.is_empty() {
+    let configured_environment_variables = get_configured_environment_variables();
+    if !configured_environment_variables.is_empty() {
       context.print_explanation("list environment variables");
       let mut formatter = ListFormatter::new(&ENVIRONMENT_VARIABLE_LABELS, None, context);
-      let hide_password = HIDE_PASSWORD.to_string();
-      for (env_var, value) in &env_vars {
-        if env_var == ENV_VAR_DSH_CLI_PASSWORD {
-          formatter.push_target_id_value(env_var.clone(), &hide_password);
-        } else {
-          formatter.push_target_id_value(env_var.clone(), value);
-        }
+      for (env_var_name, env_var_value) in &configured_environment_variables {
+        formatter.push_target_id_value(env_var_name.to_string(), env_var_value);
       }
       formatter.print(None)?;
     }
