@@ -4,8 +4,9 @@ use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
+use std::fmt::{Display, Formatter};
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub(crate) struct Requirements {
   needs_dsh_api_client: bool,
 }
@@ -25,6 +26,12 @@ impl Requirements {
 
   pub(crate) fn needs_dsh_api_client(&self) -> bool {
     self.needs_dsh_api_client
+  }
+}
+
+impl Display for Requirements {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "needs_dsh_api_client: {}", self.needs_dsh_api_client)
   }
 }
 

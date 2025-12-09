@@ -22,7 +22,7 @@ use chrono::DateTime;
 use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::parse::ImageString;
-use dsh_api::types::{Application, TaskState};
+use dsh_api::types::{Application, ApplicationSecret, TaskState};
 use dsh_api::types::{Task, TaskStatus};
 use dsh_api::vhost::VhostString;
 use dsh_api::DshApiError;
@@ -30,6 +30,7 @@ use futures::future::try_join_all;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -973,7 +974,7 @@ impl SubjectFormatter<ServiceLabel> for Application {
         .map(|readable_stream| readable_stream.to_string())
         .collect_vec()
         .join(", "),
-      ServiceLabel::Secrets => self.secrets.clone().into_iter().map(|secret| secret.name).collect_vec().join(", "),
+      ServiceLabel::Secrets => secrets_to_table(&self.secrets),
       ServiceLabel::SingleInstance => self.single_instance.to_string(),
       ServiceLabel::SpreadGroup => self.spread_group.clone().unwrap_or_default(),
       ServiceLabel::Target => service_id.to_string(),
@@ -990,6 +991,23 @@ impl SubjectFormatter<ServiceLabel> for Application {
         .join(", "),
     }
   }
+}
+
+fn secrets_to_table(secrets: &[ApplicationSecret]) -> String {
+  let m: HashMap<String, String> = secrets
+    .iter()
+    .map(|application_secret| {
+      (
+        application_secret.name.clone(),
+        application_secret
+          .injections
+          .iter()
+          .map(|injection| injection.get("env").map(|s| s.to_string()).unwrap_or("".to_string()))
+          .join(", "),
+      )
+    })
+    .collect::<HashMap<_, _>>();
+  hashmap_to_table(&m)
 }
 
 static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
