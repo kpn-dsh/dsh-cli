@@ -61,12 +61,15 @@ export SAFE_COMMANDS=(
   "certificate show $CERTIFICATE_UNDER_TEST --usage"
   "certificate show $CERTIFICATE_UNDER_TEST"
 
+  "env find $ENV_VALUE_UNDER_TEST"
   "env find $ENV_VALUE_UNDER_TEST --started"
   "env find $ENV_VALUE_UNDER_TEST --stopped"
-  "env find $ENV_VALUE_UNDER_TEST"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --regex"
   "env find $ENV_VALUE_UNDER_TEST_REGEX --regex --started"
   "env find $ENV_VALUE_UNDER_TEST_REGEX --regex --stopped"
-  "env find $ENV_VALUE_UNDER_TEST_REGEX --regex"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --substring"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --ignore-case"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --substring --ignore-case"
 
   "image find $IMAGE_UNDER_TEST --started"
   "image find $IMAGE_UNDER_TEST --stopped"
