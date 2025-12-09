@@ -19,10 +19,12 @@ use crate::{error, error_append, DshCliResult};
 use clap::builder::styling::Style;
 use clap::ArgMatches;
 use dsh_api::dsh_api_tenant::DshApiTenant;
-use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
+use dsh_api::query_processor::{Part, QueryProcessor, RegexQueryProcessor};
+use dsh_api::types::{AllocationStatus, Notification};
 use getch_rs::{Getch, Key};
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
@@ -765,6 +767,44 @@ impl Context {
     }
   }
 
+  /// # Prints an explanation to stderr
+  ///
+  /// This method is used to print an explanation about the function that is
+  /// about to be executed to stderr. When the verbosity level is `High` and a client is available,
+  /// also the target is printed to stderr.
+  /// If `quiet` is `true`, nothing will be printed.
+  /// The standard error device is almost always a tty, but can in special cases also be
+  /// a pipe or an output file.
+  pub(crate) fn print_allocation_status<T: Display>(&self, allocation_status: &AllocationStatus, target: T) {
+    if !self.quiet {
+      for notification in &allocation_status.notifications {
+        // if notification.remove {
+        self.eprintln_warning(format_notification_message(notification));
+        // } else {
+        //   self.eprintln(format_notification_message(notification));
+        // }
+      }
+      if let Some(derived_from) = &allocation_status.derived_from {
+        self.eprint(format!("derived from: {}", derived_from));
+      }
+      match self.verbosity {
+        Verbosity::Off | Verbosity::Low => (),
+        Verbosity::Medium => {
+          if allocation_status.provisioned {
+            self.eprintln(format!("{} is provisioned", target));
+          }
+        }
+        Verbosity::High => {
+          if allocation_status.provisioned {
+            self.eprintln(format!("{} is provisioned", target));
+          } else {
+            self.eprintln(format!("{} is not provisioned", target));
+          }
+        }
+      }
+    }
+  }
+
   /// # Prints the target platform and tenant to stderr
   ///
   /// This method is used to print the target platform and tenant to stderr,
@@ -982,4 +1022,44 @@ impl Context {
       println!("{}{}{:#}", self.stdout_style, text, self.stdout_style)
     }
   }
+}
+
+lazy_static! {
+  static ref NotificationQueryProcessor: RegexQueryProcessor = RegexQueryProcessor::create(r"\$\{[a-zA-Z0-9:_-]+\}").unwrap();
+}
+
+fn format_notification_message(notification: &Notification) -> String {
+  match NotificationQueryProcessor.matching_parts(&notification.message) {
+    Some(parts) => parts
+      .iter()
+      .map(|part| match part {
+        Matching(matching) => {
+          let stripped = &matching[2..matching.len() - 1];
+          if let Some(key) = stripped.strip_prefix("urn:") {
+            match notification.args.get(key) {
+              Some(value) => value.to_string(),
+              None => key.to_uppercase(),
+            }
+          } else {
+            match notification.args.get(stripped) {
+              Some(value) => value.to_string(),
+              None => stripped.to_uppercase(),
+            }
+          }
+        }
+        NonMatching(non_matching) => non_matching.to_string(),
+      })
+      .join(""),
+    None => notification.message.clone(),
+  }
+}
+
+#[test]
+fn test_format_notification_message() {
+  let mut args = std::collections::HashMap::<String, String>::new();
+  args.insert("arg1".to_string(), "ARG1".to_string());
+  args.insert("arg2".to_string(), "ARG2".to_string());
+  let message = "abc${arg1}def${urn:arg2}ghi";
+  let notification = Notification::new(args, message, true);
+  assert_eq!(format_notification_message(&notification), "abcARG1defARG2ghi");
 }
