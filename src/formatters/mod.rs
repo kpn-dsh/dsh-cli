@@ -321,9 +321,9 @@ pub(crate) fn notifications_to_string(notifications: &[Notification]) -> String 
 
 pub(crate) fn notification_to_string(notification: &Notification) -> String {
   format!(
-    "{}, {}, {}",
+    "{}\n{}\n{}",
     if notification.remove { "remove".to_string() } else { "create/update".to_string() },
     notification.message,
-    notification.args.iter().map(|(key, value)| format!("{}:{}", key, value)).collect_vec().join(", "),
+    notification.args.iter().map(|(key, value)| format!("{}:{}", key, value)).collect_vec().join("\n"),
   )
 }
