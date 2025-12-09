@@ -26,12 +26,13 @@ export DSH_CLI_VERBOSITY="high"
 export DSH_CLI_SHOW_EXECUTION_TIME=""
 
 function unset_all {
-  unset DSH_CLI_ERROR_COLOR    DSH_CLI_ERROR_STYLE
-  unset DSH_CLI_LABEL_COLOR    DSH_CLI_LABEL_STYLE
-  unset DSH_CLI_MATCHING_COLOR DSH_CLI_MATCHING_STYLE
-  unset DSH_CLI_STDERR_COLOR   DSH_CLI_STDERR_STYLE
-  unset DSH_CLI_STDOUT_COLOR   DSH_CLI_STDOUT_STYLE
-  unset DSH_CLI_WARNING_COLOR  DSH_CLI_WARNING_STYLE
+  unset DSH_CLI_ERROR_COLOR     DSH_CLI_ERROR_STYLE
+  unset DSH_CLI_LABEL_COLOR     DSH_CLI_LABEL_STYLE
+  unset DSH_CLI_LOG_COLOR       DSH_CLI_LOG_STYLE
+  unset DSH_CLI_MATCHING_COLOR  DSH_CLI_MATCHING_STYLE
+  unset DSH_CLI_STDERR_COLOR    DSH_CLI_STDERR_STYLE
+  unset DSH_CLI_STDOUT_COLOR    DSH_CLI_STDOUT_STYLE
+  unset DSH_CLI_WARNING_COLOR   DSH_CLI_WARNING_STYLE
 }
 
 ERROR_STYLES=(
@@ -44,6 +45,12 @@ LABEL_STYLES=(
   "DSH_CLI_LABEL_COLOR            DSH_CLI_LABEL_STYLE     "
   "DSH_CLI_LABEL_COLOR=normal     DSH_CLI_LABEL_STYLE=normal"
   "DSH_CLI_LABEL_COLOR=cyan       DSH_CLI_LABEL_STYLE=italic"
+)
+
+LOG_STYLES=(
+  "DSH_CLI_LOG_COLOR              DSH_CLI_LOG_STYLE     "
+  "DSH_CLI_LOG_COLOR=normal       DSH_CLI_LOG_STYLE=normal"
+  "DSH_CLI_LOG_COLOR=cyan         DSH_CLI_LOG_STYLE=italic"
 )
 
 MATCHING_STYLES=(
@@ -167,6 +174,32 @@ do
       echo "-------------------------------"
       eval "export $STDERR_STYLE"
       eval "export $WARNING_STYLE"
+      eval "$CMD"
+      echo "-------------------------------"
+      echo
+    done
+  done
+done
+
+LOG_COMMANDS=(
+  "buckets --log-level debug --dry-run"
+)
+
+set -f
+for COMMAND in "${LOG_COMMANDS[@]}"
+do
+  for STDERR_STYLE in "${STDERR_STYLES[@]}"
+  do
+    for LOG_STYLE in "${LOG_STYLES[@]}"
+    do
+      unset_all
+      CMD=$(echo "dsh $COMMAND" | envsubst)
+      echo "$CMD"
+      echo "$STDERR_STYLE"
+      echo "$LOG_STYLE"
+      echo "-------------------------------"
+      eval "export $STDERR_STYLE"
+      eval "export $LOG_STYLE"
       eval "$CMD"
       echo "-------------------------------"
       echo
