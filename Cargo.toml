@@ -52,8 +52,10 @@ termimad = "0.34"
 terminal_size = { version = "0.4", default-features = false }
 tokio = { version = "1.43", features = ["rt", "rt-multi-thread", "macros"], default-features = false }
 toml = { version = "0.9", features = ["display", "parse", "serde"], default-features = false }
+x509-parser = { version = "0.18" }
+
 
 # When publishing, alway use the crates.io dependency.
-#dsh_api = { version = "0.8.0", features = ["generic"] }
+#dsh_api = { version = "0.8.1", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api and enable the manage feature.
 dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
