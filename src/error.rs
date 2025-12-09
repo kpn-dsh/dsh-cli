@@ -18,6 +18,7 @@ pub(crate) enum DshCliError {
   TokioJoin(String),
   UrlParse(String),
   Utf8(String),
+  X509(String),
 }
 
 impl Error for DshCliError {}
@@ -115,6 +116,7 @@ impl Debug for DshCliError {
       Self::TokioJoin(message) => write!(f, "DshCliError(tokio join, {})", message),
       Self::UrlParse(message) => write!(f, "DshCliError(url parse, {})", message),
       Self::Utf8(message) => write!(f, "DshCliError(utf8, {})", message),
+      Self::X509(message) => write!(f, "DshCliError(x509, {})", message),
     }
   }
 }
@@ -138,6 +140,7 @@ impl Display for DshCliError {
       Self::TokioJoin(message) => write!(f, "{}", message),
       Self::UrlParse(message) => write!(f, "{}", message),
       Self::Utf8(message) => write!(f, "{}", message),
+      Self::X509(message) => write!(f, "{}", message),
     }
   }
 }
@@ -235,6 +238,12 @@ impl From<tokio::task::JoinError> for DshCliError {
 impl From<openidconnect::url::ParseError> for DshCliError {
   fn from(parse_error: openidconnect::url::ParseError) -> Self {
     Self::UrlParse(parse_error.to_string())
+  }
+}
+
+impl From<x509_parser::error::PEMError> for DshCliError {
+  fn from(x509_parser_error: x509_parser::error::PEMError) -> Self {
+    Self::X509(x509_parser_error.to_string())
   }
 }
 

@@ -8,7 +8,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
+use crate::formatters::{Label, OutputFormat, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
@@ -20,8 +20,13 @@ use dsh_api::secret::SecretInjection;
 use dsh_api::types::Secret;
 use dsh_api::{secret, Dependant};
 use futures::future::try_join_all;
+use futures::try_join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use serde::Serialize;
+use x509_parser::asn1_rs::FromDer;
+use x509_parser::pem::parse_x509_pem;
+use x509_parser::prelude::X509Certificate;
 
 struct SecretSubject {}
 
@@ -83,14 +88,15 @@ lazy_static! {
       ])
   );
   static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(
-      SHOW_COMMAND,
-      Some(SHOW_COMMAND_ALIAS),
-      &SecretShowAllocationStatus {},
-      "Show secret configuration or value"
-    )
-    .add_command_executors(vec![(FlagType::Usage, &SecretShowUsage {}, None), (FlagType::Value, &SecretShowValue {}, None),])
-    .add_target_argument(secret_id_argument().required(true))
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &SecretShow {}, "Show secret details")
+      .add_command_executor(
+        FlagType::AllocationStatus,
+        &SecretShowAllocationStatus {},
+        Some("Show secret allocation status".to_string())
+      )
+      .add_command_executor(FlagType::Usage, &SecretShowUsage {}, Some("Show where the secret is used".to_string()))
+      .add_command_executor(FlagType::Value, &SecretShowValue {}, Some("Show the secret value".to_string()))
+      .add_target_argument(secret_id_argument().required(true))
   );
   static ref SECRET_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &SecretUpdate {}, "Update secret")
@@ -312,16 +318,54 @@ impl CommandExecutor for SecretShowUsage {
   }
 }
 
+struct SecretShow {}
+
+#[async_trait]
+impl CommandExecutor for SecretShow {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    let secret_id = target.unwrap_or_else(|| unreachable!());
+    let start_instant = context.now();
+    let (secret, allocation_status) = try_join!(client.get_secret(&secret_id), client.get_secret_status(&secret_id))?;
+    context.print_execution_time(start_instant);
+    context.print_allocation_status(&allocation_status, "secret");
+    match parse_x509_pem(secret.as_bytes()) {
+      Ok((_, pem)) => match pem.parse_x509() {
+        Ok(x509_certificate) => {
+          context.print_explanation(format!("secret '{}' is a valid pem encoded certificate", secret_id));
+          UnitFormatter::new(secret_id.clone(), &X509_CERTIFICATE_LABELS_SHOW, None, context).print_non_serializable(&x509_certificate, None)?;
+        }
+        Err(_) => {
+          context.print_explanation(format!("secret '{}' is pem encoded", secret_id));
+        }
+      },
+      Err(_) => match X509Certificate::from_der(secret.as_bytes()) {
+        Ok((_, x509_certificate)) => {
+          context.print_explanation(format!("secret '{}' is a valid der encoded certificate", secret_id));
+          UnitFormatter::new(secret_id.clone(), &X509_CERTIFICATE_LABELS_SHOW, None, context).print_non_serializable(&x509_certificate, None)?;
+        }
+        Err(_) => {
+          context.print_explanation(format!("secret '{}' is a plain text secret, use --value to see its value", secret_id));
+        }
+      },
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
 struct SecretShowValue {}
 
 #[async_trait]
 impl CommandExecutor for SecretShowValue {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let secret_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the value of secret '{}'", secret_id));
     let start_instant = context.now();
     let secret = client.get_secret(&secret_id).await?;
     context.print_execution_time(start_instant);
+    context.print_explanation(format!("show the value of secret '{}'", secret_id));
     context.print(secret);
     Ok(())
   }
@@ -376,3 +420,92 @@ impl CommandExecutor for SecretUpdate {
     Requirements::standard_with_api()
   }
 }
+
+#[derive(Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum X509CertificateLabel {
+  Issuer,
+  IssuerUid,
+  NotAfter,
+  NotBefore,
+  SecretId,
+  Serial,
+  Signature,
+  SignatureAlgorithm,
+  SignatureValue,
+  Subject,
+  SubjectPki,
+  SubjectUid,
+  TbsCertificate,
+  Version,
+}
+
+impl Label for X509CertificateLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::Issuer => "issuer",
+      Self::IssuerUid => "issuer uid",
+      Self::NotAfter => "not after",
+      Self::NotBefore => "not before",
+      Self::SecretId => "secret id",
+      Self::Serial => "serial",
+      Self::Signature => "signature",
+      Self::SignatureAlgorithm => "signature algorithm",
+      Self::SignatureValue => "signature value",
+      Self::Subject => "subject",
+      Self::SubjectPki => "subject pki",
+      Self::SubjectUid => "subject uid",
+      Self::TbsCertificate => "tbs certificate",
+      Self::Version => "version",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::SecretId)
+  }
+}
+
+impl SubjectFormatter<X509CertificateLabel> for X509Certificate<'_> {
+  fn value(&self, label: &X509CertificateLabel, target_id: &str) -> String {
+    match label {
+      X509CertificateLabel::Issuer => self.issuer().to_string(),
+      X509CertificateLabel::IssuerUid => self
+        .issuer_uid
+        .clone()
+        .map(|uid| String::from_utf8(uid.0.data.to_vec()).unwrap_or_default().to_string())
+        .unwrap_or_default(),
+      X509CertificateLabel::NotAfter => self.validity.not_after.to_string(),
+      X509CertificateLabel::NotBefore => self.validity.not_before.to_string(),
+      X509CertificateLabel::SecretId => target_id.to_string(),
+      X509CertificateLabel::Serial => self.serial.to_string(),
+      X509CertificateLabel::Signature => self.signature.algorithm.to_string(),
+      X509CertificateLabel::SignatureAlgorithm => self.signature_algorithm.algorithm.to_string(),
+      X509CertificateLabel::SignatureValue => self.signature.algorithm.to_string(),
+      X509CertificateLabel::Subject => self.subject().to_string(),
+      X509CertificateLabel::SubjectPki => self.subject_pki.algorithm.oid().to_string(),
+      X509CertificateLabel::SubjectUid => self
+        .subject_uid
+        .clone()
+        .map(|uid| String::from_utf8(uid.0.data.to_vec()).unwrap_or_default().to_string())
+        .unwrap_or_default(),
+      X509CertificateLabel::TbsCertificate => "TODO".to_string(),
+      X509CertificateLabel::Version => self.version.to_string(),
+    }
+  }
+}
+
+static X509_CERTIFICATE_LABELS_SHOW: [X509CertificateLabel; 14] = [
+  X509CertificateLabel::SecretId,
+  X509CertificateLabel::Issuer,
+  X509CertificateLabel::IssuerUid,
+  X509CertificateLabel::NotAfter,
+  X509CertificateLabel::NotBefore,
+  X509CertificateLabel::Serial,
+  X509CertificateLabel::Signature,
+  X509CertificateLabel::SignatureAlgorithm,
+  X509CertificateLabel::SignatureValue,
+  X509CertificateLabel::Subject,
+  X509CertificateLabel::SubjectPki,
+  X509CertificateLabel::SubjectUid,
+  X509CertificateLabel::TbsCertificate,
+  X509CertificateLabel::Version,
+];

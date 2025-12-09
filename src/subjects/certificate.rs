@@ -18,6 +18,7 @@ use dsh_api::types::CertificateStatus;
 use dsh_api::types::{ActualCertificate, Certificate};
 use dsh_api::DependantApp;
 use futures::future::try_join_all;
+use futures::try_join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -73,7 +74,7 @@ lazy_static! {
       ])
   );
   static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &CertificateShowAll {}, "Show certificate configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &CertificateShow {}, "Show certificate configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
         (FlagType::Usage, &CertificateShowUsage {}, None)
@@ -198,19 +199,40 @@ impl CommandExecutor for CertificateListUsage {
   }
 }
 
-struct CertificateShowAll {}
+struct CertificateShow {}
 
 #[async_trait]
-impl CommandExecutor for CertificateShowAll {
+impl CommandExecutor for CertificateShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let start_instant = context.now();
-    let certificate = client.get_certificate(&certificate_id).await?;
-    if let Some(actual_certificate) = certificate.actual {
+    let (certificate_status, certificate_configuration, certificate_actual) = try_join!(
+      client.get_certificate(&certificate_id),
+      client.get_certificate_configuration(&certificate_id),
+      client.get_certificate_actual(&certificate_id)
+    )?;
+
+    context.print_allocation_status(&certificate_status.status, "certificate");
+    if let Some(actual_certificate) = &certificate_status.actual {
       context.print_execution_time(start_instant);
-      UnitFormatter::new(certificate_id, &CERTIFICATE_LABELS_SHOW, None, context).print(&actual_certificate, None)?;
+      UnitFormatter::new(certificate_id.clone(), &CERTIFICATE_LABELS_SHOW, None, context).print(actual_certificate, None)?;
     }
+    if let Some(ref certificate) = certificate_status.configuration {
+      context.print_execution_time(start_instant);
+      UnitFormatter::new(certificate_id, &CERTIFICATE_CONFIGURATION_LABELS, None, context).print(certificate, None)?;
+    }
+
+    if let Some(status_configuration) = certificate_status.configuration {
+      if status_configuration != certificate_configuration {
+        context.print_warning("conflicting certificate values");
+      }
+      if status_configuration != certificate_actual {
+        context.print_warning("actual certificate does not equal certificate configuration");
+        UnitFormatter::new("actual certificate", &CERTIFICATE_CONFIGURATION_LABELS, None, context).print(&certificate_actual, None)?;
+      }
+    }
+
     Ok(())
   }
 
