@@ -5,8 +5,10 @@ use crate::log_level::LogLevel;
 use crate::style::{DshColor, DshStyle};
 use crate::verbosity::Verbosity;
 use crate::{dsh_directory, error, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult, DEFAULT_DSH_CLI_SETTINGS_FILENAME};
+use itertools::Itertools;
 use log::debug;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
@@ -76,6 +78,32 @@ pub(crate) struct Settings {
   pub(crate) warning_color: Option<DshColor>,
   #[serde(rename = "warning-style", skip_serializing_if = "Option::is_none")]
   pub(crate) warning_style: Option<DshStyle>,
+}
+
+impl Settings {
+  pub(crate) fn non_empty_attributes(&self) -> DshCliResult<Vec<(String, String)>> {
+    let file_name = &self.file_name;
+    let mut valued_attributes: Vec<(String, String)> = serde_json::from_str::<Value>(serde_json::to_string(self)?.as_str())?
+      .as_object()
+      .ok_or(error!(""))?
+      .iter()
+      .map(|(attribute, value)| {
+        (
+          attribute.to_string(),
+          match value {
+            Value::String(string) => string.to_string(),
+            other => other.to_string(),
+          }
+          .to_string(),
+        )
+      })
+      .collect_vec();
+    if let Some(name) = file_name {
+      valued_attributes.push(("file-name".to_string(), name.to_string()));
+    }
+    valued_attributes.sort_by(|(attribute_a, _), (attribute_b, _)| attribute_a.cmp(attribute_b));
+    Ok(valued_attributes)
+  }
 }
 
 pub(crate) fn get_settings(explicit_settings_filename: Option<&str>) -> DshCliResult<(Settings, String)> {
