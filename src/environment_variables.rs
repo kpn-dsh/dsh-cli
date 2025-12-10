@@ -822,13 +822,13 @@ lazy_static! {
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_TENANT,
-      "Specifies the target tenant.",
+      "Specifies the target tenant name.",
       false,
       true,
       None,
-      "Tenant id for the target tenant. The target tenant is the tenant whose resources will be \n\
-      managed via the api. This environment variable can be overridden via the --tenant command \n\
-      line argument.",
+      "Tenant name for the target tenant. The target tenant is the tenant whose resources will \n\
+      be managed via the api. This environment variable can be overridden via the --tenant \n\
+      command line argument.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_TERMINAL_WIDTH,
