@@ -123,10 +123,15 @@ impl CommandExecutor for VhostList {
           .collect_vec()
       })
       .collect_vec();
-    vhost_list_values.sort_by(|a, b| (&a.vhost, &a.service_id).cmp(&(&b.vhost, &b.service_id)));
-    let mut formatter = ListFormatter::new(&VHOST_LIST_LABELS, None, context);
-    formatter.push_values(&vhost_list_values);
-    formatter.print(None)
+    if vhost_list_values.is_empty() {
+      context.print_outcome("no vhosts configured");
+      Ok(())
+    } else {
+      vhost_list_values.sort_by(|a, b| (&a.vhost, &a.service_id).cmp(&(&b.vhost, &b.service_id)));
+      let mut formatter = ListFormatter::new(&VHOST_LIST_LABELS, None, context);
+      formatter.push_values(&vhost_list_values);
+      formatter.print(None)
+    }
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -172,7 +177,7 @@ enum VhostListLabel {
   Tenant,
   Tls,
   Vhost,
-  _Whitelist,
+  Whitelist,
   Zone,
 }
 
@@ -190,7 +195,7 @@ impl Label for VhostListLabel {
       Self::Tenant => "tenant",
       Self::Tls => "tlc",
       Self::Vhost => "vhost",
-      Self::_Whitelist => "whitelist",
+      Self::Whitelist => "whitelist",
       Self::Zone => "zone",
     }
   }
@@ -226,13 +231,13 @@ impl SubjectFormatter<VhostListLabel> for VhostListValue {
       VhostListLabel::Tenant => self.tenant.clone().unwrap_or_default(),
       VhostListLabel::Tls => self.port_mapping.tls.map(|tls| tls.to_string()).unwrap_or_default(),
       VhostListLabel::Vhost => self.vhost.clone(),
-      VhostListLabel::_Whitelist => self.port_mapping.whitelist.clone().unwrap_or_default(),
+      VhostListLabel::Whitelist => self.port_mapping.whitelist.clone().unwrap_or_default(),
       VhostListLabel::Zone => self.zone.clone().map(|zone| zone.to_string()).unwrap_or_default(),
     }
   }
 }
 
-static VHOST_LIST_LABELS: [VhostListLabel; 11] = [
+static VHOST_LIST_LABELS: [VhostListLabel; 12] = [
   VhostListLabel::Vhost,
   VhostListLabel::Zone,
   VhostListLabel::ServiceId,
@@ -244,6 +249,7 @@ static VHOST_LIST_LABELS: [VhostListLabel; 11] = [
   VhostListLabel::Paths,
   VhostListLabel::Tls,
   VhostListLabel::KafkaFlag,
+  VhostListLabel::Whitelist,
 ];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
