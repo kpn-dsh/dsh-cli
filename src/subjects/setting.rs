@@ -390,7 +390,7 @@ fn get_some<T>(setting: &str, matches: &ArgMatches, context: &Context) -> DshCli
 where
   T: Clone + Display + Send + Sync + 'static,
 {
-  match matches.get_one::<T>(SETTING_AUTHENTICATION) {
+  match matches.get_one::<T>(setting) {
     Some(one) => {
       let cloned = one.clone();
       context.print_outcome(format!("{} set to {}", setting, &cloned));
