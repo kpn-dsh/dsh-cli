@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
+#[derive(Clone)]
 pub(crate) enum DshCliError {
   AesGcm(String),
   Configuration(String),
@@ -44,9 +45,9 @@ impl Error for DshCliError {}
 /// ```
 #[macro_export]
 macro_rules! error {
-    ($($t:tt)*) => {{
-        $crate::error::DshCliError::String(format!($($t)*))
-    }};
+  ($($t:tt)*) => {{
+    $crate::error::DshCliError::String(format!($($t)*))
+  }};
 }
 
 /// Creates a closure that will map a single argument into an `DshCliError::String`.

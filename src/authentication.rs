@@ -128,7 +128,7 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
           let access_token_jwt = DshJwt::from_token(access_token.secret().to_string())?;
           match &access_token_jwt.payload().preferred_username {
             Some(preferred_username) => context.print(format!("you are logged in as {}", preferred_username)),
-            None => context.print("you are already logged in"),
+            None => context.print("you are logged in"),
           }
           print_authorizations(&context, &access_token_jwt);
           Ok(())
@@ -186,7 +186,12 @@ pub(crate) async fn get_access_tokens() -> DshCliResult<Vec<(DshPlatform, DshJwt
       .map(|platform| get_access_token(platform.clone()).map(|access_token| access_token.map(|jwt| (platform.clone(), jwt)))),
   )
   .await
-  .map(|hh| hh.into_iter().filter_map(|(platform, jwt)| jwt.map(|dsh_jwt| (platform, dsh_jwt))).collect_vec())
+  .map(|tokens| {
+    tokens
+      .into_iter()
+      .filter_map(|(platform, jwt)| jwt.map(|dsh_jwt| (platform, dsh_jwt)))
+      .collect_vec()
+  })
 }
 
 fn client_id(platform: &DshPlatform) -> ClientId {

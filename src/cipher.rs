@@ -52,7 +52,7 @@ fn get_key() -> DshCliResult<Key<Aes256Gcm>> {
 
 /// Compute a hash based on unique system characteristics
 ///
-/// Computes a shash value which should be unique for the system where the program is running.
+/// Computes a hash value which should be unique for the system where the program is running.
 /// The hash is computed by listing all the entries in the users home directory and generating
 /// the hash from all entry names plus their creation timestamp.
 ///
