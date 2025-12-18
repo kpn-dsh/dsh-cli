@@ -74,7 +74,7 @@ lazy_static! {
   static ref VHOST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![VHOST_LIST_CAPABILITY.as_ref()];
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct VhostListValue {
   vhost: String,
   zone: Option<String>,

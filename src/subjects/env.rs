@@ -130,7 +130,7 @@ impl CommandExecutor for EnvFind {
   }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 enum ServiceEnvLabel {
   EnvVar,
   Instances,

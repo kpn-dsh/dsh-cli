@@ -186,7 +186,7 @@ impl Label for ImageUsageLabel {
   }
 }
 
-#[derive(Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
 struct ImageUsage {
   image: ImageString,
   service_id: String,

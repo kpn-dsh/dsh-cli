@@ -132,7 +132,7 @@ impl Label for MetricUsageLabel {
   }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 struct MetricUsage {
   service_id: String,
   instances: u64,
