@@ -9,10 +9,11 @@ use crate::arguments::{platform_name_argument, tenant_name_argument, PLATFORM_NA
 use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::directory::{get_settings, list_targets, read_target, upsert_target, write_settings};
 use crate::formatters::list_formatter::ListFormatter;
-use crate::settings::{get_settings, write_settings, Settings};
+use crate::settings::Settings;
 use crate::subject::{Requirements, Subject};
-use crate::targets::{all_targets, delete_target, read_target, upsert_target, Target};
+use crate::targets::{delete_target, Target};
 use crate::{error, read_single_line, DshCliResult};
 
 struct TargetSubject {}
@@ -103,7 +104,7 @@ impl CommandExecutor for TargetCreate {
       ));
     };
     let password = context.read_single_line_password("enter password")?;
-    let target = Target::new(platform, tenant, Some(password));
+    let target = Target::new(platform, tenant, Some(password), vec![]);
     if context.dry_run() {
       context.print_warning(format!("dry-run mode, target '{}' not created", target));
     } else {
@@ -139,11 +140,11 @@ impl CommandExecutor for TargetDelete {
             } else {
               context.print_outcome(format!("target '{}' deleted", target));
             }
-            let (settings, _) = get_settings(None)?;
+            let (settings, _) = get_settings()?;
             if let (Some(default_platform), Some(default_tenant)) = (settings.default_platform, settings.default_tenant) {
               if default_platform == target.platform.to_string() && default_tenant == target.tenant {
                 let settings = Settings { default_platform: None, default_tenant: None, ..settings };
-                write_settings(None, settings)?;
+                write_settings(settings)?;
                 context.print_outcome(format!("target '{}' unset as default", target));
               }
             }
@@ -168,16 +169,16 @@ struct TargetList {}
 impl CommandExecutor for TargetList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all target configurations");
-    let (settings, _) = get_settings(None)?;
-    let targets = all_targets()?;
+    let (settings, _) = get_settings()?;
+    let targets: Vec<(DshPlatform, String)> = list_targets()?;
     let mut target_formatters = vec![];
-    for target in targets {
+    for (target_platform, target_tenant) in targets {
       let platform_is_default = settings
         .default_platform
         .clone()
-        .is_some_and(|ref platform| target.platform.to_string() == *platform);
-      let tenant_is_default = settings.default_tenant.clone().is_some_and(|ref tenant| target.tenant == *tenant);
-      let target_formatter = TargetFormatter { platform: target.platform, tenant: target.tenant, is_default: platform_is_default && tenant_is_default };
+        .is_some_and(|ref default_platform| default_platform == target_platform.name());
+      let tenant_is_default = settings.default_tenant.clone().is_some_and(|ref default_tenant| default_tenant == &target_tenant);
+      let target_formatter = TargetFormatter { platform: target_platform, tenant: target_tenant, is_default: platform_is_default && tenant_is_default };
       target_formatters.push(target_formatter);
     }
     if target_formatters.is_empty() {
@@ -230,7 +231,7 @@ impl Label for TargetFormatterLabel {
   }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct TargetFormatter {
   platform: DshPlatform,
   tenant: String,

@@ -3,18 +3,18 @@ use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{BrowserMethod, Context};
+use crate::directory::{get_settings, read_target};
 use crate::environment_variables::get_configured_environment_variables;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::log_level::LogLevel;
-use crate::settings::get_settings;
 use crate::settings::{upsert_settings, Settings};
 use crate::style::{DshColor, DshStyle};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
-use crate::targets::{get_target_password_from_keyring, read_target};
+use crate::targets::get_target_password_from_keyring;
 use crate::verbosity::Verbosity;
 use crate::{error, DshCliResult};
 use async_trait::async_trait;
@@ -344,9 +344,9 @@ impl CommandExecutor for SettingDefault {
     if get_target_password_from_keyring(&platform, &tenant)?.is_none() {
       return Err(error!("keyring contains no password for target '{}@{}'", tenant, platform));
     }
-    upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
+    upsert_settings(|settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
     context.print_outcome(format!("default platform set to {}", platform));
-    upsert_settings(None, |settings| Ok(Settings { default_tenant: Some(tenant.to_string()), ..settings }))?;
+    upsert_settings(|settings| Ok(Settings { default_tenant: Some(tenant.to_string()), ..settings }))?;
     context.print_outcome(format!("default tenant set to {}", tenant));
     Ok(())
   }
@@ -361,7 +361,7 @@ struct SettingList {}
 #[async_trait]
 impl CommandExecutor for SettingList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (settings, _) = get_settings(None)?;
+    let (settings, _) = get_settings()?;
     if let Some(ref settings_file) = settings.file_name {
       context.print_explanation(format!("list settings from settings file '{}'", settings_file));
       UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings, None)?
@@ -408,14 +408,10 @@ impl CommandExecutor for SettingSet {
     let (target_setting, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
       SETTING_AUTHENTICATION => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { authentication: get_some(SETTING_AUTHENTICATION, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { authentication: get_some(SETTING_AUTHENTICATION, matches, context)?, ..settings }))?;
       }
       SETTING_BROWSER => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { browser: get_some(SETTING_BROWSER, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { browser: get_some(SETTING_BROWSER, matches, context)?, ..settings }))?;
       }
       SETTING_CSV_QUOTE => match matches.get_one::<String>(SETTING_CSV_QUOTE) {
         Some(csv_quote_argument) => {
@@ -425,7 +421,7 @@ impl CommandExecutor for SettingSet {
               if csv_quote_chars.next().is_some() {
                 return Err(error!("csv quote must be a single character"));
               } else {
-                upsert_settings(None, |settings| Ok(Settings { csv_quote: Some(csv_quote), ..settings }))?;
+                upsert_settings(|settings| Ok(Settings { csv_quote: Some(csv_quote), ..settings }))?;
                 context.print_outcome(format!("csv quote character set to '{}'", csv_quote));
               }
             }
@@ -435,14 +431,12 @@ impl CommandExecutor for SettingSet {
         None => unreachable!(),
       },
       SETTING_CSV_SEPARATOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { csv_separator: get_some(SETTING_CSV_SEPARATOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { csv_separator: get_some(SETTING_CSV_SEPARATOR, matches, context)?, ..settings }))?;
       }
       SETTING_DEFAULT_PLATFORM => match matches.get_one::<String>(SETTING_DEFAULT_PLATFORM) {
         Some(platform_name) => match DshPlatform::try_from(platform_name.as_str()) {
           Ok(platform) => {
-            upsert_settings(None, |settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
+            upsert_settings(|settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
             context.print_outcome(format!("default platform set to {}", platform));
           }
           Err(_) => unreachable!(),
@@ -450,107 +444,75 @@ impl CommandExecutor for SettingSet {
         None => unreachable!(),
       },
       SETTING_DEFAULT_TENANT => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { default_tenant: get_some(SETTING_DEFAULT_TENANT, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { default_tenant: get_some(SETTING_DEFAULT_TENANT, matches, context)?, ..settings }))?;
       }
       SETTING_DRY_RUN => {
-        upsert_settings(None, |settings| Ok(Settings { dry_run: Some(true), ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { dry_run: Some(true), ..settings }))?;
         context.print_outcome("dry run mode enabled");
       }
       SETTING_ERROR_COLOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { error_color: get_some(SETTING_ERROR_COLOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { error_color: get_some(SETTING_ERROR_COLOR, matches, context)?, ..settings }))?;
       }
       SETTING_ERROR_STYLE => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { error_style: get_some(SETTING_ERROR_STYLE, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { error_style: get_some(SETTING_ERROR_STYLE, matches, context)?, ..settings }))?;
       }
       SETTING_LABEL_COLOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { label_color: get_some(SETTING_LABEL_COLOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { label_color: get_some(SETTING_LABEL_COLOR, matches, context)?, ..settings }))?;
       }
       SETTING_LABEL_STYLE => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { label_style: get_some(SETTING_LABEL_STYLE, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { label_style: get_some(SETTING_LABEL_STYLE, matches, context)?, ..settings }))?;
       }
       SETTING_LOG_COLOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { log_color: get_some(SETTING_LOG_COLOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { log_color: get_some(SETTING_LOG_COLOR, matches, context)?, ..settings }))?;
       }
       SETTING_LOG_LEVEL => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { log_level: get_some(SETTING_LOG_LEVEL, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { log_level: get_some(SETTING_LOG_LEVEL, matches, context)?, ..settings }))?;
       }
       SETTING_LOG_LEVEL_API => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { log_level_api: get_some(SETTING_LOG_LEVEL_API, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { log_level_api: get_some(SETTING_LOG_LEVEL_API, matches, context)?, ..settings }))?;
       }
       SETTING_LOG_STYLE => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { log_style: get_some(SETTING_LOG_STYLE, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { log_style: get_some(SETTING_LOG_STYLE, matches, context)?, ..settings }))?;
       }
       SETTING_MATCHING_COLOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { matching_color: get_some(SETTING_MATCHING_COLOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { matching_color: get_some(SETTING_MATCHING_COLOR, matches, context)?, ..settings }))?;
       }
       SETTING_MATCHING_STYLE => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { matching_style: get_some(SETTING_MATCHING_STYLE, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { matching_style: get_some(SETTING_MATCHING_STYLE, matches, context)?, ..settings }))?;
       }
       SETTING_NO_ESCAPE => {
-        upsert_settings(None, |settings| Ok(Settings { no_escape: Some(true), ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { no_escape: Some(true), ..settings }))?;
         context.print_outcome("no escape mode enabled");
       }
       SETTING_NO_HEADERS => {
-        upsert_settings(None, |settings| Ok(Settings { no_headers: Some(true), ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { no_headers: Some(true), ..settings }))?;
         context.print_outcome("no headers mode enabled");
       }
       SETTING_OUTPUT_FORMAT => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { output_format: get_some(SETTING_OUTPUT_FORMAT, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { output_format: get_some(SETTING_OUTPUT_FORMAT, matches, context)?, ..settings }))?;
       }
       SETTING_QUIET => {
-        upsert_settings(None, |settings| Ok(Settings { quiet: Some(true), ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { quiet: Some(true), ..settings }))?;
         context.print_outcome("quiet mode enabled");
       }
       SETTING_SHOW_EXECUTION_TIME => {
-        upsert_settings(None, |settings| Ok(Settings { show_execution_time: Some(true), ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { show_execution_time: Some(true), ..settings }))?;
         context.print_outcome("show execution time enabled");
       }
       SETTING_STDERR_COLOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { stderr_color: get_some(SETTING_STDERR_COLOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { stderr_color: get_some(SETTING_STDERR_COLOR, matches, context)?, ..settings }))?;
       }
       SETTING_STDERR_STYLE => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { stderr_style: get_some(SETTING_STDERR_STYLE, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { stderr_style: get_some(SETTING_STDERR_STYLE, matches, context)?, ..settings }))?;
       }
       SETTING_STDOUT_COLOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { stdout_color: get_some(SETTING_STDOUT_COLOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { stdout_color: get_some(SETTING_STDOUT_COLOR, matches, context)?, ..settings }))?;
       }
       SETTING_STDOUT_STYLE => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { stdout_style: get_some(SETTING_STDOUT_STYLE, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { stdout_style: get_some(SETTING_STDOUT_STYLE, matches, context)?, ..settings }))?;
       }
       SETTING_SUPPRESS_EXIT_STATUS => {
-        upsert_settings(None, |settings| Ok(Settings { suppress_exit_status: Some(true), ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { suppress_exit_status: Some(true), ..settings }))?;
         context.print_outcome("suppress exit status enabled");
       }
       SETTING_TERMINAL_WIDTH => {
@@ -558,24 +520,18 @@ impl CommandExecutor for SettingSet {
         if *terminal_width < 40 {
           return Err(error!("terminal width must be greater than or equal to 40"));
         } else {
-          upsert_settings(None, |settings| Ok(Settings { terminal_width: Some(*terminal_width), ..settings }))?;
+          upsert_settings(|settings| Ok(Settings { terminal_width: Some(*terminal_width), ..settings }))?;
           context.print_outcome(format!("terminal width set to {}", terminal_width));
         }
       }
       SETTING_VERBOSITY => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { verbosity: get_some(SETTING_VERBOSITY, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { verbosity: get_some(SETTING_VERBOSITY, matches, context)?, ..settings }))?;
       }
       SETTING_WARNING_COLOR => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { warning_color: get_some(SETTING_WARNING_COLOR, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { warning_color: get_some(SETTING_WARNING_COLOR, matches, context)?, ..settings }))?;
       }
       SETTING_WARNING_STYLE => {
-        upsert_settings(None, move |settings| {
-          Ok(Settings { warning_style: get_some(SETTING_WARNING_STYLE, matches, context)?, ..settings })
-        })?;
+        upsert_settings(move |settings| Ok(Settings { warning_style: get_some(SETTING_WARNING_STYLE, matches, context)?, ..settings }))?;
       }
       _ => unreachable!(),
     }
@@ -595,127 +551,127 @@ impl CommandExecutor for SettingUnset {
     let (target_setting, _) = matches.subcommand().unwrap_or_else(|| unreachable!());
     match target_setting {
       SETTING_AUTHENTICATION => {
-        upsert_settings(None, |settings| Ok(Settings { authentication: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { authentication: None, ..settings }))?;
         context.print_outcome("authentication method unset");
       }
       SETTING_BROWSER => {
-        upsert_settings(None, |settings| Ok(Settings { browser: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { browser: None, ..settings }))?;
         context.print_outcome("browser method unset");
       }
       SETTING_CSV_QUOTE => {
-        upsert_settings(None, |settings| Ok(Settings { csv_quote: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { csv_quote: None, ..settings }))?;
         context.print_outcome("csv quote unset");
       }
       SETTING_CSV_SEPARATOR => {
-        upsert_settings(None, |settings| Ok(Settings { csv_separator: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { csv_separator: None, ..settings }))?;
         context.print_outcome("csv separator unset");
       }
       SETTING_DEFAULT_PLATFORM => {
-        upsert_settings(None, |settings| Ok(Settings { default_platform: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { default_platform: None, ..settings }))?;
         context.print_outcome("default platform unset");
       }
       SETTING_DEFAULT_TENANT => {
-        upsert_settings(None, |settings| Ok(Settings { default_tenant: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { default_tenant: None, ..settings }))?;
         context.print_outcome("default tenant unset");
       }
       SETTING_DRY_RUN => {
-        upsert_settings(None, |settings| Ok(Settings { dry_run: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { dry_run: None, ..settings }))?;
         context.print_outcome("dry run mode disabled");
       }
       SETTING_ERROR_COLOR => {
-        upsert_settings(None, |settings| Ok(Settings { error_color: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { error_color: None, ..settings }))?;
         context.print_outcome("error color unset");
       }
       SETTING_ERROR_STYLE => {
-        upsert_settings(None, |settings| Ok(Settings { error_style: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { error_style: None, ..settings }))?;
         context.print_outcome("error style unset");
       }
       SETTING_LABEL_COLOR => {
-        upsert_settings(None, |settings| Ok(Settings { label_color: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { label_color: None, ..settings }))?;
         context.print_outcome("label color unset");
       }
       SETTING_LABEL_STYLE => {
-        upsert_settings(None, |settings| Ok(Settings { label_style: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { label_style: None, ..settings }))?;
         context.print_outcome("label style unset");
       }
       SETTING_LOG_COLOR => {
-        upsert_settings(None, |settings| Ok(Settings { log_color: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { log_color: None, ..settings }))?;
         context.print_outcome("log color unset");
       }
       SETTING_LOG_LEVEL => {
-        upsert_settings(None, |settings| Ok(Settings { log_level: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { log_level: None, ..settings }))?;
         context.print_outcome("log level unset");
       }
       SETTING_LOG_LEVEL_API => {
-        upsert_settings(None, |settings| Ok(Settings { log_level_api: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { log_level_api: None, ..settings }))?;
         context.print_outcome("log level for api unset");
       }
       SETTING_LOG_STYLE => {
-        upsert_settings(None, |settings| Ok(Settings { log_style: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { log_style: None, ..settings }))?;
         context.print_outcome("log style unset");
       }
       SETTING_MATCHING_COLOR => {
-        upsert_settings(None, |settings| Ok(Settings { matching_color: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { matching_color: None, ..settings }))?;
         context.print_outcome("matching color unset");
       }
       SETTING_MATCHING_STYLE => {
-        upsert_settings(None, |settings| Ok(Settings { matching_style: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { matching_style: None, ..settings }))?;
         context.print_outcome("matching style unset");
       }
       SETTING_NO_ESCAPE => {
-        upsert_settings(None, |settings| Ok(Settings { no_escape: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { no_escape: None, ..settings }))?;
         context.print_outcome("no escape mode disabled");
       }
       SETTING_NO_HEADERS => {
-        upsert_settings(None, |settings| Ok(Settings { no_headers: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { no_headers: None, ..settings }))?;
         context.print_outcome("no headers mode disabled");
       }
       SETTING_OUTPUT_FORMAT => {
-        upsert_settings(None, |settings| Ok(Settings { output_format: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { output_format: None, ..settings }))?;
         context.print_outcome("output format unset");
       }
       SETTING_QUIET => {
-        upsert_settings(None, |settings| Ok(Settings { quiet: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { quiet: None, ..settings }))?;
         context.print_outcome("quiet mode disabled");
       }
       SETTING_SHOW_EXECUTION_TIME => {
-        upsert_settings(None, |settings| Ok(Settings { show_execution_time: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { show_execution_time: None, ..settings }))?;
         context.print_outcome("show execution mode unset");
       }
       SETTING_STDERR_COLOR => {
-        upsert_settings(None, |settings| Ok(Settings { stderr_color: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { stderr_color: None, ..settings }))?;
         context.print_outcome("stderr color unset");
       }
       SETTING_STDERR_STYLE => {
-        upsert_settings(None, |settings| Ok(Settings { stderr_style: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { stderr_style: None, ..settings }))?;
         context.print_outcome("stderr style unset");
       }
       SETTING_STDOUT_COLOR => {
-        upsert_settings(None, |settings| Ok(Settings { stdout_color: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { stdout_color: None, ..settings }))?;
         context.print_outcome("stdout color unset");
       }
       SETTING_STDOUT_STYLE => {
-        upsert_settings(None, |settings| Ok(Settings { stdout_style: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { stdout_style: None, ..settings }))?;
         context.print_outcome("stdout style unset");
       }
       SETTING_SUPPRESS_EXIT_STATUS => {
-        upsert_settings(None, |settings| Ok(Settings { suppress_exit_status: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { suppress_exit_status: None, ..settings }))?;
         context.print_outcome("suppress exit status disabled");
       }
       SETTING_TERMINAL_WIDTH => {
-        upsert_settings(None, |settings| Ok(Settings { terminal_width: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { terminal_width: None, ..settings }))?;
         context.print_outcome("terminal width unset");
       }
       SETTING_VERBOSITY => {
-        upsert_settings(None, |settings| Ok(Settings { verbosity: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { verbosity: None, ..settings }))?;
         context.print_outcome("verbosity level unset");
       }
       SETTING_WARNING_COLOR => {
-        upsert_settings(None, |settings| Ok(Settings { warning_color: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { warning_color: None, ..settings }))?;
         context.print_outcome("warning color unset");
       }
       SETTING_WARNING_STYLE => {
-        upsert_settings(None, |settings| Ok(Settings { warning_style: None, ..settings }))?;
+        upsert_settings(|settings| Ok(Settings { warning_style: None, ..settings }))?;
         context.print_outcome("warning style unset");
       }
       _ => unreachable!(),

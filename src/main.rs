@@ -7,9 +7,10 @@
 extern crate core;
 
 use crate::authentication::{get_access_token, get_access_tokens, AuthenticationMethod};
+use crate::directory::{get_settings, init_dsh_directory, read_target, supports_dsh_directory};
 use crate::environment_variables::{
   env_var_argument, env_var_file_argument, env_vars_argument, environment_variable, get_configured_environment_variables, print_environment_variable, print_environment_variables,
-  ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT, ENV_VAR_DSH_CLI_HOME, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
+  ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
 };
 use crate::error::DshCliError;
 use crate::global_arguments::{
@@ -35,7 +36,6 @@ use global_arguments::{
   suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
   TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
 };
-use homedir::my_home;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::{debug, trace};
@@ -43,7 +43,7 @@ use log_arguments::{log_level_api_argument, log_level_argument};
 use log_level::initialize_logger;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
-use settings::{get_settings, Settings};
+use settings::Settings;
 use std::collections::HashMap;
 use std::env::temp_dir;
 use std::error::Error;
@@ -76,7 +76,7 @@ use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
 use subjects::volume::VOLUME_SUBJECT;
-use targets::{get_target_password_from_keyring, read_target};
+use targets::get_target_password_from_keyring;
 
 mod argument_parsers;
 mod arguments;
@@ -86,6 +86,7 @@ mod capability;
 mod capability_builder;
 mod cipher;
 mod context;
+mod directory;
 mod environment_variables;
 mod error;
 mod filter_flags;
@@ -131,12 +132,6 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 
 const VERSION: &str = "0.8.1";
-
-const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
-const TARGETS_SUBDIRECTORY: &str = "targets";
-const REFRESH_TOKENS_SUBDIRECTORY: &str = "refresh-tokens";
-const DEFAULT_DSH_CLI_SETTINGS_FILENAME: &str = "settings.toml";
-const TOML_FILENAME_EXTENSION: &str = "toml";
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
 const OUTPUT_OPTIONS_HEADING: &str = "Output options";
@@ -235,6 +230,10 @@ async fn inner_main() -> DshCliExit {
     process::exit(0);
   });
 
+  if let Err(error) = init_dsh_directory() {
+    return DshCliExit::CliErr(error);
+  }
+
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
     API_SUBJECT.as_ref(),
     APP_SUBJECT.as_ref(),
@@ -275,7 +274,7 @@ async fn inner_main() -> DshCliExit {
     }
   }
 
-  let (settings, settings_log) = match get_settings(None) {
+  let (settings, settings_log) = match get_settings() {
     Ok((setting, settings_log)) => (setting, settings_log),
     Err(error) => return DshCliExit::CliErr(error),
   };
@@ -365,8 +364,11 @@ async fn inner_main() -> DshCliExit {
             Ok(None) => return DshCliExit::ErrContext("user is not authenticated".to_string(), Box::new(context)),
             Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
           };
-          for client in clients {
-            match subject.execute_subject_command_with_client(sub_matches, &client, &context).await {
+          for client in &clients {
+            if clients.len() > 1 {
+              context.print(format!("# target {}", client.tenant()))
+            }
+            match subject.execute_subject_command_with_client(sub_matches, client, &context).await {
               Ok(_) => {}
               Err(error) => {
                 return DshCliExit::CliErrContext(error, Box::new(context));
@@ -393,6 +395,9 @@ async fn inner_main() -> DshCliExit {
               Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
             };
             for client in &clients {
+              if clients.len() > 1 {
+                context.print(format!("# target {}@{}", client.tenant(), client.platform().name()))
+              }
               match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
                 Ok(_) => {}
                 Err(error) => {
@@ -794,58 +799,14 @@ fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> DshCliResult<S
     Ok(password_string) => {
       let trimmed_password = password_string.trim();
       if trimmed_password.is_empty() {
-        Err(error!("target password file '{}' is empty", password_file.as_ref().to_string_lossy()))
+        Err(error!("target password file '{}' is empty", password_file.as_ref().display()))
       } else {
-        debug!("target password (file '{}')", password_file.as_ref().to_string_lossy());
+        debug!("target password (file '{}')", password_file.as_ref().display());
         Ok(trimmed_password.to_string())
       }
     }
-    Err(_) => Err(error!("target password file '{}' could not be read", password_file.as_ref().to_string_lossy())),
+    Err(_) => Err(error!("target password file '{}' could not be read", password_file.as_ref().display())),
   }
-}
-
-/// # Returns the `dsh` directory
-///
-/// This function creates and returns the `dsh` directory. In this directory the cli tool stores
-/// its settings, targets and tokens. If it doesn't already exist the directory (and if needed
-/// its parent directories) will be created.
-///
-/// This function will try the potential directory names listed below, and returns at the
-/// first match.
-/// 1. If the environment variable `DSH_CLI_HOME` is set:
-///    * if the environment variable is the empty string, do not create any directories and
-///      return `Ok(None)`,
-///    * else create the specified directory (if needed) and return its [PathBuf].
-/// 1. If the environment variable `HOME` is set use its value concatenated with
-///    `/.dsh_cli`, create the directory (if needed), and return its [PathBuf].
-/// 1. Else return `Err`.
-///
-/// Note that the environment variables must be regular environment variables and cannot
-/// be specified via the command line `--environment-variable` argument.
-fn dsh_directory() -> DshCliResult<Option<PathBuf>> {
-  let dsh_directory: PathBuf = match environment_variable(ENV_VAR_DSH_CLI_HOME, None)? {
-    Some(dsh_directory_from_env_var) => {
-      if dsh_directory_from_env_var.is_empty() {
-        return Ok(None);
-      } else {
-        PathBuf::new().join(dsh_directory_from_env_var)
-      }
-    }
-    None => match my_home()? {
-      Some(user_home_directory) => user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY),
-      None => {
-        return Err(error!(
-          "could not determine dsh cli directory (check environment variable '{}' or 'HOME')",
-          ENV_VAR_DSH_CLI_HOME
-        ))
-      }
-    },
-  };
-  _ = &fs::create_dir_all(&dsh_directory)?;
-  for subdirectory in [TARGETS_SUBDIRECTORY, REFRESH_TOKENS_SUBDIRECTORY] {
-    fs::create_dir_all(dsh_directory.join(subdirectory))?;
-  }
-  Ok(Some(dsh_directory))
 }
 
 fn read_and_deserialize_from_toml_file<T>(toml_file: impl AsRef<Path>) -> DshCliResult<Option<T>>
@@ -856,7 +817,7 @@ where
     Ok(toml_string) => match toml::from_str::<T>(&toml_string) {
       Ok(deserialized_toml) => Ok(Some(deserialized_toml)),
       Err(de_error) => {
-        let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().to_string_lossy(), de_error.message());
+        let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().display(), de_error.message());
         log::error!("{}", &message);
         Err(DshCliError::from(message))
       }
@@ -864,7 +825,7 @@ where
     Err(io_error) => match io_error.kind() {
       NotFound => Ok(None),
       _ => {
-        let message = format!("could not read file '{}'", toml_file.as_ref().to_string_lossy());
+        let message = format!("could not read file '{}'", toml_file.as_ref().display());
         log::error!("{}", &message);
         Err(DshCliError::from(message))
       }
@@ -880,7 +841,7 @@ where
     Ok(toml_string) => match fs::write(&toml_file, toml_string) {
       Ok(_) => Ok(()),
       Err(io_error) => {
-        let message = format!("could not write file '{}' ({})", toml_file.as_ref().to_string_lossy(), io_error);
+        let message = format!("could not write file '{}' ({})", toml_file.as_ref().display(), io_error);
         log::error!("{}", &message);
         Err(DshCliError::from(message))
       }
@@ -910,7 +871,7 @@ where
       debug!("editor: {} {:?}", editor_command, editor_args);
       let mut temporary_configuration_file_path = temp_dir();
       temporary_configuration_file_path.push(temporary_configuration_file_name);
-      debug!("temporary configuration file: {}", temporary_configuration_file_path.to_string_lossy());
+      debug!("temporary configuration file: {}", temporary_configuration_file_path.display());
       let original_configuration = serde_json::to_string_pretty::<C>(configuration)?;
       tokio::fs::write(&temporary_configuration_file_path, &original_configuration)
         .await
@@ -984,6 +945,9 @@ async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -
 ///   least one client created, else an error is returned.
 /// * `Ok(None)` - User needs to log in.
 async fn create_clients_access_token(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
+  if !supports_dsh_directory() {
+    return Err(DshCliError::String("single-sign-on requires dsh directory to be enabled".to_string()));
+  }
   let target_platform = get_target_platform(matches, context.settings())?;
   if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
     create_clients_for_all_authorized_tenants(&target_platform).await
