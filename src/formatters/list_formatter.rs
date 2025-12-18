@@ -5,15 +5,16 @@ use crate::formatters::{Label, SubjectFormatter};
 use crate::{error, DshCliResult};
 use itertools::Itertools;
 use serde::Serialize;
+use std::borrow::Cow;
 use std::marker::PhantomData;
 use tabled::settings::peaker::PriorityMax;
 use tabled::settings::{Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style};
 
-pub(crate) struct ListFormatter<'a, L: Label, V: SubjectFormatter<L>> {
+pub(crate) struct ListFormatter<'a, L: Label, V: Clone + SubjectFormatter<L>> {
   labels: &'a [L],
   target_label: Option<&'a str>,
-  values: Vec<(String, &'a V)>,
+  values: Vec<(String, Cow<'a, V>)>,
   context: &'a Context,
   phantom: PhantomData<&'a V>,
 }
@@ -21,7 +22,7 @@ pub(crate) struct ListFormatter<'a, L: Label, V: SubjectFormatter<L>> {
 impl<'a, L, V> ListFormatter<'a, L, V>
 where
   L: Label,
-  V: SubjectFormatter<L> + Serialize,
+  V: Clone + Serialize + SubjectFormatter<L>,
 {
   /// # Creates a new `ListFormatter`
   pub(crate) fn new(labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
@@ -35,7 +36,7 @@ where
   /// and that target ids and values with the same index belong to each other.
   pub(crate) fn push_target_ids_and_values(&mut self, target_ids: &[String], values: &'a [V]) -> &Self {
     for (target_id, value) in target_ids.iter().zip(values).collect_vec() {
-      self.values.push((target_id.clone(), value));
+      self.values.push((target_id.clone(), Cow::Borrowed(value)));
     }
     self
   }
@@ -45,15 +46,15 @@ where
   /// This method expects a slice containing target id/value pairs.
   pub(crate) fn push_target_id_value_pairs(&mut self, values: &'a [(String, V)]) -> &Self {
     for (target_id, value) in values {
-      self.values.push((target_id.clone(), value));
+      self.values.push((target_id.clone(), Cow::Borrowed(value)));
     }
     self
   }
 
   pub(crate) fn _push_value(&mut self, value: &'a V) -> &Self {
     match value.target_id() {
-      Some(target_id) => self.values.push((target_id, value)),
-      None => self.values.push(("".to_string(), value)),
+      Some(target_id) => self.values.push((target_id, Cow::Borrowed(value))),
+      None => self.values.push(("".to_string(), Cow::Borrowed(value))),
     }
     self
   }
@@ -61,15 +62,20 @@ where
   pub(crate) fn push_values(&mut self, values: &'a [V]) -> &Self {
     for value in values {
       match value.target_id() {
-        Some(target_id) => self.values.push((target_id, value)),
-        None => self.values.push(("".to_string(), value)),
+        Some(target_id) => self.values.push((target_id, Cow::Borrowed(value))),
+        None => self.values.push(("".to_string(), Cow::Borrowed(value))),
       }
     }
     self
   }
 
   pub(crate) fn push_target_id_value(&mut self, target_id: String, value: &'a V) -> &Self {
-    self.values.push((target_id, value));
+    self.values.push((target_id, Cow::Borrowed(value)));
+    self
+  }
+
+  pub(crate) fn push_target_id_value_owned(&mut self, target_id: String, value: V) -> &Self {
+    self.values.push((target_id, Cow::Owned(value)));
     self
   }
 
@@ -313,11 +319,20 @@ where
     self.labels.iter().any(|label| label.is_target_label())
   }
 
-  fn simplified_values(&self) -> Option<Vec<&'a V>> {
+  fn simplified_values(&self) -> Option<Vec<&V>> {
     if self.has_target_label() {
       None
     } else {
-      Some(self.values.iter().map(|(_, value)| *value).collect_vec())
+      Some(
+        self
+          .values
+          .iter()
+          .map(|(_, value)| match value {
+            Cow::Borrowed(borrowed_value) => *borrowed_value,
+            Cow::Owned(owned_value) => owned_value,
+          })
+          .collect_vec(),
+      )
     }
   }
 }

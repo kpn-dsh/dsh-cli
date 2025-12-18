@@ -7,7 +7,7 @@ set -e
 
 export DSH_CLI_PLATFORM=nplz
 export DSH_CLI_TENANT=greenbox-dev
-export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
+export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox.pwd
 
 # For this test to run the following is expected:
 #

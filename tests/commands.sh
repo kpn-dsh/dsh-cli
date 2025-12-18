@@ -15,7 +15,7 @@ export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
 export PROXY_UNDER_TEST=broker
 export SECRET_NON_EXISTING=non-existing-secret
-export SECRET_UNDER_TEST=boss-account-ids
+export SECRET_UNDER_TEST=sbcm-ids
 export SERVICE_UNDER_TEST=keyring-dev
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
@@ -52,11 +52,11 @@ export SAFE_COMMANDS=(
   "bucket list"
   "bucket show $BUCKET_UNDER_TEST"
 
+  "certificate list"
   "certificate list --configuration"
   "certificate list --ids"
   "certificate list --status"
   "certificate list --usage"
-  "certificate list"
   "certificate show $CERTIFICATE_UNDER_TEST --status"
   "certificate show $CERTIFICATE_UNDER_TEST --usage"
   "certificate show $CERTIFICATE_UNDER_TEST"
@@ -130,10 +130,13 @@ export SAFE_COMMANDS=(
 
   "secret create $SECRET_NON_EXISTING --dry-run < /dev/null"
   "secret delete $SECRET_UNDER_TEST --force --dry-run"
+  "secret list"
+  "secret list --certificates"
+  "secret list --ids"
+  "secret list --keys"
   "secret list --status"
   "secret list --system"
   "secret list --usage"
-  "secret list"
   "secret show $SECRET_UNDER_TEST --usage"
   "secret show $SECRET_UNDER_TEST --value"
   "secret show $SECRET_UNDER_TEST"

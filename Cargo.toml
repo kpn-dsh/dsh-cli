@@ -43,6 +43,7 @@ open = { version = "5.3", default-features = false }
 openidconnect = { version = "4.0", features = ["reqwest-blocking"] }
 regex = "1.11.1"
 rpassword = { version = "7.3", default-features = false }
+rsa = { version = "0.9" }
 serde = { version = "1.0", features = ["derive"], default-features = false }
 serde_json = { version = "1.0", default-features = false }
 serde_yaml = { version = "0.9.33", default-features = false }
@@ -53,7 +54,6 @@ terminal_size = { version = "0.4", default-features = false }
 tokio = { version = "1.43", features = ["rt", "rt-multi-thread", "macros"], default-features = false }
 toml = { version = "0.9", features = ["display", "parse", "serde"], default-features = false }
 x509-parser = { version = "0.18" }
-
 
 # When publishing, alway use the crates.io dependency.
 #dsh_api = { version = "0.8.1", features = ["generic"] }
