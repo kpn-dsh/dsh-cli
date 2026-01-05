@@ -24,7 +24,7 @@ pub(crate) mod volume;
 use crate::formatters::notifications_to_string;
 use crate::formatters::{Label, SubjectFormatter};
 use dsh_api::types::AllocationStatus;
-use dsh_api::{Dependant, DependantApp, DependantApplication};
+use dsh_api::{Dependant, DependantApp, DependantApplication, DependantProxy};
 use itertools::Itertools;
 use serde::Serialize;
 use std::fmt::Display;
@@ -142,16 +142,30 @@ impl SubjectFormatter<DependantLabel> for DependantApp {
     match label {
       DependantLabel::Dependencies => self.resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
       DependantLabel::Id => self.app_id.to_string(),
-      DependantLabel::Injections => "".to_string(),
-      DependantLabel::Instances => "".to_string(),
       DependantLabel::Kind => "app".to_string(),
       DependantLabel::Resources => self.resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
       DependantLabel::Target => target_id.to_string(),
+      _ => "".to_string(),
     }
   }
 
   fn target_id(&self) -> Option<String> {
     Some(self.app_id.to_string())
+  }
+}
+
+impl SubjectFormatter<DependantLabel> for DependantProxy {
+  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
+    match label {
+      DependantLabel::Id => self.proxy_id.to_string(),
+      DependantLabel::Instances => self.instances.to_string(),
+      DependantLabel::Target => target_id.to_string(),
+      _ => "".to_string(),
+    }
+  }
+
+  fn target_id(&self) -> Option<String> {
+    Some(self.proxy_id.to_string())
   }
 }
 
@@ -163,6 +177,7 @@ where
     match self {
       Dependant::App(app) => app.value(label, target_id),
       Dependant::Application(application) => application.value(label, target_id),
+      Dependant::Proxy(proxy) => proxy.value(label, target_id),
     }
   }
 
@@ -170,6 +185,7 @@ where
     match self {
       Dependant::App(app) => Some(app.app_id.to_string()),
       Dependant::Application(application) => Some(application.application_id.to_string()),
+      Dependant::Proxy(proxy) => Some(proxy.proxy_id.to_string()),
     }
   }
 }
