@@ -12,19 +12,19 @@ This location can be changed by setting the environment variable `DSH_CLI_HOME`.
 
 ```
 $HOME/.dsh_cli/
- ├─ targets/
- │   ├─ platform1/
- │   │   ├─ tenant1/
- │   │   │   └─ certificates/
- │   │   │       ├─ broker-ca.pem
- │   │   │       ├─ broker-client.key
- │   │   │       └─ broker-client.pem
- │   │   ├─ tenant2/
- │   │   │    ...
- │   │   └─ refresh-token.encrypted
- │   └─ platform2/
- │        ...
- └─ settings.toml
+ ├── targets/
+ │    ├── platform1/
+ │    │    ├── tenant1/
+ │    │    │    └── certificates/
+ │    │    │         ├── broker-ca.pem
+ │    │    │         ├── broker-client.key
+ │    │    │         └── broker-client.pem
+ │    │    ├── tenant2/
+ │    │    │    ...
+ │    │    └── refresh-token.encrypted
+ │    └── platform2/
+ │         ...
+ └── settings.toml
 ```
 
 ## Settings

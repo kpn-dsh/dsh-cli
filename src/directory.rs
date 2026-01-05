@@ -6,19 +6,19 @@
 //!
 //! ```
 //! $HOME/.dsh_cli/
-//!  ├─ targets/
-//!  │   ├─ platform1/
-//!  │   │   ├─ tenant1/
-//!  │   │   │   └─ certificates/
-//!  │   │   │       ├─ broker-ca.pem
-//!  │   │   │       ├─ broker-client.key
-//!  │   │   │       └─ broker-client.pem
-//!  │   │   ├─ tenant2/
-//!  │   │   │    ...
-//!  │   │   └─ refresh-token.encrypted
-//!  │   └─ platform2/
+//!  ├── targets/
+//!  │    ├── platform1/
+//!  │    │    ├── tenant1/
+//!  │    │    │    └── certificates/
+//!  │    │    │         ├── broker-ca.pem
+//!  │    │    │         ├── broker-client.key
+//!  │    │    │         └── broker-client.pem
+//!  │    │    ├── tenant2/
+//!  │    │    │     ...
+//!  │    │    └── refresh-token.encrypted
+//!  │    └── platform2/
 //!  │        ...
-//!  └─ settings.toml
+//!  └── settings.toml
 //! ```
 //!
 //! The location of the dsh directory is determined by the first match of the potential directory
