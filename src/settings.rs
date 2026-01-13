@@ -48,10 +48,10 @@ pub(crate) struct Settings {
   pub(crate) matching_color: Option<DshColor>,
   #[serde(rename = "matching-style", skip_serializing_if = "Option::is_none")]
   pub(crate) matching_style: Option<DshStyle>,
+  #[serde(rename = "no-csv-headers", skip_serializing_if = "Option::is_none")]
+  pub(crate) no_csv_headers: Option<bool>,
   #[serde(rename = "no-escape", skip_serializing_if = "Option::is_none")]
   pub(crate) no_escape: Option<bool>,
-  #[serde(rename = "no-headers", skip_serializing_if = "Option::is_none")]
-  pub(crate) no_headers: Option<bool>,
   #[serde(rename = "output-format", skip_serializing_if = "Option::is_none")]
   pub(crate) output_format: Option<OutputFormat>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -68,6 +68,10 @@ pub(crate) struct Settings {
   pub(crate) stdout_style: Option<DshStyle>,
   #[serde(rename = "suppress-exit-status", skip_serializing_if = "Option::is_none")]
   pub(crate) suppress_exit_status: Option<bool>,
+  #[serde(rename = "target-color", skip_serializing_if = "Option::is_none")]
+  pub(crate) target_color: Option<DshColor>,
+  #[serde(rename = "target-style", skip_serializing_if = "Option::is_none")]
+  pub(crate) target_style: Option<DshStyle>,
   #[serde(rename = "terminal-width", skip_serializing_if = "Option::is_none")]
   pub(crate) terminal_width: Option<usize>,
   #[serde(skip_serializing_if = "Option::is_none")]

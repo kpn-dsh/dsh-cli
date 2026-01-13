@@ -4,7 +4,7 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::list_formatter::ListFormatter;
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
@@ -139,7 +139,7 @@ fn list_images(services: HashMap<String, Application>, query_processor: &dyn Que
   }
   let mut images: Vec<(String, Vec<ImageUsage>)> = images.into_iter().collect_vec();
   images.sort_by(|(image_a, _), (image_b, _)| image_a.cmp(image_b));
-  let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, None, context);
+  let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, context);
   for (image, image_usages) in &images {
     if let Some(matching) = query_processor.matching_parts(image) {
       for image_usage in image_usages {
@@ -200,22 +200,22 @@ impl ImageUsage {
 }
 
 impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
-  fn value(&self, label: &ImageUsageLabel, target_id: &str) -> String {
+  fn value(&self, label: &ImageUsageLabel, target_id: &str) -> Value {
     match label {
-      ImageUsageLabel::Id => target_id.to_string(),
-      ImageUsageLabel::Instances => self.instances.to_string(),
-      ImageUsageLabel::Service => self.service_id.clone(),
-      ImageUsageLabel::Source => self.image.source().to_string(),
+      ImageUsageLabel::Id => Value::target(target_id),
+      ImageUsageLabel::Instances => Value::plain(self.instances),
+      ImageUsageLabel::Service => Value::plain(&self.service_id),
+      ImageUsageLabel::Source => Value::plain(self.image.source()),
       ImageUsageLabel::Stage => match &self.image {
-        ImageString::App(app) => app.stage.clone(),
-        _ => "".to_string(),
+        ImageString::App(app) => Value::plain(&app.stage),
+        _ => Value::empty(),
       },
       ImageUsageLabel::Supplier => match &self.image {
-        ImageString::App(app) => app.supplier.clone(),
-        _ => "".to_string(),
+        ImageString::App(app) => Value::plain(&app.supplier),
+        _ => Value::empty(),
       },
-      ImageUsageLabel::Tenant => self.image.tenant().clone(),
-      ImageUsageLabel::Version => self.image.version().clone(),
+      ImageUsageLabel::Tenant => Value::plain(self.image.tenant()),
+      ImageUsageLabel::Version => Value::plain(self.image.version()),
     }
   }
 }

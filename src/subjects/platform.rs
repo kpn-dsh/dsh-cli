@@ -7,7 +7,7 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::subject::{Requirements, Subject};
 use crate::{error, get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
 use arboard::Clipboard;
@@ -133,7 +133,7 @@ struct PLatformList {}
 impl CommandExecutor for PLatformList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list platforms");
-    let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, None, context);
+    let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, context);
     let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect_vec();
     formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
     formatter.print(None)?;
@@ -318,7 +318,7 @@ impl CommandExecutor for PlatformShow {
       })
       .map(|label| label.to_owned())
       .collect_vec();
-    UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print_non_serializable(
+    UnitFormatter::new(platform.name(), labels.as_slice(), context).print_non_serializable(
       &(
         platform.clone(),
         app_id.unwrap_or_default(),
@@ -433,25 +433,25 @@ impl Label for DshPlatformLabel {
 
 // Subject formatter for DshPlatform only
 impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
-  fn value(&self, label: &DshPlatformLabel, _target_id: &str) -> String {
+  fn value(&self, label: &DshPlatformLabel, _target_id: &str) -> Value {
     match label {
-      DshPlatformLabel::AccessTokenEndpoint => self.access_token_endpoint().to_string(),
-      DshPlatformLabel::Alias => self.alias().to_string(),
-      DshPlatformLabel::ClientId => self.client_id(),
-      DshPlatformLabel::CloudProvider => self.cloud_provider().to_string(),
-      DshPlatformLabel::ConsoleDomain => self.console_domain(),
-      DshPlatformLabel::ConsoleUrl => self.console_url(),
-      DshPlatformLabel::Description => self.description().to_string(),
-      DshPlatformLabel::IsProduction => self.is_production().to_string(),
-      DshPlatformLabel::MqttTokenEndpoint => self.mqtt_token_endpoint(),
-      DshPlatformLabel::Name => self.name().to_string(),
-      DshPlatformLabel::PrivateDomain => self.private_domain().unwrap_or("not configured").to_string(),
-      DshPlatformLabel::PublicDomain => self.public_domain().to_string(),
-      DshPlatformLabel::Realm => self.realm().to_string(),
-      DshPlatformLabel::RestApiDomain => self.rest_api_domain(),
-      DshPlatformLabel::RestApiEndpoint => self.rest_api_endpoint(),
-      DshPlatformLabel::SwaggerUrl => self.swagger_url(),
-      DshPlatformLabel::TracingUrl => self.tracing_url(),
+      DshPlatformLabel::AccessTokenEndpoint => Value::plain(self.access_token_endpoint()),
+      DshPlatformLabel::Alias => Value::plain(self.alias()),
+      DshPlatformLabel::ClientId => Value::plain(self.client_id()),
+      DshPlatformLabel::CloudProvider => Value::plain(self.cloud_provider()),
+      DshPlatformLabel::ConsoleDomain => Value::plain(self.console_domain()),
+      DshPlatformLabel::ConsoleUrl => Value::plain(self.console_url()),
+      DshPlatformLabel::Description => Value::plain(self.description()),
+      DshPlatformLabel::IsProduction => Value::plain(self.is_production()),
+      DshPlatformLabel::MqttTokenEndpoint => Value::plain(self.mqtt_token_endpoint()),
+      DshPlatformLabel::Name => Value::plain(self.name()),
+      DshPlatformLabel::PrivateDomain => Value::some_or(self.private_domain(), "not configured"),
+      DshPlatformLabel::PublicDomain => Value::plain(self.public_domain()),
+      DshPlatformLabel::Realm => Value::plain(self.realm()),
+      DshPlatformLabel::RestApiDomain => Value::plain(self.rest_api_domain()),
+      DshPlatformLabel::RestApiEndpoint => Value::plain(self.rest_api_endpoint()),
+      DshPlatformLabel::SwaggerUrl => Value::plain(self.swagger_url()),
+      DshPlatformLabel::TracingUrl => Value::plain(self.tracing_url()),
       _ => unreachable!(),
     }
   }
@@ -459,26 +459,24 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
 
 // Subject formatter for (DshPlatform, app, bucket, service, tenant, vendor, vhost) septets
 impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String, String, String, String) {
-  fn value(&self, label: &DshPlatformLabel, target_id: &str) -> String {
+  fn value(&self, label: &DshPlatformLabel, target_id: &str) -> Value {
     let (platform, app_id, bucket_id, service_id, tenant, vendor_id, vhost) = self;
     match label {
-      DshPlatformLabel::BucketName => platform.bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID")).unwrap_or_else(|error| error),
-      DshPlatformLabel::InternalDomain => platform.internal_domain(tenant),
-      DshPlatformLabel::InternalServiceDomain => platform.internal_service_domain(tenant, service_id),
-      DshPlatformLabel::PublicVhostDomain => platform.public_vhost_domain(vhost),
-      DshPlatformLabel::TenantAppCatalogAppUrl => platform.tenant_app_catalog_app_url(tenant, vendor_id, app_id),
-      DshPlatformLabel::TenantAppCatalogUrl => platform.tenant_app_catalog_url(tenant),
-      DshPlatformLabel::TenantAppConsoleUrl => platform.tenant_app_console_url(tenant, app_id),
-      DshPlatformLabel::TenantClientId => platform.tenant_client_id(tenant),
-      DshPlatformLabel::TenantConsoleUrl => platform.tenant_console_url(tenant),
-      DshPlatformLabel::TenantDataCatalogUrl => platform.tenant_data_catalog_url(tenant),
-      DshPlatformLabel::TenantMonitoringUrl => platform.tenant_monitoring_url(tenant),
-      DshPlatformLabel::TenantPrivateVhostDomain => platform
-        .tenant_private_vhost_domain(tenant, vhost)
-        .unwrap_or("private domain not configured".to_string()),
-      DshPlatformLabel::TenantPublicAppDomain => platform.tenant_public_app_domain(tenant, app_id),
-      DshPlatformLabel::TenantPublicAppsDomain => platform.tenant_public_domain(tenant),
-      DshPlatformLabel::TenantServiceConsoleUrl => platform.tenant_service_console_url(tenant, service_id),
+      DshPlatformLabel::BucketName => Value::plain(platform.bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID")).unwrap_or_else(|error| error)),
+      DshPlatformLabel::InternalDomain => Value::plain(platform.internal_domain(tenant)),
+      DshPlatformLabel::InternalServiceDomain => Value::plain(platform.internal_service_domain(tenant, service_id)),
+      DshPlatformLabel::PublicVhostDomain => Value::plain(platform.public_vhost_domain(vhost)),
+      DshPlatformLabel::TenantAppCatalogAppUrl => Value::plain(platform.tenant_app_catalog_app_url(tenant, vendor_id, app_id)),
+      DshPlatformLabel::TenantAppCatalogUrl => Value::plain(platform.tenant_app_catalog_url(tenant)),
+      DshPlatformLabel::TenantAppConsoleUrl => Value::plain(platform.tenant_app_console_url(tenant, app_id)),
+      DshPlatformLabel::TenantClientId => Value::plain(platform.tenant_client_id(tenant)),
+      DshPlatformLabel::TenantConsoleUrl => Value::plain(platform.tenant_console_url(tenant)),
+      DshPlatformLabel::TenantDataCatalogUrl => Value::plain(platform.tenant_data_catalog_url(tenant)),
+      DshPlatformLabel::TenantMonitoringUrl => Value::plain(platform.tenant_monitoring_url(tenant)),
+      DshPlatformLabel::TenantPrivateVhostDomain => Value::ok_or(platform.tenant_private_vhost_domain(tenant, vhost), "private domain not configured"),
+      DshPlatformLabel::TenantPublicAppDomain => Value::plain(platform.tenant_public_app_domain(tenant, app_id)),
+      DshPlatformLabel::TenantPublicAppsDomain => Value::plain(platform.tenant_public_domain(tenant)),
+      DshPlatformLabel::TenantServiceConsoleUrl => Value::plain(platform.tenant_service_console_url(tenant, service_id)),
       _ => platform.value(label, target_id),
     }
   }

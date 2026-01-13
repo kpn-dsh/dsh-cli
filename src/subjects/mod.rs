@@ -21,7 +21,7 @@ pub(crate) mod topic;
 pub(crate) mod vhost;
 pub(crate) mod volume;
 
-use crate::formatters::notifications_to_string;
+use crate::formatters::{notifications_to_string, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use dsh_api::types::AllocationStatus;
 use dsh_api::{Dependant, DependantApp, DependantApplication, DependantProxy};
@@ -53,18 +53,18 @@ impl Label for AllocationStatusLabel {
 }
 
 impl SubjectFormatter<AllocationStatusLabel> for AllocationStatus {
-  fn value(&self, label: &AllocationStatusLabel, target_id: &str) -> String {
+  fn value(&self, label: &AllocationStatusLabel, target_id: &str) -> Value {
     match label {
-      AllocationStatusLabel::DerivedFrom => self.clone().derived_from.unwrap_or_default(),
+      AllocationStatusLabel::DerivedFrom => Value::option(self.derived_from.as_ref()),
       AllocationStatusLabel::Notifications => {
         if self.notifications.is_empty() {
-          "none".to_string()
+          Value::empty()
         } else {
-          notifications_to_string(&self.notifications)
+          Value::plain(notifications_to_string(&self.notifications))
         }
       }
-      AllocationStatusLabel::Provisioned => self.provisioned.to_string(),
-      AllocationStatusLabel::Target => target_id.to_string(),
+      AllocationStatusLabel::Provisioned => Value::plain(self.provisioned),
+      AllocationStatusLabel::Target => Value::target(target_id),
     }
   }
 }
@@ -78,10 +78,10 @@ static DEFAULT_ALLOCATION_STATUS_LABELS: [AllocationStatusLabel; 4] =
 #[derive(Eq, Hash, PartialEq, Serialize)]
 enum DependantLabel {
   Dependencies,
-  Id,
+  DependantId,
   Injections,
   Instances,
-  Kind,
+  DependantKind,
   Resources,
   Target,
 }
@@ -89,11 +89,11 @@ enum DependantLabel {
 impl Label for DependantLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::DependantId => "id",
+      Self::DependantKind => "app/service",
       Self::Dependencies => "dependencies",
-      Self::Id => "id",
       Self::Injections => "injections",
       Self::Instances => "instances",
-      Self::Kind => "app/service",
       Self::Resources => "app/resources",
       Self::Target => "target id",
     }
@@ -101,11 +101,11 @@ impl Label for DependantLabel {
 
   fn as_str_for_list(&self) -> &str {
     match self {
+      Self::DependantId => "dependant",
+      Self::DependantKind => "kind",
       Self::Dependencies => "dependencies",
-      Self::Id => "id",
       Self::Injections => "injections",
       Self::Instances => "#",
-      Self::Kind => "app/service",
       Self::Resources => "resources",
       Self::Target => "target id",
     }
@@ -120,52 +120,41 @@ impl<T> SubjectFormatter<DependantLabel> for DependantApplication<T>
 where
   T: Display,
 {
-  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
+  fn value(&self, label: &DependantLabel, target_id: &str) -> Value {
     match label {
-      DependantLabel::Dependencies => self.injections.iter().map(|injection| injection.to_string()).collect_vec().join("\n"),
-      DependantLabel::Id => self.application_id.to_string(),
-      DependantLabel::Injections => self.injections.iter().map(|injection| injection.to_string()).collect_vec().join("\n"),
-      DependantLabel::Instances => self.instances.to_string(),
-      DependantLabel::Kind => "service".to_string(),
-      DependantLabel::Resources => "".to_string(),
-      DependantLabel::Target => target_id.to_string(),
+      DependantLabel::Dependencies => Value::plain(self.injections.iter().map(|injection| injection.to_string()).join("\n")),
+      DependantLabel::DependantId => Value::target(&self.application_id),
+      DependantLabel::Injections => Value::plain(self.injections.iter().map(|injection| injection.to_string()).join("\n")),
+      DependantLabel::Instances => Value::plain(self.instances),
+      DependantLabel::DependantKind => Value::plain("service"),
+      DependantLabel::Resources => Value::empty(),
+      DependantLabel::Target => Value::target(target_id),
     }
-  }
-
-  fn target_id(&self) -> Option<String> {
-    Some(self.application_id.to_string())
   }
 }
 
 impl SubjectFormatter<DependantLabel> for DependantApp {
-  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
+  fn value(&self, label: &DependantLabel, target_id: &str) -> Value {
     match label {
-      DependantLabel::Dependencies => self.resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
-      DependantLabel::Id => self.app_id.to_string(),
-      DependantLabel::Kind => "app".to_string(),
-      DependantLabel::Resources => self.resources.iter().map(|resource| resource.to_string()).collect_vec().join("\n"),
-      DependantLabel::Target => target_id.to_string(),
-      _ => "".to_string(),
+      DependantLabel::Dependencies => Value::plain(self.resources.iter().map(|resource| resource.to_string()).join("\n")),
+      DependantLabel::DependantId => Value::target(&self.app_id),
+      DependantLabel::DependantKind => Value::plain("app"),
+      DependantLabel::Resources => Value::plain(self.resources.iter().map(|resource| resource.to_string()).join("\n")),
+      DependantLabel::Target => Value::target(target_id),
+      _ => Value::empty(),
     }
-  }
-
-  fn target_id(&self) -> Option<String> {
-    Some(self.app_id.to_string())
   }
 }
 
 impl SubjectFormatter<DependantLabel> for DependantProxy {
-  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
+  fn value(&self, label: &DependantLabel, target_id: &str) -> Value {
     match label {
-      DependantLabel::Id => self.proxy_id.to_string(),
-      DependantLabel::Instances => self.instances.to_string(),
-      DependantLabel::Target => target_id.to_string(),
-      _ => "".to_string(),
+      DependantLabel::DependantId => Value::target(&self.proxy_id),
+      DependantLabel::DependantKind => Value::plain("proxy"),
+      DependantLabel::Instances => Value::plain(self.instances),
+      DependantLabel::Target => Value::target(target_id),
+      _ => Value::empty(),
     }
-  }
-
-  fn target_id(&self) -> Option<String> {
-    Some(self.proxy_id.to_string())
   }
 }
 
@@ -173,27 +162,20 @@ impl<T> SubjectFormatter<DependantLabel> for Dependant<T>
 where
   T: Display,
 {
-  fn value(&self, label: &DependantLabel, target_id: &str) -> String {
+  fn value(&self, label: &DependantLabel, target_id: &str) -> Value {
     match self {
       Dependant::App(app) => app.value(label, target_id),
       Dependant::Application(application) => application.value(label, target_id),
       Dependant::Proxy(proxy) => proxy.value(label, target_id),
     }
   }
-
-  fn target_id(&self) -> Option<String> {
-    match self {
-      Dependant::App(app) => Some(app.app_id.to_string()),
-      Dependant::Application(application) => Some(application.application_id.to_string()),
-      Dependant::Proxy(proxy) => Some(proxy.proxy_id.to_string()),
-    }
-  }
 }
 
-static DEPENDANT_LABELS_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
-static _DEPENDANT_LABELS_SERVICES_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
-static _DEPENDANT_LABELS_APPS_LIST: [DependantLabel; 3] = [DependantLabel::Target, DependantLabel::Id, DependantLabel::Resources];
+static DEPENDANT_LABELS_LIST: [DependantLabel; 5] =
+  [DependantLabel::Target, DependantLabel::DependantKind, DependantLabel::DependantId, DependantLabel::Instances, DependantLabel::Dependencies];
+static _DEPENDANT_LABELS_SERVICES_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::DependantId, DependantLabel::Instances, DependantLabel::Injections];
+static _DEPENDANT_LABELS_APPS_LIST: [DependantLabel; 3] = [DependantLabel::Target, DependantLabel::DependantId, DependantLabel::Resources];
 
-static DEPENDANT_LABELS: [DependantLabel; 3] = [DependantLabel::Kind, DependantLabel::Id, DependantLabel::Dependencies];
-static DEPENDANT_LABELS_SERVICES: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Instances, DependantLabel::Injections];
-static DEPENDANT_LABELS_APPS: [DependantLabel; 3] = [DependantLabel::Id, DependantLabel::Dependencies, DependantLabel::Resources];
+static DEPENDANT_LABELS: [DependantLabel; 4] = [DependantLabel::DependantKind, DependantLabel::DependantId, DependantLabel::Instances, DependantLabel::Dependencies];
+static DEPENDANT_LABELS_SERVICES: [DependantLabel; 3] = [DependantLabel::DependantId, DependantLabel::Instances, DependantLabel::Injections];
+static DEPENDANT_LABELS_APPS: [DependantLabel; 3] = [DependantLabel::DependantId, DependantLabel::Dependencies, DependantLabel::Resources];

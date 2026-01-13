@@ -2,8 +2,8 @@ use crate::context::Context;
 use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::global_arguments::ENVIRONMENT_VARIABLE_ARGUMENT;
 use crate::{error, DshCliResult, TOOL_OPTIONS_HEADING};
 use clap::builder::ValueParser;
@@ -35,7 +35,7 @@ use std::path::PathBuf;
 /// * `Err<message>` - When the command line specifies the environment variable `env_var_name`
 ///   more than once.
 pub fn environment_variable(env_var_name: &str, matches: Option<&ArgMatches>) -> DshCliResult<Option<String>> {
-  match ENVIRONMENT_VARIABLES.iter().find(|env_var| env_var.name == env_var_name) {
+  match EnvironmentVariables.iter().find(|env_var| env_var.name == env_var_name) {
     Some(environment_variable) => {
       if environment_variable.override_allowed {
         match matches {
@@ -105,7 +105,7 @@ const REDACTED_SECRET: &str = "********";
 pub(crate) fn get_configured_environment_variables() -> Vec<(&'static str, String)> {
   let mut environment_variables: Vec<(&str, String)> = vec![];
   for (os_env_var_name, os_env_var_value) in std::env::vars() {
-    if let Some(environment_variable) = ENVIRONMENT_VARIABLES
+    if let Some(environment_variable) = EnvironmentVariables
       .iter()
       .find(|environment_variable| environment_variable.name == os_env_var_name)
     {
@@ -121,8 +121,8 @@ pub(crate) fn get_configured_environment_variables() -> Vec<(&'static str, Strin
 }
 
 pub(crate) fn print_environment_variables(context: &Context) {
-  let mut formatter = ListFormatter::new(&ENV_VAR_LABELS_LIST, None, context);
-  let styled: &Vec<(String, Option<String>, &EnvironmentVariable)> = &ENVIRONMENT_VARIABLES
+  let mut formatter = ListFormatter::new(&ENV_VAR_LABELS_LIST, context);
+  let styled: &Vec<(String, Option<String>, &EnvironmentVariable)> = &EnvironmentVariables
     .iter()
     .map(|environment_variable| {
       (
@@ -137,7 +137,7 @@ pub(crate) fn print_environment_variables(context: &Context) {
 }
 
 pub(crate) fn print_environment_variable(env_var: &str, context: &Context) {
-  let matching_env_vars: &Vec<&EnvironmentVariable> = &ENVIRONMENT_VARIABLES
+  let matching_env_vars: &Vec<&EnvironmentVariable> = &EnvironmentVariables
     .iter()
     .filter(|environment_variable| environment_variable.name.contains(&env_var.to_uppercase()))
     .collect_vec();
@@ -145,12 +145,12 @@ pub(crate) fn print_environment_variable(env_var: &str, context: &Context) {
     context.print_warning(format!("'{}' could not be matched to an environment variable recognized by the dsh tool", env_var));
   } else if matching_env_vars.len() == 1 {
     let environment_variable = matching_env_vars.first().unwrap_or_else(|| unreachable!());
-    _ = UnitFormatter::new(environment_variable.name, &ENV_VAR_LABELS, None, context).print_non_serializable(
+    _ = UnitFormatter::new(environment_variable.name, &ENV_VAR_LABELS, context).print_non_serializable(
       &(environment_variable.name.to_string(), get_env_var(environment_variable.name), *environment_variable),
       None,
     );
   } else {
-    let mut formatter = ListFormatter::new(&ENV_VAR_LABELS, None, context);
+    let mut formatter = ListFormatter::new(&ENV_VAR_LABELS, context);
     let styled_matching_env_vars = matching_env_vars
       .iter()
       .map(|environment_variable| {
@@ -333,36 +333,36 @@ impl EnvironmentVariable {
 }
 
 impl SubjectFormatter<EnvVarLabel> for (String, Option<String>, &EnvironmentVariable) {
-  fn value(&self, label: &EnvVarLabel, _: &str) -> String {
+  fn value(&self, label: &EnvVarLabel, _target_id: &str) -> Value {
     let (env_var_endorsed, value, environment_variable) = self;
     match label {
       EnvVarLabel::ContainsSecret => {
         if environment_variable.contains_secret {
-          "yes".to_string()
+          Value::plain("yes")
         } else {
-          "no".to_string()
+          Value::plain("no")
         }
       }
-      EnvVarLabel::DefaultValue => environment_variable.default_value.map(|value| value.to_string()).unwrap_or_default(),
-      EnvVarLabel::EnvVar => env_var_endorsed.to_string(),
-      EnvVarLabel::LongExplanation => environment_variable.long_explanation.to_string(),
+      EnvVarLabel::DefaultValue => Value::option(environment_variable.default_value),
+      EnvVarLabel::EnvVar => Value::plain(env_var_endorsed),
+      EnvVarLabel::LongExplanation => Value::plain(environment_variable.long_explanation),
       EnvVarLabel::OverrideAllowed => {
         if environment_variable.override_allowed {
-          "allowed".to_string()
+          Value::plain("allowed")
         } else {
-          "not allowed".to_string()
+          Value::plain("not allowed")
         }
       }
-      EnvVarLabel::ShortExplanation => environment_variable.short_explanation.to_string(),
+      EnvVarLabel::ShortExplanation => Value::plain(environment_variable.short_explanation),
       EnvVarLabel::Value => match value {
         Some(value) => {
           if environment_variable.contains_secret {
-            REDACTED_SECRET.to_string()
+            Value::secret()
           } else {
-            value.to_string()
+            Value::plain(value)
           }
         }
-        None => "".to_string(),
+        None => Value::empty(),
       },
     }
   }
@@ -443,8 +443,8 @@ pub(crate) const ENV_VAR_DSH_CLI_LOG_LEVEL_API: &str = "DSH_CLI_LOG_LEVEL_API";
 pub(crate) const ENV_VAR_DSH_CLI_LOG_STYLE: &str = "DSH_CLI_LOG_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_MATCHING_COLOR: &str = "DSH_CLI_MATCHING_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_NO_CSV_HEADERS: &str = "DSH_CLI_NO_CSV_HEADERS";
 pub(crate) const ENV_VAR_DSH_CLI_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
-pub(crate) const ENV_VAR_DSH_CLI_NO_HEADERS: &str = "DSH_CLI_NO_HEADERS";
 pub(crate) const ENV_VAR_DSH_CLI_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
 pub(crate) const ENV_VAR_DSH_CLI_PASSWORD: &str = "DSH_CLI_PASSWORD";
 pub(crate) const ENV_VAR_DSH_CLI_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
@@ -456,6 +456,8 @@ pub(crate) const ENV_VAR_DSH_CLI_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
+pub(crate) const ENV_VAR_DSH_CLI_TARGET_COLOR: &str = "DSH_CLI_TARGET_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_TARGET_STYLE: &str = "DSH_CLI_TARGET_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_TENANT: &str = "DSH_CLI_TENANT";
 pub(crate) const ENV_VAR_DSH_CLI_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
 pub(crate) const ENV_VAR_DSH_CLI_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
@@ -465,7 +467,7 @@ pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
 
 lazy_static! {
-  static ref ENVIRONMENT_VARIABLES: [EnvironmentVariable; 38] = [
+  static ref EnvironmentVariables: [EnvironmentVariable; 40] = [
     EnvironmentVariable::new(
       ENV_VAR_DSH_API_PLATFORMS_FILE,
       "Overrides the default list of available platforms.",
@@ -678,6 +680,15 @@ lazy_static! {
       'bold' will be used. See environment variable 'DSH_CLI_ERROR_STYLE' for the supported styles.",
     ),
     EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_NO_CSV_HEADERS,
+      "Disables headers in csv output.",
+      false,
+      true,
+      Some("enabled"),
+      "When this environment variables is set (to any value) csv output will not contain headers. \n\
+      This environment variable can be overridden via the --no-csv-headers command line argument.",
+    ),
+    EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_NO_ESCAPE,
       "Disables color and styling ansi escape sequences in the generated output.",
       false,
@@ -686,15 +697,6 @@ lazy_static! {
       "When this environment variable is set (to any value) the output will not contain any ansi \n\
       color or other escape sequences. This environment variable can be overridden via the \n\
       --no-color or --no-ansi command line argument.",
-    ),
-    EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_NO_HEADERS,
-      "Disables headers in the generated output.",
-      false,
-      true,
-      Some("enabled"),
-      "When this environment variables is set (to any value) the output will not contain headers. \n\
-      This environment variable can be overridden via the --no-headers command line argument.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_OUTPUT_FORMAT,
@@ -819,6 +821,28 @@ lazy_static! {
       status 0, even when an error has occurred. This can be useful in scripting environments. The \n\
       same effect can be accomplished via the '--suppress-exit-code' command line argument or the \n\
       'suppress-exit-status' setting.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_TARGET_COLOR,
+      "Specify the color to be used when printing target identifiers.",
+      false,
+      true,
+      Some("terminal default"),
+      "This environment variable specifies the color to be used when printing target \n\
+      identifiers. If this variable is not set, the settings file will be checked for the \n\
+      'target-color' entry. Else the default terminal color will be used. See environment \n\
+      variable 'DSH_CLI_ERROR_COLOR' for the supported colors.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_TARGET_STYLE,
+      "Specifies the styling to be used when printing target identifiers.",
+      false,
+      true,
+      Some("italic"),
+      "This environment variable specifies the styling to be used when printing table headers or \n\
+      labels. If this variable is not set, the settings file will be checked for the 'label-style' \n\
+      entry. Else the default value 'italic' will be used. See environment variable \n\
+      'DSH_CLI_ERROR_STYLE' for the supported styles.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_TENANT,

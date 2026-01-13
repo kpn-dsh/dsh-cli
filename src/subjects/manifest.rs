@@ -7,9 +7,9 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
 use crate::formatters::{hashmap_to_table, hashmap_to_vec, vec_to_table};
 use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::{error, DshCliResult};
 use async_trait::async_trait;
@@ -164,7 +164,7 @@ impl CommandExecutor for ManifestExplain {
     if let Some(configuration) = &manifest.configuration {
       let mut property_ids = configuration.properties.keys().map(|id| id.to_string()).collect_vec();
       property_ids.sort();
-      let mut formatter = ListFormatter::new(&PROPERTY_LABELS_LIST, None, context);
+      let mut formatter = ListFormatter::new(&PROPERTY_LABELS_LIST, context);
       for property_id in property_ids {
         if let Some(property) = configuration.properties.get(&property_id) {
           formatter.push_target_id_value(property_id, property);
@@ -236,8 +236,7 @@ impl CommandExecutor for ManifestListLatest {
     let start_instant = context.now();
     let mut latest_manifests: Vec<(String, Manifest)> = client.manifests_latest_version(include_draft).await?;
     context.print_execution_time(start_instant);
-    let mut formatter =
-      if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
+    let mut formatter = if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, context) };
     for (manifest_id, manifest) in latest_manifests.iter_mut() {
       formatter.push_target_id_value(manifest_id.clone(), manifest);
     }
@@ -264,8 +263,7 @@ impl CommandExecutor for ManifestListAllVersions {
     let start_instant = context.now();
     let manifests_by_id: Vec<(String, Vec<Manifest>)> = client.manifests_all_versions().await?;
     context.print_execution_time(start_instant);
-    let mut formatter =
-      if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
+    let mut formatter = if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, context) };
     for (manifest_id, manifests) in &manifests_by_id {
       for manifest in manifests {
         if !manifest.draft || include_draft {
@@ -326,13 +324,7 @@ impl CommandExecutor for ManifestShow {
     if manifest.draft {
       context.print_warning(format!("{}:{} is a draft manifest", manifest_id, manifest.version));
     }
-    UnitFormatter::new(
-      manifest_id,
-      if complete { &MANIFEST_LABELS_SHOW_FULL } else { &MANIFEST_LABELS_SHOW },
-      Some("manifest id"),
-      context,
-    )
-    .print(&manifest, None)
+    UnitFormatter::new(manifest_id, if complete { &MANIFEST_LABELS_SHOW_FULL } else { &MANIFEST_LABELS_SHOW }, context).print(&manifest, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -355,8 +347,7 @@ impl CommandExecutor for ManifestShowAllVersions {
     let start_instant = context.now();
     let manifests_by_id: Vec<Manifest> = client.manifest_all_versions(manifest_id.as_str()).await?;
     context.print_execution_time(start_instant);
-    let mut formatter =
-      if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, None, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, None, context) };
+    let mut formatter = if include_draft { ListFormatter::new(&MANIFEST_LABELS_LIST_INCLUDE_DRAFT, context) } else { ListFormatter::new(&MANIFEST_LABELS_LIST, context) };
     for manifest in &manifests_by_id {
       if !manifest.draft || include_draft {
         formatter.push_target_id_value(manifest_id.clone(), manifest);
@@ -396,7 +387,7 @@ impl Label for ManifestLabel {
       Self::Contact => "contact",
       Self::Description => "description",
       Self::Draft => "draft",
-      Self::Id => "app",
+      Self::Id => "manifest",
       Self::Kind => "kind",
       Self::LastModified => "last modified",
       Self::ManifestVersion => "version",
@@ -436,15 +427,12 @@ impl Label for PropertyLabel {
 }
 
 impl SubjectFormatter<PropertyLabel> for Property {
-  fn value(&self, label: &PropertyLabel, target_id: &str) -> String {
+  fn value(&self, label: &PropertyLabel, target_id: &str) -> Value {
     match label {
       PropertyLabel::Default => match self.kind {
-        PropertyKind::DnsZone => "private".to_string(),
-        PropertyKind::Number => match &self.default {
-          Some(default_value) => default_value.to_string(),
-          None => "mandatory".to_string(),
-        },
-        PropertyKind::String => match &self.default {
+        PropertyKind::DnsZone => Value::plain("private"),
+        PropertyKind::Number => Value::some_or(self.default.clone(), "mandatory"),
+        PropertyKind::String => Value::plain(match &self.default {
           Some(default_value) => {
             if self.enumeration.is_some() {
               default_value.to_string()
@@ -453,14 +441,14 @@ impl SubjectFormatter<PropertyLabel> for Property {
             }
           }
           None => "mandatory".to_string(),
-        },
+        }),
       },
-      PropertyLabel::Description => self.description.to_string(),
-      PropertyLabel::Id => target_id.to_string(),
+      PropertyLabel::Description => Value::plain(&self.description),
+      PropertyLabel::Id => Value::target(target_id),
       PropertyLabel::ValueExplanation => match self.kind {
-        PropertyKind::DnsZone => property_dns_zone_explanation(),
-        PropertyKind::Number => property_value_explanation(self, "number", ", "),
-        PropertyKind::String => property_value_explanation(self, "string", "\n"),
+        PropertyKind::DnsZone => Value::plain(property_dns_zone_explanation()),
+        PropertyKind::Number => Value::plain(property_value_explanation(self, "number", ", ")),
+        PropertyKind::String => Value::plain(property_value_explanation(self, "string", "\n")),
       },
     }
   }
@@ -581,40 +569,36 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
 }
 
 impl SubjectFormatter<ManifestLabel> for Manifest {
-  fn value(&self, label: &ManifestLabel, target_id: &str) -> String {
+  fn value(&self, label: &ManifestLabel, target_id: &str) -> Value {
     match label {
-      ManifestLabel::ApiVersion => self.api_version.clone().unwrap_or_default(),
+      ManifestLabel::ApiVersion => Value::option(self.api_version.clone()),
       ManifestLabel::Configuration => match self.configuration {
-        Some(ref configuration) => hashmap_to_table(
+        Some(ref configuration) => Value::plain(hashmap_to_table(
           &configuration
             .properties
             .iter()
             .map(|(key, property)| (key, property.to_string()))
             .collect::<HashMap<_, _>>(),
-        ),
-        None => "".to_string(),
+        )),
+        None => Value::empty(),
       },
-      ManifestLabel::Contact => self.contact.clone(),
-      ManifestLabel::Description => self.description.clone().unwrap_or_default(),
-      ManifestLabel::Draft => self.draft.to_string(),
-      ManifestLabel::Id => target_id.to_string(),
-      ManifestLabel::Kind => self.kind.clone().unwrap_or_default(),
-      ManifestLabel::LastModified => self.last_modified.clone(),
-      ManifestLabel::ManifestVersion => self.version.to_string(),
-      ManifestLabel::MoreInfo => self
-        .more_info
-        .clone()
-        .map(|more_info| termimad::text(more_info.as_str()).to_string())
-        .unwrap_or_default(),
-      ManifestLabel::Name => self.name.clone(),
-      ManifestLabel::Resources => vec_to_table(
+      ManifestLabel::Contact => Value::plain(&self.contact),
+      ManifestLabel::Description => Value::option(self.description.clone()),
+      ManifestLabel::Draft => Value::plain(self.draft),
+      ManifestLabel::Id => Value::target(target_id),
+      ManifestLabel::Kind => Value::option(self.kind.clone()),
+      ManifestLabel::LastModified => Value::plain(&self.last_modified),
+      ManifestLabel::ManifestVersion => Value::plain(&self.version),
+      ManifestLabel::MoreInfo => Value::option(self.more_info.clone().map(|more_info| termimad::text(more_info.as_str()).to_string())),
+      ManifestLabel::Name => Value::plain(&self.name),
+      ManifestLabel::Resources => Value::plain(vec_to_table(
         &self
           .resources
           .values()
           .map(|resource| (resource_to_key(resource), resource_to_strings(resource)))
           .collect_vec(),
-      ),
-      ManifestLabel::Vendor => self.vendor.clone(),
+      )),
+      ManifestLabel::Vendor => Value::plain(&self.vendor),
     }
   }
 }

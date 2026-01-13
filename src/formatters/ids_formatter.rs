@@ -33,95 +33,100 @@ impl<'a> IdsFormatter<'a> {
     self
   }
 
-  pub(crate) fn _is_empty(&self) -> bool {
+  pub(crate) fn is_empty(&self) -> bool {
     self.ids.is_empty()
   }
 
   pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
-    match self.context.output_format(default_output_format) {
-      OutputFormat::Csv => {
-        self.context.print(self.ids.join(","));
-        Ok(())
+    if self.is_empty() {
+      self.context.print_outcome("no results");
+      Ok(())
+    } else {
+      match self.context.output_format(default_output_format) {
+        OutputFormat::Csv => {
+          self.context.print(self.ids.join(","));
+          Ok(())
+        }
+
+        OutputFormat::Json => match serde_json::to_string_pretty(&self.ids) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(error!("could not convert target ids to json ({})", error)),
+        },
+
+        OutputFormat::JsonCompact => match serde_json::to_string(&self.ids) {
+          Ok(json) => {
+            self.context.print(json);
+            Ok(())
+          }
+          Err(error) => Err(error!("could not convert target ids to json compact ({})", error)),
+        },
+
+        OutputFormat::Plain => {
+          self.context.print(self.ids.join("\n"));
+          Ok(())
+        }
+
+        OutputFormat::Quiet => Ok(()),
+
+        OutputFormat::Table => {
+          let mut tabled_builder = TabledBuilder::default();
+          tabled_builder.push_record([self.context.apply_target_label_style(self.label)]);
+          for target_id in &self.ids {
+            tabled_builder.push_record::<[&str; 1]>([&self.context.apply_target_style(target_id)]);
+          }
+          let mut table = tabled_builder.build();
+          if let Some(terminal_width) = self.context.terminal_width() {
+            table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
+          }
+          table.with(Padding::new(1, 1, 0, 0));
+          table.with(Style::sharp());
+          self.context.print(table.to_string());
+          Ok(())
+        }
+
+        OutputFormat::TableNoBorder => {
+          let mut tabled_builder = TabledBuilder::default();
+          tabled_builder.push_record([self.context.apply_target_label_style(self.label)]);
+          for target_id in &self.ids {
+            tabled_builder.push_record::<[&str; 1]>([&self.context.apply_target_style(target_id)]);
+          }
+          let mut table = tabled_builder.build();
+          if let Some(terminal_width) = self.context.terminal_width() {
+            table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
+          }
+          table.with(Padding::new(0, 2, 0, 0));
+          table.with(Style::empty());
+          self.context.print(table.to_string());
+          Ok(())
+        }
+
+        OutputFormat::Toml => match toml::to_string_pretty(&HashMap::from([(&self.label, &self.ids)])) {
+          Ok(toml) => {
+            self.context.print(toml);
+            Ok(())
+          }
+          Err(error) => Err(error!("could not convert target ids to toml ({})", error)),
+        },
+
+        OutputFormat::TomlCompact => match toml::to_string(&HashMap::from([(&self.label, &self.ids)])) {
+          Ok(toml) => {
+            self.context.print(toml);
+            Ok(())
+          }
+          Err(error) => Err(error!("could not convert target ids to toml compact ({})", error)),
+        },
+
+        OutputFormat::Yaml => match serde_yaml::to_string(&self.ids) {
+          Ok(yaml) => {
+            self.context.print(yaml);
+            Ok(())
+          }
+          Err(error) => Err(error!("could not convert target ids to yaml ({})", error)),
+        },
       }
-
-      OutputFormat::Json => match serde_json::to_string_pretty(&self.ids) {
-        Ok(json) => {
-          self.context.print(json);
-          Ok(())
-        }
-        Err(error) => Err(error!("could not convert target ids to json ({})", error)),
-      },
-
-      OutputFormat::JsonCompact => match serde_json::to_string(&self.ids) {
-        Ok(json) => {
-          self.context.print(json);
-          Ok(())
-        }
-        Err(error) => Err(error!("could not convert target ids to json compact ({})", error)),
-      },
-
-      OutputFormat::Plain => {
-        self.context.print(self.ids.join("\n"));
-        Ok(())
-      }
-
-      OutputFormat::Quiet => Ok(()),
-
-      OutputFormat::Table => {
-        let mut tabled_builder = TabledBuilder::default();
-        tabled_builder.push_record([self.label]);
-        for target_id in &self.ids {
-          tabled_builder.push_record::<[&str; 1]>([target_id]);
-        }
-        let mut table = tabled_builder.build();
-        if let Some(terminal_width) = self.context.terminal_width() {
-          table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
-        }
-        table.with(Padding::new(1, 1, 0, 0));
-        table.with(Style::sharp());
-        self.context.print(table.to_string());
-        Ok(())
-      }
-
-      OutputFormat::TableNoBorder => {
-        let mut tabled_builder = TabledBuilder::default();
-        tabled_builder.push_record([self.label]);
-        for target_id in &self.ids {
-          tabled_builder.push_record::<[&str; 1]>([target_id]);
-        }
-        let mut table = tabled_builder.build();
-        if let Some(terminal_width) = self.context.terminal_width() {
-          table.with(Width::truncate(terminal_width).priority(PriorityMax::new(true)).suffix("..."));
-        }
-        table.with(Padding::new(0, 2, 0, 0));
-        table.with(Style::empty());
-        self.context.print(table.to_string());
-        Ok(())
-      }
-
-      OutputFormat::Toml => match toml::to_string_pretty(&HashMap::from([(&self.label, &self.ids)])) {
-        Ok(toml) => {
-          self.context.print(toml);
-          Ok(())
-        }
-        Err(error) => Err(error!("could not convert target ids to toml ({})", error)),
-      },
-
-      OutputFormat::TomlCompact => match toml::to_string(&HashMap::from([(&self.label, &self.ids)])) {
-        Ok(toml) => {
-          self.context.print(toml);
-          Ok(())
-        }
-        Err(error) => Err(error!("could not convert target ids to toml compact ({})", error)),
-      },
-
-      OutputFormat::Yaml => match serde_yaml::to_string(&self.ids) {
-        Ok(yaml) => {
-          self.context.print(yaml);
-          Ok(())
-        }
-        Err(error) => Err(error!("could not convert target ids to yaml ({})", error)),
-      },
     }
   }
 }

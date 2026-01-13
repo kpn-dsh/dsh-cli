@@ -118,7 +118,7 @@ impl CommandExecutor for EnvFind {
     if matching_services.is_empty() {
       context.print_outcome("no matches found in services");
     } else {
-      let mut formatter = ListFormatter::new(&SERVICE_ENV_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&SERVICE_ENV_LABELS, context);
       formatter.push_target_id_value_pairs(&matching_services);
       formatter.print(None)?;
     }

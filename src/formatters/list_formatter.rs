@@ -13,7 +13,6 @@ use tabled::{builder::Builder as TabledBuilder, settings::Style};
 
 pub(crate) struct ListFormatter<'a, L: Label, V: Clone + SubjectFormatter<L>> {
   labels: &'a [L],
-  target_label: Option<&'a str>,
   values: Vec<(String, Cow<'a, V>)>,
   context: &'a Context,
   phantom: PhantomData<&'a V>,
@@ -25,8 +24,8 @@ where
   V: Clone + Serialize + SubjectFormatter<L>,
 {
   /// # Creates a new `ListFormatter`
-  pub(crate) fn new(labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
-    Self { labels, target_label, values: vec![], context, phantom: PhantomData }
+  pub(crate) fn new(labels: &'a [L], context: &'a Context) -> Self {
+    Self { labels, values: vec![], context, phantom: PhantomData }
   }
 
   /// # Pushes target ids and values
@@ -52,19 +51,13 @@ where
   }
 
   pub(crate) fn _push_value(&mut self, value: &'a V) -> &Self {
-    match value.target_id() {
-      Some(target_id) => self.values.push((target_id, Cow::Borrowed(value))),
-      None => self.values.push(("".to_string(), Cow::Borrowed(value))),
-    }
+    self.values.push(("".to_string(), Cow::Borrowed(value)));
     self
   }
 
   pub(crate) fn push_values(&mut self, values: &'a [V]) -> &Self {
     for value in values {
-      match value.target_id() {
-        Some(target_id) => self.values.push((target_id, Cow::Borrowed(value))),
-        None => self.values.push(("".to_string(), Cow::Borrowed(value))),
-      }
+      self.values.push(("".to_string(), Cow::Borrowed(value)));
     }
     self
   }
@@ -83,14 +76,6 @@ where
     self.values.is_empty()
   }
 
-  fn label_to_header(&self, label: &L) -> String {
-    if label.is_target_label() {
-      self.add_csv_quote(self.target_label.unwrap_or(label.as_str_for_list()))
-    } else {
-      self.add_csv_quote(label.as_str_for_list())
-    }
-  }
-
   fn add_csv_quote(&self, value: &str) -> String {
     match self.context.csv_quote() {
       Some(csv_quote) => format!("{}{}{}", csv_quote, value, csv_quote),
@@ -99,42 +84,52 @@ where
   }
 
   pub(crate) fn print(&self, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
-    match self.context.output_format(default_output_format) {
-      OutputFormat::Csv => self.print_csv(),
-      OutputFormat::Json => self.print_json(),
-      OutputFormat::JsonCompact => self.print_json_compact(),
-      OutputFormat::Plain => self.print_plain(),
-      OutputFormat::Quiet => Ok(()),
-      OutputFormat::Table => self.print_table(),
-      OutputFormat::TableNoBorder => self.print_table_no_borders(),
-      OutputFormat::Toml => self.print_toml(),
-      OutputFormat::TomlCompact => self.print_toml_compact(),
-      OutputFormat::Yaml => self.print_yaml(),
+    if self.is_empty() {
+      self.context.print_outcome("no results");
+      Ok(())
+    } else {
+      match self.context.output_format(default_output_format) {
+        OutputFormat::Csv => self.print_csv(),
+        OutputFormat::Json => self.print_json(),
+        OutputFormat::JsonCompact => self.print_json_compact(),
+        OutputFormat::Plain => self.print_plain(),
+        OutputFormat::Quiet => Ok(()),
+        OutputFormat::Table => self.print_table(),
+        OutputFormat::TableNoBorder => self.print_table_no_borders(),
+        OutputFormat::Toml => self.print_toml(),
+        OutputFormat::TomlCompact => self.print_toml_compact(),
+        OutputFormat::Yaml => self.print_yaml(),
+      }
     }
   }
 
   pub(crate) fn print_non_serializable(&self, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
-    match self.context.output_format(default_output_format.clone()) {
-      OutputFormat::Csv => self.print_csv(),
-      OutputFormat::Json => Err(error!("serialization to json is not supported for this type")),
-      OutputFormat::JsonCompact => Err(error!("serialization to compact json is not supported for this type")),
-      OutputFormat::Plain => Err(error!("plain unit print not yet implemented")),
-      OutputFormat::Quiet => Ok(()),
-      OutputFormat::Table => self.print_table(),
-      OutputFormat::TableNoBorder => self.print_table_no_borders(),
-      OutputFormat::Toml => Err(error!("serialization to toml is not supported for this type")),
-      OutputFormat::TomlCompact => Err(error!("serialization to compact toml is not supported for this type")),
-      OutputFormat::Yaml => Err(error!("serialization to yaml is not supported for this type")),
+    if self.is_empty() {
+      self.context.print_outcome("no results");
+      Ok(())
+    } else {
+      match self.context.output_format(default_output_format.clone()) {
+        OutputFormat::Csv => self.print_csv(),
+        OutputFormat::Json => Err(error!("serialization to json is not supported for this type")),
+        OutputFormat::JsonCompact => Err(error!("serialization to compact json is not supported for this type")),
+        OutputFormat::Plain => Err(error!("plain unit print not yet implemented")),
+        OutputFormat::Quiet => Ok(()),
+        OutputFormat::Table => self.print_table(),
+        OutputFormat::TableNoBorder => self.print_table_no_borders(),
+        OutputFormat::Toml => Err(error!("serialization to toml is not supported for this type")),
+        OutputFormat::TomlCompact => Err(error!("serialization to compact toml is not supported for this type")),
+        OutputFormat::Yaml => Err(error!("serialization to yaml is not supported for this type")),
+      }
     }
   }
 
   fn print_csv(&self) -> DshCliResult<()> {
-    if self.context.show_headers() {
+    if !self.context.no_csv_headers() {
       self.context.print(
         self
           .labels
           .iter()
-          .map(|label| self.label_to_header(label))
+          .map(|label| self.add_csv_quote(label.as_str_for_list()))
           .join(self.context.csv_separator().as_str()),
       );
     }
@@ -143,7 +138,7 @@ where
         self
           .labels
           .iter()
-          .map(|label| self.add_csv_quote(value.value(label, target_id).as_str()))
+          .map(|label| self.add_csv_quote(value.value(label, target_id).to_undecorated_string().as_str()))
           .join(self.context.csv_separator().as_str()),
       );
     }
@@ -189,28 +184,29 @@ where
   }
 
   fn print_plain(&self) -> Result<(), DshCliError> {
-    if self.context.show_headers() {
-      self.context.print(self.labels.iter().map(|label| label.as_str()).join(","));
-    }
+    self.context.print(self.labels.iter().map(|label| label.as_str()).join(","));
     for (target_id, value) in &self.values {
-      self.context.print(self.labels.iter().map(|label| value.value(label, target_id)).join(","));
+      self
+        .context
+        .print(self.labels.iter().map(|label| value.value(label, target_id).to_undecorated_string()).join(","));
     }
     Ok(())
   }
 
   fn print_table(&self) -> Result<(), DshCliError> {
     let mut tabled_builder = TabledBuilder::default();
-    tabled_builder.push_record(
-      self
-        .labels
-        .iter()
-        .map(|label| if label.is_target_label() { self.target_label.unwrap_or(label.as_str_for_list()) } else { label.as_str_for_list() }),
-    );
+    tabled_builder.push_record(self.labels.iter().map(|label| {
+      if label.is_target_label() {
+        self.context.apply_target_label_style(label.as_str_for_list())
+      } else {
+        self.context.apply_label_style(label.as_str_for_list())
+      }
+    }));
     let mut last_target_id: Option<String> = None;
     for (target_id, value) in &self.values {
       let record = self.labels.iter().map(|label| {
         if label.is_target_label() {
-          let target_id_value = value.value(label, target_id);
+          let target_id_value = value.value(label, target_id).to_decorated_string(self.context);
           if last_target_id.clone().is_some_and(|last| last == target_id_value) {
             "".to_string()
           } else {
@@ -218,7 +214,7 @@ where
             target_id_value
           }
         } else {
-          value.value(label, target_id)
+          value.value(label, target_id).to_decorated_string(self.context)
         }
       });
       tabled_builder.push_record(record);
@@ -239,14 +235,15 @@ where
 
   fn print_table_no_borders(&self) -> Result<(), DshCliError> {
     let mut tabled_builder = TabledBuilder::default();
-    tabled_builder.push_record(
-      self
-        .labels
-        .iter()
-        .map(|label| if label.is_target_label() { self.target_label.unwrap_or(label.as_str_for_list()) } else { label.as_str_for_list() }),
-    );
+    tabled_builder.push_record(self.labels.iter().map(|label| {
+      if label.is_target_label() {
+        self.context.apply_target_label_style(label.as_str_for_list())
+      } else {
+        self.context.apply_label_style(label.as_str_for_list())
+      }
+    }));
     for (target_id, value) in &self.values {
-      tabled_builder.push_record(self.labels.iter().map(|label| value.value(label, target_id)));
+      tabled_builder.push_record(self.labels.iter().map(|label| value.value(label, target_id).to_decorated_string(self.context)));
     }
     let mut table = tabled_builder.build();
     if let Some(terminal_width) = self.context.terminal_width() {

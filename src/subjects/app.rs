@@ -6,11 +6,10 @@ use crate::capability::{
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::hashmap_to_table;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
+use crate::formatters::{hashmap_to_table, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
@@ -30,6 +29,7 @@ use dsh_api::types::AppCatalogAppResourcesValue;
 use dsh_api::types::{AppCatalogApp, AppCatalogAppConfiguration};
 use dsh_api::version::Version;
 use futures::future::try_join;
+use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -96,7 +96,7 @@ lazy_static! {
       .add_target_argument(manifest_version_argument())
   );
   static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &AppListConfiguration {}, "List deployed apps")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &AppList {}, "List deployed apps")
       .set_long_about(
         "Lists all apps deployed from the DSH app catalog. If the --ids option is provided \
          only the app identifiers will be listed."
@@ -109,7 +109,7 @@ lazy_static! {
       .add_target_argument(app_id_argument().required(true))
   );
   static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &AppShowAll {}, "Show deployed app configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &AppShow {}, "Show deployed app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .add_target_argument(app_id_argument().required(true))
   );
@@ -206,7 +206,7 @@ impl CommandExecutor for AppDeploy {
       name: app_id.to_string(),
       stopped: false,
     };
-    UnitFormatter::new(app_id, &APP_CATALOG_APP_CONFIGURATION_LABELS, Some("app id"), context).print(&app_catalog_app_configuration, None)?;
+    UnitFormatter::new(app_id, &APP_CATALOG_APP_CONFIGURATION_LABELS, context).print(&app_catalog_app_configuration, None)?;
     if context.dry_run() {
       context.print_warning("dry-run mode, app not deployed");
     } else {
@@ -276,10 +276,10 @@ fn parse_app_parameter(app_parameter: &str) -> DshCliResult<(String, String)> {
   }
 }
 
-struct AppListConfiguration {}
+struct AppList {}
 
 #[async_trait]
-impl CommandExecutor for AppListConfiguration {
+impl CommandExecutor for AppList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all deployed apps and their configurations");
     let start_instant = context.now();
@@ -287,7 +287,7 @@ impl CommandExecutor for AppListConfiguration {
     context.print_execution_time(start_instant);
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect_vec();
     app_ids.sort();
-    let mut formatter = ListFormatter::new(&APP_CATALOG_APP_LABELS, Some("app id"), context);
+    let mut formatter = ListFormatter::new(&APP_CATALOG_APP_LABELS, context);
     for app_id in app_ids {
       let app = apps.get(&app_id).unwrap_or_else(|| unreachable!());
       formatter.push_target_id_value(app_id, app);
@@ -312,7 +312,7 @@ impl CommandExecutor for AppListIds {
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("app id", context);
     formatter.push_target_ids(&ids);
-    formatter.print(Some(OutputFormat::Plain))?;
+    formatter.print(None)?;
     Ok(())
   }
 
@@ -373,39 +373,42 @@ impl CommandExecutor for AppOpen {
   }
 }
 
-struct AppShowAll {}
+struct AppShow {}
 
 #[async_trait]
-impl CommandExecutor for AppShowAll {
+impl CommandExecutor for AppShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
     let start_instant = context.now();
-    let app: AppCatalogApp = client.get_appcatalogapp_configuration(&app_id).await?;
+    let (app_catalog_app, allocation_status) = join!(client.get_appcatalogapp_configuration(&app_id), client.get_appcatalog_app_status(&app_id));
     context.print_execution_time(start_instant);
-    UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, Some("app id"), context).print(&app, None)?;
+    context.print_allocation_status(&allocation_status, APP_SUBJECT_TARGET);
+    let app = app_catalog_app?;
+    UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, context).print(&app, None)?;
+    // UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, Some("app id"), context).print(&app, None)?;
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(service) => {
-          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, Some("service resource"), context).print(service, None)?;
+          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, context).print(service, None)?;
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
-          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket, None)?;
+          UnitFormatter::new(resource_name, &BUCKET_LABELS, context).print(bucket, None)?;
         }
         AppCatalogAppResourcesValue::Certificate(certificate) => {
-          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), context).print(certificate, None)?;
+          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, context).print(certificate, None)?;
         }
         AppCatalogAppResourcesValue::Secret(secret) => {
-          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), context).print(&secret.name, None)?;
+          UnitFormatter::new(resource_name, &["secret".to_string()], context).print(&secret.name, None)?;
         }
         AppCatalogAppResourcesValue::Topic(topic) => {
-          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), context).print(topic, None)?;
+          UnitFormatter::new(resource_name, &TOPIC_LABELS, context).print(topic, None)?;
         }
         AppCatalogAppResourcesValue::Vhost(vhost) => {
-          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), context).print(vhost, None)?;
+          UnitFormatter::new(resource_name, &VHOST_LABELS, context).print(vhost, None)?;
         }
         AppCatalogAppResourcesValue::Volume(volume) => {
-          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), context).print(volume, None)?;
+          UnitFormatter::new(resource_name, &VOLUME_LABELS, context).print(volume, None)?;
         }
       }
     }
@@ -485,17 +488,17 @@ impl Label for AppCatalogAppLabel {
 }
 
 impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
-  fn value(&self, label: &AppCatalogAppLabel, target_id: &str) -> String {
+  fn value(&self, label: &AppCatalogAppLabel, target_id: &str) -> Value {
     match label {
       AppCatalogAppLabel::Configuration => match &self.configuration {
         Some(configuration) => match from_str::<HashMap<String, String>>(configuration) {
-          Ok(map) => hashmap_to_table(&map.iter().filter(|(key, _)| !key.starts_with("@")).collect()),
-          Err(_) => "error".to_string(),
+          Ok(map) => Value::plain(hashmap_to_table(&map.iter().filter(|(key, _)| !key.starts_with("@")).collect())),
+          Err(_) => Value::error("error"),
         },
-        None => "empty".to_string(),
+        None => Value::Empty,
       },
-      AppCatalogAppLabel::ManifestUrn => self.manifest_urn.clone(),
-      AppCatalogAppLabel::Target => target_id.to_string(),
+      AppCatalogAppLabel::ManifestUrn => Value::plain(&self.manifest_urn),
+      AppCatalogAppLabel::Target => Value::target(target_id),
     }
   }
 }
@@ -526,12 +529,12 @@ impl Label for AppCatalogAppConfigurationLabel {
 }
 
 impl SubjectFormatter<AppCatalogAppConfigurationLabel> for AppCatalogAppConfiguration {
-  fn value(&self, label: &AppCatalogAppConfigurationLabel, target_id: &str) -> String {
+  fn value(&self, label: &AppCatalogAppConfigurationLabel, target_id: &str) -> Value {
     match label {
-      AppCatalogAppConfigurationLabel::Configuration => hashmap_to_table(&self.configuration),
-      AppCatalogAppConfigurationLabel::ManifestUrn => self.manifest_urn.clone(),
-      AppCatalogAppConfigurationLabel::Name => target_id.to_string(),
-      AppCatalogAppConfigurationLabel::Stopped => self.stopped.to_string(),
+      AppCatalogAppConfigurationLabel::Configuration => Value::plain(hashmap_to_table(&self.configuration)),
+      AppCatalogAppConfigurationLabel::ManifestUrn => Value::plain(&self.manifest_urn),
+      AppCatalogAppConfigurationLabel::Name => Value::target(target_id),
+      AppCatalogAppConfigurationLabel::Stopped => Value::plain(self.stopped),
     }
   }
 }

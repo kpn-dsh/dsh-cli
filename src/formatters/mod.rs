@@ -1,6 +1,9 @@
+use crate::context::Context;
 use crate::error;
 use crate::error::DshCliError;
+use chrono::{DateTime, Local, Utc};
 use dsh_api::types::Notification;
+use dsh_api::DshApiResult;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -59,6 +62,136 @@ pub(crate) trait Label: Eq + Hash + PartialEq + Serialize {
   fn is_target_label(&self) -> bool;
 }
 
+#[derive(Debug)]
+pub(crate) enum Value {
+  Empty,
+  Error(String),
+  Ignore(String),
+  Plain(String),
+  Secret,
+  Target(String),
+  Warn(String),
+}
+
+impl Value {
+  pub(crate) fn date_time_expired(date_time: &DateTime<Utc>) -> Self {
+    if date_time < &Local::now() {
+      Self::error(date_time)
+    } else {
+      Self::plain(date_time)
+    }
+  }
+
+  pub(crate) fn date_time_not_yet_passed(date_time: &DateTime<Utc>) -> Self {
+    if date_time > &Local::now() {
+      Self::warn(date_time.to_string())
+    } else {
+      Self::plain(date_time.to_string())
+    }
+  }
+
+  pub(crate) fn empty() -> Self {
+    Self::Empty
+  }
+
+  pub(crate) fn error<T>(value: T) -> Self
+  where
+    T: ToString,
+  {
+    Self::Error(value.to_string())
+  }
+
+  pub(crate) fn ignore<T>(value: T) -> Self
+  where
+    T: ToString,
+  {
+    Self::Ignore(value.to_string())
+  }
+
+  pub(crate) fn ok_or<T, U, E>(value: Result<T, E>, default: U) -> Self
+  where
+    T: ToString,
+    U: ToString,
+  {
+    match value {
+      Ok(v) => Self::plain(v.to_string()),
+      Err(_) => Self::plain(default.to_string()),
+    }
+  }
+
+  pub(crate) fn option<T>(value: Option<T>) -> Self
+  where
+    T: ToString,
+  {
+    match value {
+      Some(v) => Self::plain(v.to_string()),
+      None => Self::empty(),
+    }
+  }
+
+  pub(crate) fn plain<T>(value: T) -> Self
+  where
+    T: ToString,
+  {
+    Self::Plain(value.to_string())
+  }
+
+  pub(crate) fn secret() -> Self {
+    Self::Secret
+  }
+
+  pub(crate) fn some_or<T, U>(value: Option<T>, default: U) -> Self
+  where
+    T: ToString,
+    U: ToString,
+  {
+    match value {
+      Some(v) => Self::plain(v.to_string()),
+      None => Self::plain(default.to_string()),
+    }
+  }
+
+  pub(crate) fn target<T>(value: T) -> Self
+  where
+    T: ToString,
+  {
+    Self::Target(value.to_string())
+  }
+
+  pub(crate) fn warn<T>(value: T) -> Self
+  where
+    T: ToString,
+  {
+    Self::Warn(value.to_string())
+  }
+
+  const REDACTED_SECRET: &'static str = "[redacted]";
+
+  pub(crate) fn to_decorated_string(&self, context: &Context) -> String {
+    match self {
+      Self::Empty => "".to_string(),
+      Self::Error(value) => context.apply_error_style(value),
+      Self::Ignore(value) => context.apply_ignore_style(value),
+      Self::Plain(value) => context.apply_stdout_style(value),
+      Self::Secret => Self::REDACTED_SECRET.to_string(),
+      Self::Target(value) => context.apply_target_style(value),
+      Self::Warn(value) => context.apply_warning_style(value),
+    }
+  }
+
+  pub(crate) fn to_undecorated_string(&self) -> String {
+    match self {
+      Self::Empty => "".to_string(),
+      Self::Error(value) => value.to_string(),
+      Self::Ignore(value) => value.to_string(),
+      Self::Plain(value) => value.to_string(),
+      Self::Secret => Self::REDACTED_SECRET.to_string(),
+      Self::Target(value) => value.to_string(),
+      Self::Warn(value) => value.to_string(),
+    }
+  }
+}
+
 /// # Defines how a data type will be formatted
 ///
 /// By implementing the `SubjectFormatter` trait for an arbitrary type you can define
@@ -67,22 +200,14 @@ pub(crate) trait SubjectFormatter<L>
 where
   L: Label,
 {
-  /// # Returns the value for a label
+  /// # Returns the decorated value for a label
   ///
   /// This method must return the value of the type's field that corresponds
   /// to the provided `label`.
   /// If the `label` is the target label for the data type, the `target_id` parameter
   /// must be returned. Else the returned value will be picked from the data structure,
   /// depending on the `label` value.
-  fn value(&self, label: &L, target_id: &str) -> String;
-
-  /// # Returns the target id
-  ///
-  /// If a unique identifying target id exists for the data type, this method must return its value
-  /// wrapped in a `Some`. Else it should return `None`.
-  fn target_id(&self) -> Option<String> {
-    None
-  }
+  fn value(&self, label: &L, target_id: &str) -> Value;
 }
 
 /// # Defines how a `String` pair can be formatted
@@ -93,16 +218,12 @@ impl<L> SubjectFormatter<L> for (String, String)
 where
   L: Label,
 {
-  fn value(&self, label: &L, _target_id: &str) -> String {
+  fn value(&self, label: &L, _target_id: &str) -> Value {
     if label.is_target_label() {
-      self.0.clone()
+      Value::target(&self.0)
     } else {
-      self.1.clone()
+      Value::plain(&self.1)
     }
-  }
-
-  fn target_id(&self) -> Option<String> {
-    Some(self.0.clone())
   }
 }
 
@@ -116,16 +237,12 @@ impl<L> SubjectFormatter<L> for String
 where
   L: Label,
 {
-  fn value(&self, label: &L, target_id: &str) -> String {
+  fn value(&self, label: &L, target_id: &str) -> Value {
     if label.is_target_label() {
-      target_id.to_string()
+      Value::target(target_id)
     } else {
-      self.clone()
+      Value::plain(self)
     }
-  }
-
-  fn target_id(&self) -> Option<String> {
-    Some(self.clone())
   }
 }
 
@@ -137,16 +254,62 @@ impl<L> SubjectFormatter<L> for HashMap<L, String>
 where
   L: Label,
 {
-  fn value(&self, label: &L, target_id: &str) -> String {
+  fn value(&self, label: &L, target_id: &str) -> Value {
     if label.is_target_label() {
-      target_id.to_string()
+      Value::target(target_id)
     } else {
-      self.get(label).map(|s| s.to_string()).unwrap_or_default()
+      Value::option(self.get(label))
     }
   }
+}
 
-  fn target_id(&self) -> Option<String> {
-    None
+/// # Defines how a `DshApiResult<V>` can be formatted
+///
+/// The value type `V` of the `DshApiResult` must implement `SubjectFormatter` for the label type.
+/// * When the `DshApiResult` is an `Ok`, rendering will be delegated to the value type `V`.
+/// * When the `DshApiResult` is an `Err` only the target id label will be rendered (in the "error"
+///   style). All other labels will be rendered as an empty string.
+impl<L, V> SubjectFormatter<L> for DshApiResult<V>
+where
+  L: Label,
+  V: SubjectFormatter<L>,
+{
+  fn value(&self, label: &L, target_id: &str) -> Value {
+    match self {
+      Ok(value) => value.value(label, target_id),
+      Err(_) => {
+        if label.is_target_label() {
+          Value::error(target_id.to_string())
+        } else {
+          Value::empty()
+        }
+      }
+    }
+  }
+}
+
+/// # Defines how an `Option<V>` can be formatted
+///
+/// The value type `V` of the `Option` must implement `SubjectFormatter` for the label type.
+/// * When the `Option` is a `Some`, rendering will be delegated to the value type `V`.
+/// * When the `Option` is a `None` only the target id label will be rendered (in the "ignore"
+///   style). All other labels will be rendered as an empty string.
+impl<L, V> SubjectFormatter<L> for Option<V>
+where
+  L: Label,
+  V: SubjectFormatter<L>,
+{
+  fn value(&self, label: &L, target_id: &str) -> Value {
+    match self {
+      Some(value) => value.value(label, target_id),
+      None => {
+        if label.is_target_label() {
+          Value::ignore(target_id.to_string())
+        } else {
+          Value::empty()
+        }
+      }
+    }
   }
 }
 

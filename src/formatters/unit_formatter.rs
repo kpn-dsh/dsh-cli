@@ -11,7 +11,6 @@ use tabled::{builder::Builder as TabledBuilder, settings::Style, Table};
 pub(crate) struct UnitFormatter<'a, L: Label> {
   target_id: String,
   labels: &'a [L],
-  target_label: Option<&'a str>,
   context: &'a Context,
 }
 
@@ -19,8 +18,8 @@ impl<'a, L> UnitFormatter<'a, L>
 where
   L: Label,
 {
-  pub(crate) fn new<T: Into<String>>(target_id: T, labels: &'a [L], target_label: Option<&'a str>, context: &'a Context) -> Self {
-    Self { target_id: target_id.into(), labels, target_label, context }
+  pub(crate) fn new<T: Into<String>>(target_id: T, labels: &'a [L], context: &'a Context) -> Self {
+    Self { target_id: target_id.into(), labels, context }
   }
 
   pub(crate) fn print<V: SubjectFormatter<L> + Serialize>(&self, value: &V, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
@@ -54,7 +53,7 @@ where
   }
 
   fn print_csv<V: SubjectFormatter<L>>(&self, value: &V) -> DshCliResult<()> {
-    if self.context.show_headers() {
+    if !self.context.no_csv_headers() {
       self.context.print(
         self
           .labels
@@ -68,40 +67,11 @@ where
       self
         .labels
         .iter()
-        .map(|label| self.context.csv_value(value.value(label, self.target_id.as_str()).as_str()))
+        .map(|label| self.context.csv_value(value.value(label, self.target_id.as_str()).to_undecorated_string().as_str()))
         .collect::<Result<Vec<_>, _>>()?
         .join(self.context.csv_separator().as_str()),
     );
     Ok(())
-  }
-
-  fn create_table<V: SubjectFormatter<L>>(&self, value: &V) -> Table {
-    let mut tabled_builder = TabledBuilder::default();
-    if let Some(target_label) = self.target_label {
-      tabled_builder.push_record([target_label, self.target_id.as_str()]);
-      for label in self.labels {
-        if !label.is_target_label() && label.as_str_for_unit() != target_label {
-          let value = value.value(label, self.target_id.as_str());
-          let split_value = value.split("\n").collect_vec();
-          let mut value_iterator = split_value.iter();
-          if let Some(first_line) = value_iterator.next() {
-            tabled_builder.push_record([label.as_str_for_unit(), first_line]);
-          }
-          for next_line in value_iterator {
-            tabled_builder.push_record(["", next_line]);
-          }
-        }
-      }
-    } else {
-      for label in self.labels {
-        tabled_builder.push_record([label.as_str_for_unit(), value.value(label, self.target_id.as_str()).as_str()]);
-      }
-    }
-    let mut table = tabled_builder.build();
-    if let Some(terminal_width) = self.context.terminal_width() {
-      table.with(Width::wrap(terminal_width).keep_words(true).priority(PriorityMax::new(true)));
-    }
-    table
   }
 
   fn print_json<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
@@ -148,5 +118,34 @@ where
     table.with(Style::empty());
     self.context.print(table.to_string());
     Ok(())
+  }
+
+  fn create_table<V: SubjectFormatter<L>>(&self, value: &V) -> Table {
+    let target_label = self
+      .labels
+      .iter()
+      .find(|label| label.is_target_label())
+      .map(|target_label| target_label.as_str_for_unit())
+      .unwrap_or("target id");
+    let mut tabled_builder = TabledBuilder::default();
+    tabled_builder.push_record([self.context.apply_target_label_style(target_label), self.context.apply_target_style(self.target_id.as_str())]);
+    for label in self.labels {
+      if !label.is_target_label() && label.as_str_for_unit() != target_label {
+        let value = value.value(label, self.target_id.as_str()).to_decorated_string(self.context);
+        let split_value = value.split("\n").collect_vec();
+        let mut value_iterator = split_value.iter();
+        if let Some(first_line) = value_iterator.next() {
+          tabled_builder.push_record([label.as_str_for_unit(), first_line]);
+        }
+        for next_line in value_iterator {
+          tabled_builder.push_record(["", next_line]);
+        }
+      }
+    }
+    let mut table = tabled_builder.build();
+    if let Some(terminal_width) = self.context.terminal_width() {
+      table.with(Width::wrap(terminal_width).keep_words(true).priority(PriorityMax::new(true)));
+    }
+    table
   }
 }

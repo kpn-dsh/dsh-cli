@@ -12,8 +12,8 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
 use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
 use crate::{edit_configuration, error, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
@@ -25,8 +25,8 @@ use dsh_api::parse::ImageString;
 use dsh_api::types::{Application, ApplicationSecret, TaskState};
 use dsh_api::types::{Task, TaskStatus};
 use dsh_api::vhost::VhostString;
-use dsh_api::DshApiError;
 use futures::future::try_join_all;
+use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -99,7 +99,7 @@ lazy_static! {
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ServiceShowAll {}, "Show service configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ServiceShow {}, "Show service configuration")
       .set_long_about("Show the configuration of a DSH service.")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &ServiceShowAllocationStatus {}, None),
@@ -320,13 +320,7 @@ impl CommandExecutor for ServiceDuplicate {
         }
         Ok(())
       }
-      Err(error) => match error {
-        DshApiError::NotFound(None) => {
-          context.print_error(format!("service '{}' does not exist", service_id));
-          Ok(())
-        }
-        error => Err(DshCliError::from(error)),
-      },
+      Err(error) => DshCliError::accept_not_found(error, || context.print_error(format!("service '{}' does not exist", service_id))),
     }
   }
 
@@ -365,13 +359,7 @@ impl CommandExecutor for ServiceEdit {
         }
         Ok(())
       }
-      Err(error) => match error {
-        DshApiError::NotFound(None) => {
-          context.print_error(format!("service '{}' does not exist", service_id));
-          Ok(())
-        }
-        error => Err(DshCliError::from(error)),
-      },
+      Err(error) => DshCliError::accept_not_found(error, || context.print_error(format!("service '{}' does not exist", service_id))),
     }
   }
 
@@ -415,7 +403,7 @@ impl CommandExecutor for ServiceListAll {
     let mut service_ids = services.keys().map(|k| k.to_string()).collect_vec();
     service_ids.sort();
     let (include_started, include_stopped) = include_started_stopped(matches);
-    let mut formatter = ListFormatter::new(&SERVICE_LABELS_LIST, None, context);
+    let mut formatter = ListFormatter::new(&SERVICE_LABELS_LIST, context);
     for service_id in service_ids {
       if let Some(service) = services.get(&service_id) {
         if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {
@@ -442,7 +430,7 @@ impl CommandExecutor for ServiceListAllocationStatus {
     let service_ids = client.application_ids().await?;
     let allocation_statuses = try_join_all(service_ids.iter().map(|service_id| client.get_application_status(service_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("service id"), context);
+    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, context);
     formatter.push_target_ids_and_values(service_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -499,7 +487,7 @@ impl CommandExecutor for ServiceListTasks {
       .zip(tasks)
       .map(|(id, tasks)| (id.to_string(), tasks_to_string(tasks)))
       .collect_vec();
-    let mut formatter: ListFormatter<ServiceLabel, (String, String)> = ListFormatter::new(&[ServiceLabel::Target, ServiceLabel::Tasks], None, context);
+    let mut formatter: ListFormatter<ServiceLabel, (String, String)> = ListFormatter::new(&[ServiceLabel::Target, ServiceLabel::Tasks], context);
     formatter.push_values(&service_id_tasks_pairs);
     formatter.print_non_serializable(None)?;
     Ok(())
@@ -620,13 +608,7 @@ impl CommandExecutor for ServiceRestart {
         }
         Ok(())
       }
-      Err(error) => match error {
-        DshApiError::NotFound(None) => {
-          context.print_error(format!("service '{}' does not exist", service_id));
-          Ok(())
-        }
-        error => Err(DshCliError::from(error)),
-      },
+      Err(error) => DshCliError::accept_not_found(error, || context.print_error(format!("service '{}' does not exist", service_id))),
     }
   }
 
@@ -635,17 +617,18 @@ impl CommandExecutor for ServiceRestart {
   }
 }
 
-struct ServiceShowAll {}
+struct ServiceShow {}
 
 #[async_trait]
-impl CommandExecutor for ServiceShowAll {
+impl CommandExecutor for ServiceShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for service '{}'", service_id));
     let start_instant = context.now();
-    let service = client.get_application_configuration(&service_id).await?;
+    let (service, allocation_status) = join!(client.get_application_configuration(&service_id), client.get_application_status(&service_id));
     context.print_execution_time(start_instant);
-    UnitFormatter::new(service_id, &SERVICE_LABELS_SHOW, Some("service id"), context).print(&service, None)
+    context.print_allocation_status(&allocation_status, SERVICE_SUBJECT_TARGET);
+    UnitFormatter::new(service_id, &SERVICE_LABELS_SHOW, context).print(&service?, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -663,7 +646,7 @@ impl CommandExecutor for ServiceShowAllocationStatus {
     let start_instant = context.now();
     let allocation_status = client.get_application_status(&service_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(service_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("service id"), context).print(&allocation_status, None)
+    UnitFormatter::new(service_id, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -690,7 +673,7 @@ impl CommandExecutor for ServiceShowTasks {
     context.print_execution_time(start_instant);
     let mut tasks: Vec<(String, TaskStatus)> = task_ids.into_iter().zip(task_statuses).collect();
     tasks.sort_by(|(_, task_a), (_, task_b)| timestamp(task_b).cmp(&timestamp(task_a)));
-    let mut formatter = ListFormatter::new(&TASK_LABELS_LIST, None, context);
+    let mut formatter = ListFormatter::new(&TASK_LABELS_LIST, context);
     formatter.push_target_id_value_pairs(tasks.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -730,13 +713,7 @@ impl CommandExecutor for ServiceStart {
         }
         Ok(())
       }
-      Err(error) => match error {
-        DshApiError::NotFound(None) => {
-          context.print_error(format!("service '{}' does not exist", service_id));
-          Ok(())
-        }
-        error => Err(DshCliError::from(error)),
-      },
+      Err(error) => DshCliError::accept_not_found(error, || context.print_error(format!("service '{}' does not exist", service_id))),
     }
   }
 
@@ -770,13 +747,7 @@ impl CommandExecutor for ServiceStop {
         }
         Ok(())
       }
-      Err(error) => match error {
-        DshApiError::NotFound(None) => {
-          context.print_error(format!("service '{}' does not exist", service_id));
-          Ok(())
-        }
-        error => Err(DshCliError::from(error)),
-      },
+      Err(error) => DshCliError::accept_not_found(error, || context.print_error(format!("service '{}' does not exist", service_id))),
     }
   }
 
@@ -848,13 +819,7 @@ impl CommandExecutor for ServiceUpdate {
           }
         }
       }
-      Err(error) => match error {
-        DshApiError::NotFound(None) => {
-          context.print_error(format!("service '{}' does not exist", service_id));
-          Ok(())
-        }
-        error => Err(DshCliError::from(error)),
-      },
+      Err(error) => DshCliError::accept_not_found(error, || context.print_error(format!("service '{}' does not exist", service_id))),
     }
   }
 
@@ -941,54 +906,56 @@ impl Label for ServiceLabel {
 }
 
 impl SubjectFormatter<ServiceLabel> for Application {
-  fn value(&self, label: &ServiceLabel, service_id: &str) -> String {
+  fn value(&self, label: &ServiceLabel, target_id: &str) -> Value {
     match label {
-      ServiceLabel::Cpus => self.cpus.to_string(),
-      ServiceLabel::Env => hashmap_to_table(&self.env),
-      ServiceLabel::ExposedPorts => self
-        .exposed_ports
-        .iter()
-        .map(|(port, port_mapping)| {
-          format!(
-            "{} : {}",
-            port,
-            VhostString::try_from(port_mapping).map(|vhost_string| vhost_string.to_string()).unwrap_or_default()
-          )
-        })
-        .collect_vec()
-        .join("\n"),
-      ServiceLabel::HealthCheck => self.health_check.clone().map(|health_check| health_check.to_string()).unwrap_or_default(),
-      ServiceLabel::Image => ImageString::from(self.image.as_str()).to_string(),
-      ServiceLabel::Instances => self.instances.to_string(),
-      ServiceLabel::Mem => self.mem.to_string(),
-      ServiceLabel::Metrics => self
-        .metrics
-        .clone()
-        .map(|ref metrics| format!("{}:{}", metrics.port, metrics.path))
-        .unwrap_or_default(),
-      ServiceLabel::NeedsToken => self.needs_token.to_string(),
-      ServiceLabel::ReadableStreams => self
-        .readable_streams
-        .clone()
-        .into_iter()
-        .map(|readable_stream| readable_stream.to_string())
-        .collect_vec()
-        .join(", "),
-      ServiceLabel::Secrets => secrets_to_table(&self.secrets),
-      ServiceLabel::SingleInstance => self.single_instance.to_string(),
-      ServiceLabel::SpreadGroup => self.spread_group.clone().unwrap_or_default(),
-      ServiceLabel::Target => service_id.to_string(),
-      ServiceLabel::Tasks => "".to_string(),
-      ServiceLabel::Topics => self.topics.clone().into_iter().map(|topic| topic.to_string()).collect_vec().join(", "),
-      ServiceLabel::User => self.user.clone(),
-      ServiceLabel::Volumes => self.volumes.keys().map(|k| k.to_string()).collect_vec().join(","),
-      ServiceLabel::WritableStreams => self
-        .writable_streams
-        .clone()
-        .into_iter()
-        .map(|writable_stream| writable_stream.to_string())
-        .collect_vec()
-        .join(", "),
+      ServiceLabel::Cpus => Value::plain(self.cpus),
+      ServiceLabel::Env => Value::plain(hashmap_to_table(&self.env)),
+      ServiceLabel::ExposedPorts => Value::plain(
+        self
+          .exposed_ports
+          .iter()
+          .map(|(port, port_mapping)| {
+            format!(
+              "{} : {}",
+              port,
+              VhostString::try_from(port_mapping).map(|vhost_string| vhost_string.to_string()).unwrap_or_default()
+            )
+          })
+          .collect_vec()
+          .join("\n"),
+      ),
+      ServiceLabel::HealthCheck => Value::option(self.health_check.clone()),
+      ServiceLabel::Image => Value::plain(ImageString::from(self.image.as_str())),
+      ServiceLabel::Instances => Value::plain(self.instances),
+      ServiceLabel::Mem => Value::plain(self.mem),
+      ServiceLabel::Metrics => Value::option(self.metrics.clone().map(|ref metrics| format!("{}:{}", metrics.port, metrics.path))),
+      ServiceLabel::NeedsToken => Value::plain(self.needs_token),
+      ServiceLabel::ReadableStreams => Value::plain(
+        self
+          .readable_streams
+          .clone()
+          .into_iter()
+          .map(|readable_stream| readable_stream.to_string())
+          .collect_vec()
+          .join(", "),
+      ),
+      ServiceLabel::Secrets => Value::plain(secrets_to_table(&self.secrets)),
+      ServiceLabel::SingleInstance => Value::plain(self.single_instance),
+      ServiceLabel::SpreadGroup => Value::option(self.spread_group.clone()),
+      ServiceLabel::Target => Value::target(target_id),
+      ServiceLabel::Tasks => Value::empty(),
+      ServiceLabel::Topics => Value::plain(self.topics.clone().into_iter().map(|topic| topic.to_string()).collect_vec().join(", ")),
+      ServiceLabel::User => Value::plain(&self.user),
+      ServiceLabel::Volumes => Value::plain(self.volumes.keys().map(|key| key.to_string()).collect_vec().join(",")),
+      ServiceLabel::WritableStreams => Value::plain(
+        self
+          .writable_streams
+          .clone()
+          .into_iter()
+          .map(|writable_stream| writable_stream.to_string())
+          .collect_vec()
+          .join(", "),
+      ),
     }
   }
 }
@@ -1090,27 +1057,24 @@ impl Label for TaskLabel {
 }
 
 impl SubjectFormatter<TaskLabel> for TaskStatus {
-  fn value(&self, label: &TaskLabel, task_id: &str) -> String {
+  fn value(&self, label: &TaskLabel, target_id: &str) -> Value {
     let task: Option<Task> = match self.actual.clone() {
       Some(actual) => Some(actual),
       None => self.configuration.clone(),
     };
     match task {
       Some(task) => match label {
-        TaskLabel::Healthy => task.healthy.map(|healthy| healthy.to_string()).unwrap_or_default(),
-        TaskLabel::HostIpAddress => task.host.to_string(),
-        TaskLabel::_LastestLog => task.logs.map(|log| log.to_string()).unwrap_or_default(),
-        TaskLabel::LastUpdateAt => task
-          .last_update
-          .and_then(|update| DateTime::from_timestamp_millis(update).map(|ts| ts.to_string()))
-          .unwrap_or_default(),
-        TaskLabel::StagedAt => task.staged_at.to_string(),
-        TaskLabel::StartedAt => task.started_at.to_string(),
-        TaskLabel::State => task.state.to_string(),
-        TaskLabel::StoppedAt => task.stopped_at.map(|update| update.to_string()).unwrap_or_default(),
-        TaskLabel::Target => task_id.to_string(),
+        TaskLabel::Healthy => Value::option(task.healthy),
+        TaskLabel::HostIpAddress => Value::plain(task.host),
+        TaskLabel::_LastestLog => Value::option(task.logs),
+        TaskLabel::LastUpdateAt => Value::option(task.last_update.and_then(|update| DateTime::from_timestamp_millis(update).map(|ts| ts.to_string()))),
+        TaskLabel::StagedAt => Value::plain(task.staged_at),
+        TaskLabel::StartedAt => Value::plain(task.started_at),
+        TaskLabel::State => Value::plain(task.state),
+        TaskLabel::StoppedAt => Value::option(task.stopped_at),
+        TaskLabel::Target => Value::plain(target_id),
       },
-      None => "".to_string(),
+      None => Value::empty(),
     }
   }
 }

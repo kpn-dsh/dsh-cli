@@ -4,6 +4,7 @@ use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::Value as FormatterValue;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::{error_map, DshCliResult};
@@ -152,7 +153,7 @@ fn print_content(kind: &str, context: &Context, decoded_payload: Vec<u8>, labels
         OutputFormat::JsonCompact => context.print_serializable(deserialized_payload, Some(OutputFormat::Json)),
         _ => {
           if let Some(payload_object) = deserialized_payload.as_object() {
-            let mut formatter = ListFormatter::new(labels, None, context);
+            let mut formatter = ListFormatter::new(labels, context);
             let mut vals: Vec<(String, &Value)> = Vec::from_iter(payload_object.iter().map(|(key, value)| (key.to_string(), value)));
             vals.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
             for (key, value) in vals {
@@ -189,28 +190,30 @@ impl Label for TokenLabel {
 }
 
 impl SubjectFormatter<TokenLabel> for Value {
-  fn value(&self, label: &TokenLabel, target_id: &str) -> String {
+  fn value(&self, label: &TokenLabel, target_id: &str) -> FormatterValue {
     match label {
-      TokenLabel::Key => target_id.to_string(),
-      TokenLabel::Timestamp => timestamp(self, target_id),
+      TokenLabel::Key => FormatterValue::target(target_id),
+      TokenLabel::Timestamp => FormatterValue::plain(timestamp(self, target_id)),
       TokenLabel::Value => match self {
-        Value::Array(array) => array
-          .iter()
-          .map(|value| match value {
-            Value::Array(_) => "array (unexpected)".to_string(),
-            Value::Bool(boolean) => boolean.to_string(),
-            Value::Null => "null".to_string(),
-            Value::Number(number) => number.to_string(),
-            Value::Object(_) => "object (unexpected)".to_string(),
-            Value::String(string) => string.to_string(),
-          })
-          .collect_vec()
-          .join("\n"),
-        Value::Bool(boolean) => boolean.to_string(),
-        Value::Null => "null".to_string(),
-        Value::Number(number) => number.to_string(),
-        Value::Object(_) => "object (unexpected)".to_string(),
-        Value::String(string) => string.to_string(),
+        Value::Array(array) => FormatterValue::plain(
+          array
+            .iter()
+            .map(|value| match value {
+              Value::Array(_) => "array (unexpected)".to_string(),
+              Value::Bool(boolean) => boolean.to_string(),
+              Value::Null => "null".to_string(),
+              Value::Number(number) => number.to_string(),
+              Value::Object(_) => "object (unexpected)".to_string(),
+              Value::String(string) => string.to_string(),
+            })
+            .collect_vec()
+            .join("\n"),
+        ),
+        Value::Bool(boolean) => FormatterValue::plain(boolean),
+        Value::Null => FormatterValue::plain("null"),
+        Value::Number(number) => FormatterValue::plain(number),
+        Value::Object(_) => FormatterValue::plain("object (unexpected)"),
+        Value::String(string) => FormatterValue::plain(string),
       },
     }
   }

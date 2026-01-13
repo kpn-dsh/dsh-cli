@@ -3,7 +3,7 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::formatters::list_formatter::ListFormatter;
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
@@ -83,7 +83,7 @@ impl CommandExecutor for MetricList {
     if metrics_usage.is_empty() {
       context.print_outcome("no metrics exported in services");
     } else {
-      let mut formatter = ListFormatter::new(&METRIC_USAGE_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&METRIC_USAGE_LABELS, context);
       formatter.push_values(&metrics_usage);
       formatter.print(None)?;
     }
@@ -128,7 +128,7 @@ impl Label for MetricUsageLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    false
+    matches!(self, Self::Service)
   }
 }
 
@@ -147,12 +147,12 @@ impl MetricUsage {
 }
 
 impl SubjectFormatter<MetricUsageLabel> for MetricUsage {
-  fn value(&self, label: &MetricUsageLabel, _target_id: &str) -> String {
+  fn value(&self, label: &MetricUsageLabel, _target_id: &str) -> Value {
     match label {
-      MetricUsageLabel::Service => self.service_id.clone(),
-      MetricUsageLabel::Path => self.path.clone(),
-      MetricUsageLabel::Instances => self.instances.to_string(),
-      MetricUsageLabel::Port => self.port.to_string(),
+      MetricUsageLabel::Service => Value::target(&self.service_id),
+      MetricUsageLabel::Path => Value::plain(&self.path),
+      MetricUsageLabel::Instances => Value::plain(self.instances),
+      MetricUsageLabel::Port => Value::plain(self.port),
     }
   }
 }

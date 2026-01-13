@@ -1,4 +1,4 @@
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{Label, SubjectFormatter, Value};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::platform::DshPlatform;
@@ -184,7 +184,7 @@ impl CommandExecutor for TargetList {
     if target_formatters.is_empty() {
       context.print_outcome("no targets configured");
     } else {
-      let mut formatter = ListFormatter::new(&TARGET_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&TARGET_LABELS, context);
       formatter.push_values(&target_formatters);
       formatter.print(None)?;
     }
@@ -239,17 +239,17 @@ struct TargetFormatter {
 }
 
 impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
-  fn value(&self, label: &TargetFormatterLabel, _target_id: &str) -> String {
+  fn value(&self, label: &TargetFormatterLabel, _target_id: &str) -> Value {
     match label {
       TargetFormatterLabel::Default => {
         if self.is_default {
-          "*".to_string()
+          Value::plain("*")
         } else {
-          "".to_string()
+          Value::empty()
         }
       }
-      TargetFormatterLabel::Platform => format!("{} / {}", self.platform.name(), self.platform.alias()),
-      TargetFormatterLabel::Tenant => self.tenant.clone(),
+      TargetFormatterLabel::Platform => Value::plain(format!("{} / {}", self.platform.name(), self.platform.alias())),
+      TargetFormatterLabel::Tenant => Value::plain(&self.tenant),
     }
   }
 }

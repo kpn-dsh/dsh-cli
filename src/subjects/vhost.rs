@@ -4,7 +4,7 @@ use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::list_formatter::ListFormatter;
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS_LIST;
 use crate::{include_started_stopped, DshCliResult};
@@ -128,7 +128,7 @@ impl CommandExecutor for VhostList {
       Ok(())
     } else {
       vhost_list_values.sort_by(|a, b| (&a.vhost, &a.service_id).cmp(&(&b.vhost, &b.service_id)));
-      let mut formatter = ListFormatter::new(&VHOST_LIST_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&VHOST_LIST_LABELS, context);
       formatter.push_values(&vhost_list_values);
       formatter.print(None)
     }
@@ -149,7 +149,7 @@ impl CommandExecutor for VhostListUsage {
     let start_instant = context.now();
     let vhosts_with_usage: Vec<(String, Vec<Dependant<VhostInjection>>)> = client.vhosts_with_dependants().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("vhost"), context);
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, context);
     for (vhost, dependants) in &vhosts_with_usage {
       for dependant in dependants {
         formatter.push_target_id_value(vhost.clone(), dependant);
@@ -206,33 +206,27 @@ impl Label for VhostListLabel {
 }
 
 impl SubjectFormatter<VhostListLabel> for VhostListValue {
-  fn value(&self, label: &VhostListLabel, _target_id: &str) -> String {
+  fn value(&self, label: &VhostListLabel, _target_id: &str) -> Value {
     match label {
-      VhostListLabel::Auth => self
-        .port_mapping
-        .auth
-        .clone()
-        .and_then(|auth| AuthString::from_str(&auth).ok())
-        .map(|auth_string| auth_string.to_string())
-        .unwrap_or_default(),
+      VhostListLabel::Auth => Value::option(self.port_mapping.auth.clone().and_then(|auth| AuthString::from_str(&auth).ok())),
       VhostListLabel::KafkaFlag => {
         if self.kafka_flag {
-          "set".to_string()
+          Value::plain("set")
         } else {
-          "".to_string()
+          Value::empty()
         }
       }
-      VhostListLabel::Instances => self.instances.to_string(),
-      VhostListLabel::Mode => self.port_mapping.mode.clone().unwrap_or_default(),
-      VhostListLabel::Paths => self.port_mapping.paths.iter().map(|path_spec| path_spec.to_string()).collect_vec().join(", "),
-      VhostListLabel::Port => self.port.clone(),
-      VhostListLabel::_ServiceGroup => self.port_mapping.service_group.clone().unwrap_or_default(),
-      VhostListLabel::ServiceId => self.service_id.clone(),
-      VhostListLabel::Tenant => self.tenant.clone().unwrap_or_default(),
-      VhostListLabel::Tls => self.port_mapping.tls.map(|tls| tls.to_string()).unwrap_or_default(),
-      VhostListLabel::Vhost => self.vhost.clone(),
-      VhostListLabel::Whitelist => self.port_mapping.whitelist.clone().unwrap_or_default(),
-      VhostListLabel::Zone => self.zone.clone().map(|zone| zone.to_string()).unwrap_or_default(),
+      VhostListLabel::Instances => Value::plain(self.instances),
+      VhostListLabel::Mode => Value::option(self.port_mapping.mode.as_ref()),
+      VhostListLabel::Paths => Value::plain(self.port_mapping.paths.iter().map(|path_spec| path_spec.to_string()).join(", ")),
+      VhostListLabel::Port => Value::plain(&self.port),
+      VhostListLabel::_ServiceGroup => Value::option(self.port_mapping.service_group.as_ref()),
+      VhostListLabel::ServiceId => Value::plain(&self.service_id),
+      VhostListLabel::Tenant => Value::option(self.tenant.as_ref()),
+      VhostListLabel::Tls => Value::option(self.port_mapping.tls),
+      VhostListLabel::Vhost => Value::plain(&self.vhost),
+      VhostListLabel::Whitelist => Value::option(self.port_mapping.whitelist.as_ref()),
+      VhostListLabel::Zone => Value::option(self.zone.as_ref()),
     }
   }
 }
@@ -272,10 +266,10 @@ impl Label for VhostLabel {
 }
 
 impl SubjectFormatter<VhostLabel> for Vhost {
-  fn value(&self, label: &VhostLabel, target_id: &str) -> String {
+  fn value(&self, label: &VhostLabel, target_id: &str) -> Value {
     match label {
-      VhostLabel::Target => target_id.to_string(),
-      VhostLabel::Value => self.value.to_string(),
+      VhostLabel::Target => Value::target(target_id),
+      VhostLabel::Value => Value::plain(&self.value),
     }
   }
 }
