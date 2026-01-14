@@ -15,8 +15,8 @@ pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
 pub(crate) const ENVIRONMENT_VARIABLE_ARGUMENT: &str = "environment-variable-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
 // pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
+pub(crate) const NO_CSV_HEADERS_ARGUMENT: &str = "no-csv-headers-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
-pub(crate) const NO_HEADERS_ARGUMENT: &str = "no-headers-argument";
 pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
 pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
 pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
@@ -146,14 +146,14 @@ pub(crate) fn no_escape_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn no_headers_argument() -> Arg {
-  Arg::new(NO_HEADERS_ARGUMENT)
-    .long("no-headers")
+pub(crate) fn no_csv_headers_argument() -> Arg {
+  Arg::new(NO_CSV_HEADERS_ARGUMENT)
+    .long("no-csv-headers")
     .action(ArgAction::SetTrue)
     .long_help(
-      "When this option is provided the output will not contain headers. \
+      "When this option is provided csv output will not contain headers. \
           If this argument is not provided, the environment variable \
-          DSH_CLI_NO_HEADERS or the value from the settings file will be used. \
+          DSH_CLI_NO_CSV_HEADERS or the value from the settings file will be used. \
           The default behavior is to use headers where applicable.",
     )
     .hide_short_help(true)

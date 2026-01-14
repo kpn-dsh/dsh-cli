@@ -14,8 +14,8 @@ use crate::environment_variables::{
 };
 use crate::error::DshCliError;
 use crate::global_arguments::{
-  authentication_argument, browser_argument, environment_variable_argument, target_tenants_all_argument, target_tenants_argument, TARGET_TENANTS_ALL_ARGUMENT,
-  TARGET_TENANTS_ARGUMENT,
+  authentication_argument, browser_argument, environment_variable_argument, no_csv_headers_argument, target_tenants_all_argument, target_tenants_argument,
+  TARGET_TENANTS_ALL_ARGUMENT, TARGET_TENANTS_ARGUMENT,
 };
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
@@ -25,14 +25,14 @@ use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
 use context::Context;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_client_factory::{DshApiClientFactory, DshApiPlatformClientFactory};
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
 use futures::future::try_join_all;
 use global_arguments::{
-  dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
+  dry_run_argument, force_argument, no_escape_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
   suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
   TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
 };
@@ -396,7 +396,7 @@ async fn inner_main() -> DshCliExit {
             };
             for client in &clients {
               if clients.len() > 1 {
-                context.print(format!("# target {}@{}", client.tenant(), client.platform().name()))
+                context.print(format!("# target {}", client.tenant()))
               }
               match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
                 Ok(_) => {}
@@ -462,8 +462,8 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       target_tenants_argument(),
       target_tenants_all_argument(),
       // Output options
+      no_csv_headers_argument(),
       no_escape_argument(),
-      no_headers_argument(),
       output_format_argument(),
       quiet_argument(),
       set_verbosity_argument(),
@@ -950,7 +950,7 @@ async fn create_clients_access_token(matches: &ArgMatches, context: &Context) ->
   }
   let target_platform = get_target_platform(matches, context.settings())?;
   if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
-    create_clients_for_all_authorized_tenants(&target_platform).await
+    create_clients_for_all_authorized_tenants(target_platform).await
   } else {
     match matches.get_one::<String>(TARGET_TENANTS_ARGUMENT) {
       Some(target_tenants_string) => {
@@ -958,7 +958,7 @@ async fn create_clients_access_token(matches: &ArgMatches, context: &Context) ->
         for target_tenant_name in &target_tenant_names {
           debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
         }
-        create_clients_for_tenants(&target_platform, &target_tenant_names, context).await
+        create_clients_for_tenants(target_platform, &target_tenant_names, context).await
       }
       None => {
         let target_tenant_name = get_target_tenant(matches, context.settings())?;
@@ -983,10 +983,11 @@ async fn create_clients_access_token(matches: &ArgMatches, context: &Context) ->
   }
 }
 
-/// Create client from single sign on
+/// Create multiple clients from single sign on
 ///
 /// # Parameters
-/// * `matches`
+/// * `target_platform`
+/// * `target_tenant_names`
 /// * `context`
 ///
 /// Returns
@@ -994,7 +995,7 @@ async fn create_clients_access_token(matches: &ArgMatches, context: &Context) ->
 /// * `Ok(Some([]))` - User is logged in but no clients were created because the
 ///   user is not authorized for the requested tenants.
 /// * `Ok(None)` - User needs to log in.
-async fn create_clients_for_tenants(target_platform: &DshPlatform, target_tenant_names: &[String], context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
+async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_names: &[String], context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   match get_access_token(target_platform.clone()).await {
     Ok(Some(access_token)) => {
       let unauthorized_tenants = target_tenant_names
@@ -1007,11 +1008,10 @@ async fn create_clients_for_tenants(target_platform: &DshPlatform, target_tenant
         }
         return Err(error!("not authorized for tenants {}", unauthorized_tenants.iter().join(", ")));
       }
+      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_access_token(target_platform.clone(), access_token.token().secret().clone())?;
       let clients = try_join_all(target_tenant_names.iter().map(|target_tenant_name| {
-        let dsh_api_tenant = DshApiTenant::new(target_tenant_name.to_owned(), target_platform.to_owned());
-        debug!("create client with static access token for target '{}'", dsh_api_tenant);
-        let dsh_api_client_factory = DshApiClientFactory::create_from_access_token(dsh_api_tenant, access_token.token().secret().clone());
-        dsh_api_client_factory.client()
+        debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
+        dsh_api_platform_client_factory.client(target_tenant_name)
       }))
       .await?;
       debug!("api clients created");
@@ -1025,24 +1025,25 @@ async fn create_clients_for_tenants(target_platform: &DshPlatform, target_tenant
   }
 }
 
-/// Create client from single sign on
+/// Create clients for all authorized tenants from single sign on
 ///
 /// # Parameters
-/// * `matches`
-/// * `context`
+/// * `target_platform`
 ///
 /// Returns
 /// * `Ok(Some(Vec<Client>))` - Clients were successfully created.
 /// * `Ok(None)` - User needs to log in.
-async fn create_clients_for_all_authorized_tenants(target_platform: &DshPlatform) -> DshCliResult<Option<Vec<DshApiClient>>> {
+async fn create_clients_for_all_authorized_tenants(target_platform: DshPlatform) -> DshCliResult<Option<Vec<DshApiClient>>> {
   debug!("create client with static access token for all tenants at platform '{}'", target_platform);
   match get_access_token(target_platform.clone()).await {
     Ok(Some(access_token)) => {
-      let clients = try_join_all(access_token.authorized_tenants().into_iter().map(|authorized_tenant| {
-        let dsh_api_tenant = DshApiTenant::new(authorized_tenant.to_owned(), target_platform.to_owned());
-        let dsh_api_client_factory = DshApiClientFactory::create_from_access_token(dsh_api_tenant, access_token.token().secret().clone());
-        dsh_api_client_factory.client()
-      }))
+      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_access_token(target_platform, access_token.token().secret().clone())?;
+      let clients = try_join_all(
+        access_token
+          .authorized_tenants()
+          .into_iter()
+          .map(|authorized_tenant| dsh_api_platform_client_factory.client(authorized_tenant)),
+      )
       .await?;
       debug!("clients created");
       Ok(Some(clients))
