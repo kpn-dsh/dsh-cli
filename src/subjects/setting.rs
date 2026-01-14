@@ -7,8 +7,8 @@ use crate::directory::{get_settings, read_target};
 use crate::environment_variables::get_configured_environment_variables;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::log_level::LogLevel;
 use crate::settings::{upsert_settings, Settings};
 use crate::style::{DshColor, DshStyle};
@@ -75,8 +75,8 @@ const SETTING_LOG_LEVEL_API: &str = "log-level-api";
 const SETTING_LOG_STYLE: &str = "log-style";
 const SETTING_MATCHING_COLOR: &str = "matching-color";
 const SETTING_MATCHING_STYLE: &str = "matching-style";
+const SETTING_NO_CSV_HEADERS: &str = "no-csv-headers";
 const SETTING_NO_ESCAPE: &str = "no-escape";
-const SETTING_NO_HEADERS: &str = "no-headers";
 const SETTING_OUTPUT_FORMAT: &str = "output-format";
 const SETTING_QUIET: &str = "quiet";
 const SETTING_SHOW_EXECUTION_TIME: &str = "show-execution-time";
@@ -85,6 +85,8 @@ const SETTING_STDERR_STYLE: &str = "stderr-style";
 const SETTING_STDOUT_COLOR: &str = "stdout-color";
 const SETTING_STDOUT_STYLE: &str = "stdout-style";
 const SETTING_SUPPRESS_EXIT_STATUS: &str = "suppress-exit-status";
+const SETTING_TARGET_COLOR: &str = "target-color";
+const SETTING_TARGET_STYLE: &str = "target-style";
 const SETTING_TERMINAL_WIDTH: &str = "terminal-width";
 const SETTING_VERBOSITY: &str = "verbosity";
 const SETTING_WARNING_COLOR: &str = "warning-color";
@@ -221,8 +223,8 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Styling to be used when printing matching results for the find functions"),
+    Command::new(SETTING_NO_CSV_HEADERS).about("Disables headers in csv output"),
     Command::new(SETTING_NO_ESCAPE).about("Inhibits any color or other ansi escape sequences"),
-    Command::new(SETTING_NO_HEADERS).about("Disables headers in the output"),
     Command::new(SETTING_OUTPUT_FORMAT)
       .arg(
         Arg::new(SETTING_OUTPUT_FORMAT)
@@ -272,6 +274,22 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
       )
       .about("Styling to be used when printing results"),
     Command::new(SETTING_SUPPRESS_EXIT_STATUS).about("Suppress exit status"),
+    Command::new(SETTING_TARGET_COLOR)
+      .arg(
+        Arg::new(SETTING_TARGET_COLOR)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshColor>::new())
+          .required(required),
+      )
+      .about("Color to be used when printing target identifiers"),
+    Command::new(SETTING_TARGET_STYLE)
+      .arg(
+        Arg::new(SETTING_TARGET_STYLE)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<DshStyle>::new())
+          .required(required),
+      )
+      .about("Styling to be used when printing target identifiers"),
     Command::new(SETTING_TERMINAL_WIDTH)
       .arg(
         Arg::new(SETTING_TERMINAL_WIDTH)
@@ -364,15 +382,15 @@ impl CommandExecutor for SettingList {
     let (settings, _) = get_settings()?;
     if let Some(ref settings_file) = settings.file_name {
       context.print_explanation(format!("list settings from settings file '{}'", settings_file));
-      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings, None)?
+      UnitFormatter::new("value", &SETTING_LABELS, context).print(&settings, None)?
     } else {
       context.print_explanation("list default settings");
-      UnitFormatter::new("value", &SETTING_LABELS, Some("setting"), context).print(&settings, None)?
+      UnitFormatter::new("value", &SETTING_LABELS, context).print(&settings, None)?
     }
     let configured_environment_variables = get_configured_environment_variables();
     if !configured_environment_variables.is_empty() {
       context.print_explanation("list environment variables");
-      let mut formatter = ListFormatter::new(&ENVIRONMENT_VARIABLE_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&ENVIRONMENT_VARIABLE_LABELS, context);
       for (env_var_name, env_var_value) in &configured_environment_variables {
         formatter.push_target_id_value(env_var_name.to_string(), env_var_value);
       }
@@ -480,13 +498,13 @@ impl CommandExecutor for SettingSet {
       SETTING_MATCHING_STYLE => {
         upsert_settings(move |settings| Ok(Settings { matching_style: get_some(SETTING_MATCHING_STYLE, matches, context)?, ..settings }))?;
       }
+      SETTING_NO_CSV_HEADERS => {
+        upsert_settings(|settings| Ok(Settings { no_csv_headers: Some(true), ..settings }))?;
+        context.print_outcome("no csv headers mode enabled");
+      }
       SETTING_NO_ESCAPE => {
         upsert_settings(|settings| Ok(Settings { no_escape: Some(true), ..settings }))?;
         context.print_outcome("no escape mode enabled");
-      }
-      SETTING_NO_HEADERS => {
-        upsert_settings(|settings| Ok(Settings { no_headers: Some(true), ..settings }))?;
-        context.print_outcome("no headers mode enabled");
       }
       SETTING_OUTPUT_FORMAT => {
         upsert_settings(move |settings| Ok(Settings { output_format: get_some(SETTING_OUTPUT_FORMAT, matches, context)?, ..settings }))?;
@@ -514,6 +532,12 @@ impl CommandExecutor for SettingSet {
       SETTING_SUPPRESS_EXIT_STATUS => {
         upsert_settings(|settings| Ok(Settings { suppress_exit_status: Some(true), ..settings }))?;
         context.print_outcome("suppress exit status enabled");
+      }
+      SETTING_TARGET_COLOR => {
+        upsert_settings(move |settings| Ok(Settings { target_color: get_some(SETTING_TARGET_COLOR, matches, context)?, ..settings }))?;
+      }
+      SETTING_TARGET_STYLE => {
+        upsert_settings(move |settings| Ok(Settings { target_style: get_some(SETTING_TARGET_STYLE, matches, context)?, ..settings }))?;
       }
       SETTING_TERMINAL_WIDTH => {
         let terminal_width = matches.get_one::<usize>(SETTING_TERMINAL_WIDTH).unwrap_or_else(|| unreachable!());
@@ -618,13 +642,13 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(|settings| Ok(Settings { matching_style: None, ..settings }))?;
         context.print_outcome("matching style unset");
       }
+      SETTING_NO_CSV_HEADERS => {
+        upsert_settings(|settings| Ok(Settings { no_csv_headers: None, ..settings }))?;
+        context.print_outcome("no csv headers mode disabled");
+      }
       SETTING_NO_ESCAPE => {
         upsert_settings(|settings| Ok(Settings { no_escape: None, ..settings }))?;
         context.print_outcome("no escape mode disabled");
-      }
-      SETTING_NO_HEADERS => {
-        upsert_settings(|settings| Ok(Settings { no_headers: None, ..settings }))?;
-        context.print_outcome("no headers mode disabled");
       }
       SETTING_OUTPUT_FORMAT => {
         upsert_settings(|settings| Ok(Settings { output_format: None, ..settings }))?;
@@ -657,6 +681,14 @@ impl CommandExecutor for SettingUnset {
       SETTING_SUPPRESS_EXIT_STATUS => {
         upsert_settings(|settings| Ok(Settings { suppress_exit_status: None, ..settings }))?;
         context.print_outcome("suppress exit status disabled");
+      }
+      SETTING_TARGET_COLOR => {
+        upsert_settings(|settings| Ok(Settings { target_color: None, ..settings }))?;
+        context.print_outcome("target color unset");
+      }
+      SETTING_TARGET_STYLE => {
+        upsert_settings(|settings| Ok(Settings { target_style: None, ..settings }))?;
+        context.print_outcome("target style unset");
       }
       SETTING_TERMINAL_WIDTH => {
         upsert_settings(|settings| Ok(Settings { terminal_width: None, ..settings }))?;
@@ -704,8 +736,8 @@ enum SettingLabel {
   LogStyle,
   MatchingColor,
   MatchingStyle,
+  NoCsvHeaders,
   NoEscape,
-  NoHeaders,
   OutputFormat,
   Quiet,
   ShowExecutionTime,
@@ -715,6 +747,8 @@ enum SettingLabel {
   StdoutStyle,
   SuppressExitStatus,
   Target,
+  TargetColor,
+  TargetStyle,
   TerminalWidth,
   Verbosity,
   WarningColor,
@@ -742,8 +776,8 @@ impl Label for SettingLabel {
       Self::LogStyle => SETTING_LOG_STYLE,
       Self::MatchingColor => SETTING_MATCHING_COLOR,
       Self::MatchingStyle => SETTING_MATCHING_STYLE,
+      Self::NoCsvHeaders => SETTING_NO_CSV_HEADERS,
       Self::NoEscape => SETTING_NO_ESCAPE,
-      Self::NoHeaders => SETTING_NO_HEADERS,
       Self::OutputFormat => SETTING_OUTPUT_FORMAT,
       Self::Quiet => SETTING_QUIET,
       Self::ShowExecutionTime => SETTING_SHOW_EXECUTION_TIME,
@@ -753,6 +787,8 @@ impl Label for SettingLabel {
       Self::StdoutStyle => SETTING_STDOUT_STYLE,
       Self::SuppressExitStatus => SETTING_SUPPRESS_EXIT_STATUS,
       Self::Target => "setting",
+      Self::TargetColor => SETTING_TARGET_COLOR,
+      Self::TargetStyle => SETTING_TARGET_STYLE,
       Self::TerminalWidth => SETTING_TERMINAL_WIDTH,
       Self::Verbosity => SETTING_VERBOSITY,
       Self::WarningColor => SETTING_WARNING_COLOR,
@@ -766,52 +802,51 @@ impl Label for SettingLabel {
 }
 
 impl SubjectFormatter<SettingLabel> for Settings {
-  fn value(&self, label: &SettingLabel, target_id: &str) -> String {
+  fn value(&self, label: &SettingLabel, target_id: &str) -> Value {
     match label {
-      SettingLabel::Authentication => self.authentication.clone().map(|authentication| authentication.to_string()).unwrap_or_default(),
-      SettingLabel::Browser => self.browser.clone().map(|browser| browser.to_string()).unwrap_or_default(),
-      SettingLabel::CsvQuote => self.csv_quote.map(|csv_quote| csv_quote.to_string()).unwrap_or_default(),
-      SettingLabel::CsvSeparator => self.csv_separator.clone().unwrap_or_default(),
+      SettingLabel::Authentication => Value::option(self.authentication.as_ref()),
+      SettingLabel::Browser => Value::option(self.browser.as_ref()),
+      SettingLabel::CsvQuote => Value::option(self.csv_quote),
+      SettingLabel::CsvSeparator => Value::option(self.csv_separator.clone()),
       SettingLabel::DefaultPlatform => match self.default_platform.clone().map(|platform| DshPlatform::try_from(platform.as_str())) {
-        Some(Ok(platform)) => format!("{} / {}", platform.name(), platform.alias()),
-        _ => "".to_string(),
+        Some(Ok(platform)) => Value::plain(format!("{} / {}", platform.name(), platform.alias())),
+        _ => Value::empty(),
       },
-      SettingLabel::DefaultTenant => self.default_tenant.clone().unwrap_or_default(),
-      SettingLabel::DryRun => self.dry_run.map(|dry_run| dry_run.to_string()).unwrap_or_default(),
-      SettingLabel::ErrorColor => self.error_color.clone().map(|color| color.to_string()).unwrap_or_default(),
-      SettingLabel::ErrorStyle => self.error_style.clone().map(|style| style.to_string()).unwrap_or_default(),
-      SettingLabel::FileName => self.file_name.clone().unwrap_or_default(),
-      SettingLabel::LabelColor => self.label_color.clone().map(|color| color.to_string()).unwrap_or_default(),
-      SettingLabel::LabelStyle => self.label_style.clone().map(|style| style.to_string()).unwrap_or_default(),
-      SettingLabel::LogColor => self.log_color.clone().map(|color| color.to_string()).unwrap_or_default(),
-      SettingLabel::LogLevel => self.log_level.clone().map(|log_level| log_level.to_string()).unwrap_or_default(),
-      SettingLabel::LogLevelApi => self.log_level_api.clone().map(|log_level_api| log_level_api.to_string()).unwrap_or_default(),
-      SettingLabel::LogStyle => self.log_style.clone().map(|style| style.to_string()).unwrap_or_default(),
-      SettingLabel::MatchingColor => self.matching_color.clone().map(|color| color.to_string()).unwrap_or_default(),
-      SettingLabel::MatchingStyle => self.matching_style.clone().map(|style| style.to_string()).unwrap_or_default(),
-      SettingLabel::NoEscape => self.no_escape.map(|no_escape| no_escape.to_string()).unwrap_or_default(),
-      SettingLabel::NoHeaders => self.no_headers.map(|no_headers| no_headers.to_string()).unwrap_or_default(),
-      SettingLabel::OutputFormat => self.output_format.clone().map(|format| format.to_string()).unwrap_or_default(),
-      SettingLabel::Quiet => self.quiet.map(|quiet| quiet.to_string()).unwrap_or_default(),
-      SettingLabel::ShowExecutionTime => self
-        .show_execution_time
-        .map(|show_execution_time| show_execution_time.to_string())
-        .unwrap_or_default(),
-      SettingLabel::StderrColor => self.stderr_color.clone().map(|color| color.to_string()).unwrap_or_default(),
-      SettingLabel::StderrStyle => self.stderr_style.clone().map(|style| style.to_string()).unwrap_or_default(),
-      SettingLabel::StdoutColor => self.stdout_color.clone().map(|color| color.to_string()).unwrap_or_default(),
-      SettingLabel::StdoutStyle => self.stdout_style.clone().map(|style| style.to_string()).unwrap_or_default(),
-      SettingLabel::SuppressExitStatus => self.suppress_exit_status.map(|status| status.to_string()).unwrap_or_default(),
-      SettingLabel::Target => target_id.to_string(),
-      SettingLabel::TerminalWidth => self.terminal_width.map(|width| width.to_string()).unwrap_or_default(),
-      SettingLabel::Verbosity => self.verbosity.clone().map(|verbosity| verbosity.to_string()).unwrap_or_default(),
-      SettingLabel::WarningColor => self.warning_color.clone().map(|color| color.to_string()).unwrap_or_default(),
-      SettingLabel::WarningStyle => self.warning_style.clone().map(|style| style.to_string()).unwrap_or_default(),
+      SettingLabel::DefaultTenant => Value::option(self.default_tenant.clone()),
+      SettingLabel::DryRun => Value::option(self.dry_run),
+      SettingLabel::ErrorColor => Value::option(self.error_color.as_ref()),
+      SettingLabel::ErrorStyle => Value::option(self.error_style.as_ref()),
+      SettingLabel::FileName => Value::option(self.file_name.clone()),
+      SettingLabel::LabelColor => Value::option(self.label_color.as_ref()),
+      SettingLabel::LabelStyle => Value::option(self.label_style.as_ref()),
+      SettingLabel::LogColor => Value::option(self.log_color.as_ref()),
+      SettingLabel::LogLevel => Value::option(self.log_level.as_ref()),
+      SettingLabel::LogLevelApi => Value::option(self.log_level_api.as_ref()),
+      SettingLabel::LogStyle => Value::option(self.log_style.as_ref()),
+      SettingLabel::MatchingColor => Value::option(self.matching_color.as_ref()),
+      SettingLabel::MatchingStyle => Value::option(self.matching_style.as_ref()),
+      SettingLabel::NoCsvHeaders => Value::option(self.no_csv_headers),
+      SettingLabel::NoEscape => Value::option(self.no_escape),
+      SettingLabel::OutputFormat => Value::option(self.output_format.as_ref()),
+      SettingLabel::Quiet => Value::option(self.quiet),
+      SettingLabel::ShowExecutionTime => Value::option(self.show_execution_time),
+      SettingLabel::StderrColor => Value::option(self.stderr_color.as_ref()),
+      SettingLabel::StderrStyle => Value::option(self.stderr_style.as_ref()),
+      SettingLabel::StdoutColor => Value::option(self.stdout_color.as_ref()),
+      SettingLabel::StdoutStyle => Value::option(self.stdout_style.as_ref()),
+      SettingLabel::SuppressExitStatus => Value::option(self.suppress_exit_status),
+      SettingLabel::Target => Value::target(target_id),
+      SettingLabel::TargetColor => Value::option(self.target_color.as_ref()),
+      SettingLabel::TargetStyle => Value::option(self.target_style.as_ref()),
+      SettingLabel::TerminalWidth => Value::option(self.terminal_width),
+      SettingLabel::Verbosity => Value::option(self.verbosity.as_ref()),
+      SettingLabel::WarningColor => Value::option(self.warning_color.as_ref()),
+      SettingLabel::WarningStyle => Value::option(self.warning_style.as_ref()),
     }
   }
 }
 
-static SETTING_LABELS: [SettingLabel; 33] = [
+static SETTING_LABELS: [SettingLabel; 35] = [
   SettingLabel::Authentication,
   SettingLabel::Browser,
   SettingLabel::CsvQuote,
@@ -830,8 +865,8 @@ static SETTING_LABELS: [SettingLabel; 33] = [
   SettingLabel::LogStyle,
   SettingLabel::MatchingColor,
   SettingLabel::MatchingStyle,
+  SettingLabel::NoCsvHeaders,
   SettingLabel::NoEscape,
-  SettingLabel::NoHeaders,
   SettingLabel::OutputFormat,
   SettingLabel::Quiet,
   SettingLabel::ShowExecutionTime,
@@ -841,6 +876,8 @@ static SETTING_LABELS: [SettingLabel; 33] = [
   SettingLabel::StdoutStyle,
   SettingLabel::SuppressExitStatus,
   SettingLabel::Target,
+  SettingLabel::TargetColor,
+  SettingLabel::TargetStyle,
   SettingLabel::TerminalWidth,
   SettingLabel::Verbosity,
   SettingLabel::WarningColor,

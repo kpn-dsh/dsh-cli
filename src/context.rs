@@ -2,14 +2,15 @@ use crate::authentication::AuthenticationMethod;
 use crate::environment_variables::{
   environment_variable, is_environment_variable_specified, ENV_VAR_DSH_CLI_AUTHENTICATION, ENV_VAR_DSH_CLI_BROWSER, ENV_VAR_DSH_CLI_CSV_QUOTE, ENV_VAR_DSH_CLI_CSV_SEPARATOR,
   ENV_VAR_DSH_CLI_DRY_RUN, ENV_VAR_DSH_CLI_ERROR_COLOR, ENV_VAR_DSH_CLI_ERROR_STYLE, ENV_VAR_DSH_CLI_LABEL_COLOR, ENV_VAR_DSH_CLI_LABEL_STYLE, ENV_VAR_DSH_CLI_MATCHING_COLOR,
-  ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_ESCAPE, ENV_VAR_DSH_CLI_NO_HEADERS, ENV_VAR_DSH_CLI_OUTPUT_FORMAT, ENV_VAR_DSH_CLI_QUIET, ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME,
-  ENV_VAR_DSH_CLI_STDERR_COLOR, ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR, ENV_VAR_DSH_CLI_STDOUT_STYLE, ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS,
-  ENV_VAR_DSH_CLI_TERMINAL_WIDTH, ENV_VAR_DSH_CLI_VERBOSITY, ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
+  ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_CSV_HEADERS, ENV_VAR_DSH_CLI_NO_ESCAPE, ENV_VAR_DSH_CLI_OUTPUT_FORMAT, ENV_VAR_DSH_CLI_QUIET,
+  ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, ENV_VAR_DSH_CLI_STDERR_COLOR, ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR, ENV_VAR_DSH_CLI_STDOUT_STYLE,
+  ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TARGET_COLOR, ENV_VAR_DSH_CLI_TARGET_STYLE, ENV_VAR_DSH_CLI_TERMINAL_WIDTH, ENV_VAR_DSH_CLI_VERBOSITY,
+  ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
 };
 use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::global_arguments::{
-  AUTHENTICATION_ARGUMENT, BROWSER_ARGUMENT, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_ESCAPE_ARGUMENT, NO_HEADERS_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
+  AUTHENTICATION_ARGUMENT, BROWSER_ARGUMENT, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_CSV_HEADERS_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
   SHOW_EXECUTION_TIME_ARGUMENT, SUPPRESS_EXIT_STATUS_ARGUMENT, TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
 };
 use crate::settings::Settings;
@@ -22,10 +23,10 @@ use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
 use dsh_api::query_processor::{Part, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::{AllocationStatus, Notification};
+use dsh_api::DshApiResult;
 use getch_rs::{Getch, Key};
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
@@ -84,11 +85,11 @@ pub(crate) struct Context {
   force: bool,
   label_style: Style,
   matching_style: Style,
+  no_csv_headers: bool,
   output_format_specification: Option<OutputFormat>,
   quiet: bool,
   settings: Settings,
   show_execution_time: bool,
-  show_headers: bool,
   stderr_is_terminal: bool,
   stderr_no_escape: bool,
   stderr_style: Style,
@@ -97,6 +98,8 @@ pub(crate) struct Context {
   stdout_no_escape: bool,
   stdout_style: Style,
   suppress_exit_status: bool,
+  target_label_style: Style,
+  target_style: Style,
   terminal_width: Option<usize>,
   verbosity: Verbosity,
   warning_style: Style,
@@ -124,8 +127,8 @@ impl Context {
       &Self::get_color(ENV_VAR_DSH_CLI_ERROR_COLOR, matches, &settings.error_color, DshColor::Red)?,
     );
     let label_style = style_from(
-      &Self::get_style(ENV_VAR_DSH_CLI_LABEL_STYLE, matches, &settings.label_style, DshStyle::Bold)?,
-      &Self::get_color(ENV_VAR_DSH_CLI_LABEL_COLOR, matches, &settings.label_color, DshColor::Blue)?,
+      &Self::get_style(ENV_VAR_DSH_CLI_LABEL_STYLE, matches, &settings.label_style, DshStyle::Italic)?,
+      &Self::get_color(ENV_VAR_DSH_CLI_LABEL_COLOR, matches, &settings.label_color, DshColor::Normal)?,
     );
     let matching_style = style_from(
       &Self::get_style(ENV_VAR_DSH_CLI_MATCHING_STYLE, matches, &settings.matching_style, DshStyle::Bold)?,
@@ -139,6 +142,14 @@ impl Context {
       &Self::get_style(ENV_VAR_DSH_CLI_STDOUT_STYLE, matches, &settings.stdout_style, DshStyle::Normal)?,
       &Self::get_color(ENV_VAR_DSH_CLI_STDOUT_COLOR, matches, &settings.stdout_color, DshColor::Normal)?,
     );
+    let target_label_style = style_from(
+      &Self::get_style(ENV_VAR_DSH_CLI_LABEL_STYLE, matches, &settings.label_style, DshStyle::Italic)?,
+      &Self::get_color(ENV_VAR_DSH_CLI_TARGET_COLOR, matches, &settings.label_color, DshColor::Blue)?,
+    );
+    let target_style = style_from(
+      &Self::get_style(ENV_VAR_DSH_CLI_TARGET_STYLE, matches, &settings.target_style, DshStyle::Bold)?,
+      &Self::get_color(ENV_VAR_DSH_CLI_TARGET_COLOR, matches, &settings.target_color, DshColor::Blue)?,
+    );
     let warning_style = style_from(
       &Self::get_style(ENV_VAR_DSH_CLI_WARNING_STYLE, matches, &settings.warning_style, DshStyle::Bold)?,
       &Self::get_color(ENV_VAR_DSH_CLI_WARNING_COLOR, matches, &settings.warning_color, DshColor::Blue)?,
@@ -149,7 +160,7 @@ impl Context {
     let output_format_specification = Self::get_output_format_specification(matches, &settings)?;
     let show_execution_time = Self::get_show_execution_time(matches, &settings);
     let verbosity = Self::get_verbosity(matches, &settings)?;
-    let show_headers = !Self::get_no_headers(matches, &settings);
+    let no_csv_headers = Self::get_no_csv_headers(matches, &settings);
     let terminal_width = Self::get_terminal_width(matches, &settings)?;
     if dry_run && verbosity >= Verbosity::Medium {
       eprintln!("dry-run mode enabled");
@@ -164,11 +175,11 @@ impl Context {
       force,
       label_style,
       matching_style,
+      no_csv_headers,
       output_format_specification,
       quiet,
       settings,
       show_execution_time,
-      show_headers,
       stderr_is_terminal,
       stderr_no_escape,
       stderr_style,
@@ -177,6 +188,8 @@ impl Context {
       stdout_no_escape,
       stdout_style,
       suppress_exit_status,
+      target_label_style,
+      target_style,
       terminal_width,
       verbosity,
       warning_style,
@@ -189,6 +202,10 @@ impl Context {
 
   pub(crate) fn browser_method(&self) -> &BrowserMethod {
     &self.browser_method
+  }
+
+  pub(crate) fn no_csv_headers(&self) -> bool {
+    self.no_csv_headers
   }
 
   pub(crate) fn csv_quote(&self) -> &Option<char> {
@@ -205,10 +222,6 @@ impl Context {
 
   pub(crate) fn settings(&self) -> &Settings {
     &self.settings
-  }
-
-  pub(crate) fn show_headers(&self) -> bool {
-    self.show_headers
   }
 
   pub(crate) fn stdin_is_terminal(&self) -> bool {
@@ -362,14 +375,14 @@ impl Context {
   /// 1. Default to `false`
   fn get_dry_run(matches: &ArgMatches, settings: &Settings) -> bool {
     if matches.get_flag(DRY_RUN_ARGUMENT) {
-      debug!("dry run mode enabled (argument)");
+      log::debug!("dry run mode enabled (argument)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      debug!("dry run mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
+      log::debug!("dry run mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
       true
     } else if let Some(dry_run) = settings.dry_run {
       if dry_run {
-        debug!("dry run mode enabled (settings)");
+        log::debug!("dry run mode enabled (settings)");
       }
       dry_run
     } else {
@@ -385,14 +398,14 @@ impl Context {
   /// 1. Default to `false`
   fn get_force(matches: &ArgMatches, settings: &Settings) -> bool {
     if matches.get_flag(FORCE_ARGUMENT) {
-      debug!("force mode enabled (argument)");
+      log::debug!("force mode enabled (argument)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      debug!("force mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
+      log::debug!("force mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
       true
     } else if let Some(dry_run) = settings.dry_run {
       if dry_run {
-        debug!("force mode enabled (settings)");
+        log::debug!("force mode enabled (settings)");
       }
       dry_run
     } else {
@@ -408,14 +421,14 @@ impl Context {
   /// 1. Default to `false`
   fn get_suppress_exit_status(matches: &ArgMatches, settings: &Settings) -> bool {
     if matches.get_flag(SUPPRESS_EXIT_STATUS_ARGUMENT) {
-      debug!("suppress exit status enabled (argument)");
+      log::debug!("suppress exit status enabled (argument)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, matches) {
-      debug!("suppress exit status enabled (environment variable '{}')", ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS);
+      log::debug!("suppress exit status enabled (environment variable '{}')", ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS);
       true
     } else if let Some(suppress_exit_status) = settings.suppress_exit_status {
       if suppress_exit_status {
-        debug!("suppress exit status enabled (settings)");
+        log::debug!("suppress exit status enabled (settings)");
       }
       suppress_exit_status
     } else {
@@ -467,14 +480,14 @@ impl Context {
       || settings.no_escape.unwrap_or(false)
   }
 
-  /// Gets no headers context value
+  /// Gets no csv headers context value
   ///
-  /// 1. Try flag `--no-headers`
-  /// 1. Try if environment variable `DSH_CLI_NO_HEADERS` exists
+  /// 1. Try flag `--no-csv-headers`
+  /// 1. Try if environment variable `DSH_CLI_NO_CSV_HEADERS` exists
   /// 1. Try settings file
   /// 1. Default to `false`
-  fn get_no_headers(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(NO_HEADERS_ARGUMENT) || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_HEADERS, matches) || settings.no_headers.unwrap_or(false)
+  fn get_no_csv_headers(matches: &ArgMatches, settings: &Settings) -> bool {
+    matches.get_flag(NO_CSV_HEADERS_ARGUMENT) || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_CSV_HEADERS, matches) || settings.no_csv_headers.unwrap_or(false)
   }
 
   /// Gets output format specification
@@ -614,7 +627,7 @@ impl Context {
           }
           Err(error) => {
             self.print_error(format!("could not open {} in your browser", opening_target));
-            debug!("{}", error);
+            log::debug!("{}", error);
             self.print_explanation("open url in your browser:");
             self.print(format!("{}", url));
           }
@@ -767,39 +780,57 @@ impl Context {
     }
   }
 
-  /// # Prints an explanation to stderr
+  /// # Prints allocation status to stderr
   ///
-  /// This method is used to print an explanation about the function that is
-  /// about to be executed to stderr. When the verbosity level is `High` and a client is available,
-  /// also the target is printed to stderr.
-  /// If `quiet` is `true`, nothing will be printed.
+  /// This method is used to print the allocation status to stderr. The verbosity level is `High`
+  /// determines the amount of detail that will be printed. If `quiet` is `true`, nothing will be
+  /// printed. When there are no notifications, the target is not derived from anything and the target is provisioned, nothing will be printed (unless verbosity is`high`).
   /// The standard error device is almost always a tty, but can in special cases also be
   /// a pipe or an output file.
-  pub(crate) fn print_allocation_status<T: Display>(&self, allocation_status: &AllocationStatus, target: T) {
-    if !self.quiet {
-      for notification in &allocation_status.notifications {
-        // if notification.remove {
-        self.eprintln_warning(format_notification_message(notification));
-        // } else {
-        //   self.eprintln(format_notification_message(notification));
-        // }
-      }
-      if let Some(derived_from) = &allocation_status.derived_from {
-        self.eprint(format!("derived from: {}", derived_from));
-      }
-      match self.verbosity {
-        Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium => {
-          if allocation_status.provisioned {
-            self.eprintln(format!("{} is provisioned", target));
+  ///
+  /// ## Parameters
+  /// * `allocation_status` - Allocation status.
+  /// * `subject` - Subject of which the allocation status will be printed.
+  pub(crate) fn print_allocation_status<T: Display>(&self, allocation_status: &DshApiResult<AllocationStatus>, subject: T) {
+    match allocation_status {
+      Ok(allocation_status) => {
+        if !self.quiet {
+          for notification in &allocation_status.notifications {
+            if notification.remove {
+              self.eprintln_warning(format!("removal notification: {}", format_notification_message(notification)));
+            } else {
+              self.eprintln_warning(format!("notification: {}", format_notification_message(notification)));
+            }
+          }
+          match self.verbosity {
+            Verbosity::Medium | Verbosity::High => {
+              if let Some(derived_from) = &allocation_status.derived_from {
+                self.eprintln(format!("derived from '{}'", derived_from));
+              }
+            }
+            _ => {}
+          }
+          match self.verbosity {
+            Verbosity::Low | Verbosity::Medium => {
+              if !allocation_status.provisioned {
+                self.eprintln_warning(format!("{} is provisioned", subject));
+              }
+            }
+            Verbosity::High => {
+              if allocation_status.provisioned {
+                self.eprintln(format!("{} is provisioned", subject));
+              } else {
+                self.eprintln_warning(format!("{} is not provisioned", subject));
+              }
+            }
+            _ => {}
           }
         }
-        Verbosity::High => {
-          if allocation_status.provisioned {
-            self.eprintln(format!("{} is provisioned", target));
-          } else {
-            self.eprintln(format!("{} is not provisioned", target));
-          }
+      }
+      Err(error) => {
+        log::debug!("could not get allocation status for {} ({})", subject, error);
+        if self.verbosity == Verbosity::High {
+          self.eprintln_warning(format!("could not get allocation status for {}", subject));
         }
       }
     }
@@ -955,11 +986,47 @@ impl Context {
     }
   }
 
-  fn _apply_stderr_style<T: Display>(&self, text: T) -> String {
+  pub(crate) fn apply_error_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.error_style)
+  }
+
+  pub(crate) fn apply_ignore_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.stderr_style)
+  }
+
+  pub(crate) fn apply_label_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.label_style)
+  }
+
+  pub(crate) fn _apply_matching_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.matching_style)
+  }
+
+  pub(crate) fn _apply_stderr_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.stderr_style)
+  }
+
+  pub(crate) fn apply_stdout_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.stdout_style)
+  }
+
+  pub(crate) fn apply_target_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.target_style)
+  }
+
+  pub(crate) fn apply_target_label_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.target_label_style)
+  }
+
+  pub(crate) fn apply_warning_style<T: Display>(&self, text: T) -> String {
+    self.apply_style(text, &self.warning_style)
+  }
+
+  pub(crate) fn apply_style<T: Display>(&self, text: T, style: &Style) -> String {
     if self.stderr_no_escape {
       text.to_string()
     } else {
-      format!("{}{}{:#}", self.error_style, text, self.error_style)
+      format!("{}{}{:#}", style, text, style)
     }
   }
 
@@ -1038,12 +1105,12 @@ fn format_notification_message(notification: &Notification) -> String {
           if let Some(key) = stripped.strip_prefix("urn:") {
             match notification.args.get(key) {
               Some(value) => value.to_string(),
-              None => key.to_uppercase(),
+              None => key.to_string(),
             }
           } else {
             match notification.args.get(stripped) {
               Some(value) => value.to_string(),
-              None => stripped.to_uppercase(),
+              None => stripped.to_string(),
             }
           }
         }
