@@ -4,14 +4,14 @@ use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMM
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::hashmap_to_table;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::{hashmap_to_table, Value};
 use crate::formatters::{notifications_to_string, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
-use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_LIST};
+use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::PossibleValue;
@@ -20,7 +20,8 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::topic::TopicInjection;
 use dsh_api::types::{Topic, TopicStatus};
 use dsh_api::Dependant;
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
+use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -89,7 +90,7 @@ lazy_static! {
       .add_target_argument(topic_id_argument().required(true))
   );
   static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TopicListConfiguration {}, "List scratch topics")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TopicList {}, "List scratch topics")
       .set_long_about("Lists all available scratch topics.")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicListAllocationStatus {}, None),
@@ -350,6 +351,27 @@ impl CommandExecutor for TopicDelete {
   }
 }
 
+struct TopicList {}
+
+#[async_trait]
+impl CommandExecutor for TopicList {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    context.print_explanation("list all scratch topics with their configurations");
+    let start_instant = context.now();
+    let topic_ids = client.get_topic_ids().await?;
+    let configurations = join_all(topic_ids.iter().map(|topic_id| client.get_topic_configuration(topic_id))).await;
+    context.print_execution_time(start_instant);
+    let mut formatter = ListFormatter::new(&TOPIC_LABELS, context);
+    formatter.push_target_ids_and_values(topic_ids.as_slice(), configurations.as_slice());
+    formatter.print(None)?;
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
 struct TopicListAllocationStatus {}
 
 #[async_trait]
@@ -360,29 +382,8 @@ impl CommandExecutor for TopicListAllocationStatus {
     let topic_ids = client.get_topic_ids().await?;
     let allocation_statuses = try_join_all(topic_ids.iter().map(|topic_id| client.get_topic_status(topic_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context);
+    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, context);
     formatter.push_target_ids_and_values(topic_ids.as_slice(), allocation_statuses.as_slice());
-    formatter.print(None)?;
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
-  }
-}
-
-struct TopicListConfiguration {}
-
-#[async_trait]
-impl CommandExecutor for TopicListConfiguration {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    context.print_explanation("list all scratch topics with their configurations");
-    let start_instant = context.now();
-    let topic_ids = client.get_topic_ids().await?;
-    let configurations = try_join_all(topic_ids.iter().map(|topic_id| client.get_topic_configuration(topic_id))).await?;
-    context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&TOPIC_LABELS, None, context);
-    formatter.push_target_ids_and_values(topic_ids.as_slice(), configurations.as_slice());
     formatter.print(None)?;
     Ok(())
   }
@@ -424,7 +425,7 @@ impl CommandExecutor for TopicListUsage {
     if topics_with_dependants.is_empty() {
       context.print_outcome("no scratch topics found in services");
     } else {
-      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("topic id"), context);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, context);
       for (topic_id, dependants) in &topics_with_dependants {
         for dependant in dependants {
           formatter.push_target_id_value(topic_id.clone(), dependant);
@@ -448,9 +449,10 @@ impl CommandExecutor for TopicShow {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the configuration for scratch topic '{}'", topic_id));
     let start_instant = context.now();
-    let topic = client.get_topic_configuration(&topic_id).await?;
+    let (topic, allocation_status) = join!(client.get_topic_configuration(&topic_id), client.get_topic_status(&topic_id));
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, None, context).print(&topic, None)
+    context.print_allocation_status(&allocation_status, TOPIC_SUBJECT_TARGET);
+    UnitFormatter::new(topic_id, &TOPIC_STATUS_LABELS, context).print(&topic?, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -468,7 +470,7 @@ impl CommandExecutor for TopicShowAllocationStatus {
     let start_instant = context.now();
     let allocation_status = client.get_topic_status(&topic_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("topic id"), context).print(&allocation_status, None)
+    UnitFormatter::new(topic_id, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -491,7 +493,7 @@ impl CommandExecutor for TopicShowProperties {
         let mut pairs: Vec<(String, String)> = actual_topic.kafka_properties.into_iter().collect_vec();
         pairs.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
         let (properties, values): (Vec<String>, Vec<String>) = pairs.into_iter().unzip();
-        let mut formatter = ListFormatter::new(&PROPERTY_LABELS, Some("property"), context);
+        let mut formatter = ListFormatter::new(&PROPERTY_LABELS, context);
         formatter.push_target_ids_and_values(&properties, &values);
         formatter.print(None)?;
       }
@@ -513,21 +515,15 @@ impl CommandExecutor for TopicShowUsage {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the services that use scratch topic '{}'", topic_id));
     let start_instant = context.now();
-    let _services = client.get_application_configuration_map().await?;
+    let dependants: Vec<Dependant<TopicInjection>> = client.topic_dependants(&topic_id).await?;
     context.print_execution_time(start_instant);
-    // TODO
-    // let usages: Vec<(String, &Application, Vec<Injection>)> = find_applications_that_use_topic(&topic_id, &services);
-    // let used_bys = usages
-    //   .into_iter()
-    //   .filter_map(|(service_id, service, injections)| if injections.is_empty() { None } else { Some(UsedBy::Application(service_id.clone(), service.instances, injections)) })
-    //   .collect_vec();
-    // if !used_bys.is_empty() {
-    //   let mut formatter = ListFormatter::new(&USED_BY_LABELS_LIST, Some("topic id"), context);
-    //   formatter.push_values(&used_bys);
-    //   formatter.print(None)?;
-    // } else {
-    //   context.print_outcome("topic not used");
-    // }
+    if dependants.is_empty() {
+      context.print_outcome("topic not used")
+    } else {
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS, context);
+      formatter.push_values(&dependants);
+      formatter.print(None)?;
+    }
     Ok(())
   }
 
@@ -572,7 +568,7 @@ impl Label for TopicLabel {
       Self::RetentionBytes => "retention bytes",
       Self::RetentionMs => "retention ms",
       Self::SegmentBytes => "segment bytes",
-      Self::Target => "scratch topic id",
+      Self::Target => "topic id",
       Self::TimestampType => "timestamp type",
     }
   }
@@ -603,23 +599,23 @@ impl Label for TopicLabel {
 }
 
 impl SubjectFormatter<TopicLabel> for Topic {
-  fn value(&self, label: &TopicLabel, target_id: &str) -> String {
+  fn value(&self, label: &TopicLabel, target_id: &str) -> Value {
     match label {
-      TopicLabel::CleanupPolicy => self.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned().unwrap_or_default(),
-      TopicLabel::DerivedFrom => "".to_string(),
-      TopicLabel::KafkaProperties => hashmap_to_table(&get_implicit_properties(&self.kafka_properties)),
-      TopicLabel::MaxMessageBytes => self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      TopicLabel::Notifications => "".to_string(),
-      TopicLabel::Partitions => self.partitions.to_string(),
-      TopicLabel::Provisioned => "".to_string(),
-      TopicLabel::ReplicationFactor => self.replication_factor.to_string(),
-      TopicLabel::SegmentBytes => self.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      TopicLabel::Target => target_id.to_string(),
-      TopicLabel::TimestampType => self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned().unwrap_or_default(),
-      TopicLabel::CompressionType => self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned().unwrap_or_default(),
-      TopicLabel::DeleteRetentionMs => self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
-      TopicLabel::RetentionBytes => self.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      TopicLabel::RetentionMs => self.kafka_properties.get(RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
+      TopicLabel::CleanupPolicy => Value::option(self.kafka_properties.get(CLEANUP_POLICY_PROPERTY)),
+      TopicLabel::DerivedFrom => Value::empty(), // TODO
+      TopicLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.kafka_properties))),
+      TopicLabel::MaxMessageBytes => Value::option(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY)),
+      TopicLabel::Notifications => Value::empty(), // TODO
+      TopicLabel::Partitions => Value::plain(self.partitions),
+      TopicLabel::Provisioned => Value::empty(), // TODO
+      TopicLabel::ReplicationFactor => Value::plain(self.replication_factor),
+      TopicLabel::SegmentBytes => Value::option(self.kafka_properties.get(SEGMENT_BYTES_PROPERTY)),
+      TopicLabel::Target => Value::target(target_id),
+      TopicLabel::TimestampType => Value::option(self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY)),
+      TopicLabel::CompressionType => Value::option(self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY)),
+      TopicLabel::DeleteRetentionMs => Value::option(self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY)),
+      TopicLabel::RetentionBytes => Value::option(self.kafka_properties.get(RETENTION_BYTES_PROPERTY)),
+      TopicLabel::RetentionMs => Value::option(self.kafka_properties.get(RETENTION_MS_PROPERTY)),
     }
   }
 }
@@ -642,67 +638,28 @@ pub(crate) fn get_implicit_properties(kafka_properties: &HashMap<String, String>
 }
 
 impl SubjectFormatter<TopicLabel> for TopicStatus {
-  fn value(&self, label: &TopicLabel, target_id: &str) -> String {
+  fn value(&self, label: &TopicLabel, target_id: &str) -> Value {
     match label {
-      TopicLabel::CleanupPolicy => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(CLEANUP_POLICY_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
-      TopicLabel::CompressionType => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(COMPRESSION_TYPE_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
-      TopicLabel::DeleteRetentionMs => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
-      TopicLabel::DerivedFrom => self.status.derived_from.clone().unwrap_or_default(),
-      TopicLabel::KafkaProperties => self
-        .actual
-        .as_ref()
-        .map(|topic| hashmap_to_table(&get_implicit_properties(&topic.kafka_properties)))
-        .unwrap_or_default(),
-      TopicLabel::MaxMessageBytes => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
-      TopicLabel::Notifications => notifications_to_string(&self.status.notifications),
-      TopicLabel::Partitions => self.actual.as_ref().map(|a| a.partitions.to_string()).unwrap_or_default(),
-      TopicLabel::Provisioned => self.status.provisioned.to_string(),
-      TopicLabel::ReplicationFactor => self.actual.as_ref().map(|a| a.replication_factor.to_string()).unwrap_or_default(),
-      TopicLabel::RetentionBytes => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(RETENTION_BYTES_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
-      TopicLabel::RetentionMs => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(RETENTION_MS_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
-      TopicLabel::SegmentBytes => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(SEGMENT_BYTES_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
-      TopicLabel::Target => target_id.to_string(),
-      TopicLabel::TimestampType => self
-        .actual
-        .as_ref()
-        .and_then(|topic| topic.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY))
-        .cloned()
-        .unwrap_or_default(),
+      TopicLabel::CleanupPolicy => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(CLEANUP_POLICY_PROPERTY))),
+      TopicLabel::CompressionType => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(COMPRESSION_TYPE_PROPERTY))),
+      TopicLabel::DeleteRetentionMs => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY))),
+      TopicLabel::DerivedFrom => Value::option(self.status.derived_from.as_ref()),
+      TopicLabel::KafkaProperties => Value::option(
+        self
+          .actual
+          .as_ref()
+          .map(|topic| hashmap_to_table(&get_implicit_properties(&topic.kafka_properties))),
+      ),
+      TopicLabel::MaxMessageBytes => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY))),
+      TopicLabel::Notifications => Value::plain(notifications_to_string(&self.status.notifications)),
+      TopicLabel::Partitions => Value::option(self.actual.as_ref()),
+      TopicLabel::Provisioned => Value::plain(self.status.provisioned),
+      TopicLabel::ReplicationFactor => Value::option(self.actual.as_ref()),
+      TopicLabel::RetentionBytes => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(RETENTION_BYTES_PROPERTY))),
+      TopicLabel::RetentionMs => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(RETENTION_MS_PROPERTY))),
+      TopicLabel::SegmentBytes => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(SEGMENT_BYTES_PROPERTY))),
+      TopicLabel::Target => Value::target(target_id),
+      TopicLabel::TimestampType => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY))),
     }
   }
 }

@@ -6,8 +6,8 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_APPS, DEPENDANT_LABELS_LIST, DEPENDANT_LABELS_SERVICES};
 use crate::{error, DshCliResult};
@@ -18,6 +18,7 @@ use dsh_api::types::{Volume, VolumeStatus};
 use dsh_api::volume::VolumeInjection;
 use dsh_api::{Dependant, DependantApp, DependantApplication};
 use futures::future::try_join_all;
+use futures::join;
 use itertools::{Either, Itertools};
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -72,7 +73,7 @@ lazy_static! {
       .add_target_argument(volume_id_argument().required(true))
   );
   static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &VolumeListAll {}, "List volumes")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &VolumeList {}, "List volumes")
       .set_long_about("Lists all available volumes.")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &VolumeListAllocationStatus {}, None),
@@ -82,7 +83,7 @@ lazy_static! {
       ])
   );
   static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &VolumeShowAll {}, "Show secret configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &VolumeShow {}, "Show secret configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
         (FlagType::Usage, &VolumeShowUsage {}, None),
@@ -164,17 +165,17 @@ impl CommandExecutor for VolumeDelete {
   }
 }
 
-struct VolumeListAll {}
+struct VolumeList {}
 
 #[async_trait]
-impl CommandExecutor for VolumeListAll {
+impl CommandExecutor for VolumeList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all volumes with their parameters");
     let start_instant = context.now();
     let volume_ids = client.get_volume_ids().await?;
     let volumes = try_join_all(volume_ids.iter().map(|volume_id| client.get_volume_configuration(volume_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&VOLUME_LABELS, Some("volume id"), context);
+    let mut formatter = ListFormatter::new(&VOLUME_LABELS, context);
     formatter.push_target_ids_and_values(volume_ids.as_slice(), volumes.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -195,7 +196,7 @@ impl CommandExecutor for VolumeListAllocationStatus {
     let volume_ids = client.get_volume_ids().await?;
     let allocation_statuses = try_join_all(volume_ids.iter().map(|volume_id| client.get_volume_status(volume_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context);
+    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, context);
     formatter.push_target_ids_and_values(volume_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -216,7 +217,7 @@ impl CommandExecutor for VolumeListConfiguration {
     let volume_ids = client.get_volume_ids().await?;
     let configurations = try_join_all(volume_ids.iter().map(|volume_id| client.get_volume_configuration(volume_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&VOLUME_LABELS, Some("volume id"), context);
+    let mut formatter = ListFormatter::new(&VOLUME_LABELS, context);
     formatter.push_target_ids_and_values(volume_ids.as_slice(), configurations.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -256,7 +257,7 @@ impl CommandExecutor for VolumeListUsage {
     let start_instant = context.now();
     let volumes_with_usage: Vec<(String, Vec<Dependant<VolumeInjection>>)> = client.volumes_with_dependants().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("volume id"), context);
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, context);
     for (volume_id, used_bys) in &volumes_with_usage {
       for used_by in used_bys {
         formatter.push_target_id_value(volume_id.clone(), used_by);
@@ -275,17 +276,18 @@ impl CommandExecutor for VolumeListUsage {
   }
 }
 
-struct VolumeShowAll {}
+struct VolumeShow {}
 
 #[async_trait]
-impl CommandExecutor for VolumeShowAll {
+impl CommandExecutor for VolumeShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for volume '{}'", volume_id));
     let start_instant = context.now();
-    let volume = client.get_volume(&volume_id).await?;
+    let (volume, allocation_status) = join!(client.get_volume(&volume_id), client.get_volume_status(&volume_id));
     context.print_execution_time(start_instant);
-    UnitFormatter::new(volume_id, &VOLUME_STATUS_LABELS, Some("volume id"), context).print(&volume, None)
+    context.print_allocation_status(&allocation_status, VOLUME_SUBJECT_TARGET);
+    UnitFormatter::new(volume_id, &VOLUME_STATUS_LABELS, context).print(&volume?, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -303,7 +305,7 @@ impl CommandExecutor for VolumeShowAllocationStatus {
     let start_instant = context.now();
     let allocation_status = client.get_volume_status(&volume_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("volume id"), context).print(&allocation_status, None)
+    UnitFormatter::new(volume_id, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -330,7 +332,7 @@ impl CommandExecutor for VolumeShowUsage {
       context.print_outcome("volume not used in services")
     } else {
       context.print_outcome("volume used in services");
-      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_SERVICES, Some("volume id"), context);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_SERVICES, context);
       formatter.push_values(&dependant_services);
       formatter.print(None)?;
     }
@@ -338,7 +340,7 @@ impl CommandExecutor for VolumeShowUsage {
       context.print_outcome("volume not used in apps")
     } else {
       context.print_outcome("volume used in apps");
-      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_APPS, Some("volume id"), context);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_APPS, context);
       formatter.push_values(&dependant_apps);
       formatter.print(None)?;
     }
@@ -383,22 +385,22 @@ impl Label for VolumeLabel {
 }
 
 impl SubjectFormatter<VolumeLabel> for Volume {
-  fn value(&self, label: &VolumeLabel, target_id: &str) -> String {
+  fn value(&self, label: &VolumeLabel, target_id: &str) -> Value {
     match label {
-      VolumeLabel::Target => target_id.to_string(),
-      VolumeLabel::Size => self.size_gi_b.to_string(),
-      _ => "".to_string(),
+      VolumeLabel::Target => Value::target(target_id),
+      VolumeLabel::Size => Value::plain(self.size_gi_b),
+      _ => Value::empty(),
     }
   }
 }
 
 impl SubjectFormatter<VolumeLabel> for VolumeStatus {
-  fn value(&self, label: &VolumeLabel, target_id: &str) -> String {
+  fn value(&self, label: &VolumeLabel, target_id: &str) -> Value {
     match label {
-      VolumeLabel::ActualSize => self.actual.clone().map(|a| a.size_gi_b.to_string()).unwrap_or("NA".to_string()),
-      VolumeLabel::ConfigurationSize => self.configuration.clone().map(|a| a.size_gi_b.to_string()).unwrap_or("NA".to_string()),
-      VolumeLabel::Size => self.actual.clone().map(|a| a.size_gi_b.to_string()).unwrap_or("NA".to_string()),
-      VolumeLabel::Target => target_id.to_string(),
+      VolumeLabel::ActualSize => Value::some_or(self.actual.clone().map(|volume| volume.size_gi_b), "NA"),
+      VolumeLabel::ConfigurationSize => Value::some_or(self.configuration.clone().map(|volume| volume.size_gi_b), "NA"),
+      VolumeLabel::Size => Value::some_or(self.actual.clone().map(|volume| volume.size_gi_b), "NA"),
+      VolumeLabel::Target => Value::target(target_id),
     }
   }
 }

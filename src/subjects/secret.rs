@@ -8,6 +8,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::Value as FormatterValue;
 use crate::formatters::{Label, OutputFormat, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
@@ -20,7 +21,7 @@ use dsh_api::secret::{is_system_id, secret_id_to_secret_name, SecretInjection};
 use dsh_api::types::Secret;
 use dsh_api::{Dependant, DshApiError};
 use futures::future::{join_all, try_join_all};
-use futures::try_join;
+use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use rsa::pkcs1::DecodeRsaPrivateKey;
@@ -30,8 +31,8 @@ use rsa::RsaPrivateKey;
 use rsa::RsaPublicKey;
 use serde::Serialize;
 use serde_json::Value;
-use x509_parser::asn1_rs::FromDer;
-use x509_parser::pem::{parse_x509_pem, Pem};
+use std::fmt::{Display, Formatter};
+use x509_parser::pem::Pem;
 use x509_parser::prelude::X509Certificate;
 use x509_parser::x509::X509Name;
 
@@ -209,51 +210,12 @@ impl CommandExecutor for SecretList {
       .collect_vec();
     let secret_value_results = join_all(secret_names.iter().map(|(secret_name, _)| client.get_secret(secret_name))).await;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, Some("secret id"), context);
-    for ((secret_name, system_id), secret_value_result) in secret_names.into_iter().zip(secret_value_results) {
+    let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
+    for ((secret_name, is_system), secret_value_result) in secret_names.into_iter().zip(secret_value_results) {
       match secret_value_result {
         Ok(secret_value) => {
-          if secret_value.trim().is_empty() {
-            formatter.push_target_id_value_owned(secret_name.clone(), SecretEntry::new("empty".to_string(), "".to_string(), None, None));
-          } else if system_id {
-            formatter.push_target_id_value_owned(secret_name.clone(), SecretEntry::new("system".to_string(), "plain".to_string(), None, None));
-          } else if let Some(certificate_entries) = get_certificates_from_pem(&secret_value) {
-            for certificate_entry in certificate_entries {
-              formatter.push_target_id_value_owned(
-                secret_name.clone(),
-                SecretEntry::new(
-                  "cert".to_string(),
-                  "pem".to_string(),
-                  Some(certificate_entry.subject),
-                  Some(certificate_entry.not_after),
-                ),
-              );
-            }
-          } else if let Some(keys) = get_keys_from_pem(&secret_value) {
-            for (rsa_private_key, label, kind) in keys {
-              formatter.push_target_id_value_owned(
-                secret_name.clone(),
-                SecretEntry::new(
-                  "pki".to_string(),
-                  format!("pem.{}", kind),
-                  Some(format!("{}, {} bit", label, rsa_private_key.size())),
-                  None,
-                ),
-              );
-            }
-          } else if let Some(description) = get_json(&secret_value) {
-            formatter.push_target_id_value_owned(secret_name, SecretEntry::new("settings".to_string(), "json".to_string(), Some(description), None));
-          } else if let Some(description) = get_toml(&secret_value) {
-            formatter.push_target_id_value_owned(secret_name, SecretEntry::new("settings".to_string(), "toml".to_string(), Some(description), None));
-          } else if let Some(description) = get_yaml(&secret_value) {
-            formatter.push_target_id_value_owned(secret_name, SecretEntry::new("settings".to_string(), "yaml".to_string(), Some(description), None));
-          } else if let Some(description) = get_multiline(&secret_value) {
-            formatter.push_target_id_value_owned(
-              secret_name,
-              SecretEntry::new("settings".to_string(), "multi-line".to_string(), Some(description), None),
-            );
-          } else {
-            formatter.push_target_id_value_owned(secret_name, SecretEntry::new("regular".to_string(), "plain".to_string(), None, None));
+          for secret_entry in secret_entries_from(&secret_value, is_system) {
+            formatter.push_target_id_value_owned(secret_name.clone(), secret_entry);
           }
         }
         Err(error) => {
@@ -266,7 +228,7 @@ impl CommandExecutor for SecretList {
             DshApiError::Unexpected(_, _) => ("unexpected", Some("possibly a network failure".to_string())),
             DshApiError::Unprocessable(_) => ("unprocessable", None),
           };
-          formatter.push_target_id_value_owned(secret_name, SecretEntry::new("error".to_string(), kind.to_string(), message, None));
+          formatter.push_target_id_value_owned(secret_name, SecretEntry::new(SecretKind::Error, kind.to_string(), message, None));
         }
       }
     }
@@ -289,7 +251,7 @@ impl CommandExecutor for SecretListAllocationStatus {
     let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !is_system_id(id)).collect_vec();
     let allocation_statuses = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context);
+    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, context);
     formatter.push_target_ids_and_values(non_system_secret_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -310,7 +272,7 @@ impl CommandExecutor for SecretListCertificates {
     let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !is_system_id(id)).collect_vec();
     let secret_values = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret(secret_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&X509_CERTIFICATE_LABELS_LIST, Some("secret id"), context);
+    let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, context);
     for (secret_id, secret_value) in non_system_secret_ids.into_iter().zip(secret_values) {
       if let Some(certificate_entries) = get_certificates_from_pem(&secret_value) {
         for certificate_entry in certificate_entries {
@@ -358,7 +320,7 @@ impl CommandExecutor for SecretListKeys {
     let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !is_system_id(id)).collect_vec();
     let secret_values = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret(secret_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&KEY_LABELS_LIST, Some("secret id"), context);
+    let mut formatter = ListFormatter::new(&KEY_LABELS_LIST, context);
     for (secret_id, secret_value) in non_system_secret_ids.into_iter().zip(secret_values) {
       if let Some(private_keys) = get_keys_from_pem(&secret_value) {
         for (rsa_private_key, label, kind) in private_keys {
@@ -389,7 +351,7 @@ impl CommandExecutor for SecretListSystem {
       .collect_vec();
     let allocation_statuses = try_join_all(system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, Some("system secret id"), context);
+    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, context);
     formatter.push_target_ids_and_values(secret_names.as_slice(), allocation_statuses.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -409,14 +371,14 @@ impl CommandExecutor for SecretListUsage {
     let start_instant = context.now();
     let secrets_with_dependants: Vec<(String, Vec<Dependant<SecretInjection>>)> = client.secrets_with_dependants().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("secret id"), context);
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, context);
     for (secret_id, dependants) in &secrets_with_dependants {
       for dependant in dependants {
         formatter.push_target_id_value(secret_id.clone(), dependant);
       }
     }
     if formatter.is_empty() {
-      context.print_outcome("no secrets found in apps or services");
+      context.print_outcome("no secrets found in apps, proxies or services");
     } else {
       formatter.print(None)?;
     }
@@ -438,7 +400,7 @@ impl CommandExecutor for SecretShowAllocationStatus {
     let start_instant = context.now();
     let allocation_status = client.get_secret_status(&secret_id).await?;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, Some("secret id"), context).print(&allocation_status, None)
+    UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -450,18 +412,16 @@ struct SecretShowUsage {}
 
 #[async_trait]
 impl CommandExecutor for SecretShowUsage {
-  // TODO Add other usage, e.g. in proxies
-  // TODO Improve rendering app/service
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show the apps and services that use secret '{}'", secret_id));
     let start_instant = context.now();
-    let usages = client.applications_dependant_on_secret(&secret_id).await?;
+    let usages = client.secret_dependants(&secret_id).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("secret not used")
     } else {
-      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS, Some("secret id"), context);
+      let mut formatter = ListFormatter::new(&DEPENDANT_LABELS, context);
       formatter.push_values(&usages);
       formatter.print(None)?;
     }
@@ -480,28 +440,11 @@ impl CommandExecutor for SecretShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     let start_instant = context.now();
-    let (secret, allocation_status) = try_join!(client.get_secret(&secret_id), client.get_secret_status(&secret_id))?;
+    let (secret_value, allocation_status) = join!(client.get_secret(&secret_id), client.get_secret_status(&secret_id));
     context.print_execution_time(start_instant);
-    context.print_allocation_status(&allocation_status, "secret");
-    match parse_x509_pem(secret.as_bytes()) {
-      Ok((_, pem)) => match pem.parse_x509() {
-        Ok(x509_certificate) => {
-          context.print_explanation(format!("secret '{}' is a valid pem encoded certificate", secret_id));
-          UnitFormatter::new(secret_id.clone(), &X509_CERTIFICATE_LABELS_SHOW, None, context).print_non_serializable(&x509_certificate, None)?;
-        }
-        Err(_) => {
-          context.print_explanation(format!("secret '{}' is pem encoded", secret_id));
-        }
-      },
-      Err(_) => match X509Certificate::from_der(secret.as_bytes()) {
-        Ok((_, x509_certificate)) => {
-          context.print_explanation(format!("secret '{}' is a valid der encoded certificate", secret_id));
-          UnitFormatter::new(secret_id.clone(), &X509_CERTIFICATE_LABELS_SHOW, None, context).print_non_serializable(&x509_certificate, None)?;
-        }
-        Err(_) => {
-          context.print_explanation(format!("secret '{}' is a plain text secret, use --value to see its value", secret_id));
-        }
-      },
+    context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
+    for secret_entry in secret_entries_from(&secret_value?, is_system_id(&secret_id)) {
+      _ = UnitFormatter::new(&secret_id, &SECRET_LABELS_LIST, context).print(&secret_entry, None);
     }
     Ok(())
   }
@@ -576,81 +519,6 @@ impl CommandExecutor for SecretUpdate {
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum X509CertificateLabel {
-  Label,
-  Issuer,
-  IssuerUid,
-  NotAfter,
-  NotBefore,
-  SecretId,
-  Serial,
-  Signature,
-  SignatureAlgorithm,
-  SignatureValue,
-  Subject,
-  SubjectPki,
-  SubjectUid,
-  TbsCertificate,
-  Version,
-}
-
-impl Label for X509CertificateLabel {
-  fn as_str(&self) -> &str {
-    match self {
-      Self::Label => "label",
-      Self::Issuer => "issuer",
-      Self::IssuerUid => "issuer uid",
-      Self::NotAfter => "not after",
-      Self::NotBefore => "not before",
-      Self::SecretId => "secret id",
-      Self::Serial => "serial",
-      Self::Signature => "signature",
-      Self::SignatureAlgorithm => "signature algorithm",
-      Self::SignatureValue => "signature value",
-      Self::Subject => "subject",
-      Self::SubjectPki => "subject pki",
-      Self::SubjectUid => "subject uid",
-      Self::TbsCertificate => "tbs certificate",
-      Self::Version => "version",
-    }
-  }
-
-  fn is_target_label(&self) -> bool {
-    matches!(self, Self::SecretId)
-  }
-}
-
-impl SubjectFormatter<X509CertificateLabel> for X509Certificate<'_> {
-  fn value(&self, label: &X509CertificateLabel, target_id: &str) -> String {
-    match label {
-      X509CertificateLabel::Label => "".to_string(),
-      X509CertificateLabel::Issuer => self.issuer().to_string(),
-      X509CertificateLabel::IssuerUid => self
-        .issuer_uid
-        .clone()
-        .map(|uid| String::from_utf8(uid.0.data.to_vec()).unwrap_or_default().to_string())
-        .unwrap_or_default(),
-      X509CertificateLabel::NotAfter => self.validity.not_after.to_string(),
-      X509CertificateLabel::NotBefore => self.validity.not_before.to_string(),
-      X509CertificateLabel::SecretId => target_id.to_string(),
-      X509CertificateLabel::Serial => self.serial.to_string(),
-      X509CertificateLabel::Signature => self.signature.algorithm.to_string(),
-      X509CertificateLabel::SignatureAlgorithm => self.signature_algorithm.algorithm.to_string(),
-      X509CertificateLabel::SignatureValue => self.signature.algorithm.to_string(),
-      X509CertificateLabel::Subject => self.subject().to_string(),
-      X509CertificateLabel::SubjectPki => self.subject_pki.algorithm.oid().to_string(),
-      X509CertificateLabel::SubjectUid => self
-        .subject_uid
-        .clone()
-        .map(|uid| String::from_utf8(uid.0.data.to_vec()).unwrap_or_default().to_string())
-        .unwrap_or_default(),
-      X509CertificateLabel::TbsCertificate => "TODO".to_string(),
-      X509CertificateLabel::Version => self.version.to_string(),
-    }
-  }
-}
-
 #[derive(Clone, Serialize)]
 struct CertificateEntry {
   subject: String,
@@ -688,16 +556,42 @@ impl From<(X509Certificate<'_>, String)> for CertificateEntry {
   }
 }
 
-impl SubjectFormatter<X509CertificateLabel> for CertificateEntry {
-  fn value(&self, label: &X509CertificateLabel, target_id: &str) -> String {
+#[derive(Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum CertificateLabel {
+  Label,
+  Issuer,
+  NotAfter,
+  _NotBefore,
+  SecretId,
+  Subject,
+}
+
+impl Label for CertificateLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::Label => "label",
+      Self::Issuer => "issuer",
+      Self::NotAfter => "not after",
+      Self::_NotBefore => "not before",
+      Self::SecretId => "secret id",
+      Self::Subject => "subject",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::SecretId)
+  }
+}
+
+impl SubjectFormatter<CertificateLabel> for CertificateEntry {
+  fn value(&self, label: &CertificateLabel, target_id: &str) -> FormatterValue {
     match label {
-      X509CertificateLabel::Label => self.label.to_string(),
-      X509CertificateLabel::Issuer => self.issuer.to_string(),
-      X509CertificateLabel::NotAfter => self.not_after.to_string(),
-      X509CertificateLabel::NotBefore => self.not_before.to_string(),
-      X509CertificateLabel::SecretId => target_id.to_string(),
-      X509CertificateLabel::Subject => self.subject.to_string(),
-      _ => "".to_string(),
+      CertificateLabel::Label => FormatterValue::plain(&self.label),
+      CertificateLabel::Issuer => FormatterValue::plain(&self.issuer),
+      CertificateLabel::NotAfter => FormatterValue::plain(&self.not_after), // TODO
+      CertificateLabel::_NotBefore => FormatterValue::plain(&self.not_before),
+      CertificateLabel::SecretId => FormatterValue::target(target_id),
+      CertificateLabel::Subject => FormatterValue::plain(&self.subject),
     }
   }
 }
@@ -749,51 +643,76 @@ impl Label for KeyLabel {
 }
 
 impl SubjectFormatter<KeyLabel> for KeyEntry {
-  fn value(&self, label: &KeyLabel, target_id: &str) -> String {
+  fn value(&self, label: &KeyLabel, target_id: &str) -> crate::formatters::Value {
     match label {
-      KeyLabel::Kind => self.kind.clone(),
-      KeyLabel::Label => self.label.clone(),
+      KeyLabel::Kind => FormatterValue::plain(&self.kind),
+      KeyLabel::Label => FormatterValue::plain(&self.label),
       KeyLabel::Private => {
         if self.private {
-          "private".to_string()
+          FormatterValue::plain("private")
         } else {
-          "public".to_string()
+          FormatterValue::plain("public")
         }
       }
-      KeyLabel::SecretId => target_id.to_string(),
-      KeyLabel::Size => self.size.to_string(),
+      KeyLabel::SecretId => FormatterValue::target(target_id),
+      KeyLabel::Size => FormatterValue::plain(self.size),
     }
   }
 }
 
 #[derive(Clone, Serialize)]
-struct SecretEntry {
-  kind: String,
+enum SecretKind {
+  Certificate,
+  Empty,
+  Error,
+  Pki,
+  Regular,
+  Settings,
+  System,
+}
+
+impl Display for SecretKind {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Certificate => write!(f, "cert"),
+      Self::Empty => write!(f, "empty"),
+      Self::Error => write!(f, "error"),
+      Self::Pki => write!(f, "pki"),
+      Self::Regular => write!(f, "regular"),
+      Self::Settings => write!(f, "settings"),
+      Self::System => write!(f, "system"),
+    }
+  }
+}
+
+#[derive(Clone, Serialize)]
+pub(crate) struct SecretEntry {
+  kind: SecretKind,
   format: String,
   description: Vec<String>,
   expires: Option<String>,
 }
 
 impl SecretEntry {
-  fn new(kind: String, format: String, description: Option<String>, expires: Option<String>) -> Self {
+  fn new(kind: SecretKind, format: String, description: Option<String>, expires: Option<String>) -> Self {
     Self { kind, format, description: description.map(|desc| vec![desc]).unwrap_or_default(), expires }
   }
 }
 
-impl From<(String, String, X509Certificate<'_>)> for SecretEntry {
-  fn from((kind, format, certificate): (String, String, X509Certificate)) -> Self {
+impl From<(SecretKind, String, X509Certificate<'_>)> for SecretEntry {
+  fn from((kind, format, certificate): (SecretKind, String, X509Certificate)) -> Self {
     Self { kind, format, description: vec![x509_name_to_string(&certificate.subject)], expires: Some(certificate.validity().not_after.to_string()) }
   }
 }
 
-impl From<(String, String, RsaPrivateKey)> for SecretEntry {
-  fn from((kind, format, _rsa_private_key): (String, String, RsaPrivateKey)) -> Self {
+impl From<(SecretKind, String, RsaPrivateKey)> for SecretEntry {
+  fn from((kind, format, _rsa_private_key): (SecretKind, String, RsaPrivateKey)) -> Self {
     Self::new(kind, format, None, None)
   }
 }
 
-impl From<(String, String, RsaPublicKey)> for SecretEntry {
-  fn from((kind, format, _rsa_public_key): (String, String, RsaPublicKey)) -> Self {
+impl From<(SecretKind, String, RsaPublicKey)> for SecretEntry {
+  fn from((kind, format, _rsa_public_key): (SecretKind, String, RsaPublicKey)) -> Self {
     Self::new(kind, format, None, None)
   }
 }
@@ -824,43 +743,26 @@ impl Label for SecretLabel {
 }
 
 impl SubjectFormatter<SecretLabel> for SecretEntry {
-  fn value(&self, label: &SecretLabel, target_id: &str) -> String {
+  fn value(&self, label: &SecretLabel, target_id: &str) -> FormatterValue {
     match label {
-      SecretLabel::Description => self.description.join("\n"),
-      SecretLabel::Expires => self.expires.clone().unwrap_or_default(),
-      SecretLabel::Format => self.format.clone(),
-      SecretLabel::Kind => self.kind.clone(),
-      SecretLabel::SecretId => target_id.to_string(),
+      SecretLabel::Description => FormatterValue::plain(self.description.join("\n")),
+      SecretLabel::Expires => FormatterValue::option(self.expires.clone()),
+      SecretLabel::Format => FormatterValue::plain(&self.format),
+      SecretLabel::Kind => FormatterValue::plain(&self.kind),
+      SecretLabel::SecretId => FormatterValue::target(target_id),
     }
   }
 }
 
-static X509_CERTIFICATE_LABELS_SHOW: [X509CertificateLabel; 14] = [
-  X509CertificateLabel::SecretId,
-  X509CertificateLabel::Issuer,
-  X509CertificateLabel::IssuerUid,
-  X509CertificateLabel::NotAfter,
-  X509CertificateLabel::NotBefore,
-  X509CertificateLabel::Serial,
-  X509CertificateLabel::Signature,
-  X509CertificateLabel::SignatureAlgorithm,
-  X509CertificateLabel::SignatureValue,
-  X509CertificateLabel::Subject,
-  X509CertificateLabel::SubjectPki,
-  X509CertificateLabel::SubjectUid,
-  X509CertificateLabel::TbsCertificate,
-  X509CertificateLabel::Version,
-];
-
-static X509_CERTIFICATE_LABELS_LIST: [X509CertificateLabel; 5] =
-  [X509CertificateLabel::SecretId, X509CertificateLabel::Subject, X509CertificateLabel::NotAfter, X509CertificateLabel::Issuer, X509CertificateLabel::Label];
+static CERTIFICATE_LABELS_LIST: [CertificateLabel; 5] =
+  [CertificateLabel::SecretId, CertificateLabel::Subject, CertificateLabel::NotAfter, CertificateLabel::Issuer, CertificateLabel::Label];
 
 static KEY_LABELS_LIST: [KeyLabel; 5] = [KeyLabel::SecretId, KeyLabel::Private, KeyLabel::Size, KeyLabel::Kind, KeyLabel::Label];
 
-static SECRET_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretId, SecretLabel::Kind, SecretLabel::Format, SecretLabel::Description, SecretLabel::Expires];
+pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretId, SecretLabel::Kind, SecretLabel::Format, SecretLabel::Description, SecretLabel::Expires];
 
-fn get_certificates_from_pem(secret_value: &str) -> Option<Vec<CertificateEntry>> {
-  let certificates = Pem::iter_from_buffer(secret_value.as_bytes())
+fn get_certificates_from_pem(pem: &str) -> Option<Vec<CertificateEntry>> {
+  let certificates = Pem::iter_from_buffer(pem.as_bytes())
     .flat_map(|pem_entry| pem_entry.ok())
     .flat_map(|pem| pem.parse_x509().map(|certificate| CertificateEntry::from((certificate, pem.label.clone()))))
     .collect_vec();
@@ -871,17 +773,74 @@ fn get_certificates_from_pem(secret_value: &str) -> Option<Vec<CertificateEntry>
   }
 }
 
-fn get_keys_from_pem(secret_value: &str) -> Option<Vec<(RsaPrivateKey, String, &str)>> {
-  let keys = Pem::iter_from_buffer(secret_value.as_bytes())
-    .flat_map(|pem_entry| pem_entry.ok())
-    .flat_map(|pem| {
-      if let Ok(pkcs1_pem_private_key) = RsaPrivateKey::from_pkcs1_pem(secret_value) {
-        Some((pkcs1_pem_private_key, pem.label.clone(), "pkcs1"))
-      } else if let Ok(pkcs8_pem_private_key) = RsaPrivateKey::from_pkcs8_pem(secret_value) {
-        Some((pkcs8_pem_private_key, pem.label.clone(), "pkcs8"))
-      } else {
-        None
+fn get_begin_label(line: &str) -> Option<&str> {
+  if let Some(prefix_stripped) = line.strip_prefix("-----BEGIN ") {
+    if let Some(suffix_stripped) = prefix_stripped.strip_suffix("-----") {
+      return Some(suffix_stripped);
+    }
+  }
+  None
+}
+
+fn get_end_label(line: &str) -> Option<&str> {
+  if let Some(prefix_stripped) = line.strip_prefix("-----END ") {
+    if let Some(suffix_stripped) = prefix_stripped.strip_suffix("-----") {
+      return Some(suffix_stripped);
+    }
+  }
+  None
+}
+
+fn get_pem_labels(pem: &str) -> Option<Vec<&str>> {
+  let mut labels = vec![];
+  let mut current_label: Option<&str> = None;
+  for line in pem.lines() {
+    match current_label {
+      Some(label) => {
+        if let Some(end_label) = get_end_label(line) {
+          if label == end_label {
+            labels.push(end_label);
+            current_label = None;
+          }
+        }
       }
+      None => {
+        if let Some(begin_label) = get_begin_label(line) {
+          current_label = Some(begin_label)
+        }
+      }
+    }
+  }
+  if labels.is_empty() {
+    None
+  } else {
+    Some(labels)
+  }
+}
+
+fn get_encrypted_label(pem: &str) -> Option<String> {
+  let lines = pem.lines().collect_vec();
+  if lines.get(1).is_some_and(|line| *line == "Proc-Type: 4,ENCRYPTED") {
+    if let Some(prefix_stripped) = lines.first().unwrap().strip_prefix("-----BEGIN ") {
+      if let Some(suffix_stripped) = prefix_stripped.strip_suffix("-----") {
+        return Some(suffix_stripped.to_string());
+      }
+    }
+  }
+  None
+}
+
+pub(crate) fn get_keys_from_pem(secret_value: &str) -> Option<Vec<(RsaPrivateKey, String, &str)>> {
+  let keys: Vec<(RsaPrivateKey, String, &str)> = Pem::iter_from_buffer(secret_value.as_bytes())
+    .filter_map(|pem_entry| match pem_entry {
+      Ok(pem) => match RsaPrivateKey::from_pkcs1_pem(secret_value) {
+        Ok(pkcs1_pem_private_key) => Some((pkcs1_pem_private_key, pem.label.clone(), "pkcs1")),
+        Err(_) => match RsaPrivateKey::from_pkcs8_pem(secret_value) {
+          Ok(pkcs8_pem_private_key) => Some((pkcs8_pem_private_key, pem.label.clone(), "pkcs8")),
+          Err(_) => None,
+        },
+      },
+      Err(_) => None,
     })
     .collect_vec();
   if keys.is_empty() {
@@ -934,5 +893,47 @@ fn get_multiline(secret_value: &str) -> Option<String> {
     Some(secret_size(secret_value))
   } else {
     None
+  }
+}
+
+pub(crate) fn secret_entries_from(secret_value: &str, is_system: bool) -> Vec<SecretEntry> {
+  if secret_value.trim().is_empty() {
+    vec![SecretEntry::new(SecretKind::Empty, "".to_string(), None, None)]
+  } else if is_system {
+    vec![SecretEntry::new(SecretKind::System, "plain".to_string(), None, None)]
+  } else if let Some(certificate_entries) = get_certificates_from_pem(secret_value) {
+    certificate_entries
+      .into_iter()
+      .map(|certificate_entry| {
+        SecretEntry::new(
+          SecretKind::Certificate,
+          "pem".to_string(),
+          Some(certificate_entry.subject),
+          Some(certificate_entry.not_after),
+        )
+      })
+      .collect_vec()
+  } else if let Some(encrypted_label) = get_encrypted_label(secret_value) {
+    vec![SecretEntry::new(SecretKind::Pki, "encrypted".to_string(), Some(encrypted_label), None)]
+  } else if let Some(keys) = get_keys_from_pem(secret_value) {
+    keys
+      .iter()
+      .map(|(key, label, kind)| SecretEntry::new(SecretKind::Pki, format!("pem.{}", kind), Some(format!("{}, {} bit", label, key.size())), None))
+      .collect_vec()
+  } else if let Some(labels) = get_pem_labels(secret_value) {
+    labels
+      .iter()
+      .map(|label| SecretEntry::new(SecretKind::Pki, "pem.label".to_string(), Some(label.to_string()), None))
+      .collect_vec()
+  } else if let Some(description) = get_json(secret_value) {
+    vec![SecretEntry::new(SecretKind::Settings, "json".to_string(), Some(description), None)]
+  } else if let Some(description) = get_toml(secret_value) {
+    vec![SecretEntry::new(SecretKind::Settings, "toml".to_string(), Some(description), None)]
+  } else if let Some(description) = get_yaml(secret_value) {
+    vec![SecretEntry::new(SecretKind::Settings, "yaml".to_string(), Some(description), None)]
+  } else if let Some(description) = get_multiline(secret_value) {
+    vec![SecretEntry::new(SecretKind::Settings, "multi-line".to_string(), Some(description), None)]
+  } else {
+    vec![SecretEntry::new(SecretKind::Regular, "plain".to_string(), None, None)]
   }
 }
