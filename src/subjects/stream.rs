@@ -2,7 +2,7 @@ use crate::subject::Requirements;
 
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
-use dsh_api::AccessRights;
+use dsh_api::{AccessRights, DshApiError};
 use futures::try_join;
 use lazy_static::lazy_static;
 
@@ -16,13 +16,14 @@ use dsh_api::types::{
 use crate::arguments::{managed_stream_argument, MANAGED_STREAM_ARGUMENT};
 use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
+use crate::error::DshCliError;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
 use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::subject::Subject;
 use crate::subjects::topic::{
   cleanup_policy_flag, compression_type_flag, create_topic, delete_retention_ms_flag, get_implicit_properties, max_message_size_flag, message_timestamp_type_flag, partitions_flag,
@@ -122,7 +123,7 @@ lazy_static! {
       .add_command_executor(FlagType::Ids, &StreamListIds {}, None)
   );
   static ref STREAM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &StreamShowAll {}, "Show managed stream configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &StreamShow {}, "Show managed stream configuration")
       .add_target_argument(managed_stream_argument().required(true))
   );
   static ref STREAM_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
@@ -277,9 +278,9 @@ impl CommandExecutor for StreamListAll {
         let streams = client.managed_stream_configurations().await?;
         context.print_execution_time(start_instant);
         let mut formatter = if streams.iter().any(|(_, stream)| matches!(stream, Stream::Public(_))) {
-          ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, None, context)
+          ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, context)
         } else {
-          ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, None, context)
+          ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, context)
         };
         for (stream_id, stream) in streams.iter() {
           formatter.push_target_id_value(stream_id.to_string(), stream);
@@ -291,7 +292,7 @@ impl CommandExecutor for StreamListAll {
         let start_instant = context.now();
         let internal_streams = client.managed_stream_configurations_internal().await?;
         context.print_execution_time(start_instant);
-        let mut formatter = ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, None, context);
+        let mut formatter = ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, context);
         for (internal_stream_id, internal_stream) in internal_streams.iter() {
           formatter.push_target_id_value(internal_stream_id.to_string(), internal_stream);
         }
@@ -302,7 +303,7 @@ impl CommandExecutor for StreamListAll {
         let start_instant = context.now();
         let public_streams = client.managed_stream_configurations_public().await?;
         context.print_execution_time(start_instant);
-        let mut formatter = ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, None, context);
+        let mut formatter = ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, context);
         for (public_stream_id, public_stream) in public_streams.iter() {
           formatter.push_target_id_value(public_stream_id.to_string(), public_stream);
         }
@@ -352,10 +353,10 @@ impl CommandExecutor for StreamListIds {
   }
 }
 
-struct StreamShowAll {}
+struct StreamShow {}
 
 #[async_trait]
-impl CommandExecutor for StreamShowAll {
+impl CommandExecutor for StreamShow {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     context.print_explanation(format!("show configuration for managed stream '{}'", managed_stream_id));
@@ -363,19 +364,30 @@ impl CommandExecutor for StreamShowAll {
     match try_join!(
       client.managed_stream_configuration(&managed_stream_id),
       client.managed_stream_tenants_with_access_rights(&managed_stream_id)
-    )? {
-      (Some(Stream::Internal(internal_managed_stream)), access_rights) => {
+    ) {
+      Ok((Some(Stream::Internal(internal_managed_stream)), access_rights)) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(managed_stream_id, &INTERNAL_STREAM_LABELS, None, context).print(&(Stream::Internal(internal_managed_stream), &access_rights), None)
+        UnitFormatter::new(managed_stream_id, &INTERNAL_STREAM_LABELS, context).print(&(Stream::Internal(internal_managed_stream), &access_rights), None)
       }
-      (Some(Stream::Public(public_managed_stream)), access_rights) => {
+      Ok((Some(Stream::Public(public_managed_stream)), access_rights)) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(managed_stream_id, &PUBLIC_STREAM_LABELS, None, context).print(&(Stream::Public(public_managed_stream), &access_rights), None)
+        UnitFormatter::new(managed_stream_id, &PUBLIC_STREAM_LABELS, context).print(&(Stream::Public(public_managed_stream), &access_rights), None)
       }
-      (None, _) => {
-        context.print_execution_time(start_instant);
-        Err(error!("managed stream '{}' does not exist", managed_stream_id))
+      Ok((None, _)) => {
+        context.print_error(format!("stream '{}' does not exist", managed_stream_id));
+        Ok(())
       }
+      Err(error) => match error {
+        DshApiError::NotFound(_) => {
+          context.print_error(format!("stream '{}' does not exist", managed_stream_id));
+          Ok(())
+        }
+        DshApiError::BadRequest(_) => {
+          context.print_error(format!("you are not authorized to manage stream '{}'", managed_stream_id));
+          Ok(())
+        }
+        error => Err(DshCliError::from(error)),
+      },
     }
   }
 
@@ -456,7 +468,7 @@ impl Label for ManagedStreamLabel {
 }
 
 impl SubjectFormatter<ManagedStreamLabel> for Stream {
-  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> String {
+  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> Value {
     match self {
       Stream::Internal(internal) => internal.value(label, target_id),
       Stream::Public(public) => public.value(label, target_id),
@@ -465,69 +477,73 @@ impl SubjectFormatter<ManagedStreamLabel> for Stream {
 }
 
 impl SubjectFormatter<ManagedStreamLabel> for ManagedStream {
-  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> String {
+  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> Value {
     match label {
-      ManagedStreamLabel::CanBeRetained => "NA".to_string(),
-      ManagedStreamLabel::CleanupPolicy => self.0.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::CompressionType => self.0.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::DeleteRetentionMs => self.0.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::KafkaProperties => hashmap_to_table(&get_implicit_properties(&self.0.kafka_properties)),
-      ManagedStreamLabel::MaxMessageBytes => self.0.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::Partitioner => "NA".to_string(),
-      ManagedStreamLabel::Partitions => self.0.partitions.to_string(),
-      ManagedStreamLabel::ReplicationFactor => self.0.replication_factor.to_string(),
-      ManagedStreamLabel::RetentionBytes => self.0.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::RetentionMs => self.0.kafka_properties.get(RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::SegmentBytes => self.0.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::Target => target_id.to_string(),
-      ManagedStreamLabel::TimestampType => self.0.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::Type => "internal".to_string(),
+      ManagedStreamLabel::CanBeRetained => Value::plain("NA"),
+      ManagedStreamLabel::CleanupPolicy => Value::option(self.0.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned()),
+      ManagedStreamLabel::CompressionType => Value::option(self.0.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned()),
+      ManagedStreamLabel::DeleteRetentionMs => Value::option(self.0.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.0.kafka_properties))),
+      ManagedStreamLabel::MaxMessageBytes => Value::option(self.0.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::Partitioner => Value::plain("NA"),
+      ManagedStreamLabel::Partitions => Value::plain(self.0.partitions),
+      ManagedStreamLabel::ReplicationFactor => Value::plain(self.0.replication_factor),
+      ManagedStreamLabel::RetentionBytes => Value::option(self.0.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::RetentionMs => Value::option(self.0.kafka_properties.get(RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::SegmentBytes => Value::option(self.0.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::Target => Value::target(target_id),
+      ManagedStreamLabel::TimestampType => Value::option(self.0.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned()),
+      ManagedStreamLabel::Type => Value::plain("internal"),
       _ => unreachable!("label '{}' was not expected", label.as_str()),
     }
   }
 }
 
 impl SubjectFormatter<ManagedStreamLabel> for PublicManagedStream {
-  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> String {
+  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> Value {
     match label {
-      ManagedStreamLabel::CanBeRetained => self.contract.can_be_retained.to_string(),
-      ManagedStreamLabel::CleanupPolicy => self.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::CompressionType => self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::DeleteRetentionMs => self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::KafkaProperties => hashmap_to_table(&get_implicit_properties(&self.kafka_properties)),
-      ManagedStreamLabel::MaxMessageBytes => self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned().unwrap_or_default(),
+      ManagedStreamLabel::CanBeRetained => Value::plain(self.contract.can_be_retained),
+      ManagedStreamLabel::CleanupPolicy => Value::option(self.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned()),
+      ManagedStreamLabel::CompressionType => Value::option(self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned()),
+      ManagedStreamLabel::DeleteRetentionMs => Value::option(self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.kafka_properties))),
+      ManagedStreamLabel::MaxMessageBytes => Value::option(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned()),
       ManagedStreamLabel::Partitioner => match self.contract.partitioner {
-        PublicManagedStreamContractPartitioner::TopicLevelPartitioner(ref topic_level_partitioner) => format!("topic level {}", topic_level_partitioner.topic_level),
-        PublicManagedStreamContractPartitioner::KafkaDefaultPartitioner(_) => "kafka default".to_string(),
+        PublicManagedStreamContractPartitioner::TopicLevelPartitioner(ref topic_level_partitioner) => Value::plain(format!("topic level {}", topic_level_partitioner.topic_level)),
+        PublicManagedStreamContractPartitioner::KafkaDefaultPartitioner(_) => Value::plain("kafka default"),
       },
-      ManagedStreamLabel::Partitions => self.partitions.to_string(),
-      ManagedStreamLabel::ReplicationFactor => self.replication_factor.to_string(),
-      ManagedStreamLabel::RetentionBytes => self.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::RetentionMs => self.kafka_properties.get(RETENTION_MS_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::SegmentBytes => self.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::Target => target_id.to_string(),
-      ManagedStreamLabel::TimestampType => self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned().unwrap_or_default(),
-      ManagedStreamLabel::Type => "public".to_string(),
+      ManagedStreamLabel::Partitions => Value::plain(self.partitions),
+      ManagedStreamLabel::ReplicationFactor => Value::plain(self.replication_factor),
+      ManagedStreamLabel::RetentionBytes => Value::option(self.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::RetentionMs => Value::option(self.kafka_properties.get(RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::SegmentBytes => Value::option(self.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::Target => Value::target(target_id),
+      ManagedStreamLabel::TimestampType => Value::option(self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned()),
+      ManagedStreamLabel::Type => Value::plain("public"),
       _ => unreachable!("label '{}' was not expected", label.as_str()),
     }
   }
 }
 
 impl SubjectFormatter<ManagedStreamLabel> for (Stream, &Vec<(String, AccessRights)>) {
-  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> String {
+  fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> Value {
     match label {
-      ManagedStreamLabel::TenantsGrantedReadAccess => self
-        .1
-        .iter()
-        .filter(|(_, access_rights)| access_rights == &AccessRights::Read || access_rights == &AccessRights::ReadWrite)
-        .map(|(tenant_id, _)| tenant_id)
-        .join(", "),
-      ManagedStreamLabel::TenantsGrantedWriteAccess => self
-        .1
-        .iter()
-        .filter(|(_, access_rights)| access_rights == &AccessRights::Write || access_rights == &AccessRights::ReadWrite)
-        .map(|(tenant_id, _)| tenant_id)
-        .join(", "),
+      ManagedStreamLabel::TenantsGrantedReadAccess => Value::plain(
+        self
+          .1
+          .iter()
+          .filter(|(_, access_rights)| access_rights == &AccessRights::Read || access_rights == &AccessRights::ReadWrite)
+          .map(|(tenant_id, _)| tenant_id)
+          .join(", "),
+      ),
+      ManagedStreamLabel::TenantsGrantedWriteAccess => Value::plain(
+        self
+          .1
+          .iter()
+          .filter(|(_, access_rights)| access_rights == &AccessRights::Write || access_rights == &AccessRights::ReadWrite)
+          .map(|(tenant_id, _)| tenant_id)
+          .join(", "),
+      ),
       _ => self.0.value(label, target_id),
     }
   }

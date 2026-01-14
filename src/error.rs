@@ -1,3 +1,5 @@
+use crate::DshCliResult;
+use dsh_api::DshApiError;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -20,6 +22,18 @@ pub(crate) enum DshCliError {
   UrlParse(String),
   Utf8(String),
   X509(String),
+}
+
+impl DshCliError {
+  pub(crate) fn accept_not_found(error: DshApiError, print: impl Fn()) -> DshCliResult<()> {
+    match error {
+      DshApiError::NotFound(None) => {
+        print();
+        Ok(())
+      }
+      error => Err(DshCliError::from(error)),
+    }
+  }
 }
 
 impl Error for DshCliError {}
