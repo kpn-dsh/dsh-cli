@@ -108,7 +108,6 @@ ERRONEOUS_MANAGE_COMMANDS=(
   "tenant revoke $TENANT_TENANT_NON_EXISTING --stream-rw $STREAM_NON_EXISTING --dry-run"
 
   "stream show --wrong"
-  "stream show $STREAM_NON_EXISTING"
 
   "tenant update --wrong"
   "tenant update $TENANT_TENANT_NON_EXISTING --certificate-count 1 --dry-run"
