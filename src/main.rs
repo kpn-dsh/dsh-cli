@@ -17,6 +17,7 @@ use crate::global_arguments::{
   authentication_argument, browser_argument, environment_variable_argument, no_csv_headers_argument, target_tenants_all_argument, target_tenants_argument,
   TARGET_TENANTS_ALL_ARGUMENT, TARGET_TENANTS_ARGUMENT,
 };
+use crate::releases::{newer_release, newer_release_notification};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -28,6 +29,7 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::{DshApiClientFactory, DshApiPlatformClientFactory};
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
+use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
 use futures::future::try_join_all;
@@ -52,6 +54,7 @@ use std::io::ErrorKind::NotFound;
 use std::io::{stdin, stdout, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
+use std::str::FromStr;
 use std::{fs, process};
 use subject::Subject;
 use subjects::api::API_SUBJECT;
@@ -99,6 +102,7 @@ mod log_arguments;
 mod log_level;
 mod modifier_flags;
 mod refresh_token_store;
+mod releases;
 mod settings;
 mod style;
 mod subject;
@@ -131,7 +135,9 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-const VERSION: &str = "0.8.1";
+lazy_static! {
+  static ref VERSION: Version = Version::from_str("0.8.1").unwrap();
+}
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
 const OUTPUT_OPTIONS_HEADING: &str = "Output options";
@@ -302,16 +308,6 @@ async fn inner_main() -> DshCliExit {
     return DshCliExit::Ok;
   }
 
-  if matches.get_flag(VERSION_ARGUMENT) {
-    println!(
-      "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
-      VERSION,
-      crate_version(),
-      openapi_version()
-    );
-    return DshCliExit::Ok;
-  }
-
   match initialize_logger(&matches, &settings) {
     Ok(_) => debug!("{}", settings_log),
     Err(error) => return DshCliExit::CliErr(error),
@@ -324,6 +320,42 @@ async fn inner_main() -> DshCliExit {
     }
     Err(error) => return DshCliExit::CliErr(error),
   };
+
+  if matches.get_flag(VERSION_ARGUMENT) {
+    match newer_release(&VERSION).await {
+      Ok(Some(newer_release)) => {
+        context.print(format!(
+          "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
+          *VERSION,
+          crate_version(),
+          openapi_version()
+        ));
+        context.print_warning(format!(
+          "newer release {} available at {}",
+          newer_release.version.map(|version| version.to_string()).unwrap_or("".to_string()),
+          newer_release.html_url
+        ));
+      }
+      Ok(None) => {
+        context.print(format!(
+          "version: {} (latest)\ndsh-api library version: {}\ndsh openapi version: {}",
+          *VERSION,
+          crate_version(),
+          openapi_version()
+        ));
+      }
+      Err(error) => return DshCliExit::CliErr(error),
+    }
+    return DshCliExit::Ok;
+  }
+
+  if let Some(newer_release) = newer_release_notification(&VERSION).await {
+    context.print_warning(format!(
+      "newer release {} available at {}",
+      newer_release.version.map(|version| version.to_string()).unwrap_or("".to_string()),
+      newer_release.html_url
+    ));
+  }
 
   if let Some(env_var_name) = matches.get_one::<String>(ENV_VAR_ARGUMENT) {
     print_environment_variable(env_var_name, &context);

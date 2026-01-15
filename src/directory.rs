@@ -396,7 +396,7 @@ fn root_dsh_directory_pathbuf() -> DshCliResult<Option<PathBuf>> {
 /// * `Ok<Some<PathBuf>>` - Pathbuf of the dsh directory.
 /// * `Ok<None>` - Dsh tool does not support storing state and settings.
 /// * `Err<DshCliError>` -  Dsh directory could not be determined.
-fn dsh_directory_pathbuf(subdirectory: &str) -> DshCliResult<Option<PathBuf>> {
+pub(crate) fn dsh_directory_pathbuf(subdirectory: &str) -> DshCliResult<Option<PathBuf>> {
   root_dsh_directory_pathbuf().map(|pathbuf| pathbuf.map(|root_directory| root_directory.join(subdirectory)))
   // match root_dsh_directory_pathbuf()? {
   //   Some(root_directory) => Ok(Some(root_directory.join(subdirectory))),
