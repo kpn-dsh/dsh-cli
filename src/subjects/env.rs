@@ -132,9 +132,13 @@ impl CommandExecutor for EnvFind {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 enum ServiceEnvLabel {
+  #[serde(rename = "environment-variable")]
   EnvVar,
+  #[serde(rename = "instances")]
   Instances,
+  #[serde(rename = "service")]
   Service,
+  #[serde(rename = "value")]
   Value,
 }
 
