@@ -436,7 +436,7 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
   fn value(&self, label: &DshPlatformLabel, _target_id: &str) -> Value {
     match label {
       DshPlatformLabel::AccessTokenEndpoint => Value::plain(self.access_token_endpoint()),
-      DshPlatformLabel::Alias => Value::plain(self.alias()),
+      DshPlatformLabel::Alias => Value::target(self.alias()),
       DshPlatformLabel::ClientId => Value::plain(self.client_id()),
       DshPlatformLabel::CloudProvider => Value::plain(self.cloud_provider()),
       DshPlatformLabel::ConsoleDomain => Value::plain(self.console_domain()),
@@ -444,7 +444,7 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
       DshPlatformLabel::Description => Value::plain(self.description()),
       DshPlatformLabel::IsProduction => Value::plain(self.is_production()),
       DshPlatformLabel::MqttTokenEndpoint => Value::plain(self.mqtt_token_endpoint()),
-      DshPlatformLabel::Name => Value::plain(self.name()),
+      DshPlatformLabel::Name => Value::target(self.name()),
       DshPlatformLabel::PrivateDomain => Value::some_or(self.private_domain(), "not configured"),
       DshPlatformLabel::PublicDomain => Value::plain(self.public_domain()),
       DshPlatformLabel::Realm => Value::plain(self.realm()),

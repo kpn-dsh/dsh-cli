@@ -135,7 +135,7 @@ where
         let split_value = value.split("\n").collect_vec();
         let mut value_iterator = split_value.iter();
         if let Some(first_line) = value_iterator.next() {
-          tabled_builder.push_record([label.as_str_for_unit(), first_line]);
+          tabled_builder.push_record([self.context.apply_label_style(label.as_str_for_unit()), first_line.to_string()]);
         }
         for next_line in value_iterator {
           tabled_builder.push_record(["", next_line]);
