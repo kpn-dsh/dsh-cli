@@ -5,11 +5,11 @@ use crate::arguments::{
 use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::subject::{Requirements, Subject};
-use crate::{get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
+use crate::{error, get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
@@ -21,7 +21,7 @@ use lazy_static::lazy_static;
 use log::{debug, warn};
 use serde::Serialize;
 
-pub(crate) struct PlatformSubject {}
+struct PlatformSubject {}
 
 const PLATFORM_SUBJECT_TARGET: &str = "platform";
 
@@ -34,7 +34,7 @@ const OPEN_TENANT: &str = "tenant";
 const OPEN_TRACING: &str = "tracing";
 
 lazy_static! {
-  pub static ref PLATFORM_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(PlatformSubject {});
+  pub(crate) static ref PLATFORM_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(PlatformSubject {});
 }
 
 #[async_trait]
@@ -116,7 +116,7 @@ struct PlatformExport {}
 
 #[async_trait]
 impl CommandExecutor for PlatformExport {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("export the default platforms specification");
     context.print(DEFAULT_PLATFORMS);
     Ok(())
@@ -131,9 +131,9 @@ struct PLatformList {}
 
 #[async_trait]
 impl CommandExecutor for PLatformList {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list platforms");
-    let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, None, context);
+    let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, context);
     let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect_vec();
     formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
     formatter.print(None)?;
@@ -149,7 +149,7 @@ struct PlatformOpen {}
 
 #[async_trait]
 impl CommandExecutor for PlatformOpen {
-  async fn execute_without_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     match matches.subcommand() {
       Some((target, arg_matches)) => match target {
         OPEN_APP => Self::open_app(arg_matches, context),
@@ -160,17 +160,24 @@ impl CommandExecutor for PlatformOpen {
         OPEN_TRACING => Self::open_tracing(arg_matches, context),
         _ => unreachable!(),
       },
-      None => Err("missing target argument".to_string()),
+      None => Err(error!("missing target argument")),
     }
   }
 
-  async fn execute_with_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(
+    &self,
+    _argument: Option<String>,
+    _sub_argument: Option<String>,
+    matches: &ArgMatches,
+    client: &DshApiClient,
+    context: &Context,
+  ) -> DshCliResult<()> {
     match matches.subcommand() {
       Some((target, arg_matches)) => match target {
         OPEN_SWAGGER => Self::open_swagger(arg_matches, client, context).await,
         _ => unreachable!(),
       },
-      None => Err("missing target argument".to_string()),
+      None => Err(error!("missing target argument")),
     }
   }
 
@@ -180,7 +187,7 @@ impl CommandExecutor for PlatformOpen {
 }
 
 impl PlatformOpen {
-  fn open_app(matches: &ArgMatches, context: &Context) -> DshCliResult {
+  fn open_app(matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant_name = get_target_tenant(matches, context.settings())?;
     let app = get_app_argument_or_prompt(matches)?;
@@ -191,13 +198,13 @@ impl PlatformOpen {
     Ok(())
   }
 
-  fn open_console(matches: &ArgMatches, context: &Context) -> DshCliResult {
+  fn open_console(matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     context.open_url(platform.console_url(), format!("console for platform '{}'", platform));
     Ok(())
   }
 
-  fn open_monitoring(matches: &ArgMatches, context: &Context) -> DshCliResult {
+  fn open_monitoring(matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant_name = get_target_tenant(matches, context.settings())?;
     context.open_url(
@@ -207,7 +214,7 @@ impl PlatformOpen {
     Ok(())
   }
 
-  fn open_service(matches: &ArgMatches, context: &Context) -> DshCliResult {
+  fn open_service(matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant_name = get_target_tenant(matches, context.settings())?;
     let service = get_service_argument_or_prompt(matches)?;
@@ -218,7 +225,7 @@ impl PlatformOpen {
     Ok(())
   }
 
-  fn open_tenant(matches: &ArgMatches, context: &Context) -> DshCliResult {
+  fn open_tenant(matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant_name = get_target_tenant(matches, context.settings())?;
     context.open_url(
@@ -228,7 +235,7 @@ impl PlatformOpen {
     Ok(())
   }
 
-  async fn open_swagger(matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn open_swagger(matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let token = match client.token().await {
       Ok(token) => {
@@ -252,7 +259,7 @@ impl PlatformOpen {
             format!("swagger application for platform '{}'", platform)
           }
         },
-        None => return Err("token has incorrect format".to_string()),
+        None => return Err(error!("token has incorrect format")),
       },
       None => format!("swagger application for platform '{}'", platform),
     };
@@ -260,7 +267,7 @@ impl PlatformOpen {
     Ok(())
   }
 
-  fn open_tracing(matches: &ArgMatches, context: &Context) -> DshCliResult {
+  fn open_tracing(matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     context.open_url(platform.tracing_url(), format!("tracing application for platform '{}'", platform));
     Ok(())
@@ -271,7 +278,7 @@ struct PlatformShow {}
 
 #[async_trait]
 impl CommandExecutor for PlatformShow {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     let platform = match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
       Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
       None => get_target_platform(matches, context.settings())?,
@@ -311,7 +318,7 @@ impl CommandExecutor for PlatformShow {
       })
       .map(|label| label.to_owned())
       .collect_vec();
-    UnitFormatter::new(platform.name(), labels.as_slice(), Some("platform name"), context).print(
+    UnitFormatter::new(platform.name(), labels.as_slice(), context).print_non_serializable(
       &(
         platform.clone(),
         app_id.unwrap_or_default(),
@@ -330,14 +337,14 @@ impl CommandExecutor for PlatformShow {
   }
 }
 
-fn get_app_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+fn get_app_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<String> {
   match matches.get_one::<String>(APP_ID_ARGUMENT) {
     Some(app_argument) => Ok(app_argument.to_string()),
     None => Ok(read_single_line("enter app: ")?),
   }
 }
 
-fn get_service_argument_or_prompt(matches: &ArgMatches) -> Result<String, String> {
+fn get_service_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<String> {
   match matches.get_one::<String>(SERVICE_ID_ARGUMENT) {
     Some(service_argument) => Ok(service_argument.to_string()),
     None => Ok(read_single_line("enter service: ")?),
@@ -345,7 +352,7 @@ fn get_service_argument_or_prompt(matches: &ArgMatches) -> Result<String, String
 }
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Debug)]
-pub(crate) enum DshPlatformLabel {
+enum DshPlatformLabel {
   AccessTokenEndpoint,
   Alias,
   BucketName,
@@ -426,25 +433,25 @@ impl Label for DshPlatformLabel {
 
 // Subject formatter for DshPlatform only
 impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
-  fn value(&self, label: &DshPlatformLabel, _target_id: &str) -> String {
+  fn value(&self, label: &DshPlatformLabel, _target_id: &str) -> Value {
     match label {
-      DshPlatformLabel::AccessTokenEndpoint => self.access_token_endpoint().to_string(),
-      DshPlatformLabel::Alias => self.alias().to_string(),
-      DshPlatformLabel::ClientId => self.client_id(),
-      DshPlatformLabel::CloudProvider => self.cloud_provider().to_string(),
-      DshPlatformLabel::ConsoleDomain => self.console_domain(),
-      DshPlatformLabel::ConsoleUrl => self.console_url(),
-      DshPlatformLabel::Description => self.description().to_string(),
-      DshPlatformLabel::IsProduction => self.is_production().to_string(),
-      DshPlatformLabel::MqttTokenEndpoint => self.mqtt_token_endpoint(),
-      DshPlatformLabel::Name => self.name().to_string(),
-      DshPlatformLabel::PrivateDomain => self.private_domain().unwrap_or("not configured").to_string(),
-      DshPlatformLabel::PublicDomain => self.public_domain().to_string(),
-      DshPlatformLabel::Realm => self.realm().to_string(),
-      DshPlatformLabel::RestApiDomain => self.rest_api_domain(),
-      DshPlatformLabel::RestApiEndpoint => self.rest_api_endpoint(),
-      DshPlatformLabel::SwaggerUrl => self.swagger_url(),
-      DshPlatformLabel::TracingUrl => self.tracing_url(),
+      DshPlatformLabel::AccessTokenEndpoint => Value::plain(self.access_token_endpoint()),
+      DshPlatformLabel::Alias => Value::target(self.alias()),
+      DshPlatformLabel::ClientId => Value::plain(self.client_id()),
+      DshPlatformLabel::CloudProvider => Value::plain(self.cloud_provider()),
+      DshPlatformLabel::ConsoleDomain => Value::plain(self.console_domain()),
+      DshPlatformLabel::ConsoleUrl => Value::plain(self.console_url()),
+      DshPlatformLabel::Description => Value::plain(self.description()),
+      DshPlatformLabel::IsProduction => Value::plain(self.is_production()),
+      DshPlatformLabel::MqttTokenEndpoint => Value::plain(self.mqtt_token_endpoint()),
+      DshPlatformLabel::Name => Value::target(self.name()),
+      DshPlatformLabel::PrivateDomain => Value::some_or(self.private_domain(), "not configured"),
+      DshPlatformLabel::PublicDomain => Value::plain(self.public_domain()),
+      DshPlatformLabel::Realm => Value::plain(self.realm()),
+      DshPlatformLabel::RestApiDomain => Value::plain(self.rest_api_domain()),
+      DshPlatformLabel::RestApiEndpoint => Value::plain(self.rest_api_endpoint()),
+      DshPlatformLabel::SwaggerUrl => Value::plain(self.swagger_url()),
+      DshPlatformLabel::TracingUrl => Value::plain(self.tracing_url()),
       _ => unreachable!(),
     }
   }
@@ -452,32 +459,30 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
 
 // Subject formatter for (DshPlatform, app, bucket, service, tenant, vendor, vhost) septets
 impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String, String, String, String) {
-  fn value(&self, label: &DshPlatformLabel, target_id: &str) -> String {
+  fn value(&self, label: &DshPlatformLabel, target_id: &str) -> Value {
     let (platform, app_id, bucket_id, service_id, tenant, vendor_id, vhost) = self;
     match label {
-      DshPlatformLabel::BucketName => platform.bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID")).unwrap_or_else(|error| error),
-      DshPlatformLabel::InternalDomain => platform.internal_domain(tenant),
-      DshPlatformLabel::InternalServiceDomain => platform.internal_service_domain(tenant, service_id),
-      DshPlatformLabel::PublicVhostDomain => platform.public_vhost_domain(vhost),
-      DshPlatformLabel::TenantAppCatalogAppUrl => platform.tenant_app_catalog_app_url(tenant, vendor_id, app_id),
-      DshPlatformLabel::TenantAppCatalogUrl => platform.tenant_app_catalog_url(tenant),
-      DshPlatformLabel::TenantAppConsoleUrl => platform.tenant_app_console_url(tenant, app_id),
-      DshPlatformLabel::TenantClientId => platform.tenant_client_id(tenant),
-      DshPlatformLabel::TenantConsoleUrl => platform.tenant_console_url(tenant),
-      DshPlatformLabel::TenantDataCatalogUrl => platform.tenant_data_catalog_url(tenant),
-      DshPlatformLabel::TenantMonitoringUrl => platform.tenant_monitoring_url(tenant),
-      DshPlatformLabel::TenantPrivateVhostDomain => platform
-        .tenant_private_vhost_domain(tenant, vhost)
-        .unwrap_or("private domain not configured".to_string()),
-      DshPlatformLabel::TenantPublicAppDomain => platform.tenant_public_app_domain(tenant, app_id),
-      DshPlatformLabel::TenantPublicAppsDomain => platform.tenant_public_domain(tenant),
-      DshPlatformLabel::TenantServiceConsoleUrl => platform.tenant_service_console_url(tenant, service_id),
+      DshPlatformLabel::BucketName => Value::plain(platform.bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID")).unwrap_or_else(|error| error)),
+      DshPlatformLabel::InternalDomain => Value::plain(platform.internal_domain(tenant)),
+      DshPlatformLabel::InternalServiceDomain => Value::plain(platform.internal_service_domain(tenant, service_id)),
+      DshPlatformLabel::PublicVhostDomain => Value::plain(platform.public_vhost_domain(vhost)),
+      DshPlatformLabel::TenantAppCatalogAppUrl => Value::plain(platform.tenant_app_catalog_app_url(tenant, vendor_id, app_id)),
+      DshPlatformLabel::TenantAppCatalogUrl => Value::plain(platform.tenant_app_catalog_url(tenant)),
+      DshPlatformLabel::TenantAppConsoleUrl => Value::plain(platform.tenant_app_console_url(tenant, app_id)),
+      DshPlatformLabel::TenantClientId => Value::plain(platform.tenant_client_id(tenant)),
+      DshPlatformLabel::TenantConsoleUrl => Value::plain(platform.tenant_console_url(tenant)),
+      DshPlatformLabel::TenantDataCatalogUrl => Value::plain(platform.tenant_data_catalog_url(tenant)),
+      DshPlatformLabel::TenantMonitoringUrl => Value::plain(platform.tenant_monitoring_url(tenant)),
+      DshPlatformLabel::TenantPrivateVhostDomain => Value::ok_or(platform.tenant_private_vhost_domain(tenant, vhost), "private domain not configured"),
+      DshPlatformLabel::TenantPublicAppDomain => Value::plain(platform.tenant_public_app_domain(tenant, app_id)),
+      DshPlatformLabel::TenantPublicAppsDomain => Value::plain(platform.tenant_public_domain(tenant)),
+      DshPlatformLabel::TenantServiceConsoleUrl => Value::plain(platform.tenant_service_console_url(tenant, service_id)),
       _ => platform.value(label, target_id),
     }
   }
 }
 
-pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
+static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
   // Items from platform configuration file
   DshPlatformLabel::Name,
   DshPlatformLabel::Description,
@@ -515,7 +520,7 @@ pub static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
   DshPlatformLabel::InternalServiceDomain,
 ];
 
-pub static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
+static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
   [DshPlatformLabel::Name, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
 
 // Returns the required parameters

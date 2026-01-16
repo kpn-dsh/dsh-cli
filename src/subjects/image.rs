@@ -3,8 +3,8 @@ use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
@@ -19,12 +19,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 
-pub(crate) struct ImageSubject {}
+struct ImageSubject {}
 
 const IMAGE_SUBJECT_TARGET: &str = "image";
 
 lazy_static! {
-  pub static ref IMAGE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ImageSubject {});
+  pub(crate) static ref IMAGE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ImageSubject {});
 }
 
 #[async_trait]
@@ -88,7 +88,7 @@ struct ImageFind {}
 
 #[async_trait]
 impl CommandExecutor for ImageFind {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let image_query = target.unwrap_or_else(|| unreachable!());
     let query_processor: &dyn QueryProcessor =
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*image_query)? } else { &ExactMatchQueryProcessor::create(&image_query)? };
@@ -109,7 +109,7 @@ struct ImageListAll {}
 
 #[async_trait]
 impl CommandExecutor for ImageListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all images used in services");
     let start_instant = context.now();
     let services = client.get_application_configuration_map().await?;
@@ -123,7 +123,7 @@ impl CommandExecutor for ImageListAll {
   }
 }
 
-fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> Result<(), String> {
+fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
   let (include_started, include_stopped) = include_started_stopped(matches);
   let mut services = services.iter().collect_vec();
   services.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
@@ -139,7 +139,7 @@ fn list_images(services: HashMap<String, Application>, query_processor: &dyn Que
   }
   let mut images: Vec<(String, Vec<ImageUsage>)> = images.into_iter().collect_vec();
   images.sort_by(|(image_a, _), (image_b, _)| image_a.cmp(image_b));
-  let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, None, context);
+  let mut formatter = ListFormatter::new(&IMAGE_USAGE_LABELS, context);
   for (image, image_usages) in &images {
     if let Some(matching) = query_processor.matching_parts(image) {
       for image_usage in image_usages {
@@ -186,7 +186,7 @@ impl Label for ImageUsageLabel {
   }
 }
 
-#[derive(Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
 struct ImageUsage {
   image: ImageString,
   service_id: String,
@@ -200,22 +200,22 @@ impl ImageUsage {
 }
 
 impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
-  fn value(&self, label: &ImageUsageLabel, target_id: &str) -> String {
+  fn value(&self, label: &ImageUsageLabel, target_id: &str) -> Value {
     match label {
-      ImageUsageLabel::Id => target_id.to_string(),
-      ImageUsageLabel::Instances => self.instances.to_string(),
-      ImageUsageLabel::Service => self.service_id.clone(),
-      ImageUsageLabel::Source => self.image.source().to_string(),
+      ImageUsageLabel::Id => Value::target(target_id),
+      ImageUsageLabel::Instances => Value::plain(self.instances),
+      ImageUsageLabel::Service => Value::plain(&self.service_id),
+      ImageUsageLabel::Source => Value::plain(self.image.source()),
       ImageUsageLabel::Stage => match &self.image {
-        ImageString::App(app) => app.stage.clone(),
-        _ => "".to_string(),
+        ImageString::App(app) => Value::plain(&app.stage),
+        _ => Value::empty(),
       },
       ImageUsageLabel::Supplier => match &self.image {
-        ImageString::App(app) => app.supplier.clone(),
-        _ => "".to_string(),
+        ImageString::App(app) => Value::plain(&app.supplier),
+        _ => Value::empty(),
       },
-      ImageUsageLabel::Tenant => self.image.tenant().clone(),
-      ImageUsageLabel::Version => self.image.version().clone(),
+      ImageUsageLabel::Tenant => Value::plain(self.image.tenant()),
+      ImageUsageLabel::Version => Value::plain(self.image.version()),
     }
   }
 }

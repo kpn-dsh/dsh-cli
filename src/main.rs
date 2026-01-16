@@ -7,11 +7,17 @@
 extern crate core;
 
 use crate::authentication::{get_access_token, get_access_tokens, AuthenticationMethod};
+use crate::directory::{get_settings, init_dsh_directory, read_target, supports_dsh_directory};
 use crate::environment_variables::{
-  env_var_argument, env_vars_argument, get_set_environment_variables, print_environment_variable, print_environment_variables, ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
-  ENV_VAR_DSH_CLI_HOME, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
+  env_var_argument, env_var_file_argument, env_vars_argument, environment_variable, get_configured_environment_variables, print_environment_variable, print_environment_variables,
+  ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
 };
-use crate::global_arguments::{authentication_argument, browser_argument, environment_variable_argument, ENVIRONMENT_VARIABLE_ARGUMENT};
+use crate::error::DshCliError;
+use crate::global_arguments::{
+  authentication_argument, browser_argument, environment_variable_argument, no_csv_headers_argument, target_tenants_all_argument, target_tenants_argument,
+  TARGET_TENANTS_ALL_ARGUMENT, TARGET_TENANTS_ARGUMENT,
+};
+use crate::releases::{newer_release, newer_release_notification};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -20,17 +26,18 @@ use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
 use context::Context;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_client_factory::{DshApiClientFactory, DshApiPlatformClientFactory};
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
+use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
+use futures::future::try_join_all;
 use global_arguments::{
-  dry_run_argument, force_argument, no_escape_argument, no_headers_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
+  dry_run_argument, force_argument, no_escape_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
   suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
   TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
 };
-use homedir::my_home;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::{debug, trace};
@@ -38,7 +45,7 @@ use log_arguments::{log_level_api_argument, log_level_argument};
 use log_level::initialize_logger;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
-use settings::{get_settings, Settings};
+use settings::Settings;
 use std::collections::HashMap;
 use std::env::temp_dir;
 use std::error::Error;
@@ -47,7 +54,8 @@ use std::io::ErrorKind::NotFound;
 use std::io::{stdin, stdout, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
-use std::{env, fs, process};
+use std::str::FromStr;
+use std::{fs, process};
 use subject::Subject;
 use subjects::api::API_SUBJECT;
 use subjects::app::APP_SUBJECT;
@@ -71,7 +79,7 @@ use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
 use subjects::volume::VOLUME_SUBJECT;
-use targets::{get_target_password_from_keyring, read_target};
+use targets::get_target_password_from_keyring;
 
 mod argument_parsers;
 mod arguments;
@@ -81,7 +89,9 @@ mod capability;
 mod capability_builder;
 mod cipher;
 mod context;
+mod directory;
 mod environment_variables;
+mod error;
 mod filter_flags;
 mod flags;
 mod formatters;
@@ -92,6 +102,7 @@ mod log_arguments;
 mod log_level;
 mod modifier_flags;
 mod refresh_token_store;
+mod releases;
 mod settings;
 mod style;
 mod subject;
@@ -107,7 +118,7 @@ lazy_static! {
     .placeholder(AnsiColor::Cyan.on_default());
 }
 
-pub(crate) const APPLICATION_NAME: &str = "dsh";
+const APPLICATION_NAME: &str = "dsh";
 
 /// Short help text, shown when `-h` was provided
 const ABOUT: &str = "DSH resource management api command line interface.";
@@ -124,37 +135,52 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-const VERSION: &str = "0.8.0";
+lazy_static! {
+  static ref VERSION: Version = Version::from_str("0.8.1").unwrap();
+}
 
-const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
-const TARGETS_SUBDIRECTORY: &str = "targets";
-const REFRESH_TOKENS_SUBDIRECTORY: &str = "refresh-tokens";
-const DEFAULT_DSH_CLI_SETTINGS_FILENAME: &str = "settings.toml";
-const TOML_FILENAME_EXTENSION: &str = "toml";
+const COMMAND_OPTIONS_HEADING: &str = "Command options";
+const OUTPUT_OPTIONS_HEADING: &str = "Output options";
+const TOOL_OPTIONS_HEADING: &str = "Tool options";
 
-pub(crate) const COMMAND_OPTIONS_HEADING: &str = "Command options";
-pub(crate) const OUTPUT_OPTIONS_HEADING: &str = "Output options";
-pub(crate) const TOOL_OPTIONS_HEADING: &str = "Tool options";
-
-type DshCliResult = Result<(), String>;
+type DshCliResult<T> = Result<T, DshCliError>;
 
 #[derive(Debug)]
 enum DshCliExit {
-  Ok,
-  OkClap(ClapError),
+  CliErr(DshCliError),
+  CliErrContext(DshCliError, Box<Context>),
   Err(String),
   ErrClap(ClapError),
   ErrContext(String, Box<Context>),
   ErrHelp(ClapError),
+  Ok,
+  OkClap(ClapError),
+}
+
+impl From<DshCliError> for DshCliExit {
+  fn from(dsh_cli_error: DshCliError) -> Self {
+    Self::Err(dsh_cli_error.into())
+  }
 }
 
 impl Termination for DshCliExit {
   fn report(self) -> ExitCode {
     match self {
-      DshCliExit::Ok => ExitCode::SUCCESS,
-      DshCliExit::OkClap(clap_error) => {
-        let _ = clap_error.print();
-        ExitCode::SUCCESS
+      DshCliExit::CliErr(dsh_cli_error) => {
+        eprintln!(
+          "{}",
+          apply_default_error_style(dsh_cli_error.to_string().trim_start_matches("error: ").trim_end_matches("\n"))
+        );
+        ExitCode::FAILURE
+      }
+      DshCliExit::CliErrContext(dsh_cli_error, context) => {
+        context.print_error(dsh_cli_error);
+        if context.suppress_exit_status() {
+          context.print_warning("exit status suppressed");
+          ExitCode::SUCCESS
+        } else {
+          ExitCode::FAILURE
+        }
       }
       DshCliExit::Err(msg) => {
         eprintln!("{}", apply_default_error_style(msg.trim_start_matches("error: ").trim_end_matches("\n")));
@@ -190,6 +216,11 @@ impl Termination for DshCliExit {
         let _ = clap_error.print();
         ExitCode::FAILURE
       }
+      DshCliExit::Ok => ExitCode::SUCCESS,
+      DshCliExit::OkClap(clap_error) => {
+        let _ = clap_error.print();
+        ExitCode::SUCCESS
+      }
     }
   }
 }
@@ -204,6 +235,10 @@ async fn inner_main() -> DshCliExit {
     eprintln!("{}", apply_default_warning_style("interrupted"));
     process::exit(0);
   });
+
+  if let Err(error) = init_dsh_directory() {
+    return DshCliExit::CliErr(error);
+  }
 
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
     API_SUBJECT.as_ref(),
@@ -245,9 +280,9 @@ async fn inner_main() -> DshCliExit {
     }
   }
 
-  let (settings, settings_log) = match get_settings(None) {
+  let (settings, settings_log) = match get_settings() {
     Ok((setting, settings_log)) => (setting, settings_log),
-    Err(msg) => return DshCliExit::Err(msg),
+    Err(error) => return DshCliExit::CliErr(error),
   };
 
   subject_commands.push(login_command());
@@ -273,19 +308,9 @@ async fn inner_main() -> DshCliExit {
     return DshCliExit::Ok;
   }
 
-  if matches.get_flag(VERSION_ARGUMENT) {
-    println!(
-      "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
-      VERSION,
-      crate_version(),
-      openapi_version()
-    );
-    return DshCliExit::Ok;
-  }
-
   match initialize_logger(&matches, &settings) {
     Ok(_) => debug!("{}", settings_log),
-    Err(msg) => return DshCliExit::Err(msg),
+    Err(error) => return DshCliExit::CliErr(error),
   }
 
   let context = match Context::create(&matches, settings) {
@@ -293,8 +318,44 @@ async fn inner_main() -> DshCliExit {
       trace!("{:#?}", context);
       context
     }
-    Err(msg) => return DshCliExit::Err(msg),
+    Err(error) => return DshCliExit::CliErr(error),
   };
+
+  if matches.get_flag(VERSION_ARGUMENT) {
+    match newer_release(&VERSION).await {
+      Ok(Some(newer_release)) => {
+        context.print(format!(
+          "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
+          *VERSION,
+          crate_version(),
+          openapi_version()
+        ));
+        context.print_warning(format!(
+          "newer release {} available at {}",
+          newer_release.version.map(|version| version.to_string()).unwrap_or("".to_string()),
+          newer_release.html_url
+        ));
+      }
+      Ok(None) => {
+        context.print(format!(
+          "version: {} (latest)\ndsh-api library version: {}\ndsh openapi version: {}",
+          *VERSION,
+          crate_version(),
+          openapi_version()
+        ));
+      }
+      Err(error) => return DshCliExit::CliErr(error),
+    }
+    return DshCliExit::Ok;
+  }
+
+  if let Some(newer_release) = newer_release_notification(&VERSION).await {
+    context.print_warning(format!(
+      "newer release {} available at {}",
+      newer_release.version.map(|version| version.to_string()).unwrap_or("".to_string()),
+      newer_release.html_url
+    ));
+  }
 
   if let Some(env_var_name) = matches.get_one::<String>(ENV_VAR_ARGUMENT) {
     print_environment_variable(env_var_name, &context);
@@ -308,40 +369,49 @@ async fn inner_main() -> DshCliExit {
 
   match matches.subcommand() {
     Some(("login", _)) => {
-      let platform = get_target_platform(&matches, context.settings()).unwrap();
-      return match authentication::login(platform, context).await {
-        Ok(()) => DshCliExit::Ok,
-        Err(error) => DshCliExit::Err(error),
-      };
+      return match get_target_platform(&matches, context.settings()) {
+        Ok(platform) => match authentication::login(platform, context).await {
+          Ok(()) => DshCliExit::Ok,
+          Err(error) => DshCliExit::from(error),
+        },
+        Err(error) => DshCliExit::CliErr(error),
+      }
     }
     Some(("logout", _)) => {
-      let platform = get_target_platform(&matches, context.settings()).unwrap();
-      return match authentication::logout(&platform, &context).await {
-        Ok(()) => DshCliExit::Ok,
-        Err(error) => DshCliExit::Err(error),
-      };
+      return match get_target_platform(&matches, context.settings()) {
+        Ok(platform) => match authentication::logout(platform, context).await {
+          Ok(()) => DshCliExit::Ok,
+          Err(error) => DshCliExit::from(error),
+        },
+        Err(error) => DshCliExit::CliErr(error),
+      }
     }
     Some((subject_command_name, sub_matches)) => match subject_registry.get(subject_command_name) {
       Some(subject) => {
         let requirements = subject.requirements(sub_matches);
-        debug!("{:?}", requirements);
+        debug!("{}", requirements);
         if requirements.needs_dsh_api_client() {
-          let client = match create_client(&matches, &context).await {
-            Ok(Some(client)) => client,
+          let clients = match create_clients(&matches, &context).await {
+            Ok(Some(clients)) => clients,
             Ok(None) => return DshCliExit::ErrContext("user is not authenticated".to_string(), Box::new(context)),
-            Err(error) => return DshCliExit::ErrContext(error.clone(), Box::new(context)),
+            Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
           };
-          match subject.execute_subject_command_with_client(sub_matches, &client, &context).await {
-            Ok(_) => {}
-            Err(msg) => {
-              return DshCliExit::ErrContext(msg, Box::new(context));
+          for client in &clients {
+            if clients.len() > 1 {
+              context.print(format!("# target {}", client.tenant()))
+            }
+            match subject.execute_subject_command_with_client(sub_matches, client, &context).await {
+              Ok(_) => {}
+              Err(error) => {
+                return DshCliExit::CliErrContext(error, Box::new(context));
+              }
             }
           }
         } else {
           match subject.execute_subject_command_without_client(sub_matches, &context).await {
             Ok(_) => {}
-            Err(msg) => {
-              return DshCliExit::ErrContext(msg, Box::new(context));
+            Err(error) => {
+              return DshCliExit::CliErrContext(error, Box::new(context));
             }
           }
         }
@@ -349,27 +419,29 @@ async fn inner_main() -> DshCliExit {
       None => match subject_list_shortcut_registry.get(subject_command_name) {
         Some(subject_list_shortcut) => {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
-          debug!("{:?}", requirements);
+          debug!("{}", requirements);
           if requirements.needs_dsh_api_client() {
-            let client = match create_client(&matches, &context).await {
-              Ok(Some(client)) => client,
+            let clients = match create_clients(&matches, &context).await {
+              Ok(Some(clients)) => clients,
               Ok(None) => return DshCliExit::ErrContext("user is not authenticated".to_string(), Box::new(context)),
-              Err(error) => return DshCliExit::ErrContext(error.clone(), Box::new(context)),
+              Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
             };
-            match subject_list_shortcut
-              .execute_subject_list_shortcut_with_client(sub_matches, &client, &context)
-              .await
-            {
-              Ok(_) => {}
-              Err(msg) => {
-                return DshCliExit::ErrContext(msg, Box::new(context));
+            for client in &clients {
+              if clients.len() > 1 {
+                context.print(format!("# target {}", client.tenant()))
+              }
+              match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
+                Ok(_) => {}
+                Err(error) => {
+                  return DshCliExit::CliErrContext(error, Box::new(context));
+                }
               }
             }
           } else {
             match subject_list_shortcut.execute_subject_list_shortcut_without_client(sub_matches, &context).await {
               Ok(_) => {}
-              Err(msg) => {
-                return DshCliExit::ErrContext(msg, Box::new(context));
+              Err(error) => {
+                return DshCliExit::CliErrContext(error, Box::new(context));
               }
             }
           }
@@ -419,9 +491,11 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       target_password_file_argument(),
       target_platform_argument(),
       target_tenant_argument(),
+      target_tenants_argument(),
+      target_tenants_all_argument(),
       // Output options
+      no_csv_headers_argument(),
       no_escape_argument(),
-      no_headers_argument(),
       output_format_argument(),
       quiet_argument(),
       set_verbosity_argument(),
@@ -429,6 +503,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       terminal_width_argument(),
       // Tool options
       env_var_argument(),
+      env_var_file_argument(),
       env_vars_argument(),
       generate_autocomplete_file_argument(),
       log_level_argument(),
@@ -443,57 +518,42 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
     .hide_possible_values(false)
     .styles(STYLES.clone())
     .disable_version_flag(true);
-  let mut default_settings: Vec<(&str, String)> = vec![];
-  if let Some(default_platform) = &settings.default_platform {
-    let platform = DshPlatform::try_from(default_platform.as_str()).unwrap();
-    default_settings.push(("default platform", format!("{} / {}", platform.name(), platform.alias())));
-  }
-  if let Some(default_tenant) = &settings.default_tenant {
-    default_settings.push(("default tenant", default_tenant.to_string()));
-  }
-  if let Some(ref file_name) = settings.file_name {
-    default_settings.push(("settings file", file_name.to_string()));
-  }
-  if let Some(dry_run) = settings.dry_run {
-    default_settings.push(("dry run mode", if dry_run { "enabled".to_string() } else { "disabled".to_string() }));
-  }
-
-  let mut environment_variables: Vec<(&str, String)> = vec![];
-  let env_vars = get_set_environment_variables();
-  if !env_vars.is_empty() {
-    for (env_var, value) in &env_vars {
-      if env_var == ENV_VAR_DSH_CLI_PASSWORD {
-        environment_variables.push((env_var, "********".to_string()));
-      } else {
-        environment_variables.push((env_var, value.to_string()));
-      }
-    }
-  }
 
   let mut after_help: Vec<String> = vec![];
+
+  let environment_variables: Vec<(&str, String)> = get_configured_environment_variables();
   if !environment_variables.is_empty() {
     let environment_variables_table = to_help_items("Environment variables:", environment_variables);
     after_help.push(environment_variables_table);
   }
-  if !default_settings.is_empty() {
-    let settings_table = to_help_items("Settings:", default_settings);
+  let non_empty_settings = settings.non_empty_attributes().unwrap_or_else(|error| unreachable!("{}", error));
+  if !non_empty_settings.is_empty() {
+    let settings_table = to_help_items("Settings:", non_empty_settings.iter().map(|(a, b)| (a.as_str(), b.to_string())).collect_vec());
     after_help.push(settings_table);
   }
 
   if let Ok(access_tokens) = get_access_tokens().await {
     if !access_tokens.is_empty() {
-      let access_tokensss: Vec<(&str, String)> = access_tokens
+      let access_tokens: Vec<(&str, String)> = access_tokens
         .iter()
         .map(|(platform, access_token)| {
           (platform.name(), {
-            let a = access_token.tenant_permissions.iter().map(|s| s.tenant.to_string()).collect_vec();
-            let aa = a.chunks(6).collect_vec();
-            let aaa = aa.iter().map(|a| a.join(", ")).collect_vec();
-            aaa.iter().join(",\n")
+            access_token
+              .tenant_permissions()
+              .iter()
+              .map(|permission| permission.tenant.to_string())
+              .collect_vec()
+              .chunks(6)
+              .collect_vec()
+              .iter()
+              .map(|tenants| tenants.join(", "))
+              .collect_vec()
+              .iter()
+              .join(",\n")
           })
         })
         .collect_vec();
-      let authentications = to_help_items("Authentications:", access_tokensss);
+      let authentications = to_help_items("Authentications:", access_tokens);
       after_help.push(authentications);
     }
   }
@@ -504,72 +564,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
   command
 }
 
-/// # Get an environment variable value
-///
-/// 1. Try if `env_var_name` is specified as a command line environment variable argument
-/// 1. Try if `env_var_name` is specified as a regular environment variable
-/// 1. Default to `None`
-///
-/// # Parameters
-/// * `env_var_name` - name of the environment variable
-/// * `matches` - parsed command line arguments
-///
-/// # Returns
-/// * `Err<message>` - when the command line specifies the environment variable `env_var_name`
-///   more than once.
-/// * `Ok<Some<value>>` - when the environment variable `env_var_name` is specified either
-///   via the command line or as a regular environment variable.
-/// * `Ok<None>` - when the environment variable `env_var_name` is not specified.
-pub(crate) fn environment_variable(env_var_name: &str, matches: &ArgMatches) -> Result<Option<String>, String> {
-  match matches.get_many::<String>(ENVIRONMENT_VARIABLE_ARGUMENT) {
-    Some(env_var_arguments) => {
-      let matching_env_var_arguments = env_var_arguments
-        .filter_map(|env_var_argument| env_var_argument.strip_prefix(env_var_name).and_then(|rest| rest.strip_prefix("=")))
-        .collect_vec();
-      match matching_env_var_arguments.len() {
-        0 => match env::var(env_var_name) {
-          Ok(env_var_value) => Ok(Some(env_var_value)),
-          Err(_) => Ok(None),
-        },
-        1 => {
-          if env::var(env_var_name).is_ok() {
-            log::warn!("command line argument overrides environment variable {}", env_var_name);
-          }
-          Ok(matching_env_var_arguments.first().map(|env_var_value| env_var_value.to_string()))
-        }
-        _ => Err(format!("environment variable {} is specified more than once on the command line", env_var_name)),
-      }
-    }
-    None => match env::var(env_var_name) {
-      Ok(env_var_value) => Ok(Some(env_var_value)),
-      Err(_) => Ok(None),
-    },
-  }
-}
-
-/// # Check if an environment variable is specified
-///
-/// 1. Try if `env_var_name` is specified as a command line environment variable argument
-/// 1. Try if `env_var_name` is specified as a regular environment variable
-/// 1. Default to `false`
-///
-/// # Parameters
-/// * `env_var_name` - name of the environment variable
-/// * `matches` - parsed command line arguments
-///
-/// # Returns
-/// * `true` - when the environment variable `env_var_name` is specified either
-///   via the command line or as a regular environment variable. Note that the function also
-///   returns `true` when `env_var_name` is specified on the command line more than once.
-/// * `false` - when the environment variable `env_var_name` is not specified.
-pub(crate) fn environment_variable_specified(env_var_name: &str, matches: &ArgMatches) -> bool {
-  match environment_variable(env_var_name, matches) {
-    Ok(env_var_value) => env_var_value.is_some(),
-    Err(_) => true,
-  }
-}
-
-pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String> {
+fn read_single_line(prompt: impl AsRef<str>) -> DshCliResult<String> {
   print!("{}", prompt.as_ref());
   let _ = stdout().lock().flush();
   let mut line = String::new();
@@ -577,14 +572,14 @@ pub(crate) fn read_single_line(prompt: impl AsRef<str>) -> Result<String, String
   Ok(line.trim().to_string())
 }
 
-pub(crate) fn read_single_line_password(prompt: impl AsRef<str>) -> Result<String, String> {
+fn read_single_line_password(prompt: impl AsRef<str>) -> DshCliResult<String> {
   match prompt_password(prompt.as_ref()) {
     Ok(line) => Ok(line.trim().to_string()),
-    Err(_) => Err("empty input".to_string()),
+    Err(_) => Err(error!("empty input")),
   }
 }
 
-pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
+fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
   match (matches.get_flag(FilterFlagType::Started.id()), matches.get_flag(FilterFlagType::Stopped.id())) {
     (false, false) => (true, true),
     (false, true) => (false, true),
@@ -608,19 +603,21 @@ pub(crate) fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
 /// `Ok(Some<Platform>)` - target platforms
 /// `Ok(None)` - when no implicit platform is available
 /// `Err<String>` - when invalid platform name was found
-fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> Result<Option<DshPlatform>, String> {
-  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, matches)? {
+fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
+  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, Some(matches))? {
     Some(platform_name_from_env_var) => {
       debug!(
         "target platform '{}' (environment variable '{}')",
-        platform_name_from_env_var, ENV_VAR_DSH_CLI_PASSWORD
+        platform_name_from_env_var, ENV_VAR_DSH_CLI_PLATFORM
       );
-      DshPlatform::try_from(platform_name_from_env_var.as_str()).map(Some)
+      DshPlatform::try_from(platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
     }
     None => match settings.default_platform.clone() {
       Some(default_platform_name_from_settings) => {
         debug!("default target platform '{}' (settings)", default_platform_name_from_settings);
-        DshPlatform::try_from(default_platform_name_from_settings.as_str()).map(Some)
+        DshPlatform::try_from(default_platform_name_from_settings.as_str())
+          .map_err(error_map!("{}"))
+          .map(Some)
       }
       None => Ok(None),
     },
@@ -644,11 +641,13 @@ fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> Re
 /// `Ok(Option<Platform>)` - containing the platforms
 /// `Ok(None)` - when no implicit target platform is available
 /// `Err<String>` - when an invalid platform name was found
-fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> Result<Option<DshPlatform>, String> {
+fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
   match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
     Some(target_platform_name_from_argument) => {
       debug!("target platform '{}' (argument)", target_platform_name_from_argument);
-      DshPlatform::try_from(target_platform_name_from_argument.as_str()).map(Some)
+      DshPlatform::try_from(target_platform_name_from_argument.as_str())
+        .map_err(error_map!("{}"))
+        .map(Some)
     }
     None => get_target_platform_implicit(matches, settings),
   }
@@ -671,14 +670,14 @@ fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings
 /// ## Returns
 /// `Ok<Platform>`  - target platform
 /// `Err<String>` - error message
-pub(crate) fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> Result<DshPlatform, String> {
+fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> DshCliResult<DshPlatform> {
   match get_target_platform_non_interactive(matches, settings)? {
     Some(platforms_non_interactive) => Ok(platforms_non_interactive),
     None => {
       if stdin().is_terminal() {
-        DshPlatform::try_from(read_single_line("target platform: ")?.as_str())
+        DshPlatform::try_from(read_single_line("target platform: ")?.as_str()).map_err(error_map!("{}"))
       } else {
-        Err("could not determine target platform, please check configuration".to_string())
+        Err(error!("could not determine target platform, please check configuration"))
       }
     }
   }
@@ -698,8 +697,8 @@ pub(crate) fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> 
 /// ## Returns
 /// `Some<String>` - containing the tenant name
 /// `None` - when no implicit tenant name is available
-fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> Result<Option<String>, String> {
-  match environment_variable(ENV_VAR_DSH_CLI_TENANT, matches)? {
+fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
+  match environment_variable(ENV_VAR_DSH_CLI_TENANT, Some(matches))? {
     Some(tenant_name_from_env_var) => {
       debug!("target tenant '{}' (environment variable '{}')", tenant_name_from_env_var, ENV_VAR_DSH_CLI_TENANT);
       Ok(Some(tenant_name_from_env_var))
@@ -730,7 +729,7 @@ fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> Resu
 /// ## Returns
 /// `Some<String>` - tenant name
 /// `None` - when no tenant name is available without asking the user
-fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) -> Result<Option<String>, String> {
+fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
   match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
     Some(target_tenant_name_from_argument) => {
       debug!("target tenant '{}' (argument)", target_tenant_name_from_argument);
@@ -757,19 +756,19 @@ fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) 
 /// ## Returns
 /// An `Ok<String>` tenant name
 /// An `Err<String>` error message
-fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> Result<String, String> {
+fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> DshCliResult<String> {
   match get_target_tenant_non_interactive(matches, settings)? {
     Some(tenant_names_non_interactive) => Ok(tenant_names_non_interactive),
     None => {
       if stdin().is_terminal() {
         let tenant_name_from_console = read_single_line("target tenant: ")?;
         if tenant_name_from_console.is_empty() {
-          Err("target tenant name cannot be empty".to_string())
+          Err(error!("target tenant name cannot be empty"))
         } else {
           Ok(tenant_name_from_console)
         }
       } else {
-        Err("could not determine target tenant, please check configuration".to_string())
+        Err(error!("could not determine target tenant, please check configuration"))
       }
     }
   }
@@ -796,17 +795,17 @@ fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> Result<String
 ///
 /// ## Returns
 /// An `Ok<String>` containing the password, or an `Err<String>`.
-fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> Result<String, String> {
+fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> DshCliResult<String> {
   match matches.get_one::<PathBuf>(TARGET_PASSWORD_FILE_ARGUMENT) {
     Some(password_file_from_arg) => read_target_password_file(password_file_from_arg),
-    None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD_FILE, matches)? {
+    None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD_FILE, Some(matches))? {
       Some(password_file_from_env) => read_target_password_file(password_file_from_env),
-      None => match env::var(ENV_VAR_DSH_CLI_PASSWORD) {
-        Ok(password_from_env_var) => {
+      None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD, None)? {
+        Some(password_from_env_var) => {
           debug!("target password (environment variable '{}')", ENV_VAR_DSH_CLI_PASSWORD);
           Ok(password_from_env_var)
         }
-        Err(_) => match (
+        None => match (
           read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
           get_target_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
         ) {
@@ -818,7 +817,7 @@ fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> R
             if stdin().is_terminal() {
               read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
             } else {
-              Err("could not determine password and unable to to prompt user, please check configuration".to_string())
+              Err(error!("could not determine password and unable to to prompt user, please check configuration"))
             }
           }
         },
@@ -827,70 +826,22 @@ fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> R
   }
 }
 
-fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> Result<String, String> {
+fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> DshCliResult<String> {
   match fs::read_to_string(&password_file) {
     Ok(password_string) => {
       let trimmed_password = password_string.trim();
       if trimmed_password.is_empty() {
-        Err(format!("target password file '{}' is empty", password_file.as_ref().to_string_lossy()))
+        Err(error!("target password file '{}' is empty", password_file.as_ref().display()))
       } else {
-        debug!("target password (file '{}')", password_file.as_ref().to_string_lossy());
+        debug!("target password (file '{}')", password_file.as_ref().display());
         Ok(trimmed_password.to_string())
       }
     }
-    Err(_) => Err(format!("target password file '{}' could not be read", password_file.as_ref().to_string_lossy())),
+    Err(_) => Err(error!("target password file '{}' could not be read", password_file.as_ref().display())),
   }
 }
 
-/// # Returns the `dsh` directory
-///
-/// This function creates and returns the `dsh` directory. In this directory the cli tool stores
-/// its settings, targets and tokens. If it doesn't already exist the directory (and if needed
-/// its parent directories) will be created.
-///
-/// This function will try the potential directory names listed below, and returns at the
-/// first match.
-/// 1. If the environment variable `DSH_CLI_HOME` is set:
-///    * if the environment variable is the empty string, do not create any directories and
-///      return `Ok(None)`,
-///    * else create the specified directory (if needed) and return its [PathBuf].
-/// 1. If the environment variable `HOME` is set use its value concatenated with
-///    `/.dsh_cli`, create the directory (if needed), and return its [PathBuf].
-/// 1. Else return `Err`.
-///
-/// Note that the environment variables must be regular environment variables and cannot
-/// be specified via the command line `--environment-variable` argument.
-fn dsh_directory() -> Result<Option<PathBuf>, String> {
-  let dsh_directory: PathBuf = match env::var(ENV_VAR_DSH_CLI_HOME) {
-    Ok(dsh_directory_from_env_var) => {
-      if dsh_directory_from_env_var.is_empty() {
-        return Ok(None);
-      } else {
-        PathBuf::new().join(dsh_directory_from_env_var)
-      }
-    }
-    Err(_) => match my_home() {
-      Ok(Some(user_home_directory)) => user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY),
-      _ => {
-        return Err(format!(
-          "could not determine dsh cli directory (check environment variable '{}' or 'HOME')",
-          ENV_VAR_DSH_CLI_HOME
-        ))
-      }
-    },
-  };
-  match &fs::create_dir_all(&dsh_directory) {
-    Ok(_) => {
-      for subdirectory in [TARGETS_SUBDIRECTORY, REFRESH_TOKENS_SUBDIRECTORY] {
-        fs::create_dir_all(dsh_directory.join(subdirectory)).map_err(|io_error| format!("could not create dsh {} subdirectory ({})", subdirectory, io_error))?;
-      }
-      Ok(Some(dsh_directory))
-    }
-    Err(io_error) => Err(format!("could not create dsh directory '{}' ({})", dsh_directory.to_string_lossy(), io_error)),
-  }
-}
-
-fn read_and_deserialize_from_toml_file<T>(toml_file: impl AsRef<Path>) -> Result<Option<T>, String>
+fn read_and_deserialize_from_toml_file<T>(toml_file: impl AsRef<Path>) -> DshCliResult<Option<T>>
 where
   T: for<'de> Deserialize<'de>,
 {
@@ -898,23 +849,23 @@ where
     Ok(toml_string) => match toml::from_str::<T>(&toml_string) {
       Ok(deserialized_toml) => Ok(Some(deserialized_toml)),
       Err(de_error) => {
-        let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().to_string_lossy(), de_error.message());
+        let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().display(), de_error.message());
         log::error!("{}", &message);
-        Err(message)
+        Err(DshCliError::from(message))
       }
     },
     Err(io_error) => match io_error.kind() {
       NotFound => Ok(None),
       _ => {
-        let message = format!("could not read file '{}'", toml_file.as_ref().to_string_lossy());
+        let message = format!("could not read file '{}'", toml_file.as_ref().display());
         log::error!("{}", &message);
-        Err(message)
+        Err(DshCliError::from(message))
       }
     },
   }
 }
 
-fn serialize_and_write_to_toml_file<T>(toml_file: impl AsRef<Path>, data: &T) -> Result<(), String>
+fn serialize_and_write_to_toml_file<T>(toml_file: impl AsRef<Path>, data: &T) -> DshCliResult<()>
 where
   T: Serialize,
 {
@@ -922,15 +873,15 @@ where
     Ok(toml_string) => match fs::write(&toml_file, toml_string) {
       Ok(_) => Ok(()),
       Err(io_error) => {
-        let message = format!("could not write file '{}' ({})", toml_file.as_ref().to_string_lossy(), io_error);
+        let message = format!("could not write file '{}' ({})", toml_file.as_ref().display(), io_error);
         log::error!("{}", &message);
-        Err(message)
+        Err(DshCliError::from(message))
       }
     },
     Err(ser_error) => {
       let message = format!("could not serialize data ({})", ser_error);
       log::error!("{}", &message);
-      Err(message)
+      Err(DshCliError::from(message))
     }
   }
 }
@@ -940,11 +891,11 @@ where
 /// Will serialize the provided `configuration` to a temporary file
 /// and open that file in the default system editor.
 /// When the editor closes, the temporary file will be serialized again and returned.
-async fn edit_configuration<C>(configuration: &C, temporary_configuration_file_name: &str, matches: &ArgMatches) -> Result<Option<C>, String>
+async fn edit_configuration<C>(configuration: &C, temporary_configuration_file_name: &str, matches: &ArgMatches) -> DshCliResult<Option<C>>
 where
   C: for<'de> Deserialize<'de> + Serialize,
 {
-  match environment_variable("EDITOR", matches)? {
+  match environment_variable("EDITOR", Some(matches))? {
     Some(editor_from_env_var) => {
       let editor = editor_from_env_var.split(" ").collect_vec();
       let editor_command = editor.first().ok_or("".to_string())?;
@@ -952,45 +903,45 @@ where
       debug!("editor: {} {:?}", editor_command, editor_args);
       let mut temporary_configuration_file_path = temp_dir();
       temporary_configuration_file_path.push(temporary_configuration_file_name);
-      debug!("temporary configuration file: {}", temporary_configuration_file_path.to_string_lossy());
-      let original_configuration = serde_json::to_string_pretty::<C>(configuration).unwrap();
+      debug!("temporary configuration file: {}", temporary_configuration_file_path.display());
+      let original_configuration = serde_json::to_string_pretty::<C>(configuration)?;
       tokio::fs::write(&temporary_configuration_file_path, &original_configuration)
         .await
-        .map_err(|error| format!("cannot write temporary configuration file ({})", error))?;
+        .map_err(error_map!("cannot write temporary configuration file ({})"))?;
       process::Command::new(editor_command)
         .args(editor_args)
         .arg(&temporary_configuration_file_path)
         .status()
-        .map_err(|error| format!("couldn't edit temporary configuration file ({})", error))?;
+        .map_err(error_map!("couldn't edit temporary configuration file: {}"))?;
       let updated_configuration = tokio::fs::read_to_string(&temporary_configuration_file_path)
         .await
-        .map_err(|error| format!("couldn't read temporary configuration file ({})", error))?;
+        .map_err(error_map!("couldn't read temporary configuration file ({})"))?;
       if original_configuration == updated_configuration {
         Ok(None)
       } else {
         Ok(Some(
-          serde_json::from_str::<C>(&updated_configuration).map_err(|error| format!("could not parse temporary configuration file ({})", error))?,
+          serde_json::from_str::<C>(&updated_configuration).map_err(error_map!("could not parse temporary configuration file ({})"))?,
         ))
       }
     }
-    None => Err("environment variable 'EDITOR' is not set".to_string()),
+    None => Err(error!("environment variable 'EDITOR' is not set")),
   }
 }
 
-/// Create client
+/// Create clients
 ///
 /// # Parameters
 /// * `matches`
 /// * `context`
 ///
 /// Returns
-/// * `Ok(Some(Client))` - Client was successfully created.
+/// * `Ok(Some(Vec<Client>))` - Client were successfully created. Note that there will always be at
+///   least one client created, else an error is returned.
 /// * `Ok(None)` - User needs to log in.
-/// * `Err(String)` - Something went wrong.
-async fn create_client(matches: &ArgMatches, context: &Context) -> Result<Option<DshApiClient>, String> {
+async fn create_clients(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   match context.authentication_method() {
     AuthenticationMethod::Robot => create_client_robot_password(matches, context).await.map(Some),
-    AuthenticationMethod::SingleSignOn => create_client_access_token(matches, context).await,
+    AuthenticationMethod::SingleSignOn => create_clients_access_token(matches, context).await,
   }
 }
 
@@ -1001,9 +952,9 @@ async fn create_client(matches: &ArgMatches, context: &Context) -> Result<Option
 /// * `context`
 ///
 /// Returns
-/// * `Ok(Client)` - Client was successfully created.
-/// * `Err(String)` - Something went wrong.
-async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -> Result<DshApiClient, String> {
+/// * `Ok(Vec<Client>)` - Client was successfully created. Note that there always be only one
+///   client created.
+async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -> DshCliResult<Vec<DshApiClient>> {
   let target_platform = get_target_platform(matches, context.settings())?;
   let target_tenant_name = get_target_tenant(matches, context.settings())?;
   debug!("create client with token fetcher for target '{}@{}'", target_tenant_name, target_platform);
@@ -1012,7 +963,7 @@ async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -
   let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_password);
   let dsh_api_client = dsh_api_client_factory.client().await?;
   debug!("api client created");
-  Ok(dsh_api_client)
+  Ok(vec![dsh_api_client])
 }
 
 /// Create client from single sign on
@@ -1022,25 +973,114 @@ async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -
 /// * `context`
 ///
 /// Returns
-/// * `Ok(Some(Client))` - Client was successfully created.
+/// * `Ok(Some(Vec<Client>))` - Clients were successfully created. Note that there will always be at
+///   least one client created, else an error is returned.
 /// * `Ok(None)` - User needs to log in.
-/// * `Err(String)` - Something went wrong.
-async fn create_client_access_token(matches: &ArgMatches, context: &Context) -> Result<Option<DshApiClient>, String> {
+async fn create_clients_access_token(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
+  if !supports_dsh_directory() {
+    return Err(DshCliError::String("single-sign-on requires dsh directory to be enabled".to_string()));
+  }
   let target_platform = get_target_platform(matches, context.settings())?;
-  let target_tenant_name = get_target_tenant(matches, context.settings())?;
-  debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
+  if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
+    create_clients_for_all_authorized_tenants(target_platform).await
+  } else {
+    match matches.get_one::<String>(TARGET_TENANTS_ARGUMENT) {
+      Some(target_tenants_string) => {
+        let target_tenant_names = target_tenants_string.split(",").map(|s| s.to_string()).collect_vec();
+        for target_tenant_name in &target_tenant_names {
+          debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
+        }
+        create_clients_for_tenants(target_platform, &target_tenant_names, context).await
+      }
+      None => {
+        let target_tenant_name = get_target_tenant(matches, context.settings())?;
+        match get_access_token(target_platform.clone()).await {
+          Ok(Some(access_token)) => {
+            if access_token.authorized_tenants().contains(&target_tenant_name.as_str()) {
+              let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
+              let dsh_api_client_factory = DshApiClientFactory::create_from_access_token(dsh_api_tenant, access_token.token().secret().clone());
+              Ok(Some(vec![dsh_api_client_factory.client().await?]))
+            } else {
+              Err(error!("not authorized for tenant '{}' at platform '{}'", target_tenant_name, target_platform))
+            }
+          }
+          Ok(None) => {
+            context.print_warning(format!("please log in to platform {} using the 'dsh login' command", target_platform));
+            Ok(None)
+          }
+          Err(error) => Err(error),
+        }
+      }
+    }
+  }
+}
+
+/// Create multiple clients from single sign on
+///
+/// # Parameters
+/// * `target_platform`
+/// * `target_tenant_names`
+/// * `context`
+///
+/// Returns
+/// * `Ok(Some(Vec<Client>))` - User is logged in and all clients were successfully created.
+/// * `Ok(Some([]))` - User is logged in but no clients were created because the
+///   user is not authorized for the requested tenants.
+/// * `Ok(None)` - User needs to log in.
+async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_names: &[String], context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   match get_access_token(target_platform.clone()).await {
     Ok(Some(access_token)) => {
-      let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
-      let dsh_api_client_factory = DshApiClientFactory::create_from_access_token(dsh_api_tenant, access_token.token.secret().clone());
-      let dsh_api_client = dsh_api_client_factory.client().await?;
-      debug!("api client created");
-      Ok(Some(dsh_api_client))
+      let unauthorized_tenants = target_tenant_names
+        .iter()
+        .filter(|target_tenant_name| !access_token.authorized_tenants().contains(&target_tenant_name.as_str()))
+        .collect_vec();
+      if !unauthorized_tenants.is_empty() {
+        for unauthorized_tenant in &unauthorized_tenants {
+          context.print_error(format!("not authorized for tenant {}@{}", unauthorized_tenant, target_platform));
+        }
+        return Err(error!("not authorized for tenants {}", unauthorized_tenants.iter().join(", ")));
+      }
+      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_access_token(target_platform.clone(), access_token.token().secret().clone())?;
+      let clients = try_join_all(target_tenant_names.iter().map(|target_tenant_name| {
+        debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
+        dsh_api_platform_client_factory.client(target_tenant_name)
+      }))
+      .await?;
+      debug!("api clients created");
+      Ok(Some(clients))
     }
     Ok(None) => {
-      context.print_warning(format!("please log in to platform {} using the 'dsh login' command", target_platform));
+      context.print_warning(format!("please log in to platform '{}' using the 'dsh login' command", target_platform));
       Ok(None)
     }
+    Err(error) => Err(error),
+  }
+}
+
+/// Create clients for all authorized tenants from single sign on
+///
+/// # Parameters
+/// * `target_platform`
+///
+/// Returns
+/// * `Ok(Some(Vec<Client>))` - Clients were successfully created.
+/// * `Ok(None)` - User needs to log in.
+async fn create_clients_for_all_authorized_tenants(target_platform: DshPlatform) -> DshCliResult<Option<Vec<DshApiClient>>> {
+  debug!("create client with static access token for all tenants at platform '{}'", target_platform);
+  match get_access_token(target_platform.clone()).await {
+    Ok(Some(access_token)) => {
+      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_access_token(target_platform, access_token.token().secret().clone())?;
+      let clients = try_join_all(
+        access_token
+          .authorized_tenants()
+          .into_iter()
+          .map(|authorized_tenant| dsh_api_platform_client_factory.client(authorized_tenant)),
+      )
+      .await?;
+      debug!("clients created");
+      Ok(Some(clients))
+    }
+    Ok(None) => Ok(None),
     Err(error) => Err(error),
   }
 }
@@ -1050,7 +1090,7 @@ fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> String {
   let bold_green = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
   let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
   let key_value_length_pairs: Vec<(&str, &str, usize)> = rows.iter().map(|(key, value)| (*key, value.as_ref(), key.len())).collect_vec();
-  let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap().clone();
+  let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap_or_else(|| unreachable!()).clone();
   let mut pairs = vec![];
   for (key, value, len) in key_value_length_pairs {
     let values = value.split("\n").collect_vec().iter().map(|s| s.to_string()).collect_vec();
@@ -1088,5 +1128,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.8.0");
+  assert_eq!(crate_version(), "0.8.1");
 }

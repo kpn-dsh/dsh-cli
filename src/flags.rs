@@ -5,8 +5,10 @@ pub(crate) enum FlagType {
   _Actual,
   AllocationStatus,
   AllVersions,
+  Certificates,
   Configuration,
   Ids,
+  Keys,
   Properties,
   #[cfg(feature = "manage")]
   Stream,
@@ -22,8 +24,10 @@ impl FlagType {
       Self::_Actual => "actual-flag",
       Self::AllocationStatus => "status-flag",
       Self::AllVersions => "all-versions-flag",
+      Self::Certificates => "certificates-flag",
       Self::Configuration => "configuration-flag",
       Self::Ids => "ids-flag",
+      Self::Keys => "keys-flag",
       Self::Properties => "properties-flag",
       #[cfg(feature = "manage")]
       Self::Stream => "stream-flag",
@@ -39,8 +43,10 @@ impl FlagType {
       Self::_Actual => "actual",
       Self::AllocationStatus => "status",
       Self::AllVersions => "all-versions",
+      Self::Certificates => "certificates",
       Self::Configuration => "configuration",
       Self::Ids => "ids",
+      Self::Keys => "keys",
       Self::Properties => "properties",
       #[cfg(feature = "manage")]
       Self::Stream => "stream",
@@ -57,8 +63,10 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     FlagType::_Actual => create_clap_flag(FlagType::_Actual, format!("Use the 'actual' {} configuration", subject), long_help),
     FlagType::AllocationStatus => create_clap_flag(FlagType::AllocationStatus, format!("Include the {}'s allocation status", subject), long_help),
     FlagType::AllVersions => create_clap_flag(FlagType::AllVersions, format!("List all {} versions", subject), long_help),
+    FlagType::Certificates => create_clap_flag(FlagType::Certificates, format!("Show {}s as certificates", subject), long_help),
     FlagType::Configuration => create_clap_flag(FlagType::Configuration, format!("Include the {}'s initial configuration", subject), long_help),
     FlagType::Ids => create_clap_flag(FlagType::Ids, format!("Include the {}'s ids", subject), long_help),
+    FlagType::Keys => create_clap_flag(FlagType::Keys, format!("Show {}s as a keys", subject), long_help),
     FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties", subject), long_help),
     #[cfg(feature = "manage")]
     FlagType::Stream => create_clap_flag(FlagType::Stream, format!("Include the {}'s stream", subject), long_help),

@@ -13,12 +13,59 @@ The `dsh` tool can print a list of all used environment variables via the comman
 > dsh --env-vars
 ```
 
-An explanation of an environment variable can be printed via the commands:
+An detailed explanation of an environment variable can be printed via the commands:
 
 ```bash
 > dsh --env-var DSH_CLI_DRY_RUN  # Explains environment variable "DSH_CLI_DRY_RUN"
-> dsh --env-var dry              # Lists all variables that contain "dry" (case insensitive)
+> dsh --env-var dry              # Explaines all variables that contain "dry" (case insensitive)
 ```
+
+Environment variables can be set in three ways:
+
+#### Shell command
+
+Typically, environment variables are set using shell commands. This makes them available for
+the lifetime of the shell, or until they are explicitly unset.
+
+```
+> export DSH_CLI_LOG_LEVEL=debug
+```
+
+#### Command line argument
+
+Environment variables can also be specified using command line arguments. This way they have to
+be specified with every invocation. Note that this is similar to using the command line
+options directly.
+
+```
+> dsh platforms --environment-variable DSH_CLI_LOG_LEVEL=debug
+> dsh platforms -e DSH_CLI_LOG_LEVEL_API=info
+```
+
+#### Environment variables file
+
+The third option to set the environment variables is via a text file.
+
+```
+DSH_CLI_LOG_LEVEL=debug
+DSH_CLI_LOG_LEVEL_API=info
+```
+
+Be sure that you do not use spaces around the `=` sign and that you do not use quotes around
+the value.
+
+The dsh tool will check the current working directory for a file named `.dsh_cli.env` and if it
+exists it will set the environment variables defined in it. You can also specify another file via
+a command line argument:
+
+```
+> dsh platforms --env-var-file my-settings.env
+```
+
+### Environment variables
+
+The following table describes all environment variables.
+
 
 <table>
     <tr valign="top">
@@ -92,6 +139,21 @@ An explanation of an environment variable can be printed via the commands:
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_ENV_FILE</code></td>
+        <td>
+            This environment variable specifies the location of a file that defines values for the
+            environment variables used by the dsh tool. Variables defined in this file will 
+            override the values of genuine environment variables set by the os shell, but can  
+            themselves be overridden by values defined using the <code>--environment-variable</code>
+            command line argument(s). Note that when the <code>--env-var-file</code> command line 
+            argument is provided, the environment variable <code>DSH_CLI_ENV_FILE</code> will not 
+            be used. The default location is <code>.dsh_cli.env</code> in the current working 
+            directory. This environment variable itself cannot be overridden via the 
+            <code>--environment-variable</code> command line argument, nor can it be defined 
+            in the file itself.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_ERROR_COLOR</code></td>
         <td>
             This environment variable specifies the color to be used when printing error messages. 
@@ -145,6 +207,16 @@ An explanation of an environment variable can be printed via the commands:
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_LOG_COLOR</code></td>
+        <td>
+            This environment variable specifies the color to be used when printing 
+            logging information. 
+            If this variable is not set, the settings file will be checked for the 
+            <code>log-color</code> entry. Else the default color <code>red</code> will be used.
+            See environment variable <code>DSH_CLI_ERROR_COLOR</code> for the supported colors.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_LOG_LEVEL</code></td>
         <td> 
             Use this environment variable to set the log level of the <code>dsh</code> tool.
@@ -176,6 +248,16 @@ An explanation of an environment variable can be printed via the commands:
             When the <code>--log-level-api</code> command line argument is provided this will 
             override this environment variable or the value in the settings file.
             The default log level is <code>error</code>.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_LOG_STYLE</code></td>
+        <td>
+            This environment variable specifies the styling to be used when printing 
+            logging information. 
+            If this variable is not set, the settings file will be checked for the 
+            <code>log-style</code> entry. Else the default value <code>dim</code> will be used.
+            See environment variable <code>DSH_CLI_ERROR_STYLE</code> for the supported styles.
         </td>
     </tr>
     <tr valign="top">
@@ -371,19 +453,19 @@ An explanation of an environment variable can be printed via the commands:
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_CLI_TERMINAL_WIDTH</code></td>
-        <td>
-            When this environment variable is set it will define the maximum terminal width.
-            This environment variable can be overridden via the 
-            <code>--terminal-width</code> command line argument.
-        </td>
-    </tr>
-    <tr valign="top">
         <td><code>DSH_CLI_TENANT</code></td>
         <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
             will be managed via the api.
             This environment variable can be overridden via the 
             <code>--tenant</code> (or <code>-t</code>) command line argument.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_TERMINAL_WIDTH</code></td>
+        <td>
+            When this environment variable is set it will define the maximum terminal width.
+            This environment variable can be overridden via the 
+            <code>--terminal-width</code> command line argument.
         </td>
     </tr>
     <tr valign="top">

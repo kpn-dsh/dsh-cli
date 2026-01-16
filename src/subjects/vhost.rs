@@ -3,8 +3,8 @@ use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS_LIST;
 use crate::{include_started_stopped, DshCliResult};
@@ -20,12 +20,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::str::FromStr;
 
-pub(crate) struct VhostSubject {}
+struct VhostSubject {}
 
 const VHOST_SUBJECT_TARGET: &str = "vhost";
 
 lazy_static! {
-  pub static ref VHOST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(VhostSubject {});
+  pub(crate) static ref VHOST_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(VhostSubject {});
 }
 
 #[async_trait]
@@ -74,7 +74,7 @@ lazy_static! {
   static ref VHOST_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![VHOST_LIST_CAPABILITY.as_ref()];
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct VhostListValue {
   vhost: String,
   zone: Option<String>,
@@ -90,7 +90,7 @@ struct VhostList {}
 
 #[async_trait]
 impl CommandExecutor for VhostList {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_warning("only vhosts that are actually used in service configurations will be listed here");
     context.print_explanation("list configured vhosts");
     let start_instant = context.now();
@@ -123,10 +123,15 @@ impl CommandExecutor for VhostList {
           .collect_vec()
       })
       .collect_vec();
-    vhost_list_values.sort_by(|a, b| (&a.vhost, &a.service_id).cmp(&(&b.vhost, &b.service_id)));
-    let mut formatter = ListFormatter::new(&VHOST_LIST_LABELS, None, context);
-    formatter.push_values(&vhost_list_values);
-    formatter.print(None)
+    if vhost_list_values.is_empty() {
+      context.print_outcome("no vhosts configured");
+      Ok(())
+    } else {
+      vhost_list_values.sort_by(|a, b| (&a.vhost, &a.service_id).cmp(&(&b.vhost, &b.service_id)));
+      let mut formatter = ListFormatter::new(&VHOST_LIST_LABELS, context);
+      formatter.push_values(&vhost_list_values);
+      formatter.print(None)
+    }
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -138,13 +143,13 @@ struct VhostListUsage {}
 
 #[async_trait]
 impl CommandExecutor for VhostListUsage {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_warning("only vhosts that are actually used in service configurations will be listed here");
     context.print_explanation("list vhosts with services and apps that use them");
     let start_instant = context.now();
     let vhosts_with_usage: Vec<(String, Vec<Dependant<VhostInjection>>)> = client.vhosts_with_dependants().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, Some("vhost"), context);
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, context);
     for (vhost, dependants) in &vhosts_with_usage {
       for dependant in dependants {
         formatter.push_target_id_value(vhost.clone(), dependant);
@@ -160,7 +165,7 @@ impl CommandExecutor for VhostListUsage {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum VhostListLabel {
+enum VhostListLabel {
   Auth,
   Instances,
   KafkaFlag,
@@ -172,7 +177,7 @@ pub enum VhostListLabel {
   Tenant,
   Tls,
   Vhost,
-  _Whitelist,
+  Whitelist,
   Zone,
 }
 
@@ -190,7 +195,7 @@ impl Label for VhostListLabel {
       Self::Tenant => "tenant",
       Self::Tls => "tlc",
       Self::Vhost => "vhost",
-      Self::_Whitelist => "whitelist",
+      Self::Whitelist => "whitelist",
       Self::Zone => "zone",
     }
   }
@@ -201,38 +206,32 @@ impl Label for VhostListLabel {
 }
 
 impl SubjectFormatter<VhostListLabel> for VhostListValue {
-  fn value(&self, label: &VhostListLabel, _target_id: &str) -> String {
+  fn value(&self, label: &VhostListLabel, _target_id: &str) -> Value {
     match label {
-      VhostListLabel::Auth => self
-        .port_mapping
-        .auth
-        .clone()
-        .and_then(|auth| AuthString::from_str(&auth).ok())
-        .map(|auth_string| auth_string.to_string())
-        .unwrap_or_default(),
+      VhostListLabel::Auth => Value::option(self.port_mapping.auth.clone().and_then(|auth| AuthString::from_str(&auth).ok())),
       VhostListLabel::KafkaFlag => {
         if self.kafka_flag {
-          "set".to_string()
+          Value::plain("set")
         } else {
-          "".to_string()
+          Value::empty()
         }
       }
-      VhostListLabel::Instances => self.instances.to_string(),
-      VhostListLabel::Mode => self.port_mapping.mode.clone().unwrap_or_default(),
-      VhostListLabel::Paths => self.port_mapping.paths.iter().map(|path_spec| path_spec.to_string()).collect_vec().join(", "),
-      VhostListLabel::Port => self.port.clone(),
-      VhostListLabel::_ServiceGroup => self.port_mapping.service_group.clone().unwrap_or_default(),
-      VhostListLabel::ServiceId => self.service_id.clone(),
-      VhostListLabel::Tenant => self.tenant.clone().unwrap_or_default(),
-      VhostListLabel::Tls => self.port_mapping.tls.map(|tls| tls.to_string()).unwrap_or_default(),
-      VhostListLabel::Vhost => self.vhost.clone(),
-      VhostListLabel::_Whitelist => self.port_mapping.whitelist.clone().unwrap_or_default(),
-      VhostListLabel::Zone => self.zone.clone().map(|zone| zone.to_string()).unwrap_or_default(),
+      VhostListLabel::Instances => Value::plain(self.instances),
+      VhostListLabel::Mode => Value::option(self.port_mapping.mode.as_ref()),
+      VhostListLabel::Paths => Value::plain(self.port_mapping.paths.iter().map(|path_spec| path_spec.to_string()).join(", ")),
+      VhostListLabel::Port => Value::plain(&self.port),
+      VhostListLabel::_ServiceGroup => Value::option(self.port_mapping.service_group.as_ref()),
+      VhostListLabel::ServiceId => Value::plain(&self.service_id),
+      VhostListLabel::Tenant => Value::option(self.tenant.as_ref()),
+      VhostListLabel::Tls => Value::option(self.port_mapping.tls),
+      VhostListLabel::Vhost => Value::plain(&self.vhost),
+      VhostListLabel::Whitelist => Value::option(self.port_mapping.whitelist.as_ref()),
+      VhostListLabel::Zone => Value::option(self.zone.as_ref()),
     }
   }
 }
 
-pub static VHOST_LIST_LABELS: [VhostListLabel; 11] = [
+static VHOST_LIST_LABELS: [VhostListLabel; 12] = [
   VhostListLabel::Vhost,
   VhostListLabel::Zone,
   VhostListLabel::ServiceId,
@@ -244,10 +243,11 @@ pub static VHOST_LIST_LABELS: [VhostListLabel; 11] = [
   VhostListLabel::Paths,
   VhostListLabel::Tls,
   VhostListLabel::KafkaFlag,
+  VhostListLabel::Whitelist,
 ];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum VhostLabel {
+pub(crate) enum VhostLabel {
   Target,
   Value,
 }
@@ -266,12 +266,12 @@ impl Label for VhostLabel {
 }
 
 impl SubjectFormatter<VhostLabel> for Vhost {
-  fn value(&self, label: &VhostLabel, target_id: &str) -> String {
+  fn value(&self, label: &VhostLabel, target_id: &str) -> Value {
     match label {
-      VhostLabel::Target => target_id.to_string(),
-      VhostLabel::Value => self.value.to_string(),
+      VhostLabel::Target => Value::target(target_id),
+      VhostLabel::Value => Value::plain(&self.value),
     }
   }
 }
 
-pub static VHOST_LABELS: [VhostLabel; 2] = [VhostLabel::Target, VhostLabel::Value];
+pub(crate) static VHOST_LABELS: [VhostLabel; 2] = [VhostLabel::Target, VhostLabel::Value];

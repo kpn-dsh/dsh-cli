@@ -3,27 +3,27 @@ use crate::capability::{Capability, CommandExecutor, FIND_COMMAND, FIND_COMMAND_
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::formatter::Label;
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::Label;
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
-use crate::{include_started_stopped, DshCliResult};
+use crate::{error, include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::query_processor::{ExactMatchQueryProcessor, QueryProcessor, RegexQueryProcessor};
+use dsh_api::query_processor::{QueryProcessor, RegexQueryProcessor, StringQueryProcessor};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-pub(crate) struct EnvSubject {}
+struct EnvSubject {}
 
 const ENV_SUBJECT_TARGET: &str = "env";
 
 lazy_static! {
-  pub static ref ENV_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(EnvSubject {});
+  pub(crate) static ref ENV_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(EnvSubject {});
 }
 
 #[async_trait]
@@ -65,7 +65,9 @@ lazy_static! {
         (FilterFlagType::Stopped, Some("Search in all stopped services.".to_string()))
       ])
       .add_target_argument(query_argument(None).required(true))
-      .add_modifier_flag(ModifierFlagType::Regex, None)
+      .add_modifier_flag(ModifierFlagType::IgnoreCase, Some("Case will be ignored".to_string()))
+      .add_modifier_flag(ModifierFlagType::Regex, Some("Query is a regular expression".to_string()))
+      .add_modifier_flag(ModifierFlagType::Substring, Some("Matching on substrings".to_string()))
   );
   static ref ENV_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![ENV_FIND_CAPABILITY.as_ref()];
 }
@@ -74,10 +76,16 @@ struct EnvFind {}
 
 #[async_trait]
 impl CommandExecutor for EnvFind {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let query = target.unwrap_or_else(|| unreachable!());
+    let ignore_case = matches.get_flag(ModifierFlagType::IgnoreCase.id());
+    let regex = matches.get_flag(ModifierFlagType::Regex.id());
+    let match_substring = matches.get_flag(ModifierFlagType::Substring.id());
+    if regex && (ignore_case || match_substring) {
+      return Err(error!("option --regex cannot be used together with --ignore-case and/or --substring"));
+    }
     let query_processor: &dyn QueryProcessor =
-      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*query)? } else { &ExactMatchQueryProcessor::create(&query)? };
+      if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*query)? } else { &StringQueryProcessor::create(&query, match_substring, ignore_case)? };
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation(format!("find environment variables in services that {}", query_processor.describe()));
     let start_instant = context.now();
@@ -110,7 +118,7 @@ impl CommandExecutor for EnvFind {
     if matching_services.is_empty() {
       context.print_outcome("no matches found in services");
     } else {
-      let mut formatter = ListFormatter::new(&SERVICE_ENV_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&SERVICE_ENV_LABELS, context);
       formatter.push_target_id_value_pairs(&matching_services);
       formatter.print(None)?;
     }
@@ -122,11 +130,15 @@ impl CommandExecutor for EnvFind {
   }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 enum ServiceEnvLabel {
+  #[serde(rename = "environment-variable")]
   EnvVar,
+  #[serde(rename = "instances")]
   Instances,
+  #[serde(rename = "service")]
   Service,
+  #[serde(rename = "value")]
   Value,
 }
 

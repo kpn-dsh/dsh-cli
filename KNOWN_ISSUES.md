@@ -1,31 +1,8 @@
 # Known issues
 
-```bash
-> dsh --dry-run --output-format json platform show --app kafdrop --platform prodlz --tenant greenbox-dev
-```
+### Create targets fails
 
-Wrong/incomplete results
-
-```bash
-> dsh --dry-run --output-format json platform service list --tasks
-```
-
-Service id duplicated
-
-```bash
-> dsh --dry-run --output-format json platform certificate show broker --usage
-```
-
-Usage is rendered strange
-
-```bash
-> dsh --dry-run --output-format json env find ^info$ --regex
-```
-
-Injection fields start with a capital
-
-```bash
-> dsh bucket show schema-registry
-```
-
-Doesn't show dependants
+The target mechanism doesn't work in this version. If you need this, use version 0.8.0 for now.
+The target capability in its current form is no longer necessary, since the single-sign-on
+authentication mechanism works much better. The target implementation will be reconsidered for
+future versions.  

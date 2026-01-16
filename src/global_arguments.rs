@@ -15,8 +15,8 @@ pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
 pub(crate) const ENVIRONMENT_VARIABLE_ARGUMENT: &str = "environment-variable-argument";
 pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
 // pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
+pub(crate) const NO_CSV_HEADERS_ARGUMENT: &str = "no-csv-headers-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
-pub(crate) const NO_HEADERS_ARGUMENT: &str = "no-headers-argument";
 pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
 pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
 pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
@@ -24,6 +24,8 @@ pub(crate) const SUPPRESS_EXIT_STATUS_ARGUMENT: &str = "suppress-exit-status-arg
 pub(crate) const TARGET_PASSWORD_FILE_ARGUMENT: &str = "target-password-file-argument";
 pub(crate) const TARGET_PLATFORM_ARGUMENT: &str = "target-platform-argument";
 pub(crate) const TARGET_TENANT_ARGUMENT: &str = "target-tenant-argument";
+pub(crate) const TARGET_TENANTS_ARGUMENT: &str = "target-tenants-argument";
+pub(crate) const TARGET_TENANTS_ALL_ARGUMENT: &str = "target-tenants-all-argument";
 pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 // pub(crate) const TO_CLIPBOARD_ARGUMENT: &str = "to-clipboard-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
@@ -144,14 +146,14 @@ pub(crate) fn no_escape_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn no_headers_argument() -> Arg {
-  Arg::new(NO_HEADERS_ARGUMENT)
-    .long("no-headers")
+pub(crate) fn no_csv_headers_argument() -> Arg {
+  Arg::new(NO_CSV_HEADERS_ARGUMENT)
+    .long("no-csv-headers")
     .action(ArgAction::SetTrue)
     .long_help(
-      "When this option is provided the output will not contain headers. \
+      "When this option is provided csv output will not contain headers. \
           If this argument is not provided, the environment variable \
-          DSH_CLI_NO_HEADERS or the value from the settings file will be used. \
+          DSH_CLI_NO_CSV_HEADERS or the value from the settings file will be used. \
           The default behavior is to use headers where applicable.",
     )
     .hide_short_help(true)
@@ -293,6 +295,37 @@ pub(crate) fn target_tenant_argument() -> Arg {
           as a default setting in the settings file, or else the user will be prompted.",
     )
     .global(true)
+    .conflicts_with_all([TARGET_TENANTS_ARGUMENT, TARGET_TENANTS_ALL_ARGUMENT])
+}
+
+pub(crate) fn target_tenants_argument() -> Arg {
+  Arg::new(TARGET_TENANTS_ARGUMENT)
+    .long("tenants")
+    .action(ArgAction::Append)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("TENANTS")
+    .help("Provide list of target tenants")
+    .long_help(
+      "This option specifies a comma separated list of names of target tenants, without spaces. \
+      If this argument is provided, the selected command will be executed for all tenants in the list.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .conflicts_with_all([TARGET_TENANT_ARGUMENT, TARGET_TENANTS_ALL_ARGUMENT])
+}
+
+pub(crate) fn target_tenants_all_argument() -> Arg {
+  Arg::new(TARGET_TENANTS_ALL_ARGUMENT)
+    .long("all-tenants")
+    .action(ArgAction::SetTrue)
+    .help("Use list of target tenants")
+    .long_help(
+      "If this option is specified, the selected command will be executed for all \
+      tenants that the user is authenticated for.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .conflicts_with_all([TARGET_TENANT_ARGUMENT, TARGET_TENANTS_ARGUMENT])
 }
 
 pub(crate) fn terminal_width_argument() -> Arg {

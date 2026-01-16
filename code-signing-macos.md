@@ -78,9 +78,26 @@ explanation describes the most simple way, using command line tools on the devel
 Search the internet if you need different ways to execute the steps, or if you want to incorporate
 them in your CI/CD pipeline.
 
+### Build
+
+The first step is to build the release version of the tool. Here you have to decide which features
+you want to be enabled (`manage` and/or `robot`). For this document we will build a version with
+all features enabled. Note that if you want to build multiple versions for different feature sets,
+you have to rename the created binaries between the different builds and execute the steps in the
+rest of this text once for each binary.
+
+Build the tool with the following command:
+
+```bash
+> cargo build --release --all-features
+```
+
+The build step will result in a binary file (`target/release/dsh`).
+
 ### Code signing
 
-Codesigning is executed by the `codesign` command:
+Next step is signing the binary with the KPN developers certificate.
+Code signing is executed by the `codesign` command:
 
 ```bash
 > codesign -o runtime -s "Developer ID Application: KPN B.V. (B86ZND72C8)" target/release/dsh
@@ -161,7 +178,7 @@ In order to poll the status of the process you can use the following command:
 ```
 
 When the notarise process is finished, you can check whether it was successful using the
-<tt>codesign</tt> command:
+`codesign` command:
 
 ```bash
 > codesign -vvvv -R="notarized" --check-notarization target/release/dsh
@@ -169,6 +186,8 @@ target/release/dsh: valid on disk
 target/release/dsh: satisfies its Designated Requirement
 target/release/dsh: explicit requirement satisfied
 ```
+
+## Create a GitHub release
 
 ## Tool
 

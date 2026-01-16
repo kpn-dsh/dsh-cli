@@ -5,21 +5,21 @@ export APP_UNDER_TEST=eavesdropper
 export BUCKET_UNDER_TEST=schema-registry
 export CERTIFICATE_UNDER_TEST=broker
 export ENV_VALUE_UNDER_TEST=info
-export ENV_VALUE_UNDER_TEST_REGEX="^info$"
+export ENV_VALUE_UNDER_TEST_REGEX="dsh"
 export ENV_VAR_QUERY_UNDER_TEST=password
 export ENV_VAR_UNDER_TEST=DSH_CLI_HOME
-export IMAGE_UNDER_TEST=registry:eavesdropper:0.10.0
+export IMAGE_UNDER_TEST=eavesdropper
 export IMAGE_UNDER_TEST_REGEX=registry
 export MANIFEST_UNDER_TEST=kpn/eavesdropper
 export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
 export PROXY_UNDER_TEST=broker
 export SECRET_NON_EXISTING=non-existing-secret
-export SECRET_UNDER_TEST=boss-account-ids
+export SECRET_UNDER_TEST=sbcm-ids
 export SERVICE_UNDER_TEST=keyring-dev
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
-export TOPIC_UNDER_TEST=reference-implementation-compliant
+export TOPIC_UNDER_TEST=reference-implementation-avro
 export VENDOR_UNDER_TEST=kpn
 export VHOST_UNDER_TEST=greenbox-dev
 export VOLUME_NON_EXISTING=non-existing-volume
@@ -45,28 +45,33 @@ export SAFE_COMMANDS=(
   "app explain $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "app list"
   "app list --ids"
+  "app list --output-format table-no-border"
   "app show $APP_UNDER_TEST"
+  "app show $APP_UNDER_TEST --output-format table-no-border"
   "app undeploy $APP_UNDER_TEST --force --dry-run"
 
   "bucket list --ids"
   "bucket list"
   "bucket show $BUCKET_UNDER_TEST"
 
+  "certificate list"
   "certificate list --configuration"
   "certificate list --ids"
   "certificate list --status"
   "certificate list --usage"
-  "certificate list"
   "certificate show $CERTIFICATE_UNDER_TEST --status"
   "certificate show $CERTIFICATE_UNDER_TEST --usage"
   "certificate show $CERTIFICATE_UNDER_TEST"
 
+  "env find $ENV_VALUE_UNDER_TEST"
   "env find $ENV_VALUE_UNDER_TEST --started"
   "env find $ENV_VALUE_UNDER_TEST --stopped"
-  "env find $ENV_VALUE_UNDER_TEST"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --regex"
   "env find $ENV_VALUE_UNDER_TEST_REGEX --regex --started"
   "env find $ENV_VALUE_UNDER_TEST_REGEX --regex --stopped"
-  "env find $ENV_VALUE_UNDER_TEST_REGEX --regex"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --substring"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --ignore-case"
+  "env find $ENV_VALUE_UNDER_TEST_REGEX --substring --ignore-case"
 
   "image find $IMAGE_UNDER_TEST --started"
   "image find $IMAGE_UNDER_TEST --stopped"
@@ -127,16 +132,19 @@ export SAFE_COMMANDS=(
 
   "secret create $SECRET_NON_EXISTING --dry-run < /dev/null"
   "secret delete $SECRET_UNDER_TEST --force --dry-run"
+  "secret list"
+  "secret list --certificates"
+  "secret list --ids"
+  "secret list --keys"
   "secret list --status"
   "secret list --system"
   "secret list --usage"
-  "secret list"
   "secret show $SECRET_UNDER_TEST --usage"
   "secret show $SECRET_UNDER_TEST --value"
   "secret show $SECRET_UNDER_TEST"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
-  "service export $SERVICE_UNDER_TEST --dry-run"
+  "service export $SERVICE_UNDER_TEST -o json"
   "service list --ids"
   "service list --started"
   "service list --status"

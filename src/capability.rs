@@ -38,7 +38,7 @@ pub(crate) const UNSET_COMMAND: &str = "unset";
 pub(crate) const UPDATE_COMMAND: &str = "update";
 
 #[async_trait]
-pub trait Capability {
+pub(crate) trait Capability {
   fn clap_capability_command(&self, subject_command: &str) -> Command;
 
   fn clap_flags(&self, subject: &str) -> Vec<Arg>;
@@ -56,9 +56,9 @@ pub trait Capability {
     matches: &ArgMatches,
     dsh_api_client: &DshApiClient,
     context: &Context,
-  ) -> DshCliResult;
+  ) -> DshCliResult<()>;
 
-  async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult;
+  async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()>;
 }
 
 #[async_trait]
@@ -71,12 +71,12 @@ pub(crate) trait CommandExecutor {
     matches: &ArgMatches,
     dsh_api_client: &DshApiClient,
     context: &Context,
-  ) -> DshCliResult {
+  ) -> DshCliResult<()> {
     unreachable!()
   }
 
   #[allow(unused_variables)]
-  async fn execute_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     unreachable!()
   }
 

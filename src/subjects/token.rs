@@ -2,16 +2,16 @@ use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, FETCH_COMMAND
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::OutputFormat;
+use crate::formatters::Value as FormatterValue;
+use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error_map, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
-use base64::engine::general_purpose::STANDARD_NO_PAD;
-use base64::Engine;
 use chrono::Local;
+use chrono::LocalResult::{Ambiguous, Single};
 use chrono::TimeZone;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -21,12 +21,12 @@ use log::debug;
 use serde::Serialize;
 use serde_json::Value;
 
-pub(crate) struct TokenSubject {}
+struct TokenSubject {}
 
 const TOKEN_SUBJECT_TARGET: &str = "token";
 
 lazy_static! {
-  pub static ref TOKEN_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TokenSubject {});
+  pub(crate) static ref TOKEN_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TokenSubject {});
 }
 
 #[async_trait]
@@ -75,20 +75,20 @@ struct TokenCopy {}
 
 #[async_trait]
 impl CommandExecutor for TokenCopy {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
-    context.print_explanation("fetch dsh api token");
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    context.print_explanation("fetch dsh api token and copy to clipboard");
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
-    match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(jwt.token.secret())) {
+    match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(jwt.token().secret())) {
       Ok(_) => {
-        let jwt_type = jwt.payload.token_type.clone().unwrap_or("unknown".to_string());
+        let jwt_type = jwt.payload().token_type.clone().unwrap_or("unknown".to_string());
         let not_before = &jwt
-          .payload
+          .payload()
           .not_before
           .map(|nbf| if nbf > 0 { format!(", not before: {}", nbf) } else { "".to_string() })
           .unwrap_or_default();
-        let expires_in = if jwt.payload.expires_in() > 0 { format!(", expires in: {}", jwt.payload.expires_in()) } else { "".to_string() };
+        let expires_in = if jwt.payload().expires_in() > 0 { format!(", expires in: {}", jwt.payload().expires_in()) } else { "".to_string() };
         context.print_outcome(format!("token copied to clipboard (type: {}, expires: {}{})", jwt_type, not_before, expires_in))
       }
       Err(error) => {
@@ -108,12 +108,12 @@ struct TokenFetch {}
 
 #[async_trait]
 impl CommandExecutor for TokenFetch {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("fetch dsh api token");
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
-    context.print(jwt.token.secret());
+    context.print(jwt.token().secret());
     Ok(())
   }
 
@@ -126,32 +126,17 @@ struct TokenShow {}
 
 #[async_trait]
 impl CommandExecutor for TokenShow {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let complete = matches.get_flag(FilterFlagType::Complete.id());
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(|error| error.to_string())?;
+    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
-    let parts: Vec<&str> = jwt.token.secret().split('.').collect();
-    if parts.len() != 3 {
-      return Err("".to_string());
-    }
-    let header = parts[0];
-    let payload = parts[1];
-    let _signature = parts[2];
-
     if complete {
       context.print_explanation("dsh api token header");
-      match STANDARD_NO_PAD.decode(header.as_bytes()) {
-        Ok(decoded_payload) => print_content("header", context, decoded_payload, &TOKEN_HEADER_LABELS_LIST),
-        Err(_) => context.print_error("header could not be decoded as base64"),
-      }
+      print_content("header", context, jwt.header_bytes(), &TOKEN_HEADER_LABELS_LIST);
     }
-
     context.print_explanation("dsh api token payload");
-    match STANDARD_NO_PAD.decode(payload.as_bytes()) {
-      Ok(decoded_payload) => print_content("payload", context, decoded_payload, &TOKEN_PAYLOAD_LABELS_LIST),
-      Err(_) => context.print_error("payload could not be decoded as base64"),
-    }
+    print_content("payload", context, jwt.payload_bytes(), &TOKEN_PAYLOAD_LABELS_LIST);
     Ok(())
   }
 
@@ -161,24 +146,25 @@ impl CommandExecutor for TokenShow {
 }
 
 fn print_content(kind: &str, context: &Context, decoded_payload: Vec<u8>, labels: &[TokenLabel]) {
-  let json_payload = String::from_utf8(decoded_payload).unwrap();
-  match serde_json::from_str::<Value>(&json_payload) {
-    Ok(deserialized_payload) => match context.output_format(None) {
-      OutputFormat::Json => context.print_serializable(deserialized_payload, Some(OutputFormat::Json)),
-      OutputFormat::JsonCompact => context.print_serializable(deserialized_payload, Some(OutputFormat::Json)),
-      _ => {
-        if let Some(payload_object) = deserialized_payload.as_object() {
-          let mut formatter = ListFormatter::new(labels, None, context);
-          let mut vals: Vec<(String, &Value)> = Vec::from_iter(payload_object.iter().map(|(key, value)| (key.to_string(), value)));
-          vals.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
-          for (key, value) in vals {
-            formatter.push_target_id_value(key, value);
+  if let Ok(json_payload) = String::from_utf8(decoded_payload) {
+    match serde_json::from_str::<Value>(&json_payload) {
+      Ok(deserialized_payload) => match context.output_format(None) {
+        OutputFormat::Json => context.print_serializable(deserialized_payload, Some(OutputFormat::Json)),
+        OutputFormat::JsonCompact => context.print_serializable(deserialized_payload, Some(OutputFormat::Json)),
+        _ => {
+          if let Some(payload_object) = deserialized_payload.as_object() {
+            let mut formatter = ListFormatter::new(labels, context);
+            let mut vals: Vec<(String, &Value)> = Vec::from_iter(payload_object.iter().map(|(key, value)| (key.to_string(), value)));
+            vals.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+            for (key, value) in vals {
+              formatter.push_target_id_value(key, value);
+            }
+            let _ = formatter.print(None);
           }
-          let _ = formatter.print(None);
         }
-      }
-    },
-    Err(_) => context.print_error(format!("{} could not be parsed as valid json", kind)),
+      },
+      Err(_) => context.print_error(format!("{} could not be parsed as valid json", kind)),
+    }
   }
 }
 
@@ -204,39 +190,51 @@ impl Label for TokenLabel {
 }
 
 impl SubjectFormatter<TokenLabel> for Value {
-  fn value(&self, label: &TokenLabel, target_id: &str) -> String {
+  fn value(&self, label: &TokenLabel, target_id: &str) -> FormatterValue {
     match label {
-      TokenLabel::Key => target_id.to_string(),
-      TokenLabel::Timestamp => {
-        if ["exp", "iat", "nbf"].contains(&target_id) {
-          let n = self.as_number();
-          let i = n.and_then(|number| number.as_i64());
-          let s = i.map(|valid_number| Local.timestamp_opt(valid_number, 0).unwrap().to_string());
-          s.unwrap_or("illegal number".to_string())
-        } else {
-          "".to_string()
-        }
-      }
+      TokenLabel::Key => FormatterValue::target(target_id),
+      TokenLabel::Timestamp => FormatterValue::plain(timestamp(self, target_id)),
       TokenLabel::Value => match self {
-        Value::Array(array) => array
-          .iter()
-          .map(|value| match value {
-            Value::Array(_) => "array (unexpected)".to_string(),
-            Value::Bool(boolean) => boolean.to_string(),
-            Value::Null => "null".to_string(),
-            Value::Number(number) => number.to_string(),
-            Value::Object(_) => "object (unexpected)".to_string(),
-            Value::String(string) => string.to_string(),
-          })
-          .collect_vec()
-          .join("\n"),
-        Value::Bool(boolean) => boolean.to_string(),
-        Value::Null => "null".to_string(),
-        Value::Number(number) => number.to_string(),
-        Value::Object(_) => "object (unexpected)".to_string(),
-        Value::String(string) => string.to_string(),
+        Value::Array(array) => FormatterValue::plain(
+          array
+            .iter()
+            .map(|value| match value {
+              Value::Array(_) => "array (unexpected)".to_string(),
+              Value::Bool(boolean) => boolean.to_string(),
+              Value::Null => "null".to_string(),
+              Value::Number(number) => number.to_string(),
+              Value::Object(_) => "object (unexpected)".to_string(),
+              Value::String(string) => string.to_string(),
+            })
+            .collect_vec()
+            .join("\n"),
+        ),
+        Value::Bool(boolean) => FormatterValue::plain(boolean),
+        Value::Null => FormatterValue::plain("null"),
+        Value::Number(number) => FormatterValue::plain(number),
+        Value::Object(_) => FormatterValue::plain("object (unexpected)"),
+        Value::String(string) => FormatterValue::plain(string),
       },
     }
+  }
+}
+
+fn timestamp(value: &Value, target_id: &str) -> String {
+  if ["auth_time", "exp", "iat", "nbf"].contains(&target_id) {
+    match value
+      .as_number()
+      .and_then(|number| number.as_i64())
+      .map(|valid_number| Local.timestamp_opt(valid_number, 0))
+    {
+      Some(mapped_local_time) => match mapped_local_time {
+        Single(single) => single.to_string(),
+        Ambiguous(ambiguous, _) => ambiguous.to_string(),
+        _ => value.to_string(),
+      },
+      None => "".to_string(),
+    }
+  } else {
+    "".to_string()
   }
 }
 

@@ -6,11 +6,11 @@ use crate::capability::{
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{hashmap_to_table, Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
+use crate::formatters::{hashmap_to_table, Value};
+use crate::formatters::{Label, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::bucket::BUCKET_LABELS;
@@ -20,7 +20,7 @@ use crate::subjects::service::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
 use crate::subjects::vhost::VHOST_LABELS;
 use crate::subjects::volume::VOLUME_LABELS;
-use crate::{get_target_platform, get_target_tenant, DshCliResult};
+use crate::{error, get_target_platform, get_target_tenant, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -29,6 +29,7 @@ use dsh_api::types::AppCatalogAppResourcesValue;
 use dsh_api::types::{AppCatalogApp, AppCatalogAppConfiguration};
 use dsh_api::version::Version;
 use futures::future::try_join;
+use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -37,12 +38,12 @@ use serde_json::de::from_str;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-pub(crate) struct AppSubject {}
+struct AppSubject {}
 
 const APP_SUBJECT_TARGET: &str = "app";
 
 lazy_static! {
-  pub static ref APP_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(AppSubject {});
+  pub(crate) static ref APP_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(AppSubject {});
 }
 
 #[async_trait]
@@ -95,7 +96,7 @@ lazy_static! {
       .add_target_argument(manifest_version_argument())
   );
   static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &AppListConfiguration {}, "List deployed apps")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &AppList {}, "List deployed apps")
       .set_long_about(
         "Lists all apps deployed from the DSH app catalog. If the --ids option is provided \
          only the app identifiers will be listed."
@@ -108,7 +109,7 @@ lazy_static! {
       .add_target_argument(app_id_argument().required(true))
   );
   static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &AppShowAll {}, "Show deployed app configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &AppShow {}, "Show deployed app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .add_target_argument(app_id_argument().required(true))
   );
@@ -131,18 +132,18 @@ struct AppDeploy {}
 
 #[async_trait]
 impl CommandExecutor for AppDeploy {
-  async fn execute_with_client(&self, target: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let manifest_id = target.unwrap_or_else(|| unreachable!());
-    let manifest_version = Version::from_str(sub_argument.unwrap().as_str())?;
+    let manifest_version = Version::from_str(sub_argument.unwrap_or_else(|| unreachable!()).as_str())?;
     let app_id = matches.get_one::<String>(APP_ID_ARGUMENT).unwrap_or_else(|| unreachable!());
     if client.get_appcatalog_app_configuration(app_id).await.is_ok() {
-      return Err(format!("app '{}' already exists", app_id));
+      return Err(error!("app '{}' already exists", app_id));
     }
     let implicit_defaults = matches.get_flag(ModifierFlagType::ImplicitDefaults.id());
     context.print_explanation(format!("get manifest '{}', version {}", manifest_id, manifest_version));
     let ((gid, uid), manifest) = try_join(client.guid(), client.manifest(manifest_id.as_str(), &manifest_version))
       .await
-      .map_err(|_| format!("manifest '{}:{}' does not exist", manifest_id, manifest_version))?;
+      .map_err(|_| error!("manifest '{}:{}' does not exist", manifest_id, manifest_version))?;
     let command_line_app_parameters = match matches.get_many::<String>(APP_PARAMETER_ARGUMENT) {
       Some(app_parameters) => app_parameters
         .map(|app_parameter| parse_app_parameter(app_parameter.as_str()))
@@ -158,7 +159,7 @@ impl CommandExecutor for AppDeploy {
       property_names.sort();
       for property_name in property_names {
         let property = manifest_configuration.properties.get(property_name).unwrap_or_else(|| unreachable!());
-        let app_parameter: Result<String, String> = match command_line_app_parameters.get(property_name) {
+        let app_parameter: DshCliResult<String> = match command_line_app_parameters.get(property_name) {
           Some(command_line_app_parameter) => Ok(command_line_app_parameter.clone()),
           None => {
             if context.stdin_is_terminal() {
@@ -176,14 +177,14 @@ impl CommandExecutor for AppDeploy {
             } else if implicit_defaults {
               match property.default.clone() {
                 Some(property_default) => Ok(property_default),
-                None => Err("no default for property".to_string()),
+                None => Err(error!("no default for property")),
               }
             } else {
-              Err("no default for property".to_string())
+              Err(error!("no default for property"))
             }
           }
         };
-        match app_parameter.and_then(|a| validate_parameter(&a, property_name, property)) {
+        match app_parameter.and_then(|app_parameter| validate_parameter(&app_parameter, property_name, property)) {
           Ok(valid_parameter) => {
             app_configuration.insert(property_name.clone(), valid_parameter);
           }
@@ -195,9 +196,9 @@ impl CommandExecutor for AppDeploy {
       }
     }
     if missing_or_invalid_parameters == 1 {
-      return Err("missing or invalid parameter".to_string());
+      return Err(error!("missing or invalid parameter"));
     } else if missing_or_invalid_parameters > 1 {
-      return Err(format!("{} missing or invalid parameters", missing_or_invalid_parameters));
+      return Err(error!("{} missing or invalid parameters", missing_or_invalid_parameters));
     }
     let app_catalog_app_configuration = AppCatalogAppConfiguration {
       configuration: app_configuration,
@@ -205,7 +206,7 @@ impl CommandExecutor for AppDeploy {
       name: app_id.to_string(),
       stopped: false,
     };
-    UnitFormatter::new(app_id, &APP_CATALOG_APP_CONFIGURATION_LABELS, Some("app id"), context).print(&app_catalog_app_configuration, None)?;
+    UnitFormatter::new(app_id, &APP_CATALOG_APP_CONFIGURATION_LABELS, context).print(&app_catalog_app_configuration, None)?;
     if context.dry_run() {
       context.print_warning("dry-run mode, app not deployed");
     } else {
@@ -220,13 +221,13 @@ impl CommandExecutor for AppDeploy {
   }
 }
 
-fn validate_parameter(parameter: &String, property_name: &str, property: &Property) -> Result<String, String> {
+fn validate_parameter(parameter: &String, property_name: &str, property: &Property) -> DshCliResult<String> {
   match &property.enumeration {
     Some(enumeration) => {
       if enumeration.contains(parameter) {
         Ok(parameter.clone())
       } else {
-        Err(format!(
+        Err(error!(
           "property {} has illegal value \"{}\", should be one of {}",
           property_name,
           parameter,
@@ -242,7 +243,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
         if parameter == "private" || parameter == "public" {
           Ok(parameter.clone())
         } else {
-          Err(format!(
+          Err(error!(
             "dns-zone property {} has illegal value \"{}\", should be \"private\" or \"public\"",
             property_name, parameter
           ))
@@ -250,11 +251,11 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
       }
       PropertyKind::Number => {
         lazy_static! {
-          static ref NUMBER_REGEX: Regex = Regex::new(r"^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$").unwrap();
+          static ref NUMBER_REGEX: Regex = Regex::new(r"^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$").unwrap_or_else(|_| unreachable!());
         }
         match NUMBER_REGEX.captures(parameter) {
           Some(_) => Ok(parameter.clone()),
-          None => Err(format!("property {} has illegal value \"{}\", should be a number", property_name, parameter)),
+          None => Err(error!("property {} has illegal value \"{}\", should be a number", property_name, parameter)),
         }
       }
       PropertyKind::String => Ok(parameter.clone()),
@@ -262,30 +263,33 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
   }
 }
 
-fn parse_app_parameter(app_parameter: &str) -> Result<(String, String), String> {
+fn parse_app_parameter(app_parameter: &str) -> DshCliResult<(String, String)> {
   lazy_static! {
-    static ref APP_PARAMETER_REGEX: Regex = Regex::new(r"^([A-Z][a-zA-Z0-9_]+)=(.*)$").unwrap();
+    static ref APP_PARAMETER_REGEX: Regex = Regex::new(r"^([A-Z][a-zA-Z0-9_]+)=(.*)$").unwrap_or_else(|_| unreachable!());
   }
   match APP_PARAMETER_REGEX.captures(app_parameter) {
-    Some(captures) => Ok((captures.get(1).unwrap().as_str().to_string(), captures.get(2).unwrap().as_str().to_string())),
-    None => Err(format!("illegal app parameter {}", app_parameter)),
+    Some(captures) => Ok((
+      captures.get(1).unwrap_or_else(|| unreachable!()).as_str().to_string(),
+      captures.get(2).unwrap_or_else(|| unreachable!()).as_str().to_string(),
+    )),
+    None => Err(error!("illegal app parameter {}", app_parameter)),
   }
 }
 
-struct AppListConfiguration {}
+struct AppList {}
 
 #[async_trait]
-impl CommandExecutor for AppListConfiguration {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+impl CommandExecutor for AppList {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all deployed apps and their configurations");
     let start_instant = context.now();
     let apps = client.get_appcatalogapp_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut app_ids = apps.keys().map(|k| k.to_string()).collect_vec();
     app_ids.sort();
-    let mut formatter = ListFormatter::new(&APP_CATALOG_APP_LABELS, Some("app id"), context);
+    let mut formatter = ListFormatter::new(&APP_CATALOG_APP_LABELS, context);
     for app_id in app_ids {
-      let app = apps.get(&app_id).unwrap();
+      let app = apps.get(&app_id).unwrap_or_else(|| unreachable!());
       formatter.push_target_id_value(app_id, app);
     }
     formatter.print(None)?;
@@ -301,14 +305,14 @@ struct AppListIds {}
 
 #[async_trait]
 impl CommandExecutor for AppListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all deployed app ids");
     let start_instant = context.now();
     let ids = client.app_ids().await?;
     context.print_execution_time(start_instant);
     let mut formatter = IdsFormatter::new("app id", context);
     formatter.push_target_ids(&ids);
-    formatter.print(Some(OutputFormat::Plain))?;
+    formatter.print(None)?;
     Ok(())
   }
 
@@ -321,7 +325,7 @@ struct AppOpen {}
 
 #[async_trait]
 impl CommandExecutor for AppOpen {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant_name = get_target_tenant(matches, context.settings())?;
     let app_id = target.unwrap_or_else(|| unreachable!());
@@ -331,7 +335,7 @@ impl CommandExecutor for AppOpen {
     for resource in app.resources.values() {
       if let AppCatalogAppResourcesValue::Vhost(vhost) = resource {
         lazy_static! {
-          static ref VHOST_REGEX: Regex = Regex::new(r"^([a-zA-Z0-9_-]+)\.([a-zA-Z0-9_-]+)@([a-zA-Z0-9_-]+)$").unwrap();
+          static ref VHOST_REGEX: Regex = Regex::new(r"^([a-zA-Z0-9_-]+)\.([a-zA-Z0-9_-]+)@([a-zA-Z0-9_-]+)$").unwrap_or_else(|_| unreachable!());
         }
         match VHOST_REGEX.captures(vhost.value.as_str()) {
           Some(captures) => {
@@ -342,12 +346,15 @@ impl CommandExecutor for AppOpen {
                     "https://{}",
                     client
                       .platform()
-                      .tenant_private_vhost_domain(client.tenant().name(), captures.get(1).unwrap().as_str())?
+                      .tenant_private_vhost_domain(client.tenant().name(), captures.get(1).unwrap_or_else(|| unreachable!()).as_str())?
                   ),
                   format!("private vhost for tenant '{}@{}' and app '{}'", tenant_name, platform, app_id),
                 ),
                 "public" => context.open_url(
-                  format!("https://{}", client.platform().public_vhost_domain(captures.get(1).unwrap().as_str())),
+                  format!(
+                    "https://{}",
+                    client.platform().public_vhost_domain(captures.get(1).unwrap_or_else(|| unreachable!()).as_str())
+                  ),
                   format!("public vhost for tenant '{}@{}' and app '{}'", tenant_name, platform, app_id),
                 ),
                 illegal_zone => context.print_warning(format!("illegal zone in vhost resource {}", illegal_zone)),
@@ -366,39 +373,42 @@ impl CommandExecutor for AppOpen {
   }
 }
 
-struct AppShowAll {}
+struct AppShow {}
 
 #[async_trait]
-impl CommandExecutor for AppShowAll {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+impl CommandExecutor for AppShow {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let app_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for app '{}'", app_id));
     let start_instant = context.now();
-    let app: AppCatalogApp = client.get_appcatalogapp_configuration(&app_id).await?;
+    let (app_catalog_app, allocation_status) = join!(client.get_appcatalogapp_configuration(&app_id), client.get_appcatalog_app_status(&app_id));
     context.print_execution_time(start_instant);
-    UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, Some("app id"), context).print(&app, None)?;
+    context.print_allocation_status(&allocation_status, APP_SUBJECT_TARGET);
+    let app = app_catalog_app?;
+    UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, context).print(&app, None)?;
+    // UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, Some("app id"), context).print(&app, None)?;
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(service) => {
-          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, Some("service resource"), context).print(service, None)?;
+          UnitFormatter::new(resource_name, &SERVICE_LABELS_SHOW, context).print(service, None)?;
         }
         AppCatalogAppResourcesValue::Bucket(bucket) => {
-          UnitFormatter::new(resource_name, &BUCKET_LABELS, Some("bucket resource"), context).print(bucket, None)?;
+          UnitFormatter::new(resource_name, &BUCKET_LABELS, context).print(bucket, None)?;
         }
         AppCatalogAppResourcesValue::Certificate(certificate) => {
-          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, Some("certificate resource"), context).print(certificate, None)?;
+          UnitFormatter::new(resource_name, &CERTIFICATE_LABELS_SHOW, context).print(certificate, None)?;
         }
         AppCatalogAppResourcesValue::Secret(secret) => {
-          UnitFormatter::new(resource_name, &["secret".to_string()], Some("secret"), context).print(&secret.name, None)?;
+          UnitFormatter::new(resource_name, &["secret".to_string()], context).print(&secret.name, None)?;
         }
         AppCatalogAppResourcesValue::Topic(topic) => {
-          UnitFormatter::new(resource_name, &TOPIC_LABELS, Some("topic resource"), context).print(topic, None)?;
+          UnitFormatter::new(resource_name, &TOPIC_LABELS, context).print(topic, None)?;
         }
         AppCatalogAppResourcesValue::Vhost(vhost) => {
-          UnitFormatter::new(resource_name, &VHOST_LABELS, Some("vhost resource"), context).print(vhost, None)?;
+          UnitFormatter::new(resource_name, &VHOST_LABELS, context).print(vhost, None)?;
         }
         AppCatalogAppResourcesValue::Volume(volume) => {
-          UnitFormatter::new(resource_name, &VOLUME_LABELS, Some("volume resource"), context).print(volume, None)?;
+          UnitFormatter::new(resource_name, &VOLUME_LABELS, context).print(volume, None)?;
         }
       }
     }
@@ -414,10 +424,10 @@ struct AppUndeploy {}
 
 #[async_trait]
 impl CommandExecutor for AppUndeploy {
-  async fn execute_with_client(&self, target: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let app_id = target.unwrap_or_else(|| unreachable!());
     if client.get_appcatalog_app_configuration(&app_id).await.is_err() {
-      return Err(format!("app '{}' does not exist", app_id));
+      return Err(error!("app '{}' does not exist", app_id));
     }
     if context.confirmed(format!("undeploy app '{}'?", app_id))? {
       if context.dry_run() {
@@ -439,7 +449,7 @@ impl CommandExecutor for AppUndeploy {
 
 const APP_PARAMETER_ARGUMENT: &str = "app-parameter-argument";
 
-pub(crate) fn app_parameter_argument() -> Arg {
+fn app_parameter_argument() -> Arg {
   Arg::new(APP_PARAMETER_ARGUMENT)
     .long("app-parameter")
     .short('a')
@@ -457,7 +467,7 @@ pub(crate) fn app_parameter_argument() -> Arg {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum AppCatalogAppLabel {
+enum AppCatalogAppLabel {
   Configuration,
   ManifestUrn,
   Target,
@@ -478,25 +488,25 @@ impl Label for AppCatalogAppLabel {
 }
 
 impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
-  fn value(&self, label: &AppCatalogAppLabel, target_id: &str) -> String {
+  fn value(&self, label: &AppCatalogAppLabel, target_id: &str) -> Value {
     match label {
       AppCatalogAppLabel::Configuration => match &self.configuration {
         Some(configuration) => match from_str::<HashMap<String, String>>(configuration) {
-          Ok(map) => hashmap_to_table(&map.iter().filter(|(key, _)| !key.starts_with("@")).collect()),
-          Err(_) => "error".to_string(),
+          Ok(map) => Value::plain(hashmap_to_table(&map.iter().filter(|(key, _)| !key.starts_with("@")).collect())),
+          Err(_) => Value::error("error"),
         },
-        None => "empty".to_string(),
+        None => Value::Empty,
       },
-      AppCatalogAppLabel::ManifestUrn => self.manifest_urn.clone(),
-      AppCatalogAppLabel::Target => target_id.to_string(),
+      AppCatalogAppLabel::ManifestUrn => Value::plain(&self.manifest_urn),
+      AppCatalogAppLabel::Target => Value::target(target_id),
     }
   }
 }
 
-pub static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
+static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum AppCatalogAppConfigurationLabel {
+enum AppCatalogAppConfigurationLabel {
   Configuration,
   ManifestUrn,
   Name,
@@ -519,17 +529,17 @@ impl Label for AppCatalogAppConfigurationLabel {
 }
 
 impl SubjectFormatter<AppCatalogAppConfigurationLabel> for AppCatalogAppConfiguration {
-  fn value(&self, label: &AppCatalogAppConfigurationLabel, target_id: &str) -> String {
+  fn value(&self, label: &AppCatalogAppConfigurationLabel, target_id: &str) -> Value {
     match label {
-      AppCatalogAppConfigurationLabel::Configuration => hashmap_to_table(&self.configuration),
-      AppCatalogAppConfigurationLabel::ManifestUrn => self.manifest_urn.clone(),
-      AppCatalogAppConfigurationLabel::Name => target_id.to_string(),
-      AppCatalogAppConfigurationLabel::Stopped => self.stopped.to_string(),
+      AppCatalogAppConfigurationLabel::Configuration => Value::plain(hashmap_to_table(&self.configuration)),
+      AppCatalogAppConfigurationLabel::ManifestUrn => Value::plain(&self.manifest_urn),
+      AppCatalogAppConfigurationLabel::Name => Value::target(target_id),
+      AppCatalogAppConfigurationLabel::Stopped => Value::plain(self.stopped),
     }
   }
 }
 
-pub static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
+static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
   [AppCatalogAppConfigurationLabel::Name, AppCatalogAppConfigurationLabel::ManifestUrn, AppCatalogAppConfigurationLabel::Stopped, AppCatalogAppConfigurationLabel::Configuration];
 
 const DEPLOY_LONG_ABOUT: &str = "Deploy an app from the app catalog. \

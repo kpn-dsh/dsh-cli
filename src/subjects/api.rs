@@ -1,9 +1,11 @@
 use crate::capability::{Capability, CommandExecutor, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+#[cfg(feature = "manage")]
+use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -13,12 +15,12 @@ use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
-pub(crate) struct ApiSubject {}
+struct ApiSubject {}
 
 const API_SUBJECT_TARGET: &str = "api";
 
 lazy_static! {
-  pub static ref API_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ApiSubject {});
+  pub(crate) static ref API_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ApiSubject {});
 }
 
 #[async_trait]
@@ -249,19 +251,15 @@ struct ApiDelete {}
 
 #[async_trait]
 impl CommandExecutor for ApiDelete {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("delete", selector).unwrap_or_else(|| unreachable!());
+    let parameters = parameters_from_matches(matches, method_descriptor)?;
     context.print_explanation(format!("DELETE {}", method_descriptor.path));
     if context.confirmed("delete?")? {
       if context.dry_run() {
         context.print_warning("dry-run mode, nothing deleted");
       } else {
-        let parameters = method_descriptor
-          .parameters
-          .iter()
-          .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-          .collect_vec();
         let start_instant = context.now();
         client.delete(selector, &parameters).await?;
         context.print_execution_time(start_instant);
@@ -282,15 +280,11 @@ struct ApiGet {}
 
 #[async_trait]
 impl CommandExecutor for ApiGet {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("get", selector).unwrap_or_else(|| unreachable!());
+    let parameters = parameters_from_matches(matches, method_descriptor)?;
     context.print_explanation(format!("GET {}", method_descriptor.path));
-    let parameters = method_descriptor
-      .parameters
-      .iter()
-      .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect_vec();
     let start_instant = context.now();
     let response = client.get(selector, &parameters).await?;
     context.print_execution_time(start_instant);
@@ -309,15 +303,11 @@ struct ApiHead {}
 #[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiHead {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("head", selector).unwrap_or_else(|| unreachable!());
+    let parameters = parameters_from_matches(matches, method_descriptor)?;
     context.print_explanation(format!("HEAD {}", method_descriptor.path));
-    let parameters = method_descriptor
-      .parameters
-      .iter()
-      .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect_vec();
     let start_instant = context.now();
     client.head(selector, &parameters).await?;
     context.print_execution_time(start_instant);
@@ -336,15 +326,11 @@ struct ApiPatch {}
 #[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiPatch {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("patch", selector).unwrap_or_else(|| unreachable!());
+    let parameters = parameters_from_matches(matches, method_descriptor)?;
     context.print_explanation(format!("PATCH {}", method_descriptor.path));
-    let parameters = method_descriptor
-      .parameters
-      .iter()
-      .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect_vec();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
     if context.dry_run() {
       context.print_warning("dry-run mode, nothing patched");
@@ -359,7 +345,7 @@ impl CommandExecutor for ApiPatch {
         }
         Err(error) => {
           log::debug!("{:#?}", error);
-          Err(error.to_string())
+          Err(DshCliError::from(error))
         }
       }
     }
@@ -374,15 +360,11 @@ struct ApiPost {}
 
 #[async_trait]
 impl CommandExecutor for ApiPost {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("post", selector).unwrap_or_else(|| unreachable!());
+    let parameters = parameters_from_matches(matches, method_descriptor)?;
     context.print_explanation(format!("POST {}", method_descriptor.path));
-    let parameters = method_descriptor
-      .parameters
-      .iter()
-      .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect_vec();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
     if context.dry_run() {
       context.print_warning("dry-run mode, nothing posted");
@@ -405,15 +387,11 @@ struct ApiPut {}
 
 #[async_trait]
 impl CommandExecutor for ApiPut {
-  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (selector, matches) = matches.subcommand().unwrap_or_else(|| unreachable!());
     let method_descriptor = find_method_descriptor("put", selector).unwrap_or_else(|| unreachable!());
+    let parameters = parameters_from_matches(matches, method_descriptor)?;
     context.print_explanation(format!("PUT {}", method_descriptor.path));
-    let parameters = method_descriptor
-      .parameters
-      .iter()
-      .map(|(parameter_name, _, _)| matches.get_one::<String>(parameter_name).unwrap().as_str())
-      .collect_vec();
     let body = if method_descriptor.body_type.is_some() { Some(context.read_multi_line("enter json request body (terminate input with ctrl-d after last line)")?) } else { None };
     if context.dry_run() {
       context.print_warning("dry-run mode, nothing put");
@@ -432,11 +410,24 @@ impl CommandExecutor for ApiPut {
   }
 }
 
+fn parameters_from_matches<'a>(matches: &'a ArgMatches, method_descriptor: &MethodDescriptor) -> DshCliResult<Vec<&'a str>> {
+  method_descriptor
+    .parameters
+    .iter()
+    .map(|(parameter_name, _, _)| {
+      matches
+        .get_one::<String>(parameter_name)
+        .ok_or(error!("missing parameter {}", parameter_name))
+        .map(|parameter| parameter.as_str())
+    })
+    .collect::<Result<Vec<_>, _>>()
+}
+
 struct ApiShow {}
 
 #[async_trait]
 impl CommandExecutor for ApiShow {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("print the open api specification");
     context.print(DshApiClient::openapi_spec());
     Ok(())

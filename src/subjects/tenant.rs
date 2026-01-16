@@ -5,12 +5,13 @@ use crate::capability::{
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::flags::FlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::limits_flags::{
   certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
   stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_FLAG, CONSUMER_RATE_FLAG, CPU_FLAG, KAFKA_ACL_GROUP_COUNT_FLAG,
@@ -18,26 +19,26 @@ use crate::limits_flags::{
   VPN_FLAG,
 };
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::stream::Stream;
 use dsh_api::tenant::TenantLimits;
 use dsh_api::types::{LimitValue, ManagedStreamId, ManagedTenant, ManagedTenantServices, ManagedTenantServicesName};
-use dsh_api::{AccessRights, DshApiError};
-use futures::future::try_join_all;
-use futures::try_join;
+use dsh_api::AccessRights;
+use futures::future::{try_join, try_join_all};
+use futures::{join, try_join};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
 
-pub(crate) struct TenantSubject {}
+struct TenantSubject {}
 
 const TENANT_SUBJECT_TARGET: &str = "tenant";
 
 lazy_static! {
-  pub static ref TENANT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TenantSubject {});
+  pub(crate) static ref TENANT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(TenantSubject {});
 }
 
 lazy_static! {
@@ -83,7 +84,7 @@ lazy_static! {
       .add_extra_argument(stream_rw_flag("Revoke"))
   );
   static ref TENANT_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TenantShowAll {}, "Show managed tenant configuration")
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TenantShow {}, "Show managed tenant configuration")
       .set_long_about("Show the configuration of a managed tenant.")
       .add_target_argument(managed_tenant_argument().required(true))
       .add_command_executor(FlagType::Stream, &TenantShowStreams {}, None)
@@ -148,10 +149,10 @@ struct TenantCreate {}
 
 #[async_trait]
 impl CommandExecutor for TenantCreate {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     if client.get_tenant_configuration(&tenant_id).await.is_ok() {
-      return Err(format!("managed tenant '{}' already exists", tenant_id));
+      return Err(error!("managed tenant '{}' already exists", tenant_id));
     }
     let enable_tracing = matches.get_one::<bool>(TRACING_FLAG);
     let enable_vpn = matches.get_one::<bool>(VPN_FLAG);
@@ -185,10 +186,10 @@ struct TenantDelete {}
 
 #[async_trait]
 impl CommandExecutor for TenantDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     if client.get_tenant_configuration(&tenant_id).await.is_err() {
-      return Err(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
+      return Err(error!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
     }
     if context.confirmed(format!("delete tenant '{}'?", tenant_id))? {
       if context.dry_run() {
@@ -212,7 +213,7 @@ struct TenantGrant {}
 
 #[async_trait]
 impl CommandExecutor for TenantGrant {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_tenant_id = target.unwrap_or_else(|| unreachable!());
     let (managed_stream_id, access_rights) = get_managed_stream_id(matches, client.tenant_name())?;
     context.print_explanation(format!(
@@ -235,7 +236,7 @@ struct TenantListAll {}
 
 #[async_trait]
 impl CommandExecutor for TenantListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all tenants with their limits");
     let start_instant = context.now();
     let tenant_ids: Vec<String> = client.get_tenant_ids().await?;
@@ -248,7 +249,7 @@ impl CommandExecutor for TenantListAll {
       )?;
       context.print_execution_time(start_instant);
       let managed_tenants_limits: Vec<(ManagedTenant, TenantLimits)> = managed_tenants.into_iter().zip(limits).collect_vec();
-      let mut formatter = ListFormatter::new(&TENANT_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&TENANT_LABELS, context);
       for (tenant_id, managed_tenant_limit) in tenant_ids.iter().zip(&managed_tenants_limits) {
         formatter.push_target_id_value(tenant_id.clone(), managed_tenant_limit);
       }
@@ -266,7 +267,7 @@ struct TenantListIds {}
 
 #[async_trait]
 impl CommandExecutor for TenantListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all tenant ids");
     let start_instant = context.now();
     let tenant_ids: Vec<String> = client.get_tenant_ids().await?;
@@ -290,7 +291,7 @@ struct TenantListStreams {}
 
 #[async_trait]
 impl CommandExecutor for TenantListStreams {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all tenants with the managed streams that they are granted access");
     let start_instant = context.now();
 
@@ -301,7 +302,7 @@ impl CommandExecutor for TenantListStreams {
       let tenants_granted_streams: Vec<Vec<(ManagedStreamId, Stream, AccessRights)>> =
         try_join_all(tenant_ids.iter().map(|tenant_id| client.managed_tenant_granted_managed_streams(tenant_id))).await?;
       context.print_execution_time(start_instant);
-      let mut formatter = ListFormatter::new(&LIST_STREAM_ACCESS_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&LIST_STREAM_ACCESS_LABELS, context);
       for (tenant_id, granted_streams) in tenant_ids.iter().zip(&tenants_granted_streams) {
         for granted_stream in granted_streams {
           formatter.push_target_id_value(tenant_id.clone(), granted_stream);
@@ -321,7 +322,7 @@ struct TenantRevoke {}
 
 #[async_trait]
 impl CommandExecutor for TenantRevoke {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_tenant_id = target.unwrap_or_else(|| unreachable!());
     let (managed_stream_id, rights) = get_managed_stream_id(matches, client.tenant_name())?;
     context.print_explanation(format!(
@@ -338,26 +339,27 @@ impl CommandExecutor for TenantRevoke {
   }
 }
 
-struct TenantShowAll {}
+struct TenantShow {}
 
 #[async_trait]
-impl CommandExecutor for TenantShowAll {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+impl CommandExecutor for TenantShow {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show all limits for tenant '{}'", tenant_id));
+    context.print_explanation(format!("show tenant '{}' with its limits", tenant_id));
     let start_instant = context.now();
-    match try_join!(client.get_tenant_configuration(&tenant_id), client.managed_tenant_limits(&tenant_id)) {
+    let (managed_tenant_with_limits, allocation_status) = join!(
+      try_join(client.get_tenant_configuration(&tenant_id), client.managed_tenant_limits(&tenant_id)),
+      client.get_tenant_status(&tenant_id)
+    );
+    match managed_tenant_with_limits {
       Ok((managed_tenant, tenant_limits)) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(tenant_id, &TENANT_LABELS, Some("tenant id"), context).print(&(managed_tenant, tenant_limits), None)
+        context.print_allocation_status(&allocation_status, TENANT_SUBJECT_TARGET);
+        UnitFormatter::new(tenant_id, &TENANT_LABELS, context).print(&(managed_tenant, tenant_limits), None)
       }
-      Err(error) => match error {
-        DshApiError::NotFound(None) => {
-          context.print_error(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
-          Ok(())
-        }
-        error => Err(String::from(error)),
-      },
+      Err(error) => DshCliError::accept_not_found(error, || {
+        context.print_error(format!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id))
+      }),
     }
   }
 
@@ -370,13 +372,13 @@ struct TenantShowStreams {}
 
 #[async_trait]
 impl CommandExecutor for TenantShowStreams {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all streams that tenant '{}' has access to", tenant_id));
     let start_instant = context.now();
     let grants: Vec<(ManagedStreamId, Stream, AccessRights)> = client.managed_tenant_granted_managed_streams(&tenant_id).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&STREAM_ACCESS_LABELS, None, context);
+    let mut formatter = ListFormatter::new(&STREAM_ACCESS_LABELS, context);
     formatter.push_values(&grants);
     formatter.print(None)
   }
@@ -390,7 +392,7 @@ struct TenantUpdateLimit {}
 
 #[async_trait]
 impl CommandExecutor for TenantUpdateLimit {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     let enable_tracing_argument = matches.get_one::<bool>(TRACING_FLAG);
     let enable_vpn_argument = matches.get_one::<bool>(VPN_FLAG);
@@ -400,7 +402,7 @@ impl CommandExecutor for TenantUpdateLimit {
       enable_tracing_argument.is_some() || enable_vpn_argument.is_some(),
       !tenant_limits_from_arguments.is_empty(),
     ) {
-      (false, false) => Err("at least one limit or capability argument must be provided".to_string()),
+      (false, false) => Err(error!("at least one limit or capability argument must be provided")),
 
       (false, true) => {
         context.print_explanation(format!("update limits of managed tenant '{}'", tenant_id));
@@ -421,13 +423,9 @@ impl CommandExecutor for TenantUpdateLimit {
             }
             Ok(())
           }
-          Err(error) => match error {
-            DshApiError::NotFound(None) => {
-              context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
-              Ok(())
-            }
-            error => Err(String::from(error)),
-          },
+          Err(error) => DshCliError::accept_not_found(error, || {
+            context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id))
+          }),
         }
       }
 
@@ -480,17 +478,13 @@ impl CommandExecutor for TenantUpdateLimit {
             }
             Ok(())
           }
-          Err(error) => match error {
-            DshApiError::NotFound(None) => {
-              context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
-              Ok(())
-            }
-            error => Err(String::from(error)),
-          },
+          Err(error) => DshCliError::accept_not_found(error, || {
+            context.print_error(format!("managed tenant '{}' does not exist or you are not authorized to manage it", tenant_id))
+          }),
         }
       }
 
-      (true, true) => Err("provide either limit arguments or capability arguments, but not both".to_string()),
+      (true, true) => Err(error!("provide either limit arguments or capability arguments, but not both")),
     }
   }
 
@@ -499,7 +493,7 @@ impl CommandExecutor for TenantUpdateLimit {
   }
 }
 
-fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<(ManagedStreamId, AccessRights), String> {
+fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> DshCliResult<(ManagedStreamId, AccessRights)> {
   Ok(match matches.get_one::<String>(STREAM_READ_FLAG) {
     Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Read),
     None => match matches.get_one::<String>(STREAM_RW_FLAG) {
@@ -512,15 +506,15 @@ fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> Result<
   })
 }
 
-fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> Result<ManagedStreamId, String> {
+fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> DshCliResult<ManagedStreamId> {
   if stream_argument.starts_with(&format!("{}---", managing_tenant)) {
-    ManagedStreamId::try_from(stream_argument).map_err(|error| error.to_string())
+    ManagedStreamId::try_from(stream_argument).map_err(DshCliError::from)
   } else {
-    Err(format!("managed stream id must start with '{}---'", managing_tenant))
+    Err(error!("managed stream id must start with '{}---'", managing_tenant))
   }
 }
 
-fn tenant_limits_try_from_matches(matches: &ArgMatches) -> Result<TenantLimits, String> {
+fn tenant_limits_try_from_matches(matches: &ArgMatches) -> DshCliResult<TenantLimits> {
   Ok(TenantLimits {
     certificate_count: matches.get_one::<i64>(CERTIFICATE_COUNT_FLAG).cloned(),
     consumer_rate: matches.get_one::<i64>(CONSUMER_RATE_FLAG).cloned(),
@@ -529,7 +523,7 @@ fn tenant_limits_try_from_matches(matches: &ArgMatches) -> Result<TenantLimits, 
         if (0.01..=16.0).contains(&cpus) {
           Some(cpus)
         } else {
-          return Err("number of cpus should be greater than or equal to 0.01 and lower than or equal to 16.0".to_string());
+          return Err(error!("number of cpus should be greater than or equal to 0.01 and lower than or equal to 16.0"));
         }
       }
       None => None,
@@ -545,7 +539,7 @@ fn tenant_limits_try_from_matches(matches: &ArgMatches) -> Result<TenantLimits, 
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum TenantLabel {
+enum TenantLabel {
   CertificateCount,
   ConsumerRate,
   Cpu,
@@ -610,25 +604,25 @@ impl Label for TenantLabel {
 }
 
 impl SubjectFormatter<TenantLabel> for TenantLimits {
-  fn value(&self, label: &TenantLabel, target_id: &str) -> String {
+  fn value(&self, label: &TenantLabel, target_id: &str) -> Value {
     match label {
-      TenantLabel::CertificateCount => self.certificate_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLabel::ConsumerRate => self.consumer_rate.map(|rate| rate.to_string()).unwrap_or_default(),
-      TenantLabel::Cpu => self.cpu.map(|cpu| cpu.to_string()).unwrap_or_default(),
-      TenantLabel::KafkaAclGroupCount => self.kafka_acl_group_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLabel::Mem => self.mem.map(|mem| mem.to_string()).unwrap_or_default(),
-      TenantLabel::PartitionCount => self.partition_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLabel::ProducerRate => self.producer_rate.map(|rate| rate.to_string()).unwrap_or_default(),
-      TenantLabel::RequestRate => self.request_rate.map(|rate| rate.to_string()).unwrap_or_default(),
-      TenantLabel::SecretCount => self.secret_count.map(|count| count.to_string()).unwrap_or_default(),
-      TenantLabel::Tenant => target_id.to_string(),
-      TenantLabel::TopicCount => self.topic_count.map(|count| count.to_string()).unwrap_or_default(),
+      TenantLabel::CertificateCount => Value::option(self.certificate_count),
+      TenantLabel::ConsumerRate => Value::option(self.consumer_rate),
+      TenantLabel::Cpu => Value::option(self.cpu),
+      TenantLabel::KafkaAclGroupCount => Value::option(self.kafka_acl_group_count),
+      TenantLabel::Mem => Value::option(self.mem),
+      TenantLabel::PartitionCount => Value::option(self.partition_count),
+      TenantLabel::ProducerRate => Value::option(self.producer_rate),
+      TenantLabel::RequestRate => Value::option(self.request_rate),
+      TenantLabel::SecretCount => Value::option(self.secret_count),
+      TenantLabel::Tenant => Value::target(target_id),
+      TenantLabel::TopicCount => Value::option(self.topic_count),
       _ => unreachable!(),
     }
   }
 }
 
-pub static TENANT_LABELS: [TenantLabel; 15] = [
+static TENANT_LABELS: [TenantLabel; 15] = [
   TenantLabel::Tenant,
   TenantLabel::Manager,
   TenantLabel::Monitoring,
@@ -647,19 +641,19 @@ pub static TENANT_LABELS: [TenantLabel; 15] = [
 ];
 
 impl SubjectFormatter<TenantLabel> for ManagedTenant {
-  fn value(&self, label: &TenantLabel, _target_id: &str) -> String {
+  fn value(&self, label: &TenantLabel, _target_id: &str) -> Value {
     match label {
-      TenantLabel::Manager => self.manager.to_string(),
-      TenantLabel::Monitoring => service_enabled(self, ManagedTenantServicesName::Monitoring),
-      TenantLabel::Tracing => service_enabled(self, ManagedTenantServicesName::Tracing),
-      TenantLabel::Vpn => service_enabled(self, ManagedTenantServicesName::Vpn),
+      TenantLabel::Manager => Value::plain(&self.manager),
+      TenantLabel::Monitoring => Value::plain(service_enabled(self, ManagedTenantServicesName::Monitoring)),
+      TenantLabel::Tracing => Value::plain(service_enabled(self, ManagedTenantServicesName::Tracing)),
+      TenantLabel::Vpn => Value::plain(service_enabled(self, ManagedTenantServicesName::Vpn)),
       _ => unreachable!(),
     }
   }
 }
 
 impl SubjectFormatter<TenantLabel> for (ManagedTenant, TenantLimits) {
-  fn value(&self, label: &TenantLabel, target_id: &str) -> String {
+  fn value(&self, label: &TenantLabel, target_id: &str) -> Value {
     match label {
       TenantLabel::Manager | TenantLabel::Monitoring | TenantLabel::Tracing | TenantLabel::Vpn => self.0.value(label, target_id),
       _ => self.1.value(label, target_id),
@@ -668,7 +662,7 @@ impl SubjectFormatter<TenantLabel> for (ManagedTenant, TenantLimits) {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum StreamAccessLabel {
+enum StreamAccessLabel {
   ReadAccess,
   StreamId,
   StreamKind,
@@ -696,66 +690,66 @@ impl Label for StreamAccessLabel {
 }
 
 impl SubjectFormatter<StreamAccessLabel> for (&ManagedStreamId, &str, bool, bool) {
-  fn value(&self, label: &StreamAccessLabel, target_id: &str) -> String {
+  fn value(&self, label: &StreamAccessLabel, target_id: &str) -> Value {
     match label {
       StreamAccessLabel::ReadAccess => {
         if self.2 {
-          "granted".to_string()
+          Value::plain("granted")
         } else {
-          "denied".to_string()
+          Value::plain("denied")
         }
       }
-      StreamAccessLabel::StreamId => self.0.to_string(),
-      StreamAccessLabel::StreamKind => self.1.to_string(),
-      StreamAccessLabel::Tenant => target_id.to_string(),
+      StreamAccessLabel::StreamId => Value::plain(self.0),
+      StreamAccessLabel::StreamKind => Value::plain(self.1),
+      StreamAccessLabel::Tenant => Value::target(target_id),
       StreamAccessLabel::WriteAccess => {
         if self.3 {
-          "granted".to_string()
+          Value::plain("granted")
         } else {
-          "denied".to_string()
+          Value::plain("denied")
         }
       }
-      _ => "".to_string(),
+      _ => Value::empty(),
     }
   }
 }
 
 impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRights) {
-  fn value(&self, label: &StreamAccessLabel, target_id: &str) -> String {
+  fn value(&self, label: &StreamAccessLabel, target_id: &str) -> Value {
     match label {
       StreamAccessLabel::Partitions => match &self.1 {
-        Stream::Internal(internal) => internal.partitions.to_string(),
-        Stream::Public(public) => public.partitions.to_string(),
+        Stream::Internal(internal) => Value::plain(internal.partitions),
+        Stream::Public(public) => Value::plain(public.partitions),
       },
       StreamAccessLabel::ReplicationFactor => match &self.1 {
-        Stream::Internal(internal) => internal.replication_factor.to_string(),
-        Stream::Public(public) => public.replication_factor.to_string(),
+        Stream::Internal(internal) => Value::plain(internal.replication_factor),
+        Stream::Public(public) => Value::plain(public.replication_factor),
       },
       StreamAccessLabel::ReadAccess => {
         if self.2.has_read_access() {
-          "granted".to_string()
+          Value::plain("granted")
         } else {
-          "denied".to_string()
+          Value::plain("denied")
         }
       }
-      StreamAccessLabel::StreamId => self.0.to_string(),
+      StreamAccessLabel::StreamId => Value::plain(&self.0),
       StreamAccessLabel::StreamKind => match self.1 {
-        Stream::Internal(_) => "internal".to_string(),
-        Stream::Public(_) => "public".to_string(),
+        Stream::Internal(_) => Value::plain("internal"),
+        Stream::Public(_) => Value::plain("public"),
       },
-      StreamAccessLabel::Tenant => target_id.to_string(),
+      StreamAccessLabel::Tenant => Value::target(target_id),
       StreamAccessLabel::WriteAccess => {
         if self.2.has_write_access() {
-          "granted".to_string()
+          Value::plain("granted")
         } else {
-          "denied".to_string()
+          Value::plain("denied")
         }
       }
     }
   }
 }
 
-pub static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
+static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
   StreamAccessLabel::StreamId,
   StreamAccessLabel::StreamKind,
   StreamAccessLabel::ReadAccess,
@@ -764,7 +758,7 @@ pub static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
   StreamAccessLabel::ReplicationFactor,
 ];
 
-pub static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
+static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
   StreamAccessLabel::Tenant,
   StreamAccessLabel::StreamId,
   StreamAccessLabel::StreamKind,

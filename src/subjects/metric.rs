@@ -2,8 +2,8 @@ use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::formatter::{Label, SubjectFormatter};
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::subject::{Requirements, Subject};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
@@ -15,12 +15,12 @@ use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
 
-pub(crate) struct MetricSubject {}
+struct MetricSubject {}
 
 const METRIC_SUBJECT_TARGET: &str = "metric";
 
 lazy_static! {
-  pub static ref METRIC_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(MetricSubject {});
+  pub(crate) static ref METRIC_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(MetricSubject {});
 }
 
 #[async_trait]
@@ -66,7 +66,14 @@ struct MetricList {}
 
 #[async_trait]
 impl CommandExecutor for MetricList {
-  async fn execute_with_client(&self, _argument: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(
+    &self,
+    _argument: Option<String>,
+    _sub_argument: Option<String>,
+    matches: &ArgMatches,
+    client: &DshApiClient,
+    context: &Context,
+  ) -> DshCliResult<()> {
     let (include_started, include_stopped) = include_started_stopped(matches);
     context.print_explanation("find exported metrics in services");
     let start_instant = context.now();
@@ -76,7 +83,7 @@ impl CommandExecutor for MetricList {
     if metrics_usage.is_empty() {
       context.print_outcome("no metrics exported in services");
     } else {
-      let mut formatter = ListFormatter::new(&METRIC_USAGE_LABELS, None, context);
+      let mut formatter = ListFormatter::new(&METRIC_USAGE_LABELS, context);
       formatter.push_values(&metrics_usage);
       formatter.print(None)?;
     }
@@ -121,11 +128,11 @@ impl Label for MetricUsageLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    false
+    matches!(self, Self::Service)
   }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 struct MetricUsage {
   service_id: String,
   instances: u64,
@@ -140,12 +147,12 @@ impl MetricUsage {
 }
 
 impl SubjectFormatter<MetricUsageLabel> for MetricUsage {
-  fn value(&self, label: &MetricUsageLabel, _target_id: &str) -> String {
+  fn value(&self, label: &MetricUsageLabel, _target_id: &str) -> Value {
     match label {
-      MetricUsageLabel::Service => self.service_id.clone(),
-      MetricUsageLabel::Path => self.path.clone(),
-      MetricUsageLabel::Instances => self.instances.to_string(),
-      MetricUsageLabel::Port => self.port.to_string(),
+      MetricUsageLabel::Service => Value::target(&self.service_id),
+      MetricUsageLabel::Path => Value::plain(&self.path),
+      MetricUsageLabel::Instances => Value::plain(self.instances),
+      MetricUsageLabel::Port => Value::plain(self.port),
     }
   }
 }

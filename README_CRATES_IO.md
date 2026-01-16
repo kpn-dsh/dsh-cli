@@ -49,7 +49,7 @@ When installation completed without any errors,
 you should be able to start the `dsh` tool from the command line.
 
 ```bash
->dsh
+> dsh
 DSH resource management api command line interface.
 
 Usage: dsh [OPTIONS] [SUBJECT/COMMAND]

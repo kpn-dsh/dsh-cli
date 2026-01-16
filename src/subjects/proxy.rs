@@ -1,13 +1,3 @@
-use crate::formatters::formatter::{Label, SubjectFormatter};
-use async_trait::async_trait;
-use clap::ArgMatches;
-use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::types::KafkaProxy;
-use futures::future::try_join_all;
-use itertools::Itertools;
-use lazy_static::lazy_static;
-use serde::Serialize;
-
 use crate::arguments::proxy_id_argument;
 use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
@@ -16,16 +6,26 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
+use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
-use crate::DshCliResult;
+use crate::{error, DshCliResult};
+use async_trait::async_trait;
+use clap::ArgMatches;
+use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::types::KafkaProxy;
+use futures::future::try_join_all;
+use futures::join;
+use itertools::Itertools;
+use lazy_static::lazy_static;
+use serde::Serialize;
 
-pub(crate) struct ProxySubject {}
+struct ProxySubject {}
 
 const PROXY_SUBJECT_TARGET: &str = "proxy";
 
 lazy_static! {
-  pub static ref PROXY_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ProxySubject {});
+  pub(crate) static ref PROXY_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(ProxySubject {});
 }
 
 #[async_trait]
@@ -63,13 +63,12 @@ lazy_static! {
       .add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyListAll {}, "List proxies")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyList {}, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
   );
   static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShowConfiguration {}, "Show Kafka proxy configuration")
-      .add_target_argument(proxy_id_argument().required(true))
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShow {}, "Show Kafka proxy configuration").add_target_argument(proxy_id_argument().required(true))
   );
   static ref PROXY_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref()];
@@ -79,10 +78,10 @@ struct ProxyDelete {}
 
 #[async_trait]
 impl CommandExecutor for ProxyDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
-      return Err(format!("proxy '{}' does not exists", proxy_id));
+      return Err(error!("proxy '{}' does not exists", proxy_id));
     }
     if context.confirmed(format!("delete proxy '{}'?", proxy_id))? {
       if context.dry_run() {
@@ -102,17 +101,17 @@ impl CommandExecutor for ProxyDelete {
   }
 }
 
-struct ProxyListAll {}
+struct ProxyList {}
 
 #[async_trait]
-impl CommandExecutor for ProxyListAll {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+impl CommandExecutor for ProxyList {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all proxies with parameters");
     let start_instant = context.now();
     let proxy_ids = client.get_kafkaproxy_ids().await?;
     let proxys = try_join_all(proxy_ids.iter().map(|proxy_id| client.get_kafkaproxy_configuration(proxy_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&PROXY_LABELS_LIST, None, context);
+    let mut formatter = ListFormatter::new(&PROXY_LABELS_LIST, context);
     formatter.push_target_ids_and_values(proxy_ids.as_slice(), proxys.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -127,7 +126,7 @@ struct ProxyListIds {}
 
 #[async_trait]
 impl CommandExecutor for ProxyListIds {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all proxy ids");
     let start_instant = context.now();
     let proxy_ids = client.get_kafkaproxy_ids().await?;
@@ -143,17 +142,18 @@ impl CommandExecutor for ProxyListIds {
   }
 }
 
-struct ProxyShowConfiguration {}
+struct ProxyShow {}
 
 #[async_trait]
-impl CommandExecutor for ProxyShowConfiguration {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult {
+impl CommandExecutor for ProxyShow {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
     let start_instant = context.now();
-    let proxy = client.get_kafkaproxy_configuration(&proxy_id).await?;
+    let (proxy, allocation_status) = join!(client.get_kafkaproxy_configuration(&proxy_id), client.get_kafkaproxy_status(&proxy_id));
     context.print_execution_time(start_instant);
-    UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, None, context).print(&proxy, None)
+    context.print_allocation_status(&allocation_status, PROXY_SUBJECT_TARGET);
+    UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, context).print(&proxy?, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -162,7 +162,7 @@ impl CommandExecutor for ProxyShowConfiguration {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub enum ProxyLabel {
+enum ProxyLabel {
   AclGroupsEnabled,
   CaChainSecretName,
   Certificate,
@@ -188,7 +188,7 @@ impl Label for ProxyLabel {
       ProxyLabel::Name => "certificate",
       ProxyLabel::SchemaStore => "schema store",
       ProxyLabel::Target => "proxy id",
-      ProxyLabel::Validations => "validation",
+      ProxyLabel::Validations => "validations",
       ProxyLabel::Zone => "zone",
     }
   }
@@ -204,7 +204,7 @@ impl Label for ProxyLabel {
       ProxyLabel::Name => "certificate name",
       ProxyLabel::SchemaStore => "schema store",
       ProxyLabel::Target => "proxy id",
-      ProxyLabel::Validations => "validation",
+      ProxyLabel::Validations => "validations",
       ProxyLabel::Zone => "zone",
     }
   }
@@ -215,18 +215,17 @@ impl Label for ProxyLabel {
 }
 
 impl SubjectFormatter<ProxyLabel> for KafkaProxy {
-  fn value(&self, label: &ProxyLabel, target_id: &str) -> String {
+  fn value(&self, label: &ProxyLabel, target_id: &str) -> Value {
     match label {
-      ProxyLabel::AclGroupsEnabled => self.enable_kafka_acl_groups.map(|enabled| enabled.to_string()).unwrap_or_default(),
-      ProxyLabel::CaChainSecretName => self.secret_name_ca_chain.to_string(),
-      ProxyLabel::Certificate => self.certificate.clone(),
-      ProxyLabel::Cpus => self.cpus.to_string(),
-      ProxyLabel::Instances => self.instances.to_string(),
-      ProxyLabel::Mem => self.mem.to_string(),
-      ProxyLabel::Name => self.name.clone().unwrap_or_default(),
-      ProxyLabel::SchemaStore => self
-        .schema_store
-        .map(|enabled| {
+      ProxyLabel::AclGroupsEnabled => Value::option(self.enable_kafka_acl_groups),
+      ProxyLabel::CaChainSecretName => Value::plain(&self.secret_name_ca_chain),
+      ProxyLabel::Certificate => Value::plain(&self.certificate),
+      ProxyLabel::Cpus => Value::plain(self.cpus),
+      ProxyLabel::Instances => Value::plain(self.instances),
+      ProxyLabel::Mem => Value::plain(self.mem),
+      ProxyLabel::Name => Value::option(self.name.clone()),
+      ProxyLabel::SchemaStore => Value::some_or(
+        self.schema_store.map(|enabled| {
           if enabled {
             format!(
               "true (cpus: {}, mem: {})",
@@ -236,29 +235,31 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
           } else {
             "false".to_string()
           }
-        })
-        .unwrap_or("NA".to_string()),
-      ProxyLabel::Target => target_id.to_string(),
+        }),
+        "NA",
+      ),
+      ProxyLabel::Target => Value::target(target_id),
       ProxyLabel::Validations => {
         if self.validations.is_empty() {
-          "none".to_string()
+          Value::plain("none")
         } else {
-          self
-            .validations
-            .iter()
-            .map(|validation| validation.common_name.clone().unwrap_or_default())
-            .collect_vec()
-            .join("\n")
+          Value::plain(
+            self
+              .validations
+              .iter()
+              .map(|validation| validation.common_name.clone().unwrap_or_default())
+              .join("\n"),
+          )
         }
       }
-      ProxyLabel::Zone => self.zone.to_string(),
+      ProxyLabel::Zone => Value::plain(self.zone),
     }
   }
 }
 
-pub static PROXY_LABELS_LIST: [ProxyLabel; 6] = [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore];
+static PROXY_LABELS_LIST: [ProxyLabel; 6] = [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore];
 
-pub static PROXY_LABELS_SHOW: [ProxyLabel; 11] = [
+static PROXY_LABELS_SHOW: [ProxyLabel; 11] = [
   ProxyLabel::Target,
   ProxyLabel::Certificate,
   ProxyLabel::Cpus,

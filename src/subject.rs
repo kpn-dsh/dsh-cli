@@ -4,27 +4,34 @@ use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
+use std::fmt::{Display, Formatter};
 
-#[derive(Debug, PartialEq)]
-pub struct Requirements {
+#[derive(PartialEq)]
+pub(crate) struct Requirements {
   needs_dsh_api_client: bool,
 }
 
 impl Requirements {
-  pub fn new(needs_dsh_api_client: bool) -> Self {
+  pub(crate) fn new(needs_dsh_api_client: bool) -> Self {
     Self { needs_dsh_api_client }
   }
 
-  pub fn standard_with_api() -> Self {
+  pub(crate) fn standard_with_api() -> Self {
     Self::new(true)
   }
 
-  pub fn standard_without_api() -> Self {
+  pub(crate) fn standard_without_api() -> Self {
     Self::new(false)
   }
 
-  pub fn needs_dsh_api_client(&self) -> bool {
+  pub(crate) fn needs_dsh_api_client(&self) -> bool {
     self.needs_dsh_api_client
+  }
+}
+
+impl Display for Requirements {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "needs_dsh_api_client: {}", self.needs_dsh_api_client)
   }
 }
 
@@ -32,7 +39,7 @@ impl Requirements {
 // a Secret, a Target or the API itself.
 // The subject is always selected by the first command on the command line.
 #[async_trait]
-pub trait Subject {
+pub(crate) trait Subject {
   fn subject(&self) -> &'static str;
 
   fn subject_command_about(&self) -> String;
@@ -102,7 +109,7 @@ pub trait Subject {
     self.capability(LIST_COMMAND).unwrap_or_else(|| unreachable!()).requirements(matches)
   }
 
-  async fn execute_subject_command_with_client<'a>(&self, subject_matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_subject_command_with_client<'a>(&self, subject_matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!());
     let capability = self.capability(capability_command_id).unwrap_or_else(|| unreachable!());
     let arguments = capability.command_target_argument_ids();
@@ -113,7 +120,7 @@ pub trait Subject {
       .await
   }
 
-  async fn execute_subject_command_without_client<'a>(&self, subject_matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_subject_command_without_client<'a>(&self, subject_matches: &'a ArgMatches, context: &Context) -> DshCliResult<()> {
     let (capability_command_id, capability_matches) = subject_matches.subcommand().unwrap_or_else(|| unreachable!());
     let capability = self.capability(capability_command_id).unwrap_or_else(|| unreachable!());
     let arguments = capability.command_target_argument_ids();
@@ -124,7 +131,7 @@ pub trait Subject {
       .await
   }
 
-  async fn execute_subject_list_shortcut_with_client<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult {
+  async fn execute_subject_list_shortcut_with_client<'a>(&self, matches: &'a ArgMatches, dsh_api_client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     self
       .capability(LIST_COMMAND)
       .unwrap_or_else(|| unreachable!())
@@ -132,7 +139,7 @@ pub trait Subject {
       .await
   }
 
-  async fn execute_subject_list_shortcut_without_client<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult {
+  async fn execute_subject_list_shortcut_without_client<'a>(&self, matches: &'a ArgMatches, context: &Context) -> DshCliResult<()> {
     self
       .capability(LIST_COMMAND)
       .unwrap_or_else(|| unreachable!())

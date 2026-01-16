@@ -7,7 +7,7 @@ set -e
 
 export DSH_CLI_PLATFORM=nplz
 export DSH_CLI_TENANT=greenbox-dev
-export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
+export DSH_CLI_PASSWORD_FILE="$(dirname "$0")/../np-aws-lz-dsh.greenbox.pwd"
 
 # For this test to run the following is expected:
 #
@@ -19,15 +19,18 @@ export DSH_CLI_VERBOSITY="high"
 export DSH_CLI_OUTPUT_FORMAT="table"
 export DSH_CLI_SHOW_EXECUTION_TIME=""
 
-source commands.sh
+source "$(dirname "$0")/commands.sh"
 
 set -f
 for COMMAND in "${SAFE_COMMANDS[@]}"
 do
-  CMD=$(echo "dsh $COMMAND" | envsubst)
-  echo "$CMD"
-  echo "-------------------------------"
-  eval "$CMD"
-  echo "-------------------------------"
-  echo
+  if [[ $COMMAND == "$1"* ]]
+  then
+    CMD=$(echo "dsh $COMMAND" | envsubst)
+    echo "$CMD"
+    echo "-------------------------------"
+    eval "$CMD"
+    echo "-------------------------------"
+    echo
+  fi
 done
