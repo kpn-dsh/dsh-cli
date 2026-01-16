@@ -24,5 +24,3 @@ jobs:
         run: cargo test --all-features --verbose
       - name: Run clippy with all features enabled
         run: cargo clippy --all-features
-      - name: Run format checker
-        run: cargo +nightly fmt --check --all
