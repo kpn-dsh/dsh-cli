@@ -189,6 +189,16 @@ target/release/dsh: explicit requirement satisfied
 
 ## Create a GitHub release
 
+To create a GitHub release, first rename the binary:
+
+```bash
+> mv target/release/dsh dsh-v0.8.1-aarch64-apple-darwin
+```
+
+Then go to [GitHub\releases](https://github.com/kpn-dsh/dsh-cli/releases), click
+`Draft a new release` and follow the steps, attaching the renamed binary by dropping it on the
+page or by selecting it.
+
 ## Tool
 
 A useful tool is [What' s Your Sign](https://objective-see.org/products/whatsyoursign.html).
@@ -197,3 +207,6 @@ It allows you to check the status by right-clicking the `dsh` binary in the Find
 this as follows:
 
 <img src="docs/images/whats-your-sign.png" width="600" />
+
+rtzo-wmei-anqk-rrpw
+2a7903a3-3248-4b0c-8c69-ac3438d42aa2
