@@ -4,25 +4,37 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.8.1] - yyyy-mm-dd
+## [0.8.1] - 2026-01-15
 
 ### Added
 
+* Secrets list shows information about the secrets.
+* Details about certificates or keys in secrets are shown.
+* Capability to execute commands for multiple tenants.
 * Added default values to explanation of environment variables.
 * Set color and styling for logging information.
 * Capability to set environment variables from file.
+* Notification when a newer version is available.
 
 ### Changed
 
+* Structure of dsh tool directories and files.
+* All `show` capabilities also show the allocation status.
+* Upgraded dependency `dsh_api` to version `0.8.1`.
 * Improved rendering of token payload.
 * Improved error handling.
 * Improved handling of environment variables.
+* Improved rendering of secrets used in services.
+* Improved styling of tables.
+* Added whitelists to vhosts capability.
+* Removed `--no-headers` option.
 
 ### Fixes
 
 * Fixed bug with `dsh bucket show`.
 * Fixed bug with `dsh platform show` command for json output.
 * Fixed bug with `dsh service list --tasks` command for json output.
+* Resolved some known issues.
 
 ## [0.8.0] - 2025-11-20
 
@@ -40,7 +52,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 ### Changed
 
 * Capability to list images improved.
-* Upgraded dependency `dsh_api` to version `0.8.0` and open api specification `1.10.0`,
+* Upgraded dependency `dsh_api` to version `0.8.0` and open api specification `1.10.0`.
 * Upgraded dependencies from `crates.io`.
 * Removed `prod-aws-lz-laas` from default platform list.
 * Improved error messages when illegal arguments are provided.
