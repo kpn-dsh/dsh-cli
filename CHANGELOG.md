@@ -4,6 +4,14 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.2] - YYYY-MM-DD
+
+* Capability to copy secret to clipboard.
+
+### Changed
+
+* Show platform parameters in different categories.
+
 ## [0.8.1] - 2026-01-15
 
 ### Added

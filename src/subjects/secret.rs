@@ -1,6 +1,7 @@
 use crate::arguments::secret_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
+  Capability, CommandExecutor, COPY_COMMAND, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS,
+  UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -14,6 +15,7 @@ use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::{error, DshCliResult};
+use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -24,6 +26,7 @@ use futures::future::{join_all, try_join_all};
 use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::debug;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::traits::PublicKeyParts;
@@ -60,6 +63,7 @@ impl Subject for SecretSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      COPY_COMMAND => Some(SECRET_COPY_CAPABILITY.as_ref()),
       CREATE_COMMAND => Some(SECRET_CREATE_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(SECRET_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(SECRET_LIST_CAPABILITY.as_ref()),
@@ -75,6 +79,8 @@ impl Subject for SecretSubject {
 }
 
 lazy_static! {
+  static ref SECRET_COPY_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+    Box::new(CapabilityBuilder::new(COPY_COMMAND, None, &SecretCopy {}, "Copy secret to clipboard").add_target_argument(secret_id_argument().required(true)));
   static ref SECRET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &SecretCreate {}, "Create new secret")
       .set_long_about("Create a new secret.")
@@ -115,8 +121,41 @@ lazy_static! {
       .add_target_argument(secret_id_argument().required(true))
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );
-  static ref SECRET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![SECRET_CREATE_CAPABILITY.as_ref(), SECRET_DELETE_CAPABILITY.as_ref(), SECRET_LIST_CAPABILITY.as_ref(), SECRET_SHOW_CAPABILITY.as_ref(), SECRET_UPDATE_CAPABILITY.as_ref()];
+  static ref SECRET_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
+    SECRET_COPY_CAPABILITY.as_ref(),
+    SECRET_CREATE_CAPABILITY.as_ref(),
+    SECRET_DELETE_CAPABILITY.as_ref(),
+    SECRET_LIST_CAPABILITY.as_ref(),
+    SECRET_SHOW_CAPABILITY.as_ref(),
+    SECRET_UPDATE_CAPABILITY.as_ref()
+  ];
+}
+
+struct SecretCopy {}
+
+#[async_trait]
+impl CommandExecutor for SecretCopy {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    let secret_id = target.unwrap_or_else(|| unreachable!());
+    let start_instant = context.now();
+    let secret = client.get_secret(&secret_id).await?;
+    context.print_execution_time(start_instant);
+    context.print_explanation(format!("show the value of secret '{}'", secret_id));
+    match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(secret)) {
+      Ok(_) => {
+        context.print_outcome("secret copied to clipboard");
+      }
+      Err(error) => {
+        debug!("clipboard error {}", error);
+        context.print_error("could not secret token to clipboard")
+      }
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
 }
 
 struct SecretCreate {}
