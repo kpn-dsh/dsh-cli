@@ -103,6 +103,7 @@ mod log_level;
 mod modifier_flags;
 mod refresh_token_store;
 mod releases;
+mod secret_entry;
 mod settings;
 mod style;
 mod subject;
