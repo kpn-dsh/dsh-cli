@@ -12,17 +12,18 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::Value as FormatterValue;
 use crate::formatters::{Label, OutputFormat, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
-use crate::secret_entry::{get_certificates_from_pem, get_keys_from_pem, secret_entries_from, CertificateEntry, KeyEntry, SecretEntry, SecretKind};
+use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
-use crate::{error, DshCliResult};
+use crate::{err, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::error::DshApiError;
 use dsh_api::secret::{is_system_id, secret_id_to_secret_name, SecretInjection};
 use dsh_api::types::Secret;
-use dsh_api::{Dependant, DshApiError};
+use dsh_api::Dependant;
 use futures::future::{join_all, try_join_all};
 use futures::join;
 use itertools::Itertools;
@@ -156,7 +157,7 @@ impl CommandExecutor for SecretCreate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     if client.get_secret(&secret_id).await.is_ok() {
-      return Err(error!("secret '{}' already exists", secret_id));
+      return err!("secret '{}' already exists", secret_id);
     }
     if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {
@@ -205,7 +206,7 @@ impl CommandExecutor for SecretDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     if client.get_secret_configuration(&secret_id).await.is_err() {
-      return Err(error!("secret '{}' does not exist", secret_id));
+      return err!("secret '{}' does not exist", secret_id);
     }
     if context.confirmed(format!("delete secret '{}'?", secret_id))? {
       if context.dry_run() {
@@ -225,6 +226,44 @@ impl CommandExecutor for SecretDelete {
   }
 }
 
+/// secret_id, secret_name, is_system, metadata
+async fn get_secrets_with_metadata(client: &DshApiClient) -> DshCliResult<Vec<(String, String, bool, Vec<SecretMetadata>)>> {
+  let secret_names: Vec<(String, String, bool)> = client
+    .get_secret_ids()
+    .await?
+    .iter()
+    .map(|secret_id| {
+      if is_system_id(secret_id) {
+        (secret_id.to_string(), secret_id_to_secret_name(secret_id).into_owned(), true)
+      } else {
+        (secret_id.to_string(), secret_id.to_string(), false)
+      }
+    })
+    .collect_vec();
+  let secret_value_results = join_all(secret_names.iter().map(|(_, secret_name, _)| client.get_secret(secret_name))).await;
+  let secrets_with_metadata: Vec<(String, String, bool, Vec<SecretMetadata>)> = secret_names
+    .into_iter()
+    .zip(secret_value_results)
+    .map(|((secret_id, secret_name, is_system), secret_value_result)| {
+      let secret_metadata = match secret_value_result {
+        Ok(value) => secret_metadata(&value, is_system),
+        Err(error) => match error {
+          DshApiError::NotFound(_) => vec![SecretMetadata::Error("secret not found, possibly pending".to_string())],
+          DshApiError::BadRequest(_) => vec![SecretMetadata::Error("bad request".to_string())],
+          DshApiError::Configuration(_) => vec![SecretMetadata::Error("configuration error".to_string())],
+          DshApiError::Conversion(_) => vec![SecretMetadata::Error("conversion error".to_string())],
+          DshApiError::NotAuthorized(_) => vec![SecretMetadata::Error("not authorized".to_string())],
+          DshApiError::Parameter(_) => vec![SecretMetadata::Error("parameter error".to_string())],
+          DshApiError::Unexpected(_, _) => vec![SecretMetadata::Error("unexpected error, possibly a network failure".to_string())],
+          DshApiError::Unprocessable(_) => vec![SecretMetadata::Error("unprocessable".to_string())],
+        },
+      };
+      (secret_id, secret_name, is_system, secret_metadata)
+    })
+    .collect_vec();
+  Ok(secrets_with_metadata)
+}
+
 struct SecretList {}
 
 #[async_trait]
@@ -232,34 +271,12 @@ impl CommandExecutor for SecretList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets");
     let start_instant = context.now();
-    let secret_names = client
-      .get_secret_ids()
-      .await?
-      .iter()
-      .map(|secret_id| if is_system_id(secret_id) { (secret_id_to_secret_name(secret_id).into_owned(), true) } else { (secret_id.to_string(), false) })
-      .collect_vec();
-    let secret_value_results = join_all(secret_names.iter().map(|(secret_name, _)| client.get_secret(secret_name))).await;
+    let secrets: Vec<(String, String, bool, Vec<SecretMetadata>)> = get_secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
-    for ((secret_name, is_system), secret_value_result) in secret_names.into_iter().zip(secret_value_results) {
-      match secret_value_result {
-        Ok(secret_value) => {
-          for secret_entry in secret_entries_from(&secret_value, is_system) {
-            formatter.push_target_id_value_owned(secret_name.clone(), secret_entry);
-          }
-        }
-        Err(error) => {
-          let (kind, message) = match error {
-            DshApiError::NotFound(_) => ("not-found", Some("secret not found, possibly pending".to_string())),
-            DshApiError::BadRequest(_) => ("bad-request", None),
-            DshApiError::Configuration(_) => ("configuration", None),
-            DshApiError::NotAuthorized(_) => ("not-authorized", None),
-            DshApiError::Parameter(_) => ("parameter", None),
-            DshApiError::Unexpected(_, _) => ("unexpected", Some("possibly a network failure".to_string())),
-            DshApiError::Unprocessable(_) => ("unprocessable", None),
-          };
-          formatter.push_target_id_value_owned(secret_name, SecretEntry::new(SecretKind::Error, kind.to_string(), message, None));
-        }
+    for (_secret_id, secret_name, _is_system, secret_metadatas) in secrets.into_iter() {
+      for secret_metadata in secret_metadatas {
+        formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
       }
     }
     formatter.print(None)?;
@@ -299,14 +316,13 @@ impl CommandExecutor for SecretListCertificates {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that contain certificates");
     let start_instant = context.now();
-    let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !is_system_id(id)).collect_vec();
-    let secret_values = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret(secret_id))).await?;
+    let secrets_with_metadata = get_secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, context);
-    for (secret_id, secret_value) in non_system_secret_ids.into_iter().zip(secret_values) {
-      if let Some(certificate_entries) = get_certificates_from_pem(&secret_value) {
-        for certificate_entry in certificate_entries {
-          formatter.push_target_id_value_owned(secret_id.clone(), certificate_entry);
+    for (secret_id, _secret_name, _is_system, secret_metadatas) in secrets_with_metadata {
+      for secret_metadata in secret_metadatas {
+        if let SecretMetadata::Certificate(_subject, _not_after, _not_before, _issuer, _label) = &secret_metadata {
+          formatter.push_target_id_value_owned(secret_id.clone(), secret_metadata);
         }
       }
     }
@@ -345,16 +361,15 @@ struct SecretListKeys {}
 #[async_trait]
 impl CommandExecutor for SecretListKeys {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    context.print_explanation("list all secrets that contain keys");
+    context.print_explanation("list all secrets that contain private of public keys");
     let start_instant = context.now();
-    let non_system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| !is_system_id(id)).collect_vec();
-    let secret_values = try_join_all(non_system_secret_ids.iter().map(|secret_id| client.get_secret(secret_id))).await?;
+    let secrets_with_metadata = get_secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&KEY_LABELS_LIST, context);
-    for (secret_id, secret_value) in non_system_secret_ids.into_iter().zip(secret_values) {
-      if let Some(private_keys) = get_keys_from_pem(&secret_value) {
-        for (rsa_private_key, label, kind) in private_keys {
-          formatter.push_target_id_value_owned(secret_id.clone(), KeyEntry::from((kind.to_string(), label.to_string(), rsa_private_key)));
+    for (secret_id, _secret_name, _is_system, secret_metadatas) in secrets_with_metadata {
+      for secret_metadata in secret_metadatas {
+        if let SecretMetadata::Pki(_secret_format, _private, _label, _algorithm) = &secret_metadata {
+          formatter.push_target_id_value_owned(secret_id.clone(), secret_metadata);
         }
       }
     }
@@ -374,15 +389,16 @@ impl CommandExecutor for SecretListSystem {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all system secret ids");
     let start_instant = context.now();
-    let system_secret_ids = client.get_secret_ids().await?.into_iter().filter(|id| is_system_id(id)).collect_vec();
-    let secret_names: Vec<String> = system_secret_ids
-      .iter()
-      .map(|secret_id| secret_id_to_secret_name(secret_id).into_owned())
-      .collect_vec();
-    let allocation_statuses = try_join_all(system_secret_ids.iter().map(|secret_id| client.get_secret_status(secret_id))).await?;
+    let secrets_with_metadata = get_secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, context);
-    formatter.push_target_ids_and_values(secret_names.as_slice(), allocation_statuses.as_slice());
+    let mut formatter = ListFormatter::new(&SYSTEM_LABELS_LIST, context);
+    for (secret_id, secret_name, _is_system, secret_metadatas) in secrets_with_metadata {
+      for secret_metadata in secret_metadatas {
+        if let SecretMetadata::System(_) = &secret_metadata {
+          formatter.push_target_id_value_owned(secret_id.clone(), (secret_name.clone(), secret_metadata));
+        }
+      }
+    }
     formatter.print(None)?;
     Ok(())
   }
@@ -473,7 +489,7 @@ impl CommandExecutor for SecretShow {
     let (secret_value, allocation_status) = join!(client.get_secret(&secret_id), client.get_secret_status(&secret_id));
     context.print_execution_time(start_instant);
     context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
-    for secret_entry in secret_entries_from(&secret_value?, is_system_id(&secret_id)) {
+    for secret_entry in secret_metadata(&secret_value?, is_system_id(&secret_id)) {
       _ = UnitFormatter::new(&secret_id, &SECRET_LABELS_LIST, context).print(&secret_entry, None);
     }
     Ok(())
@@ -510,7 +526,7 @@ impl CommandExecutor for SecretUpdate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let secret_id = target.unwrap_or_else(|| unreachable!());
     if client.get_secret(&secret_id).await.is_err() {
-      return Err(error!("secret '{}' does not exist", secret_id));
+      return err!("secret '{}' does not exist", secret_id);
     }
     if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {
@@ -550,23 +566,41 @@ impl CommandExecutor for SecretUpdate {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum CertificateLabel {
-  Label,
+pub(crate) enum SecretLabel {
+  Description,
+  Expires,
+  _Format,
+  FormatKind,
   Issuer,
-  NotAfter,
+  Kind,
+  Label,
   _NotBefore,
+  NotAfter,
+  _NumberOfEntries,
+  Private,
   SecretId,
+  SecretName,
+  Size,
   Subject,
 }
 
-impl Label for CertificateLabel {
+impl Label for SecretLabel {
   fn as_str(&self) -> &str {
     match self {
-      Self::Label => "label",
+      Self::Description => "description",
+      Self::Expires => "expires",
+      Self::_Format => "format",
+      Self::FormatKind => "format",
       Self::Issuer => "issuer",
-      Self::NotAfter => "not after",
+      Self::Kind => "kind",
+      Self::Label => "label",
       Self::_NotBefore => "not before",
+      Self::NotAfter => "not after",
+      Self::_NumberOfEntries => "entries",
+      Self::Private => "private",
       Self::SecretId => "secret id",
+      Self::SecretName => "secret name",
+      Self::Size => "size",
       Self::Subject => "subject",
     }
   }
@@ -576,102 +610,62 @@ impl Label for CertificateLabel {
   }
 }
 
-impl SubjectFormatter<CertificateLabel> for CertificateEntry {
-  fn value(&self, label: &CertificateLabel, target_id: &str) -> FormatterValue {
+impl SubjectFormatter<SecretLabel> for (String, SecretMetadata) {
+  fn value(&self, label: &SecretLabel, target_id: &str) -> FormatterValue {
+    let (secret_name, secret_metadata) = self;
     match label {
-      CertificateLabel::Label => FormatterValue::plain(&self.label),
-      CertificateLabel::Issuer => FormatterValue::plain(&self.issuer),
-      CertificateLabel::NotAfter => FormatterValue::plain(&self.not_after), // TODO
-      CertificateLabel::_NotBefore => FormatterValue::plain(&self.not_before),
-      CertificateLabel::SecretId => FormatterValue::target(target_id),
-      CertificateLabel::Subject => FormatterValue::plain(&self.subject),
+      SecretLabel::SecretName => FormatterValue::target(secret_name),
+      _ => secret_metadata.value(label, target_id),
     }
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum KeyLabel {
-  Kind,
-  Label,
-  Private,
-  SecretId,
-  Size,
-}
-
-impl Label for KeyLabel {
-  fn as_str(&self) -> &str {
-    match self {
-      Self::Kind => "kind",
-      Self::Label => "label",
-      Self::Private => "private",
-      Self::SecretId => "secret id",
-      Self::Size => "size",
-    }
-  }
-
-  fn is_target_label(&self) -> bool {
-    matches!(self, Self::SecretId)
-  }
-}
-
-impl SubjectFormatter<KeyLabel> for KeyEntry {
-  fn value(&self, label: &KeyLabel, target_id: &str) -> crate::formatters::Value {
-    match label {
-      KeyLabel::Kind => FormatterValue::plain(&self.kind),
-      KeyLabel::Label => FormatterValue::plain(&self.label),
-      KeyLabel::Private => {
-        if self.private {
-          FormatterValue::plain("private")
-        } else {
-          FormatterValue::plain("public")
-        }
-      }
-      KeyLabel::SecretId => FormatterValue::target(target_id),
-      KeyLabel::Size => FormatterValue::plain(self.size),
-    }
-  }
-}
-
-#[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum SecretLabel {
-  Description,
-  Expires,
-  Format,
-  Kind,
-  SecretId,
-}
-
-impl Label for SecretLabel {
-  fn as_str(&self) -> &str {
-    match self {
-      Self::Description => "description",
-      Self::Expires => "expires",
-      Self::Format => "format",
-      Self::Kind => "kind",
-      Self::SecretId => "secret id",
-    }
-  }
-
-  fn is_target_label(&self) -> bool {
-    matches!(self, Self::SecretId)
-  }
-}
-
-impl SubjectFormatter<SecretLabel> for SecretEntry {
+impl SubjectFormatter<SecretLabel> for SecretMetadata {
   fn value(&self, label: &SecretLabel, target_id: &str) -> FormatterValue {
     match label {
-      SecretLabel::Description => FormatterValue::plain(self.description.join("\n")),
-      SecretLabel::Expires => FormatterValue::option(self.expires.clone()),
-      SecretLabel::Format => FormatterValue::plain(&self.format),
-      SecretLabel::Kind => FormatterValue::plain(&self.kind),
+      SecretLabel::Description => FormatterValue::option(self.additional_info()),
+      SecretLabel::Expires => FormatterValue::plain(self.expires().unwrap_or_default()),
+      SecretLabel::_Format => FormatterValue::plain(self.format()),
+      SecretLabel::FormatKind => FormatterValue::option(self.format_kind()),
+      SecretLabel::Issuer => match self {
+        SecretMetadata::Certificate(_, _, _, issuer, _) => FormatterValue::plain(issuer),
+        _ => FormatterValue::not_applicable(),
+      },
+      SecretLabel::Kind => FormatterValue::plain(self.kind()),
+      SecretLabel::Label => match self {
+        SecretMetadata::Certificate(_, _, _, _, label) => FormatterValue::plain(label),
+        SecretMetadata::Pki(_, _, label, _) => FormatterValue::plain(label),
+        _ => FormatterValue::not_applicable(),
+      },
+      SecretLabel::_NotBefore => match self {
+        SecretMetadata::Certificate(_, _, not_before, _, _) => FormatterValue::plain(not_before),
+        _ => FormatterValue::not_applicable(),
+      },
+      SecretLabel::NotAfter => match self {
+        SecretMetadata::Certificate(_, not_after, _, _, _) => FormatterValue::plain(not_after),
+        _ => FormatterValue::not_applicable(),
+      },
+      SecretLabel::_NumberOfEntries => FormatterValue::option(self.number_of_entries()),
+      SecretLabel::Private => match self {
+        SecretMetadata::Pki(_, private, _, _) => FormatterValue::plain(if *private { "private" } else { "public" }),
+        _ => FormatterValue::not_applicable(),
+      },
       SecretLabel::SecretId => FormatterValue::target(target_id),
+      SecretLabel::SecretName => FormatterValue::not_applicable(),
+      SecretLabel::Size => FormatterValue::option(self.secret_size()),
+      SecretLabel::Subject => match self {
+        SecretMetadata::Certificate(subject, _, _, _, _) => FormatterValue::plain(subject),
+        _ => FormatterValue::not_applicable(),
+      },
     }
   }
 }
 
-static CERTIFICATE_LABELS_LIST: [CertificateLabel; 5] =
-  [CertificateLabel::SecretId, CertificateLabel::Subject, CertificateLabel::NotAfter, CertificateLabel::Issuer, CertificateLabel::Label];
+static CERTIFICATE_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretId, SecretLabel::Subject, SecretLabel::NotAfter, SecretLabel::Issuer, SecretLabel::Label];
 
-static KEY_LABELS_LIST: [KeyLabel; 5] = [KeyLabel::SecretId, KeyLabel::Private, KeyLabel::Size, KeyLabel::Kind, KeyLabel::Label];
+static KEY_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretId, SecretLabel::Private, SecretLabel::Size, SecretLabel::Kind, SecretLabel::Label];
 
-pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretId, SecretLabel::Kind, SecretLabel::Format, SecretLabel::Description, SecretLabel::Expires];
+static SYSTEM_LABELS_LIST: [SecretLabel; 4] = [SecretLabel::SecretId, SecretLabel::SecretName, SecretLabel::FormatKind, SecretLabel::Size];
+
+pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 6] =
+  [SecretLabel::SecretId, SecretLabel::Kind, SecretLabel::FormatKind, SecretLabel::Size, SecretLabel::Description, SecretLabel::Expires];

@@ -8,7 +8,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
-use crate::secret_entry::secret_entries_from;
+use crate::secret_metadata::secret_metadata;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::secret::SECRET_LABELS_LIST;
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
@@ -16,9 +16,10 @@ use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::error::{DshApiError, DshApiResult};
 use dsh_api::types::CertificateStatus;
 use dsh_api::types::{ActualCertificate, Certificate};
-use dsh_api::{Dependant, DshApiError, DshApiResult};
+use dsh_api::Dependant;
 use futures::future::{join_all, try_join_all};
 use futures::join;
 use itertools::Itertools;
@@ -229,7 +230,7 @@ impl CommandExecutor for CertificateShow {
       context.print_execution_time(start_instant);
       let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
       for (secret_id, secret) in certificate_secret_ids.iter().zip(certificate_secrets) {
-        for secret_entry in secret_entries_from(&secret, false) {
+        for secret_entry in secret_metadata(&secret, false) {
           formatter.push_target_id_value_owned(secret_id.clone(), secret_entry);
         }
       }
