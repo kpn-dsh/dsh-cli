@@ -4,7 +4,7 @@ use crate::error::DshCliError;
 use crate::log_arguments::{LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT};
 use crate::settings::Settings;
 use crate::style::{style_from, DshColor, DshStyle};
-use crate::{error, DshCliResult};
+use crate::{err, DshCliResult};
 use clap::ArgMatches;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
@@ -97,7 +97,7 @@ impl TryFrom<&str> for LogLevel {
       "info" => Ok(Self::Info),
       "debug" => Ok(Self::Debug),
       "trace" => Ok(Self::Trace),
-      _ => Err(error!("invalid log level value '{}'", value)),
+      _ => err!("invalid log level value '{}'", value),
     }
   }
 }

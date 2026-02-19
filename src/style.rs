@@ -1,4 +1,4 @@
-use crate::error;
+use crate::err;
 use crate::error::DshCliError;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use serde::{Deserialize, Serialize};
@@ -64,7 +64,7 @@ impl TryFrom<&str> for DshColor {
       "red" => Ok(Self::Red),
       "white" => Ok(Self::White),
       "yellow" => Ok(Self::Yellow),
-      _ => Err(error!("invalid matching color '{}'", value)),
+      _ => err!("invalid matching color '{}'", value),
     }
   }
 }
@@ -116,7 +116,7 @@ impl TryFrom<&str> for DshStyle {
       "italic" => Ok(Self::Italic),
       "underline" => Ok(Self::Underline),
       "reverse" => Ok(Self::Reverse),
-      _ => Err(error!("invalid matching style '{}'", value)),
+      _ => err!("invalid matching style '{}'", value),
     }
   }
 }

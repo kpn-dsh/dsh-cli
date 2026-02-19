@@ -11,7 +11,7 @@ use crate::formatters::{notifications_to_string, vec_to_table, OutputFormat, Val
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS;
-use crate::{error, DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::{err, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::bucket::BucketInjection;
@@ -109,7 +109,7 @@ impl CommandExecutor for BucketCreate {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     let versioned = matches.get_flag(VERSIONED_FLAG);
     if client.get_bucket_configuration(&bucket_id).await.is_ok() {
-      return Err(error!("bucket '{}' already exists", bucket_id));
+      return err!("bucket '{}' already exists", bucket_id);
     }
     context.print_explanation(format!("create new bucket '{}'", bucket_id));
     if context.dry_run() {
@@ -134,7 +134,7 @@ impl CommandExecutor for BucketDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     if client.get_bucket_configuration(&bucket_id).await.is_err() {
-      return Err(error!("bucket '{}' does not exists", bucket_id));
+      return err!("bucket '{}' does not exists", bucket_id);
     }
     if context.confirmed(format!("delete bucket '{}'?", bucket_id))? {
       if context.dry_run() {

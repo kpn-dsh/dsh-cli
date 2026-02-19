@@ -5,7 +5,7 @@ use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::style::{DshColor, DshStyle};
 use crate::verbosity::Verbosity;
-use crate::{error, DshCliResult};
+use crate::{cli_error, err, DshCliResult};
 use itertools::Itertools;
 use log::debug;
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,7 @@ impl Settings {
     let file_name = &self.file_name;
     let mut valued_attributes: Vec<(String, String)> = serde_json::from_str::<Value>(serde_json::to_string(self)?.as_str())?
       .as_object()
-      .ok_or(error!(""))?
+      .ok_or(cli_error!(""))?
       .iter()
       .map(|(attribute, value)| {
         (
@@ -119,6 +119,6 @@ where
       debug!("updated settings");
       write_settings(upserted_settings)
     }
-    Err(error) => Err(error!("unable to update settings ({})", error)),
+    Err(error) => err!("unable to update settings ({})", error),
   }
 }

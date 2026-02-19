@@ -11,13 +11,13 @@ use crate::formatters::{hashmap_to_table, hashmap_to_vec, vec_to_table};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
-use crate::{error, DshCliResult};
+use crate::{cli_error, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::error::DshApiError;
 use dsh_api::manifest::{Manifest, Property, PropertyKind, Resource};
 use dsh_api::version::Version;
-use dsh_api::DshApiError;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -141,11 +141,11 @@ impl CommandExecutor for ManifestExplain {
       Some(version) => client
         .manifest(manifest_id.as_str(), &version)
         .await
-        .map_err(|_| error!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
+        .map_err(|_| cli_error!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
       None => client
         .manifest_latest_version(manifest_id.as_str(), false)
         .await
-        .map_err(|_| error!("app catalog manifest '{}' does not exist", manifest_id))?,
+        .map_err(|_| cli_error!("app catalog manifest '{}' does not exist", manifest_id))?,
     };
     context.print_execution_time(start_instant);
     context.print(manifest.name);
@@ -201,12 +201,12 @@ impl CommandExecutor for ManifestExport {
         .await
         .map(|(raw_manifest, draft)| (version.clone(), raw_manifest, draft))
         .map_err(|error| match error {
-          DshApiError::NotFound(_) => error!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
-          _ => error!("{}", error),
+          DshApiError::NotFound(_) => cli_error!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
+          _ => cli_error!("{}", error),
         })?,
       None => client.manifest_raw_latest(manifest_id.as_str(), false).await.map_err(|error| match error {
-        DshApiError::NotFound(_) => error!("app catalog manifest '{}' does not exist", manifest_id),
-        _ => error!("{}", error),
+        DshApiError::NotFound(_) => cli_error!("app catalog manifest '{}' does not exist", manifest_id),
+        _ => cli_error!("{}", error),
       })?,
     };
     context.print_execution_time(start_instant);

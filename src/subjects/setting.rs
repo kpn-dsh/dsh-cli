@@ -16,7 +16,7 @@ use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::get_target_password_from_keyring;
 use crate::verbosity::Verbosity;
-use crate::{error, DshCliResult};
+use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
@@ -357,10 +357,10 @@ impl CommandExecutor for SettingDefault {
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
     if read_target(&platform, &tenant)?.is_none() {
-      return Err(error!("target '{}@{}' does not exist", tenant, platform));
+      return err!("target '{}@{}' does not exist", tenant, platform);
     };
     if get_target_password_from_keyring(&platform, &tenant)?.is_none() {
-      return Err(error!("keyring contains no password for target '{}@{}'", tenant, platform));
+      return err!("keyring contains no password for target '{}@{}'", tenant, platform);
     }
     upsert_settings(|settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
     context.print_outcome(format!("default platform set to {}", platform));
@@ -414,7 +414,7 @@ where
       context.print_outcome(format!("{} set to {}", setting, &cloned));
       Ok(Some(cloned))
     }
-    None => Err(error!("{}", setting)),
+    None => err!("{}", setting),
   }
 }
 
@@ -437,7 +437,7 @@ impl CommandExecutor for SettingSet {
           match csv_quote_chars.next() {
             Some(csv_quote) => {
               if csv_quote_chars.next().is_some() {
-                return Err(error!("csv quote must be a single character"));
+                return err!("csv quote must be a single character");
               } else {
                 upsert_settings(|settings| Ok(Settings { csv_quote: Some(csv_quote), ..settings }))?;
                 context.print_outcome(format!("csv quote character set to '{}'", csv_quote));
@@ -542,7 +542,7 @@ impl CommandExecutor for SettingSet {
       SETTING_TERMINAL_WIDTH => {
         let terminal_width = matches.get_one::<usize>(SETTING_TERMINAL_WIDTH).unwrap_or_else(|| unreachable!());
         if *terminal_width < 40 {
-          return Err(error!("terminal width must be greater than or equal to 40"));
+          return err!("terminal width must be greater than or equal to 40");
         } else {
           upsert_settings(|settings| Ok(Settings { terminal_width: Some(*terminal_width), ..settings }))?;
           context.print_outcome(format!("terminal width set to {}", terminal_width));

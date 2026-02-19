@@ -16,17 +16,18 @@ use crate::global_arguments::{
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
 use crate::verbosity::Verbosity;
-use crate::{error, error_append, DshCliResult};
+use crate::{err, error_append, DshCliResult};
 use clap::builder::styling::Style;
 use clap::ArgMatches;
-use dsh_api::dsh_api_tenant::DshApiTenant;
+use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::error::DshApiResult;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
 use dsh_api::query_processor::{Part, QueryProcessor, RegexQueryProcessor};
 use dsh_api::types::{AllocationStatus, Notification};
-use dsh_api::DshApiResult;
 use getch_rs::{Getch, Key};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
@@ -54,7 +55,7 @@ impl TryFrom<&str> for BrowserMethod {
     match value {
       "instruct" => Ok(Self::Instruct),
       "open" => Ok(Self::Open),
-      _ => Err(error!("invalid browser method '{}'", value)),
+      _ => err!("invalid browser method '{}'", value),
     }
   }
 }
@@ -114,7 +115,7 @@ impl Context {
     let csv_separator = Self::get_csv_separator(matches, &settings)?;
     if let Some(quote) = csv_quote {
       if csv_separator.contains(quote) {
-        return Err(error!("csv separator string cannot contain quote character"));
+        return err!("csv separator string cannot contain quote character");
       }
     }
     let authentication_method = Self::get_authentication_method(matches, &settings, stdin_is_terminal)?;
@@ -315,7 +316,7 @@ impl Context {
             Ok(false)
           }
         },
-        Err(error) => Err(error!("\nerror getting key event ({})", error)),
+        Err(error) => err!("\nerror getting key event ({})", error),
       }
     } else {
       Ok(false)
@@ -333,7 +334,7 @@ impl Context {
         if csv_quote_env_var.len() == 1 {
           Ok(csv_quote_env_var.chars().next())
         } else {
-          Err(error!("csv quote must one character"))
+          err!("csv quote must one character")
         }
       }
       None => Ok(settings.csv_quote),
@@ -351,7 +352,7 @@ impl Context {
         if !csv_separator_env_var.is_empty() {
           Ok(csv_separator_env_var)
         } else {
-          Err(error!("seperator cannot be empty"))
+          err!("seperator cannot be empty")
         }
       }
       None => match settings.csv_separator.clone() {
@@ -359,7 +360,7 @@ impl Context {
           if !csv_separator_setting.is_empty() {
             Ok(csv_separator_setting)
           } else {
-            Err(error!("seperator cannot be empty"))
+            err!("seperator cannot be empty")
           }
         }
         None => Ok(",".to_string()),
@@ -375,14 +376,14 @@ impl Context {
   /// 1. Default to `false`
   fn get_dry_run(matches: &ArgMatches, settings: &Settings) -> bool {
     if matches.get_flag(DRY_RUN_ARGUMENT) {
-      log::debug!("dry run mode enabled (argument)");
+      debug!("dry run mode enabled (argument)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      log::debug!("dry run mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
+      debug!("dry run mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
       true
     } else if let Some(dry_run) = settings.dry_run {
       if dry_run {
-        log::debug!("dry run mode enabled (settings)");
+        debug!("dry run mode enabled (settings)");
       }
       dry_run
     } else {
@@ -398,14 +399,14 @@ impl Context {
   /// 1. Default to `false`
   fn get_force(matches: &ArgMatches, settings: &Settings) -> bool {
     if matches.get_flag(FORCE_ARGUMENT) {
-      log::debug!("force mode enabled (argument)");
+      debug!("force mode enabled (argument)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      log::debug!("force mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
+      debug!("force mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
       true
     } else if let Some(dry_run) = settings.dry_run {
       if dry_run {
-        log::debug!("force mode enabled (settings)");
+        debug!("force mode enabled (settings)");
       }
       dry_run
     } else {
@@ -421,14 +422,14 @@ impl Context {
   /// 1. Default to `false`
   fn get_suppress_exit_status(matches: &ArgMatches, settings: &Settings) -> bool {
     if matches.get_flag(SUPPRESS_EXIT_STATUS_ARGUMENT) {
-      log::debug!("suppress exit status enabled (argument)");
+      debug!("suppress exit status enabled (argument)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, matches) {
-      log::debug!("suppress exit status enabled (environment variable '{}')", ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS);
+      debug!("suppress exit status enabled (environment variable '{}')", ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS);
       true
     } else if let Some(suppress_exit_status) = settings.suppress_exit_status {
       if suppress_exit_status {
-        log::debug!("suppress exit status enabled (settings)");
+        debug!("suppress exit status enabled (settings)");
       }
       suppress_exit_status
     } else {
@@ -560,18 +561,19 @@ impl Context {
         Some(terminal_width_env_var) => match terminal_width_env_var.parse::<usize>() {
           Ok(terminal_width) => {
             if terminal_width < 40 {
-              Err(error!(
+              err!(
                 "terminal width in environment variable {} must be greater than or equal to 40",
                 ENV_VAR_DSH_CLI_TERMINAL_WIDTH
-              ))
+              )
             } else {
               Ok(Some(terminal_width))
             }
           }
-          Err(_) => Err(error!(
+          Err(_) => err!(
             "non-numerical value '{}' in environment variable {}",
-            terminal_width_env_var, ENV_VAR_DSH_CLI_TERMINAL_WIDTH
-          )),
+            terminal_width_env_var,
+            ENV_VAR_DSH_CLI_TERMINAL_WIDTH
+          ),
         },
         None => match settings.terminal_width {
           Some(terminal_width_from_settings) => Ok(Some(terminal_width_from_settings)),
@@ -627,7 +629,7 @@ impl Context {
           }
           Err(error) => {
             self.print_error(format!("could not open {} in your browser", opening_target));
-            log::debug!("{}", error);
+            debug!("{}", error);
             self.print_explanation("open url in your browser:");
             self.print(format!("{}", url));
           }
@@ -828,7 +830,7 @@ impl Context {
         }
       }
       Err(error) => {
-        log::debug!("could not get allocation status for {} ({})", subject, error);
+        debug!("could not get allocation status for {} ({})", subject, error);
         if self.verbosity == Verbosity::High {
           self.eprintln_warning(format!("could not get allocation status for {}", subject));
         }
@@ -843,11 +845,23 @@ impl Context {
   /// If `quiet` is `true`, nothing will be printed.
   /// The standard error device is almost always a tty, but can in special cases also be
   /// a pipe or an output file.
-  pub(crate) fn print_target(&self, dsh_api_tenant: &DshApiTenant) {
-    if !self.quiet {
-      match self.verbosity {
-        Verbosity::Off | Verbosity::Low | Verbosity::Medium => (),
-        Verbosity::High => self.eprintln(format!("target {}", dsh_api_tenant)),
+  pub(crate) fn print_target(&self, dsh_api_client: &DshApiClient) {
+    match self.authentication_method {
+      AuthenticationMethod::Robot => {
+        if !self.quiet {
+          match self.verbosity {
+            Verbosity::Off => (),
+            Verbosity::Low | Verbosity::Medium | Verbosity::High => self.print_warning(format!("target {}, authenticated with robot password", dsh_api_client.tenant())),
+          }
+        }
+      }
+      AuthenticationMethod::SingleSignOn => {
+        if !self.quiet {
+          match self.verbosity {
+            Verbosity::Off | Verbosity::Low | Verbosity::Medium => (),
+            Verbosity::High => self.eprintln(format!("target {}", dsh_api_client.tenant())),
+          }
+        }
       }
     }
   }
@@ -876,7 +890,7 @@ impl Context {
       match stdin.read_line(&mut multi_line) {
         Ok(0) => break,
         Ok(_) => continue,
-        Err(_) => return Err(error!("error reading line")),
+        Err(_) => return err!("error reading line"),
       }
     }
     Ok(multi_line)
@@ -911,7 +925,7 @@ impl Context {
     if self.stdin_is_terminal {
       match prompt_password(prompt) {
         Ok(line) => Ok(line.trim().to_string()),
-        Err(_) => Err(error!("empty input")),
+        Err(_) => err!("empty input"),
       }
     } else {
       self.read_single_line(prompt)
@@ -972,12 +986,12 @@ impl Context {
   /// It will perform some checks to see if conversion is allowed and add quotes if necessary.
   pub(crate) fn csv_value(&self, value: &str) -> DshCliResult<String> {
     if value.contains(self.csv_separator.as_str()) {
-      Err(error!("csv value contains separator character"))
+      err!("csv value contains separator character")
     } else if value.contains("\n") {
-      Err(error!("csv value contains new line"))
+      err!("csv value contains new line")
     } else if let Some(csv_quote) = self.csv_quote {
       if value.contains(csv_quote) {
-        Err(error!("csv value contains quote character"))
+        err!("csv value contains quote character")
       } else {
         Ok(format!("{}{}{}", csv_quote, value, csv_quote))
       }

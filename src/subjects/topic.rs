@@ -12,7 +12,7 @@ use crate::formatters::{notifications_to_string, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
-use crate::{error, DshCliResult};
+use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction, ArgMatches};
@@ -258,7 +258,7 @@ impl CommandExecutor for TopicCreate {
     const REPLICATION_FACTOR: u32 = 3;
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if client.get_topic_configuration(&topic_id).await.is_ok() {
-      return Err(error!("scratch topic '{}' already exists", topic_id));
+      return err!("scratch topic '{}' already exists", topic_id);
     }
     let topic = create_topic(matches)?;
     context.print_explanation(format!(
@@ -331,7 +331,7 @@ impl CommandExecutor for TopicDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let topic_id = target.unwrap_or_else(|| unreachable!());
     if client.get_topic(&topic_id).await.is_err() {
-      return Err(error!("scratch topic '{}' does not exists", topic_id));
+      return err!("scratch topic '{}' does not exists", topic_id);
     }
     if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
       if context.dry_run() {

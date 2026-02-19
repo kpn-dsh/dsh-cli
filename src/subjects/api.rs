@@ -5,7 +5,7 @@ use crate::context::Context;
 use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
-use crate::{error, DshCliResult};
+use crate::{cli_error, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -14,6 +14,7 @@ use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, POST_METHO
 use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::debug;
 
 struct ApiSubject {}
 
@@ -184,22 +185,18 @@ fn create_about(description: &str) -> String {
 }
 
 fn create_long_about(method_command: &str, method_descriptor: &MethodDescriptor, description: &str) -> String {
-  let response_string = method_descriptor
-    .response_type
-    .map(|response_type| {
-      if method_command == "get" {
-        if response_type == "String" {
-          "Returns a string.".to_string()
-        } else if response_type == "Vec<String>" {
-          "Returns a list of identifiers.".to_string()
-        } else {
-          format!("Returns a formatted {}.", response_type)
-        }
+  let response_string = match method_descriptor.response_description {
+    Some(response_description) => format!("Returns ok when {}.", response_description),
+    None => {
+      if method_descriptor.response_type == "String" {
+        "Returns a string.".to_string()
+      } else if method_descriptor.response_type == "Vec<String>" {
+        "Returns a list of identifiers.".to_string()
       } else {
-        format!("Returns ok when {}.", response_type)
+        format!("Returns a formatted {}.", method_descriptor.response_type)
       }
-    })
-    .unwrap_or_default();
+    }
+  };
   [
     Some(format!("{} {}", method_command.to_ascii_uppercase(), method_descriptor.path)),
     Some(description.to_string()),
@@ -344,7 +341,7 @@ impl CommandExecutor for ApiPatch {
           Ok(())
         }
         Err(error) => {
-          log::debug!("{:#?}", error);
+          debug!("{:#?}", error);
           Err(DshCliError::from(error))
         }
       }
@@ -417,7 +414,7 @@ fn parameters_from_matches<'a>(matches: &'a ArgMatches, method_descriptor: &Meth
     .map(|(parameter_name, _, _)| {
       matches
         .get_one::<String>(parameter_name)
-        .ok_or(error!("missing parameter {}", parameter_name))
+        .ok_or(cli_error!("missing parameter {}", parameter_name))
         .map(|parameter| parameter.as_str())
     })
     .collect::<Result<Vec<_>, _>>()
