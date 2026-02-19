@@ -90,9 +90,9 @@ The following table describes all environment variables.
         <td>
             This environment variable specifies the authentication method that will be used
             to access the resource management api. The allowed values are <code>robot</code> and 
-            <code>single-sign-on</code>. If this variable is not provided, the value from the 
+            <code>sso</code> (single sign on). If this variable is not provided, the value from the 
             settings file will be used, if it exists. Else, the default value will be 
-            <code>single-sign-on</code> when the cli tool is run interactive (<code>stdin</code> 
+            <code>sso</code> when the cli tool is run interactive (<code>stdin</code> 
             is a terminal) and <code>robot</code> if not.
         </td>
     </tr>

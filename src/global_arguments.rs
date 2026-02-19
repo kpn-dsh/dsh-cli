@@ -42,8 +42,8 @@ pub(crate) fn authentication_argument() -> Arg {
       "This option specifies the authentication method that will be used \
           to access the resource management api. If this argument is not provided, the value \
           from the environment variable 'DSH_CLI_AUTHENTICATION' or the value from the \
-          settings file will be used. By default, when stdout is a terminal 'single-sign-on' \
-          will be used, while if stdout is not a terminal 'robot' will be used.",
+          settings file will be used. By default, when stdout is a terminal 'sso' \
+          (single sign on) will be used, while if stdout is not a terminal 'robot' will be used.",
     )
     .hide_short_help(true)
     .global(true)
