@@ -16,7 +16,7 @@ use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
-use crate::{edit_configuration, error, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::{edit_configuration, err, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use chrono::DateTime;
 use clap::{Arg, ArgAction, ArgMatches};
@@ -48,7 +48,6 @@ lazy_static! {
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &ServiceCreate {}, "Create service")
       .set_long_about("Create a new service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag())
   );
   static ref SERVICE_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, None, &ServiceDelete {}, "Delete service")
@@ -233,7 +232,7 @@ impl CommandExecutor for ServiceCreate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     if client.get_application_configuration(&service_id).await.is_ok() {
-      return Err(error!("service '{}' already exists", service_id));
+      return err!("service '{}' already exists", service_id);
     }
     context.print_explanation(format!("create new service '{}'", service_id));
     let configuration = context.read_multi_line("enter json configuration (terminate input with ctrl-d after last line)")?;
@@ -247,7 +246,7 @@ impl CommandExecutor for ServiceCreate {
         }
         Ok(())
       }
-      Err(error) => Err(error!("invalid json configuration ({})", error)),
+      Err(error) => err!("invalid json configuration ({})", error),
     }
   }
 
@@ -263,7 +262,7 @@ impl CommandExecutor for ServiceDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
     if client.get_application_configuration(&service_id).await.is_err() {
-      return Err(error!("service '{}' does not exist", service_id));
+      return err!("service '{}' does not exist", service_id);
     }
     if context.confirmed(format!("delete service '{}'?", service_id))? {
       if context.dry_run() {
@@ -510,7 +509,7 @@ impl CommandExecutor for ServiceOpen {
     let service = client.get_application_configuration(&service_id).await?;
     context.print_execution_time(start_instant);
     if service.exposed_ports.len() > 1 {
-      Err(error!("service has more than one exposed port"))
+      err!("service has more than one exposed port")
     } else {
       match service.exposed_ports.iter().next() {
         Some((_, port_mapping)) => match &port_mapping.vhost {
@@ -534,15 +533,15 @@ impl CommandExecutor for ServiceOpen {
                   );
                   Ok(())
                 } else {
-                  Err(error!("exposed port has illegal zone {}", zone))
+                  err!("exposed port has illegal zone {}", zone)
                 }
               }
-              None => Err(error!("exposed port has no zone")),
+              None => err!("exposed port has no zone"),
             }
           }
-          None => Err(error!("port mapping has no vhost")),
+          None => err!("port mapping has no vhost"),
         },
-        None => Err(error!("service has no exposed ports")),
+        None => err!("service has no exposed ports"),
       }
     }
   }
@@ -767,7 +766,7 @@ impl CommandExecutor for ServiceUpdate {
         if cpus >= 0.1 {
           Some(cpus)
         } else {
-          return Err(error!("cpus should be greater than or equal to 0.1"));
+          return err!("cpus should be greater than or equal to 0.1");
         }
       }
       None => None,
@@ -815,7 +814,7 @@ impl CommandExecutor for ServiceUpdate {
               }
               Ok(())
             }
-            Err(error) => Err(error!("invalid json configuration ({})", error)),
+            Err(error) => err!("invalid json configuration ({})", error),
           }
         }
       }
@@ -839,6 +838,7 @@ pub(crate) enum ServiceLabel {
   Mem,
   Metrics,
   NeedsToken,
+  NodepoolFeatures,
   ReadableStreams,
   Secrets,
   SingleInstance,
@@ -864,6 +864,7 @@ impl Label for ServiceLabel {
       Self::Mem => "mem",
       Self::Metrics => "metrics",
       Self::NeedsToken => "needs token",
+      Self::NodepoolFeatures => "nodepool features",
       Self::ReadableStreams => "readable streams",
       Self::Secrets => "secrets",
       Self::SingleInstance => "single instance",
@@ -887,6 +888,7 @@ impl Label for ServiceLabel {
       Self::Mem => "mem",
       Self::Metrics => "metrics",
       Self::NeedsToken => "token",
+      Self::NodepoolFeatures => "nodepool",
       Self::ReadableStreams => "readable streams",
       Self::Secrets => "secrets",
       Self::SingleInstance => "single",
@@ -930,6 +932,7 @@ impl SubjectFormatter<ServiceLabel> for Application {
       ServiceLabel::Mem => Value::plain(self.mem),
       ServiceLabel::Metrics => Value::option(self.metrics.clone().map(|ref metrics| format!("{}:{}", metrics.port, metrics.path))),
       ServiceLabel::NeedsToken => Value::plain(self.needs_token),
+      ServiceLabel::NodepoolFeatures => Value::option(self.node_features.clone()),
       ServiceLabel::ReadableStreams => Value::plain(
         self
           .readable_streams
@@ -977,7 +980,7 @@ fn secrets_to_table(secrets: &[ApplicationSecret]) -> String {
   hashmap_to_table(&m)
 }
 
-static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
+static SERVICE_LABELS_LIST: [ServiceLabel; 9] = [
   ServiceLabel::Target,
   ServiceLabel::NeedsToken,
   ServiceLabel::Instances,
@@ -985,10 +988,11 @@ static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
   ServiceLabel::Mem,
   ServiceLabel::ExposedPorts,
   ServiceLabel::Metrics,
+  ServiceLabel::NodepoolFeatures,
   ServiceLabel::Image,
 ];
 
-pub(crate) static SERVICE_LABELS_SHOW: [ServiceLabel; 18] = [
+pub(crate) static SERVICE_LABELS_SHOW: [ServiceLabel; 19] = [
   ServiceLabel::Target,
   ServiceLabel::NeedsToken,
   ServiceLabel::Instances,
@@ -997,6 +1001,7 @@ pub(crate) static SERVICE_LABELS_SHOW: [ServiceLabel; 18] = [
   ServiceLabel::ExposedPorts,
   ServiceLabel::Volumes,
   ServiceLabel::Metrics,
+  ServiceLabel::NodepoolFeatures,
   ServiceLabel::Image,
   ServiceLabel::HealthCheck,
   ServiceLabel::ReadableStreams,
