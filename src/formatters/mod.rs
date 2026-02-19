@@ -1,9 +1,10 @@
 use crate::context::Context;
-use crate::error;
+use crate::err;
 use crate::error::DshCliError;
-use chrono::{DateTime, Local, Utc};
+use chrono::LocalResult::{Ambiguous, Single};
+use chrono::{DateTime, Local, TimeZone, Utc};
+use dsh_api::error::DshApiResult;
 use dsh_api::types::Notification;
-use dsh_api::DshApiResult;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -67,6 +68,7 @@ pub(crate) enum Value {
   Empty,
   Error(String),
   Ignore(String),
+  NotApplicable,
   Plain(String),
   Secret,
   Target(String),
@@ -106,6 +108,10 @@ impl Value {
     T: ToString,
   {
     Self::Ignore(value.to_string())
+  }
+
+  pub(crate) fn not_applicable() -> Self {
+    Self::NotApplicable
   }
 
   pub(crate) fn ok_or<T, U, E>(value: Result<T, E>, default: U) -> Self
@@ -158,6 +164,54 @@ impl Value {
     Self::Target(value.to_string())
   }
 
+  pub(crate) fn timestamp_seconds(timestamp_seconds: i64) -> Self {
+    match Local.timestamp_opt(timestamp_seconds, 0) {
+      Single(ref single) => Self::plain(single),
+      Ambiguous(ref ambiguous, _) => Self::plain(ambiguous),
+      _ => Self::plain(timestamp_seconds),
+    }
+  }
+
+  pub(crate) fn timestamp_seconds_expired(timestamp_seconds: i64) -> Self {
+    match Local.timestamp_opt(timestamp_seconds, 0) {
+      Single(ref single) => {
+        if single < &Local::now() {
+          Self::error(single)
+        } else {
+          Self::plain(single)
+        }
+      }
+      Ambiguous(ref ambiguous, _) => {
+        if ambiguous < &Local::now() {
+          Self::error(ambiguous)
+        } else {
+          Self::plain(ambiguous)
+        }
+      }
+      _ => Self::plain(timestamp_seconds),
+    }
+  }
+
+  pub(crate) fn timestamp_seconds_not_yet_passed(timestamp_seconds: i64) -> Self {
+    match Local.timestamp_opt(timestamp_seconds, 0) {
+      Single(ref single) => {
+        if single > &Local::now() {
+          Self::warn(single)
+        } else {
+          Self::plain(single)
+        }
+      }
+      Ambiguous(ref ambiguous, _) => {
+        if ambiguous > &Local::now() {
+          Self::warn(ambiguous)
+        } else {
+          Self::plain(ambiguous)
+        }
+      }
+      _ => Self::plain(timestamp_seconds),
+    }
+  }
+
   pub(crate) fn warn<T>(value: T) -> Self
   where
     T: ToString,
@@ -172,6 +226,7 @@ impl Value {
       Self::Empty => "".to_string(),
       Self::Error(value) => context.apply_error_style(value),
       Self::Ignore(value) => context.apply_ignore_style(value),
+      Self::NotApplicable => context.apply_ignore_style("n.a."),
       Self::Plain(value) => context.apply_stdout_style(value),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => context.apply_target_style(value),
@@ -184,11 +239,18 @@ impl Value {
       Self::Empty => "".to_string(),
       Self::Error(value) => value.to_string(),
       Self::Ignore(value) => value.to_string(),
+      Self::NotApplicable => "".to_string(),
       Self::Plain(value) => value.to_string(),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => value.to_string(),
       Self::Warn(value) => value.to_string(),
     }
+  }
+}
+
+impl Default for Value {
+  fn default() -> Self {
+    Self::Empty
   }
 }
 
@@ -390,7 +452,7 @@ impl TryFrom<&str> for OutputFormat {
       "toml" => Ok(Self::Toml),
       "toml-compact" => Ok(Self::TomlCompact),
       "yaml" => Ok(Self::Yaml),
-      _ => Err(error!("invalid output format '{}'", value)),
+      _ => err!("invalid output format '{}'", value),
     }
   }
 }
