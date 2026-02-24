@@ -37,11 +37,11 @@
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
 use crate::settings::Settings;
 use crate::targets::{upsert_password_to_keyring, Target};
-use crate::{error, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
+use crate::{err, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::platform::DshPlatform;
 use homedir::my_home;
 use lazy_static::lazy_static;
-use log::debug;
+use log::{debug, info, warn};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -73,27 +73,27 @@ pub(crate) fn init_dsh_directory() -> DshCliResult<()> {
     Ok(Some(dsh_directory)) => {
       if dsh_directory.exists() {
         if dsh_directory.is_dir() {
-          log::debug!("dsh directory already {} exists", dsh_directory.display());
+          debug!("dsh directory '{}' already exists", dsh_directory.display());
           Ok(())
         } else {
-          Err(error!(
-            "initialization failed because {} already exists but is not a directory",
+          err!(
+            "dsh directory initialization failed because '{}' already exists but is not a directory",
             dsh_directory.display()
-          ))
+          )
         }
       } else {
         _ = &fs::create_dir_all(&dsh_directory)?;
-        log::info!("dsh directory {} created", dsh_directory.display());
+        info!("dsh directory {} created", dsh_directory.display());
         for dsh_subdirectory_name in [TARGETS_SUBDIRECTORY] {
           let dsh_subdirectory = dsh_directory.join(dsh_subdirectory_name);
           fs::create_dir_all(&dsh_subdirectory)?;
-          log::info!("dsh subdirectory {} created", dsh_subdirectory.display());
+          info!("dsh subdirectory '{}' created", dsh_subdirectory.display());
         }
         Ok(())
       }
     }
     Ok(None) => Ok(()),
-    Err(error) => Err(error!("initialization failed {})", error)),
+    Err(error) => err!("dsh directory initialization failed ({})", error),
   }
 }
 
@@ -127,15 +127,15 @@ pub(crate) fn delete_refresh_token(platform: &DshPlatform) -> DshCliResult<bool>
   match refresh_token_pathbuf(platform)? {
     Some(refresh_token_pathbuf) => match fs::remove_file(&refresh_token_pathbuf) {
       Ok(()) => {
-        log::debug!("refresh token {} deleted", refresh_token_pathbuf.display());
+        debug!("refresh token '{}' deleted", refresh_token_pathbuf.display());
         Ok(true)
       }
       Err(error) => match error.kind() {
         ErrorKind::NotFound => Ok(false),
-        _ => Err(error!("error deleting refresh token {} ({})", refresh_token_pathbuf.display(), error)),
+        _ => err!("error deleting refresh token '{}' ({})", refresh_token_pathbuf.display(), error),
       },
     },
-    None => Err(error!("dsh directory disabled, refresh token cannot be deleted")),
+    None => err!("dsh directory disabled, refresh token cannot be deleted"),
   }
 }
 
@@ -149,22 +149,26 @@ pub(crate) fn delete_refresh_token(platform: &DshPlatform) -> DshCliResult<bool>
 /// * `Ok<None>` - Refresh token does not exist.
 /// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
 pub(crate) fn read_refresh_token(platform: &DshPlatform) -> DshCliResult<Option<String>> {
-  // let refresh_token_pathbuf = refresh_token_pathbuf(platform)?;
   match refresh_token_pathbuf(platform)? {
     Some(refresh_token_pathbuf) => match fs::read_to_string(&refresh_token_pathbuf) {
       Ok(refresh_token_string) => {
-        log::debug!("refresh token for platform '{}' read from file {}", platform, refresh_token_pathbuf.display());
+        debug!("refresh token for platform '{}' read from file {}", platform, refresh_token_pathbuf.display());
         Ok(Some(refresh_token_string))
       }
       Err(error) => match error.kind() {
         ErrorKind::NotFound => {
-          log::debug!("refresh token for platform '{}' not found", platform);
+          debug!("refresh token for platform '{}' not found", platform);
           Ok(None)
         }
-        _ => Err(error!("error reading refresh token {} ({})", refresh_token_pathbuf.display(), error)),
+        _ => err!(
+          "error reading refresh token '{}' for platform '{}' ({})",
+          refresh_token_pathbuf.display(),
+          platform,
+          error
+        ),
       },
     },
-    None => Err(error!("dsh directory disabled, refresh token cannot be read")),
+    None => err!("dsh directory disabled, refresh token cannot be read"),
   }
 }
 
@@ -177,14 +181,15 @@ pub(crate) fn read_refresh_token(platform: &DshPlatform) -> DshCliResult<Option<
 /// ## Returns
 /// * `Ok<()>` - If storing was successful.
 /// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
-pub(crate) fn write_refresh_token(platform: &DshPlatform, refresh_token: String) -> DshCliResult<()> {
+pub(crate) fn write_refresh_token(platform: &DshPlatform, refresh_token: &str) -> DshCliResult<()> {
   match refresh_token_pathbuf(platform)? {
     Some(refresh_token_pathbuf) => {
       create_parent_directories(&refresh_token_pathbuf)?;
+      debug!("write refresh token for platform '{}' to '{}'", platform, refresh_token_pathbuf.display());
       fs::write(refresh_token_pathbuf, refresh_token)?;
       Ok(())
     }
-    None => Err(error!("dsh directory disabled, refresh token cannot be stored")),
+    None => err!("dsh directory disabled, refresh token cannot be stored"),
   }
 }
 
@@ -220,7 +225,7 @@ pub(crate) fn write_settings(settings: Settings) -> DshCliResult<()> {
       debug!("write settings to default file '{}'", settings_file.display());
       serialize_and_write_to_toml_file(settings_file, &settings)
     }
-    None => Err(error!("dsh directory disabled, settings cannot be stored")),
+    None => err!("dsh directory disabled, settings cannot be stored"),
   }
 }
 
@@ -239,16 +244,17 @@ pub(crate) fn delete_target_directory(platform: &DshPlatform, tenant: &str) -> D
     Some(target_directory) => {
       if target_directory.exists() {
         if target_directory.is_dir() {
-          fs::remove_dir_all(target_directory)?;
+          fs::remove_dir_all(&target_directory)?;
+          debug!("target directory '{}' deleted", target_directory.display());
           Ok(true)
         } else {
-          Err(error!("{} is not a directory", target_directory.display()))
+          err!("'{}' is not a directory", target_directory.display())
         }
       } else {
         Ok(false)
       }
     }
-    None => Err(error!("dsh directory disabled, target directory cannot be deleted")),
+    None => err!("dsh directory disabled, target directory cannot be deleted"),
   }
 }
 
@@ -270,15 +276,17 @@ pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> DshCliResult<
     Some(target_directory) => {
       if target_directory.exists() {
         if target_directory.is_dir() {
+          debug!("target read from target directory '{}'", target_directory.display());
           Ok(Some(Target::new(platform.clone(), tenant.to_string(), None, vec![])))
         } else {
-          Err(error!("{} is not a directory", target_directory.display()))
+          err!("'{}' is not a target directory", target_directory.display())
         }
       } else {
+        debug!("target directory '{}' does not exist", target_directory.display());
         Ok(None)
       }
     }
-    None => Err(error!("dsh directory disabled, target cannot be read")),
+    None => err!("dsh directory disabled, target cannot be read"),
   }
 }
 
@@ -312,7 +320,7 @@ pub(crate) fn upsert_target(target: &Target) -> DshCliResult<()> {
             Ok(())
           }
           Err(keyring_error) => {
-            debug!(
+            warn!(
               "target file '{}' upserted with target '{}', but keyring update failed ({})",
               target_file.display(),
               target,
@@ -322,12 +330,12 @@ pub(crate) fn upsert_target(target: &Target) -> DshCliResult<()> {
           }
         },
         None => {
-          debug!("target file '{}' upserted with target '{}', but password is empty", target_file.display(), target);
+          warn!("target file '{}' upserted with target '{}', but password is empty", target_file.display(), target);
           Ok(())
         }
       }
     }
-    None => Err(error!("dsh directory disabled, target cannot be upserted")),
+    None => err!("dsh directory disabled, target cannot be upserted"),
   }
 }
 
@@ -364,7 +372,7 @@ pub(crate) fn list_targets() -> DshCliResult<Vec<(DshPlatform, String)>> {
       targets.sort();
       Ok(targets)
     }
-    None => Err(error!("dsh directory disabled, targets cannot be listed")),
+    None => err!("dsh directory disabled, targets cannot be listed"),
   }
 }
 
@@ -398,10 +406,6 @@ fn root_dsh_directory_pathbuf() -> DshCliResult<Option<PathBuf>> {
 /// * `Err<DshCliError>` -  Dsh directory could not be determined.
 pub(crate) fn dsh_directory_pathbuf(subdirectory: &str) -> DshCliResult<Option<PathBuf>> {
   root_dsh_directory_pathbuf().map(|pathbuf| pathbuf.map(|root_directory| root_directory.join(subdirectory)))
-  // match root_dsh_directory_pathbuf()? {
-  //   Some(root_directory) => Ok(Some(root_directory.join(subdirectory))),
-  //   None => Ok(None)
-  // }
 }
 
 /// Returns `PathBuf` for refresh token file
@@ -454,15 +458,15 @@ fn create_parent_directories(path: &Path) -> DshCliResult<()> {
         if parent.is_dir() {
           Ok(())
         } else {
-          Err(error!("parent {} already exists but is not a directory", parent.display()))
+          err!("parent '{}' already exists but is not a directory", parent.display())
         }
       } else {
         fs::create_dir_all(parent)?;
-        log::debug!("parent directory {} created", parent.display());
+        debug!("parent directory '{}' created", parent.display());
         Ok(())
       }
     }
-    None => Err(error!("{} has no parent", path.display())),
+    None => err!("'{}' has no parent", path.display()),
   }
 }
 
@@ -471,21 +475,31 @@ lazy_static! {
     match environment_variable(ENV_VAR_DSH_CLI_HOME, None) {
       Ok(Some(dsh_directory_from_env_var)) => {
         if dsh_directory_from_env_var.is_empty() {
+          warn!("environment variable '{}' is set but empty", ENV_VAR_DSH_CLI_HOME);
           Ok(None)
         } else {
+          debug!(
+            "dsh directory '{}' set from environment variable '{}'",
+            dsh_directory_from_env_var, ENV_VAR_DSH_CLI_HOME
+          );
           Ok(Some(PathBuf::new().join(dsh_directory_from_env_var)))
         }
       }
       Ok(None) => match my_home() {
-        Ok(Some(user_home_directory)) => Ok(Some(user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY))),
-        Ok(None) => Err(error!(
+        Ok(Some(user_home_directory)) => {
+          let dsh_directory = user_home_directory.join(DEFAULT_USER_DSH_CLI_DIRECTORY);
+          debug!("dsh directory '{}' in user home directory", dsh_directory.display());
+          Ok(Some(dsh_directory))
+        }
+        Ok(None) => err!(
           "could not determine dsh cli directory, check environment variable '{}' or 'HOME'",
           ENV_VAR_DSH_CLI_HOME
-        )),
-        Err(error) => Err(error!(
-          "could not determine dsh cli directory, check environment variable '{}' or 'HOME' ({})",
-          ENV_VAR_DSH_CLI_HOME, error
-        )),
+        ),
+        Err(error) => err!(
+          "error determining user home directory, check environment variable '{}' or 'HOME' ({})",
+          ENV_VAR_DSH_CLI_HOME,
+          error
+        ),
       },
       Err(_) => unreachable!(),
     }

@@ -17,7 +17,7 @@ use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
 use crate::verbosity::Verbosity;
 use crate::{err, error_append, DshCliResult};
-use clap::builder::styling::Style;
+use clap::builder::styling::{Color, Style};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::error::DshApiResult;
@@ -31,7 +31,7 @@ use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
 use std::process;
 use std::time::Instant;
@@ -75,7 +75,7 @@ impl Default for BrowserMethod {
   }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub(crate) struct Context {
   authentication_method: AuthenticationMethod,
   browser_method: BrowserMethod,
@@ -104,6 +104,68 @@ pub(crate) struct Context {
   terminal_width: Option<usize>,
   verbosity: Verbosity,
   warning_style: Style,
+}
+
+fn color_to_string(color: &Color) -> String {
+  match color {
+    Color::Ansi(ansi) => format!("{:?}", ansi),
+    Color::Ansi256(ansi256) => format!("{:?}", ansi256),
+    Color::Rgb(rgb) => format!("{:?}", rgb),
+  }
+}
+
+fn style_to_string(style: &Style) -> String {
+  [
+    style.get_fg_color().map(|color| color_to_string(&color)),
+    style.get_bg_color().map(|color| color_to_string(&color)),
+    style.get_underline_color().map(|color| color_to_string(&color)),
+    Some(format!("{:?}", style.get_effects())),
+  ]
+  .iter()
+  .flatten()
+  .join(", ")
+}
+
+impl Debug for Context {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut builder = f.debug_struct("Settings");
+    builder.field("authentication_method", &self.authentication_method);
+    builder.field("browser_method", &self.browser_method);
+
+    if let Some(csv_quote) = &self.csv_quote {
+      builder.field("csv_quote", csv_quote);
+    }
+    builder.field("csv_separator", &self.csv_separator);
+    builder.field("dry_run", &self.dry_run);
+    builder.field("error_style", &style_to_string(&self.error_style));
+    builder.field("force", &self.force);
+    builder.field("label_style", &style_to_string(&self.label_style));
+    builder.field("matching_style", &style_to_string(&self.matching_style));
+    builder.field("no_csv_headers", &self.no_csv_headers);
+    if let Some(output_format_specification) = &self.output_format_specification {
+      builder.field("output_format_specification", output_format_specification);
+    }
+    builder.field("quiet", &self.quiet);
+    builder.field("settings", &self.settings);
+    builder.field("show_execution_time", &self.show_execution_time);
+    builder.field("stderr_is_terminal", &self.stderr_is_terminal);
+    builder.field("stderr_no_escape", &self.stderr_no_escape);
+    builder.field("stderr_style", &style_to_string(&self.stderr_style));
+    builder.field("stdin_is_terminal", &self.stdin_is_terminal);
+    builder.field("stdout_is_terminal", &self.stdout_is_terminal);
+    builder.field("stdout_no_escape", &self.stdout_no_escape);
+    builder.field("stdout_style", &style_to_string(&self.stdout_style));
+    builder.field("suppress_exit_status", &self.suppress_exit_status);
+    builder.field("target_label_style", &style_to_string(&self.target_label_style));
+    builder.field("target_style", &style_to_string(&self.target_style));
+    if let Some(terminal_width) = &self.terminal_width {
+      builder.field("terminal_width", terminal_width);
+    }
+    builder.field("verbosity", &self.verbosity);
+    builder.field("warning_style", &style_to_string(&self.warning_style));
+
+    builder.finish()
+  }
 }
 
 impl Context {
