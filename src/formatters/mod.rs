@@ -1,8 +1,5 @@
-use crate::context::Context;
 use crate::err;
 use crate::error::DshCliError;
-use chrono::LocalResult::{Ambiguous, Single};
-use chrono::{DateTime, Local, TimeZone, Utc};
 use dsh_api::error::DshApiResult;
 use dsh_api::types::Notification;
 use itertools::Itertools;
@@ -14,6 +11,9 @@ use std::hash::Hash;
 pub(crate) mod ids_formatter;
 pub(crate) mod list_formatter;
 pub(crate) mod unit_formatter;
+pub(crate) mod value;
+
+pub(crate) use value::Value;
 
 /// # Defines behavior of labels
 ///
@@ -61,197 +61,6 @@ pub(crate) trait Label: Eq + Hash + PartialEq + Serialize {
   /// * `true` - if `self` is the target label for this label type.
   ///   Only one value can return `true`.
   fn is_target_label(&self) -> bool;
-}
-
-#[derive(Debug)]
-pub(crate) enum Value {
-  Empty,
-  Error(String),
-  Ignore(String),
-  NotApplicable,
-  Plain(String),
-  Secret,
-  Target(String),
-  Warn(String),
-}
-
-impl Value {
-  pub(crate) fn date_time_expired(date_time: &DateTime<Utc>) -> Self {
-    if date_time < &Local::now() {
-      Self::error(date_time)
-    } else {
-      Self::plain(date_time)
-    }
-  }
-
-  pub(crate) fn date_time_not_yet_passed(date_time: &DateTime<Utc>) -> Self {
-    if date_time > &Local::now() {
-      Self::warn(date_time.to_string())
-    } else {
-      Self::plain(date_time.to_string())
-    }
-  }
-
-  pub(crate) fn empty() -> Self {
-    Self::Empty
-  }
-
-  pub(crate) fn error<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Error(value.to_string())
-  }
-
-  pub(crate) fn ignore<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Ignore(value.to_string())
-  }
-
-  pub(crate) fn not_applicable() -> Self {
-    Self::NotApplicable
-  }
-
-  pub(crate) fn ok_or<T, U, E>(value: Result<T, E>, default: U) -> Self
-  where
-    T: ToString,
-    U: ToString,
-  {
-    match value {
-      Ok(v) => Self::plain(v.to_string()),
-      Err(_) => Self::plain(default.to_string()),
-    }
-  }
-
-  pub(crate) fn option<T>(value: Option<T>) -> Self
-  where
-    T: ToString,
-  {
-    match value {
-      Some(v) => Self::plain(v.to_string()),
-      None => Self::empty(),
-    }
-  }
-
-  pub(crate) fn plain<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Plain(value.to_string())
-  }
-
-  pub(crate) fn secret() -> Self {
-    Self::Secret
-  }
-
-  pub(crate) fn some_or<T, U>(value: Option<T>, default: U) -> Self
-  where
-    T: ToString,
-    U: ToString,
-  {
-    match value {
-      Some(v) => Self::plain(v.to_string()),
-      None => Self::plain(default.to_string()),
-    }
-  }
-
-  pub(crate) fn target<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Target(value.to_string())
-  }
-
-  pub(crate) fn timestamp_seconds(timestamp_seconds: i64) -> Self {
-    match Local.timestamp_opt(timestamp_seconds, 0) {
-      Single(ref single) => Self::plain(single),
-      Ambiguous(ref ambiguous, _) => Self::plain(ambiguous),
-      _ => Self::plain(timestamp_seconds),
-    }
-  }
-
-  pub(crate) fn timestamp_seconds_expired(timestamp_seconds: i64) -> Self {
-    match Local.timestamp_opt(timestamp_seconds, 0) {
-      Single(ref single) => {
-        if single < &Local::now() {
-          Self::error(single)
-        } else {
-          Self::plain(single)
-        }
-      }
-      Ambiguous(ref ambiguous, _) => {
-        if ambiguous < &Local::now() {
-          Self::error(ambiguous)
-        } else {
-          Self::plain(ambiguous)
-        }
-      }
-      _ => Self::plain(timestamp_seconds),
-    }
-  }
-
-  pub(crate) fn timestamp_seconds_not_yet_passed(timestamp_seconds: i64) -> Self {
-    match Local.timestamp_opt(timestamp_seconds, 0) {
-      Single(ref single) => {
-        if single > &Local::now() {
-          Self::warn(single)
-        } else {
-          Self::plain(single)
-        }
-      }
-      Ambiguous(ref ambiguous, _) => {
-        if ambiguous > &Local::now() {
-          Self::warn(ambiguous)
-        } else {
-          Self::plain(ambiguous)
-        }
-      }
-      _ => Self::plain(timestamp_seconds),
-    }
-  }
-
-  pub(crate) fn warn<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Warn(value.to_string())
-  }
-
-  const REDACTED_SECRET: &'static str = "[redacted]";
-
-  pub(crate) fn to_decorated_string(&self, context: &Context) -> String {
-    match self {
-      Self::Empty => "".to_string(),
-      Self::Error(value) => context.apply_error_style(value),
-      Self::Ignore(value) => context.apply_ignore_style(value),
-      Self::NotApplicable => context.apply_ignore_style("n.a."),
-      Self::Plain(value) => context.apply_stdout_style(value),
-      Self::Secret => Self::REDACTED_SECRET.to_string(),
-      Self::Target(value) => context.apply_target_style(value),
-      Self::Warn(value) => context.apply_warning_style(value),
-    }
-  }
-
-  pub(crate) fn to_undecorated_string(&self) -> String {
-    match self {
-      Self::Empty => "".to_string(),
-      Self::Error(value) => value.to_string(),
-      Self::Ignore(value) => value.to_string(),
-      Self::NotApplicable => "".to_string(),
-      Self::Plain(value) => value.to_string(),
-      Self::Secret => Self::REDACTED_SECRET.to_string(),
-      Self::Target(value) => value.to_string(),
-      Self::Warn(value) => value.to_string(),
-    }
-  }
-}
-
-impl Default for Value {
-  fn default() -> Self {
-    Self::Empty
-  }
 }
 
 /// # Defines how a data type will be formatted
