@@ -145,7 +145,7 @@ pub enum SecretMetadata {
   /// Secret contains a certificate
   ///
   /// Parameters: `subject`, `not_after`, `not_before`, `issuer`, `label`
-  Certificate(String, String, String, String, String),
+  Certificate(String, u64, u64, String, String),
   /// Secret is empty
   Empty,
   /// Secret metadata could not be determined
@@ -164,10 +164,6 @@ pub enum SecretMetadata {
   ///
   /// Parameter: `secret_format`
   Settings(SecretFormat),
-  /// System secret
-  ///
-  /// Parameter: `secret_format`
-  System(SecretFormat),
 }
 
 impl SecretMetadata {
@@ -180,7 +176,6 @@ impl SecretMetadata {
       Self::Pki(_, private, label, _) => Some(format!("{}, {}", label, if *private { "private" } else { "public" })),
       Self::Regular(_) => None,
       Self::Settings(_) => None,
-      Self::System(_) => None,
     }
   }
 
@@ -193,14 +188,21 @@ impl SecretMetadata {
       Self::Pki(_, _, _, _) => "pki",
       Self::Regular(_) => "regular",
       Self::Settings(_) => "settings",
-      Self::System(_) => "system",
     }
   }
 
   /// Returns the secrets expiration timestamp, if applicable
-  pub fn expires(&self) -> Option<String> {
+  pub fn not_after(&self) -> Option<u64> {
     match self {
       Self::Certificate(_, not_after, _, _, _) => Some(not_after.clone()),
+      _ => None,
+    }
+  }
+
+  /// Returns the secrets starting timestamp, if applicable
+  pub fn not_before(&self) -> Option<u64> {
+    match self {
+      Self::Certificate(_, _, not_before, _, _) => Some(not_before.clone()),
       _ => None,
     }
   }
@@ -214,7 +216,6 @@ impl SecretMetadata {
       Self::Pki(format, _, _, _) => format.clone(),
       Self::Regular(format) => format.clone(),
       Self::Settings(format) => format.clone(),
-      Self::System(format) => format.clone(),
     }
   }
 
@@ -227,7 +228,6 @@ impl SecretMetadata {
       Self::Pki(format, _, _, _) => Some(format.kind()),
       Self::Regular(format) => Some(format.kind()),
       Self::Settings(format) => Some(format.kind()),
-      Self::System(format) => Some(format.kind()),
     }
   }
 
@@ -237,7 +237,6 @@ impl SecretMetadata {
       Self::Pki(secret_format, _, _, _) => secret_format.secret_size(),
       Self::Regular(secret_format) => secret_format.secret_size(),
       Self::Settings(secret_format) => secret_format.secret_size(),
-      Self::System(secret_format) => secret_format.secret_size(),
       _ => None,
     }
   }
@@ -248,7 +247,6 @@ impl SecretMetadata {
       Self::Pki(secret_format, _, _, _) => secret_format.number_of_entries(),
       Self::Regular(secret_format) => secret_format.number_of_entries(),
       Self::Settings(secret_format) => secret_format.number_of_entries(),
-      Self::System(secret_format) => secret_format.number_of_entries(),
       _ => None,
     }
   }
@@ -263,7 +261,6 @@ impl Display for SecretMetadata {
       Self::Pki(_format, _private, _label, _algorithm) => write!(f, "pki"),
       Self::Regular(_format) => write!(f, "regular"),
       Self::Settings(_format) => write!(f, "settings"),
-      Self::System(_format) => write!(f, "system"),
     }
   }
 }
@@ -282,8 +279,8 @@ pub fn try_certificates(secret: &str) -> Result<Vec<SecretMetadata>, ()> {
         .iter()
         .map(|certificate| {
           let subject = certificate.tbs_certificate.subject.to_string();
-          let not_after = certificate.tbs_certificate.validity.not_after.to_string();
-          let not_before = certificate.tbs_certificate.validity.not_before.to_string();
+          let not_after = certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs();
+          let not_before = certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs();
           let issuer = certificate.tbs_certificate.issuer.to_string();
           SecretMetadata::Certificate(subject, not_after, not_before, issuer, "".to_string())
         })
@@ -398,14 +395,9 @@ fn try_multi_line_format(secret: &str) -> Result<SecretFormat, ()> {
   }
 }
 
-pub fn secret_metadata(secret: &str, is_system: bool) -> Vec<SecretMetadata> {
+pub fn secret_metadata(secret: &str) -> Vec<SecretMetadata> {
   if secret.trim().is_empty() {
     vec![SecretMetadata::Empty]
-  } else if is_system {
-    match try_multi_line_format(secret) {
-      Ok(multi_line_format) => vec![SecretMetadata::System(multi_line_format)],
-      Err(_) => vec![SecretMetadata::System(SecretFormat::String(SecretSize { number_of_lines: 1, number_of_characters: secret.trim().len() }))],
-    }
   } else if let Ok(pkcs1_private_key) = try_certificates(secret) {
     pkcs1_private_key
   } else if let Some(encrypted_label) = get_encrypted_label(secret) {
