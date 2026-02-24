@@ -1,25 +1,25 @@
+use crate::authentication::get_stored_refresh_token;
 use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, FETCH_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::filter_flags::FilterFlagType;
-use crate::formatters::list_formatter::ListFormatter;
-use crate::formatters::OutputFormat;
+use crate::flags::FlagType;
+use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::Value as FormatterValue;
+use crate::formatters::Value;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
-use crate::{error_map, DshCliResult};
+use crate::{error_map, get_target_platform, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
-use chrono::Local;
-use chrono::LocalResult::{Ambiguous, Single};
-use chrono::TimeZone;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::dsh_jwt::{DshJwt, DshJwtHeader, DshJwtPayload};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::debug;
 use serde::Serialize;
-use serde_json::Value;
+use std::str::FromStr;
 
 struct TokenSubject {}
 
@@ -66,6 +66,7 @@ lazy_static! {
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TokenShow {}, "Show token payload")
       .set_long_about("Fetch a DSH API token and show its payload contents.")
       .add_filter_flag(FilterFlagType::Complete, Some("Include header contents.".to_string()))
+      .add_command_executor(FlagType::OpenId, &TokenShowOpenId {}, Some("Show openid token".to_string()))
   );
   static ref TOKEN_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
     vec![TOKEN_COPY_CAPABILITY.as_ref(), TOKEN_FETCH_CAPABILITY.as_ref(), TOKEN_SHOW_CAPABILITY.as_ref()];
@@ -78,17 +79,22 @@ impl CommandExecutor for TokenCopy {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("fetch dsh api token and copy to clipboard");
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
+    let jwt = client.jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
+    let access_token = client.raw_token().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
-    match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(jwt.token().secret())) {
+    match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(access_token)) {
       Ok(_) => {
-        let jwt_type = jwt.payload().token_type.clone().unwrap_or("unknown".to_string());
+        let jwt_type = jwt.payload.token_type.clone().unwrap_or("unknown".to_string());
         let not_before = &jwt
-          .payload()
+          .payload
           .not_before
           .map(|nbf| if nbf > 0 { format!(", not before: {}", nbf) } else { "".to_string() })
           .unwrap_or_default();
-        let expires_in = if jwt.payload().expires_in() > 0 { format!(", expires in: {}", jwt.payload().expires_in()) } else { "".to_string() };
+        let expires_in = jwt
+          .payload
+          .expires_in()
+          .map(|expires_in| if expires_in > 0 { format!(", expires in: {}", expires_in) } else { "".to_string() })
+          .unwrap_or_default();
         context.print_outcome(format!("token copied to clipboard (type: {}, expires: {}{})", jwt_type, not_before, expires_in))
       }
       Err(error) => {
@@ -111,9 +117,9 @@ impl CommandExecutor for TokenFetch {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("fetch dsh api token");
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
+    let raw_token = client.raw_token().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
-    context.print(jwt.token().secret());
+    context.print(raw_token);
     Ok(())
   }
 
@@ -129,14 +135,23 @@ impl CommandExecutor for TokenShow {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let complete = matches.get_flag(FilterFlagType::Complete.id());
     let start_instant = context.now();
-    let jwt = client.fresh_jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
+    let jwt = client.jwt().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
     if complete {
       context.print_explanation("dsh api token header");
-      print_content("header", context, jwt.header_bytes(), &TOKEN_HEADER_LABELS_LIST);
+      let formatter = UnitFormatter::new("", &TOKEN_HEADER_LABELS_LIST, context);
+      formatter.print(&jwt, None)?;
+      context.print_explanation("dsh api token rfc7519");
+      let formatter = UnitFormatter::new("", &TOKEN_PAYLOAD_LABELS_LIST_RFC7519, context);
+      formatter.print(&jwt, None)?;
+      context.print_explanation("dsh api token dsh specific");
+      let formatter = UnitFormatter::new("", &TOKEN_PAYLOAD_LABELS_LIST_DSH, context);
+      formatter.print(&jwt, None)?;
+    } else {
+      context.print_explanation("dsh api token");
+      let formatter = UnitFormatter::new("", &TOKEN_PAYLOAD_LABELS_LIST_CONCISE, context);
+      formatter.print(&jwt, None)?;
     }
-    context.print_explanation("dsh api token payload");
-    print_content("payload", context, jwt.payload_bytes(), &TOKEN_PAYLOAD_LABELS_LIST);
     Ok(())
   }
 
@@ -145,98 +160,226 @@ impl CommandExecutor for TokenShow {
   }
 }
 
-fn print_content(kind: &str, context: &Context, decoded_payload: Vec<u8>, labels: &[TokenLabel]) {
-  if let Ok(json_payload) = String::from_utf8(decoded_payload) {
-    match serde_json::from_str::<Value>(&json_payload) {
-      Ok(deserialized_payload) => match context.output_format(None) {
-        OutputFormat::Json => context.print_serializable(deserialized_payload, Some(OutputFormat::Json)),
-        OutputFormat::JsonCompact => context.print_serializable(deserialized_payload, Some(OutputFormat::Json)),
-        _ => {
-          if let Some(payload_object) = deserialized_payload.as_object() {
-            let mut formatter = ListFormatter::new(labels, context);
-            let mut vals: Vec<(String, &Value)> = Vec::from_iter(payload_object.iter().map(|(key, value)| (key.to_string(), value)));
-            vals.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
-            for (key, value) in vals {
-              formatter.push_target_id_value(key, value);
-            }
-            let _ = formatter.print(None);
-          }
+struct TokenShowOpenId {}
+
+#[async_trait]
+impl CommandExecutor for TokenShowOpenId {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform(matches, context.settings())?;
+    let complete = matches.get_flag(FilterFlagType::Complete.id());
+    match get_stored_refresh_token(&platform)? {
+      Some(stored_refresh_token) => {
+        let refresh_jwt = DshJwt::from_str(stored_refresh_token.secret())?;
+        if complete {
+          context.print_explanation("openid refresh token header");
+          let formatter = UnitFormatter::new("", &TOKEN_HEADER_LABELS_LIST, context);
+          formatter.print(&refresh_jwt, None)?;
+          context.print_explanation("openid refresh token rfc7519");
+          let formatter = UnitFormatter::new("", &TOKEN_PAYLOAD_LABELS_LIST_RFC7519, context);
+          formatter.print(&refresh_jwt, None)?;
+          context.print_explanation("openid refresh token dsh specific");
+          let formatter = UnitFormatter::new("", &TOKEN_PAYLOAD_LABELS_LIST_DSH, context);
+          formatter.print(&refresh_jwt, None)?;
+        } else {
+          context.print_explanation("openid refresh token");
+          let formatter = UnitFormatter::new("", &TOKEN_PAYLOAD_LABELS_LIST_CONCISE, context);
+          formatter.print(&refresh_jwt, None)?;
         }
-      },
-      Err(_) => context.print_error(format!("{} could not be parsed as valid json", kind)),
+      }
+      None => context.print_warning(format!("no refresh token for platform '{}'", platform)),
     }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Eq, Hash, PartialEq, Serialize)]
 enum TokenLabel {
-  Key,
-  Timestamp,
-  Value,
+  DshAuthenticatedTenants,
+  DshAuthenticationTime,
+  DshAuthorizedParty,
+  DshClientAddress,
+  DshClientHost,
+  DshClientId,
+  DshEmail,
+  DshEmailVerified,
+  DshExpiresIn,
+  DshFamilyName,
+  DshGivenName,
+  DshName,
+  DshPermissions,
+  DshPreferredUsername,
+  DshScope,
+  DshSessionId,
+  DshTokenType,
+  HeaderAlg,
+  HeaderKid,
+  HeaderTyp,
+  Rfc7519Aud,
+  Rfc7519Exp,
+  Rfc7519Iat,
+  Rfc7519Iss,
+  Rfc7519Jti,
+  Rfc7519Nbf,
+  Rfc7519Sub,
 }
 
 impl Label for TokenLabel {
   fn as_str(&self) -> &str {
     match self {
-      Self::Key => "key",
-      Self::Timestamp => "timestamp",
-      Self::Value => "value",
+      Self::DshAuthenticatedTenants => "authenticated tenants",
+      Self::DshAuthenticationTime => "authentication time",
+      Self::DshAuthorizedParty => "authorized party",
+      Self::DshClientAddress => "client address",
+      Self::DshClientHost => "client host",
+      Self::DshClientId => "client id",
+      Self::DshEmail => "email",
+      Self::DshEmailVerified => "email verified",
+      Self::DshExpiresIn => "expires in",
+      Self::DshFamilyName => "family name",
+      Self::DshGivenName => "given name",
+      Self::DshName => "name",
+      Self::DshPermissions => "permissions",
+      Self::DshPreferredUsername => "preferred username",
+      Self::DshScope => "scope",
+      Self::DshSessionId => "session id",
+      Self::DshTokenType => "token type",
+      Self::HeaderAlg => "alg",
+      Self::HeaderKid => "kid",
+      Self::HeaderTyp => "typ",
+      Self::Rfc7519Aud => "aud",
+      Self::Rfc7519Exp => "exp",
+      Self::Rfc7519Iat => "iat",
+      Self::Rfc7519Iss => "iss",
+      Self::Rfc7519Jti => "jti",
+      Self::Rfc7519Nbf => "nbf",
+      Self::Rfc7519Sub => "sub",
     }
   }
 
   fn is_target_label(&self) -> bool {
-    matches!(self, Self::Key)
+    false
   }
 }
 
-impl SubjectFormatter<TokenLabel> for Value {
+impl SubjectFormatter<TokenLabel> for DshJwt {
   fn value(&self, label: &TokenLabel, target_id: &str) -> FormatterValue {
     match label {
-      TokenLabel::Key => FormatterValue::target(target_id),
-      TokenLabel::Timestamp => FormatterValue::plain(timestamp(self, target_id)),
-      TokenLabel::Value => match self {
-        Value::Array(array) => FormatterValue::plain(
-          array
-            .iter()
-            .map(|value| match value {
-              Value::Array(_) => "array (unexpected)".to_string(),
-              Value::Bool(boolean) => boolean.to_string(),
-              Value::Null => "null".to_string(),
-              Value::Number(number) => number.to_string(),
-              Value::Object(_) => "object (unexpected)".to_string(),
-              Value::String(string) => string.to_string(),
-            })
-            .collect_vec()
-            .join("\n"),
-        ),
-        Value::Bool(boolean) => FormatterValue::plain(boolean),
-        Value::Null => FormatterValue::plain("null"),
-        Value::Number(number) => FormatterValue::plain(number),
-        Value::Object(_) => FormatterValue::plain("object (unexpected)"),
-        Value::String(string) => FormatterValue::plain(string),
-      },
+      TokenLabel::DshAuthenticatedTenants
+      | TokenLabel::DshAuthenticationTime
+      | TokenLabel::DshAuthorizedParty
+      | TokenLabel::DshClientAddress
+      | TokenLabel::DshClientHost
+      | TokenLabel::DshClientId
+      | TokenLabel::DshEmail
+      | TokenLabel::DshEmailVerified
+      | TokenLabel::DshExpiresIn
+      | TokenLabel::DshFamilyName
+      | TokenLabel::DshGivenName
+      | TokenLabel::DshName
+      | TokenLabel::DshPermissions
+      | TokenLabel::DshPreferredUsername
+      | TokenLabel::DshScope
+      | TokenLabel::DshSessionId
+      | TokenLabel::DshTokenType => self.payload.value(label, target_id),
+
+      TokenLabel::HeaderAlg | TokenLabel::HeaderKid | TokenLabel::HeaderTyp => self.header.value(label, target_id),
+
+      TokenLabel::Rfc7519Aud
+      | TokenLabel::Rfc7519Exp
+      | TokenLabel::Rfc7519Iat
+      | TokenLabel::Rfc7519Iss
+      | TokenLabel::Rfc7519Jti
+      | TokenLabel::Rfc7519Nbf
+      | TokenLabel::Rfc7519Sub => self.payload.value(label, target_id),
     }
   }
 }
 
-fn timestamp(value: &Value, target_id: &str) -> String {
-  if ["auth_time", "exp", "iat", "nbf"].contains(&target_id) {
-    match value
-      .as_number()
-      .and_then(|number| number.as_i64())
-      .map(|valid_number| Local.timestamp_opt(valid_number, 0))
-    {
-      Some(mapped_local_time) => match mapped_local_time {
-        Single(single) => single.to_string(),
-        Ambiguous(ambiguous, _) => ambiguous.to_string(),
-        _ => value.to_string(),
-      },
-      None => "".to_string(),
+impl SubjectFormatter<TokenLabel> for DshJwtHeader {
+  fn value(&self, label: &TokenLabel, _: &str) -> FormatterValue {
+    match label {
+      TokenLabel::HeaderAlg => Value::plain(&self.algorithm),
+      TokenLabel::HeaderKid => Value::option(self.kid.as_ref()),
+      TokenLabel::HeaderTyp => Value::plain(&self.typ),
+      _ => Value::not_applicable(),
     }
-  } else {
-    "".to_string()
   }
 }
 
-static TOKEN_HEADER_LABELS_LIST: [TokenLabel; 2] = [TokenLabel::Key, TokenLabel::Value];
-static TOKEN_PAYLOAD_LABELS_LIST: [TokenLabel; 3] = [TokenLabel::Key, TokenLabel::Value, TokenLabel::Timestamp];
+impl SubjectFormatter<TokenLabel> for DshJwtPayload {
+  fn value(&self, label: &TokenLabel, _: &str) -> FormatterValue {
+    match label {
+      TokenLabel::DshAuthenticatedTenants => Value::option(self.authenticated_tenants().ok().map(|tenants| tenants.join(", "))),
+      TokenLabel::DshAuthenticationTime => self.authentication_time.map(Value::timestamp_seconds).unwrap_or_default(),
+      TokenLabel::DshAuthorizedParty => Value::option(self.authorized_party.as_ref()),
+      TokenLabel::DshClientAddress => Value::option(self.client_address.as_ref()),
+      TokenLabel::DshClientHost => Value::option(self.client_host.as_ref()),
+      TokenLabel::DshClientId => Value::option(self.client_id.as_ref()),
+      TokenLabel::DshEmail => Value::option(self.email.as_ref()),
+      TokenLabel::DshEmailVerified => Value::option(self.email_verified.map(|verified| verified.to_string())),
+      TokenLabel::DshExpiresIn => Value::option(self.expires_in()),
+      TokenLabel::DshFamilyName => Value::option(self.family_name.as_ref()),
+      TokenLabel::DshGivenName => Value::option(self.given_name.as_ref()),
+      TokenLabel::DshName => Value::option(self.name.as_ref()),
+      TokenLabel::DshPermissions => Value::option(self.dsh_permission_representations.as_ref().map(|permissions| permissions.iter().join("\n"))),
+      TokenLabel::DshPreferredUsername => Value::option(self.preferred_username.as_ref()),
+      TokenLabel::DshScope => Value::option(self.scope.as_ref()),
+      TokenLabel::DshSessionId => Value::option(self.session_id.as_ref()),
+      TokenLabel::DshTokenType => Value::option(self.token_type.as_ref()),
+      TokenLabel::Rfc7519Aud => Value::option(self.audience.as_ref()),
+      TokenLabel::Rfc7519Exp => self.expiration_time.map(Value::timestamp_seconds).unwrap_or_default(),
+      TokenLabel::Rfc7519Iat => self.issued_at.map(Value::timestamp_seconds).unwrap_or_default(),
+      TokenLabel::Rfc7519Iss => Value::option(self.issuer.as_ref()),
+      TokenLabel::Rfc7519Jti => Value::option(self.jwt_id.as_ref()),
+      TokenLabel::Rfc7519Nbf => self.not_before.map(Value::timestamp_seconds_not_before).unwrap_or_default(),
+      TokenLabel::Rfc7519Sub => Value::option(self.subject.as_ref()),
+      _ => Value::not_applicable(),
+    }
+  }
+}
+
+static TOKEN_HEADER_LABELS_LIST: [TokenLabel; 3] = [TokenLabel::HeaderTyp, TokenLabel::HeaderAlg, TokenLabel::HeaderKid];
+
+static TOKEN_PAYLOAD_LABELS_LIST_DSH: [TokenLabel; 17] = [
+  TokenLabel::DshAuthenticatedTenants,
+  TokenLabel::DshAuthenticationTime,
+  TokenLabel::DshAuthorizedParty,
+  TokenLabel::DshClientAddress,
+  TokenLabel::DshClientHost,
+  TokenLabel::DshClientId,
+  TokenLabel::DshEmail,
+  TokenLabel::DshEmailVerified,
+  TokenLabel::DshExpiresIn,
+  TokenLabel::DshFamilyName,
+  TokenLabel::DshGivenName,
+  TokenLabel::DshName,
+  TokenLabel::DshPermissions,
+  TokenLabel::DshPreferredUsername,
+  TokenLabel::DshScope,
+  TokenLabel::DshSessionId,
+  TokenLabel::DshTokenType,
+];
+
+static TOKEN_PAYLOAD_LABELS_LIST_RFC7519: [TokenLabel; 7] =
+  [TokenLabel::Rfc7519Aud, TokenLabel::Rfc7519Exp, TokenLabel::Rfc7519Iat, TokenLabel::Rfc7519Iss, TokenLabel::Rfc7519Jti, TokenLabel::Rfc7519Nbf, TokenLabel::Rfc7519Sub];
+
+static TOKEN_PAYLOAD_LABELS_LIST_CONCISE: [TokenLabel; 14] = [
+  TokenLabel::Rfc7519Aud,
+  TokenLabel::Rfc7519Exp,
+  TokenLabel::Rfc7519Iat,
+  TokenLabel::Rfc7519Iss,
+  TokenLabel::Rfc7519Jti,
+  TokenLabel::Rfc7519Nbf,
+  TokenLabel::Rfc7519Sub,
+  TokenLabel::DshClientId,
+  TokenLabel::DshAuthenticatedTenants,
+  TokenLabel::DshAuthenticationTime,
+  TokenLabel::DshAuthorizedParty,
+  TokenLabel::DshExpiresIn,
+  TokenLabel::DshScope,
+  TokenLabel::DshTokenType,
+];

@@ -538,20 +538,21 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
     if !access_tokens.is_empty() {
       let access_tokens: Vec<(&str, String)> = access_tokens
         .iter()
-        .map(|(platform, access_token)| {
-          (platform.name(), {
-            access_token
-              .tenant_permissions
-              .iter()
-              .map(|permission| permission.tenant.to_string())
-              .collect_vec()
-              .chunks(6)
-              .collect_vec()
-              .iter()
-              .map(|tenants| tenants.join(", "))
-              .collect_vec()
-              .iter()
-              .join(",\n")
+        .flat_map(|(platform, access_token)| {
+          access_token.tenant_permissions.as_ref().map(|tenant_permissions| {
+            (platform.name(), {
+              tenant_permissions
+                .iter()
+                .map(|permission| permission.tenant.to_string())
+                .collect_vec()
+                .chunks(6)
+                .collect_vec()
+                .iter()
+                .map(|tenants| tenants.join(", "))
+                .collect_vec()
+                .iter()
+                .join(",\n")
+            })
           })
         })
         .collect_vec();
@@ -998,7 +999,10 @@ async fn create_clients_access_token(matches: &ArgMatches, context: &Context) ->
         let target_tenant_name = get_target_tenant(matches, context.settings())?;
         match get_access_token(target_platform.clone()).await {
           Ok(Some((access_token, jwt))) => {
-            if jwt.authorized_tenants().contains(&target_tenant_name.as_str()) {
+            if jwt
+              .authorized_tenants()
+              .is_some_and(|authorized_tenants| authorized_tenants.contains(&target_tenant_name.as_str()))
+            {
               let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
               let dsh_api_client_factory = DshApiClientFactory::create_from_static_token(dsh_api_tenant, access_token);
               Ok(Some(vec![dsh_api_client_factory.client().await?]))
@@ -1034,7 +1038,11 @@ async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_
     Ok(Some((access_token, jwt))) => {
       let unauthorized_tenants = target_tenant_names
         .iter()
-        .filter(|target_tenant_name| !jwt.authorized_tenants().contains(&target_tenant_name.as_str()))
+        .filter(|target_tenant_name| {
+          !jwt
+            .authorized_tenants()
+            .is_some_and(|authorized_tenants| authorized_tenants.contains(&target_tenant_name.as_str()))
+        })
         .collect_vec();
       if !unauthorized_tenants.is_empty() {
         for unauthorized_tenant in &unauthorized_tenants {
@@ -1070,18 +1078,20 @@ async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_
 async fn create_clients_for_all_authorized_tenants(target_platform: DshPlatform) -> DshCliResult<Option<Vec<DshApiClient>>> {
   debug!("create client with static access token for all tenants at platform '{}'", target_platform);
   match get_access_token(target_platform.clone()).await {
-    Ok(Some((access_token, jwt))) => {
-      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_static_token(target_platform, access_token)?;
-      let clients = try_join_all(
-        jwt
-          .authorized_tenants()
-          .into_iter()
-          .map(|authorized_tenant| dsh_api_platform_client_factory.client(authorized_tenant)),
-      )
-      .await?;
-      debug!("clients created");
-      Ok(Some(clients))
-    }
+    Ok(Some((access_token, jwt))) => match jwt.authorized_tenants() {
+      Some(authorized_tenants) => {
+        let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_static_token(target_platform, access_token)?;
+        let clients = try_join_all(
+          authorized_tenants
+            .iter()
+            .map(|authorized_tenant| dsh_api_platform_client_factory.client(*authorized_tenant)),
+        )
+        .await?;
+        debug!("clients created");
+        Ok(Some(clients))
+      }
+      None => err!("json web token does not provide authorized tenants"),
+    },
     Ok(None) => Ok(None),
     Err(error) => Err(error),
   }
