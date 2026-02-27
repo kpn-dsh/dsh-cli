@@ -97,6 +97,7 @@ mod filter_flags;
 mod flags;
 mod formatters;
 mod global_arguments;
+mod issues;
 #[cfg(feature = "manage")]
 mod limits_flags;
 mod log_arguments;
@@ -399,7 +400,7 @@ async fn inner_main() -> DshCliExit {
             Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
           };
           for client in &clients {
-            if clients.len() > 1 {
+            if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
               context.print(format!("# {}", client.tenant()))
             }
             match subject.execute_subject_command_with_client(sub_matches, client, &context).await {
@@ -429,7 +430,7 @@ async fn inner_main() -> DshCliExit {
               Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
             };
             for client in &clients {
-              if clients.len() > 1 {
+              if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
                 context.print(format!("# {}", client.tenant()))
               }
               match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
