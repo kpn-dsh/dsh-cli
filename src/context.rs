@@ -1009,8 +1009,8 @@ impl Context {
           parts
             .iter()
             .map(|part| match part {
-              Matching(matching_part) => format!("{}{}{:#}{}", self.matching_style, matching_part, self.matching_style, self.stdout_style),
-              NonMatching(non_matching_part) => non_matching_part.to_string(),
+              Matching { part } => format!("{}{}{:#}{}", self.matching_style, part, self.matching_style, self.stdout_style),
+              NonMatching { part } => part.to_string(),
             })
             .collect_vec()
             .join("")
@@ -1176,8 +1176,8 @@ fn format_notification_message(notification: &Notification) -> String {
     Some(parts) => parts
       .iter()
       .map(|part| match part {
-        Matching(matching) => {
-          let stripped = &matching[2..matching.len() - 1];
+        Matching { part } => {
+          let stripped = &part[2..part.len() - 1];
           if let Some(key) = stripped.strip_prefix("urn:") {
             match notification.args.get(key) {
               Some(value) => value.to_string(),
@@ -1190,7 +1190,7 @@ fn format_notification_message(notification: &Notification) -> String {
             }
           }
         }
-        NonMatching(non_matching) => non_matching.to_string(),
+        NonMatching { part } => part.to_string(),
       })
       .join(""),
     None => notification.message.clone(),

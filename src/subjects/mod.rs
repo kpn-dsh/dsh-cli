@@ -165,9 +165,9 @@ where
 {
   fn value(&self, label: &DependantLabel, target_id: &str) -> Value {
     match self {
-      Dependant::App(app) => app.value(label, target_id),
-      Dependant::Application(application) => application.value(label, target_id),
-      Dependant::Proxy(proxy) => proxy.value(label, target_id),
+      Dependant::App { app } => app.value(label, target_id),
+      Dependant::Application { application } => application.value(label, target_id),
+      Dependant::Proxy { proxy } => proxy.value(label, target_id),
     }
   }
 }

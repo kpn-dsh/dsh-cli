@@ -719,12 +719,12 @@ impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRig
   fn value(&self, label: &StreamAccessLabel, target_id: &str) -> Value {
     match label {
       StreamAccessLabel::Partitions => match &self.1 {
-        Stream::Internal(internal) => Value::plain(internal.partitions),
-        Stream::Public(public) => Value::plain(public.partitions),
+        Stream::Internal { internal_stream } => Value::plain(internal_stream.partitions),
+        Stream::Public { public_stream } => Value::plain(public_stream.partitions),
       },
       StreamAccessLabel::ReplicationFactor => match &self.1 {
-        Stream::Internal(internal) => Value::plain(internal.replication_factor),
-        Stream::Public(public) => Value::plain(public.replication_factor),
+        Stream::Internal { internal_stream } => Value::plain(internal_stream.replication_factor),
+        Stream::Public { public_stream } => Value::plain(public_stream.replication_factor),
       },
       StreamAccessLabel::ReadAccess => {
         if self.2.has_read_access() {
@@ -735,8 +735,8 @@ impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRig
       }
       StreamAccessLabel::StreamId => Value::plain(&self.0),
       StreamAccessLabel::StreamKind => match self.1 {
-        Stream::Internal(_) => Value::plain("internal"),
-        Stream::Public(_) => Value::plain("public"),
+        Stream::Internal { .. } => Value::plain("internal"),
+        Stream::Public { .. } => Value::plain("public"),
       },
       StreamAccessLabel::Tenant => Value::target(target_id),
       StreamAccessLabel::WriteAccess => {

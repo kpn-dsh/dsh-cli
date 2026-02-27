@@ -27,7 +27,7 @@ pub(crate) enum DshCliError {
 impl DshCliError {
   pub(crate) fn accept_not_found(error: DshApiError, print: impl Fn()) -> DshCliResult<()> {
     match error {
-      DshApiError::NotFound(None) => {
+      DshApiError::NotFound { message: None } => {
         print();
         Ok(())
       }
@@ -277,12 +277,6 @@ impl From<openidconnect::url::ParseError> for DshCliError {
     Self::UrlParse(parse_error.to_string())
   }
 }
-
-// impl From<x509_parser::error::PEMError> for DshCliError {
-//   fn from(x509_parser_error: x509_parser::error::PEMError) -> Self {
-//     Self::X509(x509_parser_error.to_string())
-//   }
-// }
 
 impl From<std::string::FromUtf8Error> for DshCliError {
   fn from(utf8_error: std::string::FromUtf8Error) -> Self {

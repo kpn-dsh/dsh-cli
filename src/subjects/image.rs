@@ -207,11 +207,11 @@ impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
       ImageUsageLabel::Service => Value::target(&self.service_id),
       ImageUsageLabel::Source => Value::plain(self.image.source()),
       ImageUsageLabel::Stage => match &self.image {
-        ImageString::App(app) => Value::plain(&app.stage),
+        ImageString::App { image } => Value::plain(&image.stage),
         _ => Value::empty(),
       },
       ImageUsageLabel::Supplier => match &self.image {
-        ImageString::App(app) => Value::plain(&app.supplier),
+        ImageString::App { image } => Value::plain(&image.supplier),
         _ => Value::empty(),
       },
       ImageUsageLabel::Tenant => Value::plain(self.image.tenant()),

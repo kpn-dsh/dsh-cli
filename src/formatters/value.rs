@@ -1,6 +1,5 @@
 use crate::context::Context;
-use chrono::LocalResult::{Ambiguous, Single};
-use chrono::{DateTime, Days, Local, TimeZone, Utc};
+use chrono::{DateTime, Days, Utc};
 
 #[derive(Clone, Debug)]
 pub(crate) enum Value {
@@ -11,49 +10,85 @@ pub(crate) enum Value {
   Plain(String),
   Secret,
   Target(String),
-  Todo,
+  Unreachable,
   Warn(String),
+}
+
+/// Creates a `Value::PLain` with a formatted string.
+///
+/// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
+///
+/// # Examples
+/// ```
+/// let id = "my-id";
+/// let plain_value = plain!("id:{}", id);
+/// assert!(matches!(plain_value, Value::Plain { .. }));
+/// assert_eq!(plain_value.to_undecorated_string, "id:my-id"));
+/// ```
+#[macro_export]
+macro_rules! plain {
+  ($($t:tt)*) => {{
+    $crate::formatters::value::Value::Plain(format!($($t)*))
+  }};
+}
+
+/// Creates a `Value::Warn` with a formatted string.
+///
+/// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
+///
+/// # Examples
+/// ```
+/// let id = "my-id";
+/// let warn_value = warn!("{} not found", id);
+/// assert!(matches!(warn_value, Value::Warn { .. }));
+/// assert_eq!(warn_value.to_undecorated_string, "my-id not found"));
+/// ```
+#[macro_export]
+macro_rules! warn {
+  ($($t:tt)*) => {{
+    $crate::formatters::value::Value::Warn(format!($($t)*))
+  }};
 }
 
 impl Value {
   /// Create `Value` representing date/time
   ///
   /// # Parameters
-  /// * `date_time` - References a `DateTime<Utc>` struct representing the date/time.
+  /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
   ///
   /// # Returns
   /// * `Value::Plain`
   #[allow(dead_code)]
-  pub(crate) fn date_time(date_time: &DateTime<Utc>) -> Self {
-    Self::plain(date_time)
+  pub(crate) fn datetime(datetime: &DateTime<Utc>) -> Self {
+    Self::plain(datetime)
   }
 
   /// Create `Value` representing date/time with expiration check
   ///
   /// # Parameters
-  /// * `date_time` - References a `DateTime<Utc>` struct representing the date/time.
+  /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
   /// * `days` - Optional number of days in the future for the warning check.
   ///
   /// # Returns
-  /// * `Value::Error` - When `date_time` is in the past.
-  /// * `Value::Warn` - When `date` is present and `date_time` will expire within `days` days.
+  /// * `Value::Error` - When `datetime` is in the past.
+  /// * `Value::Warn` - When `date` is present and `datetime` will expire within `days` days.
   /// * `Value::Plain` - Otherwise.
-  pub(crate) fn date_time_expired(date_time: &DateTime<Utc>, days: Option<u64>) -> Self {
-    if date_time < &Local::now() {
-      Self::error(date_time)
+  pub(crate) fn datetime_expired(datetime: &DateTime<Utc>, days: Option<u64>) -> Self {
+    if datetime < &Utc::now() {
+      Self::error(datetime)
     } else {
       match days {
-        Some(warning_days) => match Local::now().checked_add_days(Days::new(warning_days)) {
+        Some(warning_days) => match Utc::now().checked_add_days(Days::new(warning_days)) {
           Some(expiration_warning_date) => {
-            if date_time < &expiration_warning_date {
-              Self::warn(date_time)
+            if datetime < &expiration_warning_date {
+              Self::warn(datetime)
             } else {
-              Self::plain(date_time)
+              Self::plain(datetime)
             }
           }
-          None => Self::plain(format!("{} (unchecked)", date_time)),
+          None => plain!("{} (unchecked)", datetime),
         },
-        None => Self::plain(date_time),
+        None => Self::plain(datetime),
       }
     }
   }
@@ -61,16 +96,16 @@ impl Value {
   /// Create `Value` representing date/time with not-before check
   ///
   /// # Parameters
-  /// * `date_time` - References a `DateTime<Utc>` struct representing the date/time.
+  /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
   ///
   /// # Returns
-  /// * `Value::Plain` - When `date_time` is in the past.
-  /// * `Value::Warn` - When `date_time` is now or in the future.
-  pub(crate) fn date_time_not_before(date_time: &DateTime<Utc>) -> Self {
-    if date_time > &Local::now() {
-      Self::warn(date_time.to_string())
+  /// * `Value::Plain` - When `datetime` is in the past.
+  /// * `Value::Warn` - When `datetime` is now or in the future.
+  pub(crate) fn datetime_not_before(datetime: &DateTime<Utc>) -> Self {
+    if datetime > &Utc::now() {
+      Self::warn(datetime.to_string())
     } else {
-      Self::plain(date_time.to_string())
+      Self::plain(datetime.to_string())
     }
   }
 
@@ -214,10 +249,9 @@ impl Value {
   /// # Returns
   /// * `Value::Plain` - Formatted timestamp.
   pub(crate) fn timestamp_seconds(timestamp: i64) -> Self {
-    match Utc.timestamp_opt(timestamp, 0) {
-      Single(ref single) => Self::plain(single),
-      Ambiguous(ref ambiguous, _) => Self::plain(ambiguous),
-      _ => Self::plain(timestamp),
+    match DateTime::from_timestamp_secs(timestamp) {
+      Some(datetime) => Self::plain(datetime),
+      None => plain!("{} (error)", timestamp),
     }
   }
 
@@ -233,10 +267,9 @@ impl Value {
   /// * `Value::Plain` - Otherwise.
   #[allow(dead_code)]
   pub(crate) fn timestamp_seconds_expired(timestamp: i64, days: Option<u64>) -> Self {
-    match Utc.timestamp_opt(timestamp, 0) {
-      Single(ref single) => Self::date_time_expired(single, days),
-      Ambiguous(ref ambiguous, _) => Self::date_time_expired(ambiguous, days),
-      _ => Self::plain(format!("{} (unchecked)", timestamp)),
+    match DateTime::from_timestamp_secs(timestamp) {
+      Some(ref datetime) => Self::datetime_expired(datetime, days),
+      None => plain!("{} (unchecked)", timestamp),
     }
   }
 
@@ -249,19 +282,18 @@ impl Value {
   /// * `Value::Plain` - When `timestamp` is in the past.
   /// * `Value::Warn` - When `timestamp` is now or in the future.
   pub(crate) fn timestamp_seconds_not_before(timestamp: i64) -> Self {
-    match Utc.timestamp_opt(timestamp, 0) {
-      Single(ref single) => Self::date_time_not_before(single),
-      Ambiguous(ref ambiguous, _) => Self::date_time_not_before(ambiguous),
-      _ => Self::plain(format!("{} (unchecked)", timestamp)),
+    match DateTime::from_timestamp_secs(timestamp) {
+      Some(ref datetime) => Self::datetime_not_before(datetime),
+      None => plain!("{} (unchecked)", timestamp),
     }
   }
 
-  /// Create `Value` representing a value that is not yet implemented
+  /// Create `Value` representing a program flow error
   ///
   /// # Returns
-  /// * `Value::Todo`
-  pub(crate) fn todo() -> Self {
-    Self::Todo
+  /// * `Value::Unreachable`
+  pub(crate) fn unreachable() -> Self {
+    Self::Unreachable
   }
 
   /// Create `Value` representing a warning
@@ -286,7 +318,7 @@ impl Value {
       Self::Plain(value) => context.apply_stdout_style(value),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => context.apply_target_style(value),
-      Self::Todo => context.apply_warning_style("todo"),
+      Self::Unreachable => context.apply_error_style("unreachable"),
       Self::Warn(value) => context.apply_warning_style(value),
     }
   }
@@ -300,7 +332,7 @@ impl Value {
       Self::Plain(value) => value.to_string(),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => value.to_string(),
-      Self::Todo => "todo".to_string(),
+      Self::Unreachable => "unreachable".to_string(),
       Self::Warn(value) => value.to_string(),
     }
   }

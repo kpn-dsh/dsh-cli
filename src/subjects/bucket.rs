@@ -317,15 +317,15 @@ impl SubjectFormatter<BucketLabel> for (BucketStatus, String) {
 
 fn dependant_to_tuple(dependant: &Dependant<BucketInjection>) -> (String, Vec<String>) {
   match dependant {
-    Dependant::App(app) => (
+    Dependant::App { app } => (
       format!("app:{}", app.app_id),
       app.resources.iter().map(|resource| resource.to_string()).collect_vec(),
     ),
-    Dependant::Application(application) => (
+    Dependant::Application { application } => (
       format!("service:{}", application.application_id),
       application.injections.iter().map(|injection| injection.to_string()).collect_vec(),
     ),
-    Dependant::Proxy(proxy) => (format!("proxy:{}", proxy.proxy_id), vec!["".to_string()]),
+    Dependant::Proxy { proxy } => (format!("proxy:{}", proxy.proxy_id), vec!["".to_string()]),
   }
 }
 

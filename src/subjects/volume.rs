@@ -324,9 +324,9 @@ impl CommandExecutor for VolumeShowUsage {
     let (_, usages) = client.volume_with_dependants(&volume_id).await?;
     context.print_execution_time(start_instant);
     let (dependant_apps, dependant_services): (Vec<DependantApp>, Vec<DependantApplication<VolumeInjection>>) = usages.into_iter().partition_map(|dependant| match dependant {
-      Dependant::App(app) => Either::Left(app),
-      Dependant::Application(service) => Either::Right(service),
-      Dependant::Proxy(_) => unreachable!(),
+      Dependant::App { app } => Either::Left(app),
+      Dependant::Application { application } => Either::Right(application),
+      Dependant::Proxy { .. } => unreachable!(),
     });
     if dependant_services.is_empty() {
       context.print_outcome("volume not used in services")
