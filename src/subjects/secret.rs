@@ -5,12 +5,14 @@ use crate::capability::{
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::Value;
 use crate::formatters::{Label, OutputFormat, SubjectFormatter};
+use crate::issues::{Issue, IssueLabel, Severity};
 use crate::modifier_flags::ModifierFlagType;
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
@@ -21,7 +23,7 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::error::DshApiError;
-use dsh_api::secret::SecretInjection;
+use dsh_api::secret::{normalize_secret_name, SecretInjection};
 use dsh_api::types::{AllocationStatus, Secret};
 use dsh_api::Dependant;
 use futures::future::{join, join_all, try_join_all};
@@ -30,6 +32,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::debug;
 use serde::Serialize;
+use std::cmp::PartialEq;
 
 pub struct SecretSubject {}
 
@@ -90,7 +93,9 @@ lazy_static! {
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &SecretListAllocationStatus {}, None),
         (FlagType::Certificates, &SecretListCertificates {}, None),
+        (FlagType::Errors, &SecretListErrors {}, None),
         (FlagType::Ids, &SecretListIds {}, None),
+        (FlagType::Issues, &SecretListIssues {}, None),
         (FlagType::Keys, &SecretListKeys {}, None),
         (FlagType::System, &SecretListSystem {}, None),
         (FlagType::Usage, &SecretListUsage {}, None)
@@ -157,40 +162,43 @@ struct SecretCreate {}
 #[async_trait]
 impl CommandExecutor for SecretCreate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    if client.get_secret(&secret_id).await.is_ok() {
-      return err!("secret '{}' already exists", secret_id);
+    let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    if secret_id.is_some() {
+      return err!("system secret '{}' cannot be created", secret_name);
+    }
+    if client.get_secret(&secret_name).await.is_ok() {
+      return err!("secret '{}' already exists", secret_name);
     }
     if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {
-        context.print_explanation(format!("create new multi-line secret '{}'", secret_id));
+        context.print_explanation(format!("create new multi-line secret '{}'", secret_name));
         let secret = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
-        let secret = Secret { name: secret_id.clone(), value: secret };
+        let secret = Secret { name: secret_name.clone(), value: secret };
         if context.dry_run() {
           context.print_warning("dry-run mode, secret not created");
         } else {
           client.post_secret(&secret).await?;
-          context.print_outcome(format!("secret '{}' created", secret_id));
+          context.print_outcome(format!("secret '{}' created", secret_name));
         }
       } else {
-        context.print_explanation(format!("create new single line secret '{}'", secret_id));
+        context.print_explanation(format!("create new single line secret '{}'", secret_name));
         let secret = context.read_single_line_password("enter secret")?;
-        let secret = Secret { name: secret_id.clone(), value: secret };
+        let secret = Secret { name: secret_name.clone(), value: secret };
         if context.dry_run() {
           context.print_warning("dry-run mode, secret not created");
         } else {
           client.post_secret(&secret).await?;
-          context.print_outcome(format!("secret '{}' created", secret_id));
+          context.print_outcome(format!("secret '{}' created", secret_name));
         }
       }
     } else {
       let secret = context.read_multi_line("")?;
-      let secret = Secret { name: secret_id.clone(), value: secret };
+      let secret = Secret { name: secret_name.clone(), value: secret };
       if context.dry_run() {
         context.print_warning("dry-run mode, secret not created");
       } else {
         client.post_secret(&secret).await?;
-        context.print_outcome(format!("secret '{}' created", secret_id));
+        context.print_outcome(format!("secret '{}' created", secret_name));
       }
     }
     Ok(())
@@ -206,19 +214,22 @@ struct SecretDelete {}
 #[async_trait]
 impl CommandExecutor for SecretDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    if client.get_secret_configuration(&secret_id).await.is_err() {
-      return err!("secret '{}' does not exist", secret_id);
+    let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    if secret_id.is_some() {
+      return err!("system secret '{}' cannot be deleted", secret_name);
     }
-    if context.confirmed(format!("delete secret '{}'?", secret_id))? {
+    if client.get_secret_configuration(&secret_name).await.is_err() {
+      return err!("secret '{}' does not exist", secret_name);
+    }
+    if context.confirmed(format!("delete secret '{}'?", secret_name))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, secret not deleted");
       } else {
-        client.delete_secret_configuration(&secret_id).await?;
-        context.print_outcome(format!("secret '{}' deleted", secret_id));
+        client.delete_secret_configuration(&secret_name).await?;
+        context.print_outcome(format!("secret '{}' deleted", secret_name));
       }
     } else {
-      context.print_outcome(format!("cancelled, secret '{}' not deleted", secret_id));
+      context.print_outcome(format!("cancelled, secret '{}' not deleted", secret_name));
     }
     Ok(())
   }
@@ -235,13 +246,11 @@ impl CommandExecutor for SecretList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets");
     let start_instant = context.now();
-    let secrets: Vec<(String, Option<String>, Vec<SecretMetadata>, Option<AllocationStatus>)> = secrets_with_metadata(client).await?;
+    let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
-    for (secret_name, secret_id, secret_metadatas, allocation_status) in secrets.into_iter() {
-      for secret_metadata in secret_metadatas {
-        formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, allocation_status.clone()));
-      }
+    for (secret_name, secret_id, secret_metadata, allocation_status, _dependants) in secrets.into_iter() {
+      formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, allocation_status.clone()));
     }
     formatter.print(None)?;
     Ok(())
@@ -283,15 +292,25 @@ impl CommandExecutor for SecretListCertificates {
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, context);
-    for (secret_name, _, secret_metadatas, _) in secrets_with_metadata {
-      for secret_metadata in secret_metadatas {
-        if let SecretMetadata::Certificate(_subject, _not_after, _not_before, _issuer, _label) = &secret_metadata {
-          formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
-        }
-      }
+    for (secret_name, _, secret_metadata, _, _) in secrets_with_metadata {
+      formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
     }
     formatter.print(None)?;
     Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct SecretListErrors {}
+
+#[async_trait]
+impl CommandExecutor for SecretListErrors {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    context.print_explanation("list all secrets that have errors");
+    list_issues(client, context, true).await?
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -320,6 +339,40 @@ impl CommandExecutor for SecretListIds {
   }
 }
 
+struct SecretListIssues {}
+
+#[async_trait]
+impl CommandExecutor for SecretListIssues {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    context.print_explanation("list all secrets that have potential issues");
+    list_issues(client, context, false).await?
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+async fn list_issues(client: &DshApiClient, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
+  pub(crate) static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
+    [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::Subject, IssueLabel::IssueDetails];
+  let start_instant = context.now();
+  let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
+  context.print_execution_time(start_instant);
+  let secrets_issues: Vec<(String, SecretMetadata, Vec<Issue>)> = secrets
+    .iter()
+    .flat_map(|secret_tuple| has_issues(secret_tuple, EXPIRATION_CHECK_DAYS, only_errors).map(|issues| (secret_tuple.0.clone(), secret_tuple.2.clone(), issues)))
+    .collect_vec();
+  let mut formatter = ListFormatter::new(&SECRET_LIST_ISSUES_LABELS_LIST, context);
+  for (secret_name, secret_metadata, issues) in secrets_issues.into_iter() {
+    for issue in issues {
+      formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata.clone(), issue));
+    }
+  }
+  formatter.print(None)?;
+  Ok(Ok(()))
+}
+
 struct SecretListKeys {}
 
 #[async_trait]
@@ -330,11 +383,9 @@ impl CommandExecutor for SecretListKeys {
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&KEY_LABELS_LIST, context);
-    for (secret_name, _, secret_metadatas, _) in secrets_with_metadata {
-      for secret_metadata in secret_metadatas {
-        if let SecretMetadata::Pki(_secret_format, _private, _label, _algorithm) = &secret_metadata {
-          formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
-        }
+    for (secret_name, _, secret_metadata, _, _) in secrets_with_metadata {
+      if let SecretMetadata::Pki { .. } = &secret_metadata {
+        formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
       }
     }
     formatter.print(None)?;
@@ -356,11 +407,9 @@ impl CommandExecutor for SecretListSystem {
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SYSTEM_LABELS_LIST, context);
-    for (secret_name, secret_id, secret_metadatas, _) in secrets_with_metadata {
+    for (secret_name, secret_id, secret_metadata, _, _) in secrets_with_metadata {
       if secret_id.is_some() {
-        for secret_metadata in secret_metadatas {
-          formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, None));
-        }
+        formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, None));
       }
     }
     formatter.print(None)?;
@@ -400,17 +449,40 @@ impl CommandExecutor for SecretListUsage {
   }
 }
 
+struct SecretShow {}
+
+#[async_trait]
+impl CommandExecutor for SecretShow {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    let start_instant = context.now();
+    let (secret_value, allocation_status) = join!(client.get_secret(&secret_name), client.get_secret_status(&secret_name));
+    context.print_execution_time(start_instant);
+    context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
+    _ = UnitFormatter::new(&secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_id.clone(), secret_metadata(&secret_value?), allocation_status.clone().ok()), None);
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
 struct SecretShowAllocationStatus {}
 
 #[async_trait]
 impl CommandExecutor for SecretShowAllocationStatus {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show allocation status for secret '{}'", secret_id));
+    let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    if secret_id.is_some() {
+      return err!("system secret '{}' has no allocation status", secret_name);
+    }
+    context.print_explanation(format!("show allocation status for secret '{}'", secret_name));
     let start_instant = context.now();
-    let allocation_status = client.get_secret_status(&secret_id).await?;
+    let allocation_status = client.get_secret_status(&secret_name).await;
     context.print_execution_time(start_instant);
-    UnitFormatter::new(secret_id, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status, None)
+    context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
+    UnitFormatter::new(secret_name, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status?, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -423,10 +495,10 @@ struct SecretShowUsage {}
 #[async_trait]
 impl CommandExecutor for SecretShowUsage {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show the apps and services that use secret '{}'", secret_id));
+    let (secret_name, _) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    context.print_explanation(format!("show the apps and services that use secret '{}'", secret_name));
     let start_instant = context.now();
-    let usages = client.secret_dependants(&secret_id).await?;
+    let usages = client.secret_dependants(&secret_name).await?;
     context.print_execution_time(start_instant);
     if usages.is_empty() {
       context.print_outcome("secret not used")
@@ -443,37 +515,16 @@ impl CommandExecutor for SecretShowUsage {
   }
 }
 
-struct SecretShow {}
-
-#[async_trait]
-impl CommandExecutor for SecretShow {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    let start_instant = context.now();
-    let (secret_value, allocation_status) = join!(client.get_secret(&secret_id), client.get_secret_status(&secret_id));
-    context.print_execution_time(start_instant);
-    context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
-    for secret_entry in secret_metadata(&secret_value?) {
-      _ = UnitFormatter::new(&secret_id, &SECRET_LABELS_LIST, context).print(&secret_entry, None);
-    }
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
-  }
-}
-
 struct SecretShowValue {}
 
 #[async_trait]
 impl CommandExecutor for SecretShowValue {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
+    let (secret_name, _) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
     let start_instant = context.now();
-    let secret = client.get_secret(&secret_id).await?;
+    let secret = client.get_secret(&secret_name).await?;
     context.print_execution_time(start_instant);
-    context.print_explanation(format!("show the value of secret '{}'", secret_id));
+    context.print_explanation(format!("show the value of secret '{}'", secret_name));
     context.print(secret);
     Ok(())
   }
@@ -488,28 +539,31 @@ struct SecretUpdate {}
 #[async_trait]
 impl CommandExecutor for SecretUpdate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let secret_id = target.unwrap_or_else(|| unreachable!());
-    if client.get_secret(&secret_id).await.is_err() {
-      return err!("secret '{}' does not exist", secret_id);
+    let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    if secret_id.is_some() {
+      return err!("system secret '{}' cannot be updated", secret_name);
+    }
+    if client.get_secret(&secret_name).await.is_err() {
+      return err!("secret '{}' does not exist", secret_name);
     }
     if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {
-        context.print_explanation(format!("update multi-line secret '{}'", secret_id));
+        context.print_explanation(format!("update multi-line secret '{}'", secret_name));
         let secret = context.read_multi_line("enter multi-line secret (terminate input with ctrl-d after last line)")?;
         if context.dry_run() {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          client.put_secret(&secret_id, secret).await?;
-          context.print_outcome(format!("secret '{}' updated", secret_id));
+          client.put_secret(&secret_name, secret).await?;
+          context.print_outcome(format!("secret '{}' updated", secret_name));
         }
       } else {
-        context.print_explanation(format!("update single line secret '{}'", secret_id));
+        context.print_explanation(format!("update single line secret '{}'", secret_name));
         let secret = context.read_single_line_password("enter secret")?;
         if context.dry_run() {
           context.print_warning("dry-run mode, secret not updated");
         } else {
-          client.put_secret(&secret_id, secret).await?;
-          context.print_outcome(format!("secret '{}' updated", secret_id));
+          client.put_secret(&secret_name, secret).await?;
+          context.print_outcome(format!("secret '{}' updated", secret_name));
         }
       }
     } else {
@@ -517,8 +571,8 @@ impl CommandExecutor for SecretUpdate {
       if context.dry_run() {
         context.print_warning("dry-run mode, secret not updated");
       } else {
-        client.put_secret(&secret_id, secret).await?;
-        context.print_outcome(format!("secret '{}' updated", secret_id));
+        client.put_secret(&secret_name, secret).await?;
+        context.print_outcome(format!("secret '{}' updated", secret_name));
       }
     }
     Ok(())
@@ -543,23 +597,26 @@ impl CommandExecutor for SecretUpdate {
 /// * `Vec<SecretMetadata>` - List containing the metadata items.
 /// * `Option<AllocationStatus>` - Secrets allocation status for non-system secrets,
 ///   empty otherwise.
-pub(crate) async fn secret_with_metadata(secret_name: &str, client: &DshApiClient) -> (Vec<SecretMetadata>, Option<AllocationStatus>) {
+pub(crate) async fn secret_with_metadata(secret_name: String, client: &DshApiClient) -> (SecretMetadata, Option<AllocationStatus>) {
   match join(
-    client.get_secret(secret_name),
-    client.get_secret_status(secret_name).map(|allocation_status| allocation_status.ok()),
+    client.get_secret(&secret_name),
+    client.get_secret_status(&secret_name).map(|allocation_status| allocation_status.ok()),
   )
   .await
   {
-    (Ok(secret_value), status) => (secret_metadata(&secret_value), status),
+    (Ok(secret_value), allocation_status) => (secret_metadata(&secret_value), allocation_status),
     (Err(error), allocation_status) => match error {
-      DshApiError::NotFound(_) => (vec![SecretMetadata::Error("secret not found, possibly pending".to_string())], allocation_status),
-      DshApiError::BadRequest(_) => (vec![SecretMetadata::Error("bad request".to_string())], None),
-      DshApiError::Configuration(_) => (vec![SecretMetadata::Error("configuration error".to_string())], None),
-      DshApiError::Conversion(_) => (vec![SecretMetadata::Error("conversion error".to_string())], None),
-      DshApiError::NotAuthorized(_) => (vec![SecretMetadata::Error("not authorized".to_string())], None),
-      DshApiError::Parameter(_) => (vec![SecretMetadata::Error("parameter error".to_string())], None),
-      DshApiError::Unexpected(_, _) => (vec![SecretMetadata::Error("unexpected error, possibly a network failure".to_string())], None),
-      DshApiError::Unprocessable(_) => (vec![SecretMetadata::Error("unprocessable".to_string())], None),
+      DshApiError::NotFound { .. } => (
+        SecretMetadata::NotFound { message: Some("secret not found, possibly pending".to_string()) },
+        allocation_status,
+      ),
+      DshApiError::BadRequest { .. } => (SecretMetadata::Error { message: "bad request".to_string() }, None),
+      DshApiError::Configuration { .. } => (SecretMetadata::Error { message: "configuration error".to_string() }, None),
+      DshApiError::Conversion { .. } => (SecretMetadata::Error { message: "conversion error".to_string() }, None),
+      DshApiError::NotAuthorized { .. } => (SecretMetadata::Error { message: "not authorized".to_string() }, None),
+      DshApiError::Parameter { .. } => (SecretMetadata::Error { message: "parameter error".to_string() }, None),
+      DshApiError::Unexpected { .. } => (SecretMetadata::Error { message: "unexpected error, possibly a network failure".to_string() }, None),
+      DshApiError::Unprocessable { .. } => (SecretMetadata::Error { message: "unprocessable".to_string() }, None),
     },
   }
 }
@@ -571,15 +628,105 @@ pub(crate) async fn secret_with_metadata(secret_name: &str, client: &DshApiClien
 /// * `String` - Secret name.
 /// * `Option<String>` - Secret id when secret is a system secret, empty otherwise.
 /// * `Vec<SecretMetadata>` - List containing the metadata.
-/// * `Option<AllocationStatus>` - Secrets allocation status for non-system secrets,
-pub(crate) async fn secrets_with_metadata(client: &DshApiClient) -> DshCliResult<Vec<(String, Option<String>, Vec<SecretMetadata>, Option<AllocationStatus>)>> {
-  let secret_names: Vec<(String, Option<String>)> = client.secret_names().await?;
+/// * `Option<AllocationStatus>` - Secrets allocation status for non-system secrets.
+/// * `Vec<Dependant<SecretInjection>>` - Apps, applications and proxies that depend on the secret.
+pub(crate) async fn secrets_with_metadata(
+  client: &DshApiClient,
+) -> DshCliResult<Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)>> {
+  let secrets: Vec<(String, Option<String>, Vec<Dependant<SecretInjection>>)> = client.secrets_with_dependants().await?;
   Ok(
-    join_all(secret_names.iter().map(|(secret_name, secret_id)| {
-      secret_with_metadata(secret_name, client).map(|(metadata, allocation_status)| (secret_name.clone(), secret_id.clone(), metadata, allocation_status))
+    join_all(secrets.into_iter().map(|(secret_name, secret_id, dependants)| {
+      secret_with_metadata(secret_name.clone(), client).map(|(metadata, allocation_status)| (secret_name, secret_id, metadata, allocation_status, dependants))
     }))
     .await,
   )
+}
+
+/// Check if a secret has issues
+///
+/// # Parameters
+/// * `secret_tuple` - Tuple of secret parameters, coinsisting of
+///   * `String` Secret name.
+///   * `Option<String>` - Secret id when it is a system secret.
+///   * `SecretMetadata` - Secret metadata.
+///   * `Option<AllocationStatus>` - Secret allocation status.
+///   * `Vec<Dependant<SecretInjection>>` List of apps, applications and proxies that depend
+///     on the secret.
+/// * `days`
+///
+/// # Returns
+/// * `Some(Vec<Issue>)` - List of found issues (at least one).
+/// * `None` - No issues where found.
+fn has_issues(
+  secret_tuple: &(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>),
+  days: Option<u64>,
+  only_errors: bool,
+) -> Option<Vec<Issue>> {
+  let (_, secret_id, secret_metadata, allocation_status, dependants) = secret_tuple;
+  let mut issues: Vec<Issue> = vec![];
+  match secret_metadata {
+    SecretMetadata::Certificate { not_after, not_before, .. } => {
+      if let Some(issue) = Issue::timestamp_expired(*not_after as i64, days) {
+        issues.push(issue);
+      }
+      if let Some(issue) = Issue::timestamp_before(*not_before as i64) {
+        issues.push(issue);
+      }
+    }
+    SecretMetadata::Empty => {
+      issues.push(Issue::Empty);
+    }
+    SecretMetadata::Error { message } => {
+      issues.push(Issue::IncorrectValue { explanation: message.clone() });
+    }
+    SecretMetadata::Misconfiguration { message } => {
+      issues.push(Issue::Misconfiguration { explanation: message.clone() });
+    }
+    SecretMetadata::NotFound { message } => {
+      issues.push(Issue::Misconfiguration { explanation: message.clone().unwrap_or_default().to_string() });
+    }
+    SecretMetadata::Pki { .. } => {}
+    SecretMetadata::Regular { .. } => {}
+    SecretMetadata::Settings { .. } => {}
+  }
+  if secret_id.is_none() && dependants.is_empty() {
+    issues.push(Issue::NotUsed)
+  }
+  if let Some(allocation_status) = allocation_status {
+    if !allocation_status.provisioned {
+      issues.push(Issue::NotProvisioned)
+    }
+    for notification in &allocation_status.notifications {
+      if notification.remove {
+        issues.push(Issue::RemovalNotification { notification: notification.clone() });
+      } else {
+        issues.push(Issue::CreationUpdateNotification { notification: notification.clone() });
+      }
+    }
+  }
+  if only_errors {
+    issues.retain(|issue| issue.severity() == Severity::Error);
+  }
+  if issues.is_empty() {
+    None
+  } else {
+    Some(issues)
+  }
+}
+
+impl SubjectFormatter<IssueLabel> for (SecretMetadata, Issue) {
+  fn value(&self, label: &IssueLabel, target_id: &str) -> Value {
+    let (secret_metadata, issue) = self;
+    match label {
+      IssueLabel::ConfigurationItem => issue.value(label, target_id),
+      IssueLabel::IssueDetails => issue.value(label, target_id),
+      IssueLabel::IssueKind => issue.value(label, target_id),
+      IssueLabel::Subject => Value::option(secret_metadata.value_description()),
+      IssueLabel::SubjectKind => Value::option(secret_metadata.kind()),
+      IssueLabel::Target => Value::target(target_id),
+      IssueLabel::Value => issue.value(label, target_id),
+    }
+  }
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
@@ -651,7 +798,7 @@ impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<A
           if allocation_status.provisioned {
             Value::empty()
           } else {
-            Value::warn("not provisioned")
+            Value::error("not provisioned")
           }
         }
         None => Value::empty(),
@@ -672,8 +819,8 @@ impl SubjectFormatter<SecretLabel> for SecretMetadata {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
     match label {
       SecretLabel::Description => match self.kind() {
-        "error" => Value::error(self.additional_info().map(|info| info.to_string()).unwrap_or_default()),
-        _ => Value::plain(self.kind()),
+        Some("error") => Value::error(self.additional_info().map(|info| info.to_string()).unwrap_or_default()),
+        _ => Value::option(self.additional_info()),
       },
       SecretLabel::Expires => match self.not_after() {
         Some(not_after) => Value::timestamp_seconds_expired(not_after as i64, EXPIRATION_CHECK_DAYS),
@@ -682,35 +829,35 @@ impl SubjectFormatter<SecretLabel> for SecretMetadata {
       SecretLabel::_Format => Value::plain(self.format()),
       SecretLabel::FormatKind => Value::option(self.format_kind()),
       SecretLabel::Issuer => match self {
-        SecretMetadata::Certificate(_, _, _, issuer, _) => Value::plain(issuer),
+        SecretMetadata::Certificate { issuer, .. } => Value::plain(issuer),
         _ => Value::not_applicable(),
       },
       SecretLabel::Kind => match self.kind() {
-        "error" => Value::error(self.kind()),
-        _ => Value::plain(self.kind()),
+        Some("error") => Value::error("ERROR"),
+        _ => Value::option(self.kind()),
       },
       SecretLabel::Label => match self {
-        SecretMetadata::Certificate(_, _, _, _, label) => Value::plain(label),
-        SecretMetadata::Pki(_, _, label, _) => Value::plain(label),
+        SecretMetadata::Certificate { label, .. } => Value::plain(label),
+        SecretMetadata::Pki { labels, .. } => Value::plain(labels.join("/")),
         _ => Value::not_applicable(),
       },
       SecretLabel::_NotBefore => match self {
-        SecretMetadata::Certificate(_, _, not_before, _, _) => Value::plain(not_before),
+        SecretMetadata::Certificate { not_before, .. } => Value::plain(not_before),
         _ => Value::not_applicable(),
       },
       SecretLabel::NotAfter => match self {
-        SecretMetadata::Certificate(_, not_after, _, _, _) => Value::plain(not_after),
+        SecretMetadata::Certificate { not_after, .. } => Value::plain(not_after),
         _ => Value::not_applicable(),
       },
       SecretLabel::_NumberOfEntries => Value::option(self.number_of_entries()),
       SecretLabel::Private => match self {
-        SecretMetadata::Pki(_, private, _, _) => Value::plain(if *private { "private" } else { "public" }),
+        SecretMetadata::Pki { private, .. } => Value::plain(if *private { "private" } else { "public" }),
         _ => Value::not_applicable(),
       },
       SecretLabel::SecretName => Value::target(target_id),
       SecretLabel::Size => Value::option(self.secret_size()),
       SecretLabel::Subject => match self {
-        SecretMetadata::Certificate(subject, _, _, _, _) => Value::plain(subject),
+        SecretMetadata::Certificate { subject, .. } => Value::plain(subject),
         _ => Value::not_applicable(),
       },
       _ => Value::not_applicable(),
@@ -726,6 +873,19 @@ static SYSTEM_LABELS_LIST: [SecretLabel; 4] = [SecretLabel::SecretName, SecretLa
 
 pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 9] = [
   SecretLabel::SecretName,
+  SecretLabel::System,
+  SecretLabel::Kind,
+  SecretLabel::FormatKind,
+  SecretLabel::Size,
+  SecretLabel::Description,
+  SecretLabel::Expires,
+  SecretLabel::Status,
+  SecretLabel::Notifications,
+];
+
+pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 10] = [
+  SecretLabel::SecretName,
+  SecretLabel::SecretId,
   SecretLabel::System,
   SecretLabel::Kind,
   SecretLabel::FormatKind,

@@ -1,3 +1,4 @@
+use crate::subjects::certificate::distinguished_name_to_map;
 use itertools::Itertools;
 use pkcs1::{RsaPrivateKey, RsaPublicKey};
 use pkcs8::PrivateKeyInfo;
@@ -8,7 +9,7 @@ use x509_cert::Certificate;
 
 /// Describes the size of a secret
 #[derive(Clone, Serialize)]
-pub struct SecretSize {
+pub(crate) struct SecretSize {
   /// Number of lines after trimming whitespace
   number_of_lines: usize,
   /// Number of characters after trimming whitespace
@@ -38,73 +39,86 @@ impl Display for SecretSize {
 
 /// Describes the format of a secret
 #[derive(Clone, Serialize)]
-pub enum SecretFormat {
+pub(crate) enum SecretFormat {
   /// Secret is empty after trimming white space
   Empty,
+
   /// Secret contains an encrypted value
   ///
-  /// Parameter: `secret_size`
-  Encrypted(SecretSize),
+  /// # Fields
+  /// * `secret_size` - Size of the encrypted value.
+  Encrypted { secret_size: SecretSize },
+
   /// Secret could not be processed
   Error,
+
   /// Secret contains a json array
   ///
-  /// Parameters: `number_of_elements`, `secret_size`
-  JsonArray(usize, SecretSize),
+  /// # Fields
+  /// * `number_of_elements` - Number of array elements.
+  /// * `secret_size` - Size of the json array.
+  JsonArray { number_of_elements: usize, secret_size: SecretSize },
+
   /// Secret contains a json object
   ///
-  /// Parameters: `number_of_fields`, `secret_size`
-  JsonObject(usize, SecretSize),
+  /// # Fields
+  /// * `number_of_fields` - Number of object elements.
+  /// * `secret_size` - Size of the json object.
+  JsonObject { number_of_fields: usize, secret_size: SecretSize },
+
   /// Secret contains a multi line string
-  ///
-  /// Parameter: `secret_size`
-  MultiLine(SecretSize),
+  /// * `secret-size` - Size of the multi line secret.
+  MultiLine { secret_size: SecretSize },
+
   /// Secret contains a pem formatted string
   Pem,
+
   /// Secret contains a pem label
   PemLabel,
+
   /// Secret contains a pkcs1 formatted string
   PemPkcs1,
+
   /// Secret contains a pkcs8 formatted string
   PemPkcs8,
+
   /// Secret contains a single line string
-  ///
-  /// Parameter: `secret_size`
-  String(SecretSize),
+  /// * `secret_size` - Size of the single line secret.
+  String { secret_size: SecretSize },
 }
 
 impl SecretFormat {
-  pub fn kind(&self) -> &str {
+  pub(crate) fn kind(&self) -> &str {
     match self {
       Self::Empty => "empty",
-      Self::Encrypted(_) => "encrypted",
+      Self::Encrypted { .. } => "encrypted",
       Self::Error => "error",
-      Self::JsonArray(_, _) => "json array",
-      Self::JsonObject(_, _) => "json object",
-      Self::MultiLine(_) => "multi line",
+      Self::JsonArray { .. } => "json array",
+      Self::JsonObject { .. } => "json object",
+      Self::MultiLine { .. } => "multi line",
       Self::Pem => "pem",
       Self::PemLabel => "pem label",
       Self::PemPkcs1 => "pkcs1",
       Self::PemPkcs8 => "pkcs8",
-      Self::String(_) => "string",
+      Self::String { .. } => "string",
     }
   }
 
-  pub fn number_of_entries(&self) -> Option<&usize> {
+  pub(crate) fn number_of_entries(&self) -> Option<&usize> {
     match self {
-      Self::JsonArray(number_of_elements, _) => Some(number_of_elements),
-      Self::JsonObject(number_of_fields, _) => Some(number_of_fields),
+      Self::JsonArray { number_of_elements, .. } => Some(number_of_elements),
+      Self::JsonObject { number_of_fields, .. } => Some(number_of_fields),
       _ => None,
     }
   }
 
-  pub fn secret_size(&self) -> Option<&SecretSize> {
+  pub(crate) fn secret_size(&self) -> Option<&SecretSize> {
     match self {
-      Self::Encrypted(secret_size) => Some(secret_size),
-      Self::JsonArray(_, secret_size) => Some(secret_size),
-      Self::JsonObject(_, secret_size) => Some(secret_size),
-      Self::MultiLine(secret_size) => Some(secret_size),
-      Self::String(secret_size) => Some(secret_size),
+      Self::Encrypted { secret_size } => Some(secret_size),
+      Self::JsonArray { secret_size, .. } => Some(secret_size),
+      Self::JsonObject { secret_size, .. } => Some(secret_size),
+      Self::MultiLine { secret_size, .. } => Some(secret_size),
+      Self::String { secret_size, .. } => Some(secret_size),
       _ => None,
     }
   }
@@ -114,20 +128,20 @@ impl Display for SecretFormat {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Empty => write!(f, "empty"),
-      Self::Encrypted(secret_size) => {
+      Self::Encrypted { secret_size } => {
         write!(f, "encrypted, ")?;
         secret_size.fmt(f)
       }
       Self::Error => write!(f, "error"),
-      Self::JsonArray(number_of_elements, secret_size) => {
+      Self::JsonArray { number_of_elements, secret_size } => {
         write!(f, "json array, {} elements, ", number_of_elements,)?;
         secret_size.fmt(f)
       }
-      Self::JsonObject(number_of_fields, secret_size) => {
+      Self::JsonObject { number_of_fields, secret_size } => {
         write!(f, "json object, {} fields, ", number_of_fields)?;
         secret_size.fmt(f)
       }
-      Self::MultiLine(secret_size) => {
+      Self::MultiLine { secret_size } => {
         write!(f, "multi line, ")?;
         secret_size.fmt(f)
       }
@@ -135,132 +149,172 @@ impl Display for SecretFormat {
       Self::PemLabel => write!(f, "pem label"),
       Self::PemPkcs1 => write!(f, "pkcs1"),
       Self::PemPkcs8 => write!(f, "pkcs8"),
-      Self::String(length) => write!(f, "string, {} chars", length),
+      Self::String { secret_size } => write!(f, "string, {} chars", secret_size),
     }
   }
 }
 
 #[derive(Clone, Serialize)]
-pub enum SecretMetadata {
+pub(crate) enum SecretMetadata {
   /// Secret contains a certificate
   ///
-  /// Parameters: `subject`, `not_after`, `not_before`, `issuer`, `label`
-  Certificate(String, u64, u64, String, String),
+  /// # Fields
+  /// * `subject` - Subject or distinguished name.
+  /// * `not_after` - Timestamp value of the configuration item in seconds since epoch.
+  /// * `not_before` - Timestamp at which the configuration item becomes valid in seconds.
+  /// * `issuer` - Issuer of the certificate.
+  /// * `label` - Label in the pem file that contained the certificate.
+  /// * `chain` - Chain of certificate authorities that issued the certificate. This will
+  ///   always be a `SecretMetadata::Certificate` variant.
+  Certificate { subject: String, not_after: u64, not_before: u64, issuer: String, label: String, chain: Vec<SecretMetadata> },
+
   /// Secret is empty
   Empty,
+
   /// Secret metadata could not be determined
   ///
-  /// Parameter: `error_message`
-  Error(String),
+  /// # Fields
+  /// * `message` - Message that describes the error.
+  Error { message: String },
+
+  /// Secret metadata could not be determined caused by misconfiguration
+  ///
+  /// # Fields
+  /// * `message` - Message that describes the misconfiguration.
+  Misconfiguration { message: String },
+
+  /// Secret could not be found
+  ///
+  /// # Fields
+  /// * `message` - Message that describes the error.
+  NotFound { message: Option<String> },
+
   /// Secrets is a private or public key
   ///
-  /// Parameters: `secret_format`, `private`, `label`, `algorithm`
-  Pki(SecretFormat, bool, String, Option<String>),
+  /// # Fields
+  /// * `secret_format` - Format of the secret.
+  /// * `private` - Whether the key is a private key or a public key.
+  /// * `label` - Label in the pem file that contained the certificate.
+  /// * `algorithm` - Key algorithm.
+  Pki { secret_format: SecretFormat, private: bool, labels: Vec<String>, algorithm: Option<String> },
+
   /// Regular secret
   ///
-  /// Parameter: `secret_format`
-  Regular(SecretFormat),
+  /// # Fields
+  /// * `secret_format` - Describes the format of the key.
+  Regular { secret_format: SecretFormat },
+
   /// Secret contains settings data
   ///
-  /// Parameter: `secret_format`
-  Settings(SecretFormat),
+  /// # Fields
+  /// * `secret_format` - Describes the format of the key.
+  Settings { secret_format: SecretFormat },
 }
 
 impl SecretMetadata {
   /// Returns additional information
-  pub fn additional_info(&self) -> Option<String> {
+  pub(crate) fn additional_info(&self) -> Option<String> {
     match self {
-      Self::Certificate(_, _, _, _, label) => Some(label.to_string()),
+      Self::Certificate { label, .. } => Some(label.to_string()),
       Self::Empty => None,
-      Self::Error(message) => Some(message.to_string()),
-      Self::Pki(_, private, label, _) => Some(format!("{}, {}", label, if *private { "private" } else { "public" })),
-      Self::Regular(_) => None,
-      Self::Settings(_) => None,
+      Self::Error { message } => Some(message.to_string()),
+      Self::Misconfiguration { message } => Some(message.to_string()),
+      Self::NotFound { message } => message.clone(),
+      Self::Pki { private, labels, .. } => Some(format!("{}, {}", labels.join("/"), if *private { "private" } else { "public" })),
+      Self::Regular { .. } => None,
+      Self::Settings { .. } => None,
     }
   }
 
   /// Returns the kind of secret
-  pub fn kind(&self) -> &str {
+  pub(crate) fn kind(&self) -> Option<&str> {
     match self {
-      Self::Certificate(_, _, _, _, _) => "cert",
-      Self::Empty => "empty",
-      Self::Error(_) => "error",
-      Self::Pki(_, _, _, _) => "pki",
-      Self::Regular(_) => "regular",
-      Self::Settings(_) => "settings",
+      Self::Certificate { .. } => Some("cert"),
+      Self::Empty => Some("empty"),
+      Self::Error { .. } => None,
+      Self::Misconfiguration { .. } => None,
+      Self::NotFound { .. } => None,
+      Self::Pki { .. } => Some("pki"),
+      Self::Regular { .. } => Some("regular"),
+      Self::Settings { .. } => Some("settings"),
     }
   }
 
   /// Returns the secrets expiration timestamp, if applicable
-  pub fn not_after(&self) -> Option<u64> {
+  pub(crate) fn not_after(&self) -> Option<u64> {
     match self {
-      Self::Certificate(_, not_after, _, _, _) => Some(not_after.clone()),
+      Self::Certificate { not_after, .. } => Some(*not_after),
       _ => None,
     }
   }
 
   /// Returns the secrets starting timestamp, if applicable
-  pub fn not_before(&self) -> Option<u64> {
+  #[allow(dead_code)]
+  pub(crate) fn not_before(&self) -> Option<u64> {
     match self {
-      Self::Certificate(_, _, not_before, _, _) => Some(not_before.clone()),
+      Self::Certificate { not_before, .. } => Some(*not_before),
       _ => None,
     }
   }
 
   /// Returns the secrets format
-  pub fn format(&self) -> SecretFormat {
+  pub(crate) fn format(&self) -> SecretFormat {
     match self {
-      Self::Certificate(_, _, _, _, _) => SecretFormat::Pem,
+      Self::Certificate { .. } => SecretFormat::Pem,
       Self::Empty => SecretFormat::Empty,
-      Self::Error(_) => SecretFormat::Error,
-      Self::Pki(format, _, _, _) => format.clone(),
-      Self::Regular(format) => format.clone(),
-      Self::Settings(format) => format.clone(),
+      Self::Error { .. } => SecretFormat::Error,
+      Self::Misconfiguration { .. } => SecretFormat::Error,
+      Self::NotFound { .. } => SecretFormat::Error,
+      Self::Pki { secret_format, .. } => secret_format.clone(),
+      Self::Regular { secret_format, .. } => secret_format.clone(),
+      Self::Settings { secret_format, .. } => secret_format.clone(),
     }
   }
 
   /// Returns the secrets kind of format
-  pub fn format_kind(&self) -> Option<&str> {
+  pub(crate) fn format_kind(&self) -> Option<&str> {
     match self {
-      Self::Certificate(_, _, _, _, _) => None,
+      Self::Pki { secret_format, .. } => Some(secret_format.kind()),
+      Self::Regular { secret_format, .. } => Some(secret_format.kind()),
+      Self::Settings { secret_format, .. } => Some(secret_format.kind()),
+      _ => None,
+    }
+  }
+
+  /// Returns the secrets kind of format
+  pub(crate) fn value_description(&self) -> Option<String> {
+    match self {
+      Self::Certificate { subject, .. } => match distinguished_name_to_map(subject).get("CN") {
+        Some(common_name) => Some(common_name.to_string()),
+        None => Some(subject.to_string()),
+      },
       Self::Empty => None,
-      Self::Error(_) => None,
-      Self::Pki(format, _, _, _) => Some(format.kind()),
-      Self::Regular(format) => Some(format.kind()),
-      Self::Settings(format) => Some(format.kind()),
+      Self::Error { .. } => None,
+      Self::Misconfiguration { .. } => None,
+      Self::NotFound { .. } => None,
+      Self::Pki { secret_format, .. } => Some(secret_format.to_string()),
+      Self::Regular { secret_format } => Some(secret_format.to_string()),
+      Self::Settings { secret_format } => Some(secret_format.to_string()),
     }
   }
 
   /// Returns the secrets size
-  pub fn secret_size(&self) -> Option<&SecretSize> {
+  pub(crate) fn secret_size(&self) -> Option<&SecretSize> {
     match self {
-      Self::Pki(secret_format, _, _, _) => secret_format.secret_size(),
-      Self::Regular(secret_format) => secret_format.secret_size(),
-      Self::Settings(secret_format) => secret_format.secret_size(),
+      Self::Pki { secret_format, .. } => secret_format.secret_size(),
+      Self::Regular { secret_format, .. } => secret_format.secret_size(),
+      Self::Settings { secret_format, .. } => secret_format.secret_size(),
       _ => None,
     }
   }
 
   /// Returns the number of entries, if applicable
-  pub fn number_of_entries(&self) -> Option<&usize> {
+  pub(crate) fn number_of_entries(&self) -> Option<&usize> {
     match self {
-      Self::Pki(secret_format, _, _, _) => secret_format.number_of_entries(),
-      Self::Regular(secret_format) => secret_format.number_of_entries(),
-      Self::Settings(secret_format) => secret_format.number_of_entries(),
+      Self::Pki { secret_format, .. } => secret_format.number_of_entries(),
+      Self::Regular { secret_format, .. } => secret_format.number_of_entries(),
+      Self::Settings { secret_format, .. } => secret_format.number_of_entries(),
       _ => None,
-    }
-  }
-}
-
-impl Display for SecretMetadata {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Self::Certificate(_subject, _not_after, _not_before, _issuer, _label) => write!(f, "cert"),
-      Self::Empty => write!(f, "empty"),
-      Self::Error(_message) => write!(f, "error"),
-      Self::Pki(_format, _private, _label, _algorithm) => write!(f, "pki"),
-      Self::Regular(_format) => write!(f, "regular"),
-      Self::Settings(_format) => write!(f, "settings"),
     }
   }
 }
@@ -272,23 +326,27 @@ impl Display for SecretMetadata {
 ///
 /// # Returns
 /// List of certificates
-pub fn try_certificates(secret: &str) -> Result<Vec<SecretMetadata>, ()> {
+pub(crate) fn try_certificates(secret: &str) -> Result<SecretMetadata, ()> {
   match Certificate::load_pem_chain(secret.as_bytes()) {
     Ok(certificates) => {
-      let certificate_enums = certificates
-        .iter()
-        .map(|certificate| {
-          let subject = certificate.tbs_certificate.subject.to_string();
-          let not_after = certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs();
-          let not_before = certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs();
-          let issuer = certificate.tbs_certificate.issuer.to_string();
-          SecretMetadata::Certificate(subject, not_after, not_before, issuer, "".to_string())
-        })
-        .collect_vec();
-      if certificate_enums.is_empty() {
-        Err(())
+      if let Some(certificate) = certificates.first() {
+        let subject = certificate.tbs_certificate.subject.to_string();
+        let not_after = certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs();
+        let not_before = certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs();
+        let issuer = certificate.tbs_certificate.issuer.to_string();
+        let certificate_chain = certificates
+          .iter()
+          .map(|certificate| {
+            let subject = certificate.tbs_certificate.subject.to_string();
+            let not_after = certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs();
+            let not_before = certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs();
+            let issuer = certificate.tbs_certificate.issuer.to_string();
+            SecretMetadata::Certificate { subject, not_after, not_before, issuer, label: "".to_string(), chain: vec![] }
+          })
+          .collect_vec();
+        Ok(SecretMetadata::Certificate { subject, not_after, not_before, issuer, label: "".to_string(), chain: certificate_chain })
       } else {
-        Ok(certificate_enums)
+        Err(())
       }
     }
     Err(_) => Err(()),
@@ -352,36 +410,36 @@ fn get_encrypted_label(pem: &str) -> Option<String> {
   None
 }
 
-pub fn try_pkcs1_private_key_metadata(secret: &str) -> Result<SecretMetadata, ()> {
+pub(crate) fn try_pkcs1_private_key_metadata(secret: &str) -> Result<SecretMetadata, ()> {
   match RsaPrivateKey::try_from(secret.as_bytes()) {
-    Ok(_) => Ok(SecretMetadata::Pki(SecretFormat::PemPkcs1, true, "RSA PRIVATE KEY".to_string(), None)),
+    Ok(_) => Ok(SecretMetadata::Pki { secret_format: SecretFormat::PemPkcs1, private: true, labels: vec!["RSA PRIVATE KEY".to_string()], algorithm: None }),
     Err(_) => Err(()),
   }
 }
 
-pub fn try_pkcs1_public_key_metadata(secret: &str) -> Result<SecretMetadata, ()> {
+pub(crate) fn try_pkcs1_public_key_metadata(secret: &str) -> Result<SecretMetadata, ()> {
   match RsaPublicKey::try_from(secret.as_bytes()) {
-    Ok(_) => Ok(SecretMetadata::Pki(SecretFormat::PemPkcs1, false, "RSA PUBLIC KEY".to_string(), None)),
+    Ok(_) => Ok(SecretMetadata::Pki { secret_format: SecretFormat::PemPkcs1, private: false, labels: vec!["RSA PUBLIC KEY".to_string()], algorithm: None }),
     Err(_) => Err(()),
   }
 }
 
-pub fn try_pkcs8_private_key_metadata(secret: &str) -> Result<SecretMetadata, ()> {
+pub(crate) fn try_pkcs8_private_key_metadata(secret: &str) -> Result<SecretMetadata, ()> {
   match PrivateKeyInfo::try_from(secret.as_bytes()) {
-    Ok(private_key_info) => Ok(SecretMetadata::Pki(
-      SecretFormat::PemPkcs8,
-      true,
-      "PRIVATE KEY".to_string(),
-      Some(private_key_info.algorithm.oid.to_string()),
-    )),
+    Ok(private_key_info) => Ok(SecretMetadata::Pki {
+      secret_format: SecretFormat::PemPkcs8,
+      private: true,
+      labels: vec!["PRIVATE KEY".to_string()],
+      algorithm: Some(private_key_info.algorithm.oid.to_string()),
+    }),
     Err(_) => Err(()),
   }
 }
 
 fn try_json_format(secret: &str) -> Result<SecretFormat, ()> {
   match serde_json::from_str::<Value>(secret) {
-    Ok(Value::Array(array)) => Ok(SecretFormat::JsonArray(array.len(), SecretSize::from(secret))),
-    Ok(Value::Object(object)) => Ok(SecretFormat::JsonObject(object.len(), SecretSize::from(secret))),
+    Ok(Value::Array(array)) => Ok(SecretFormat::JsonArray { number_of_elements: array.len(), secret_size: SecretSize::from(secret) }),
+    Ok(Value::Object(object)) => Ok(SecretFormat::JsonObject { number_of_fields: object.len(), secret_size: SecretSize::from(secret) }),
     _ => Err(()),
   }
 }
@@ -389,35 +447,32 @@ fn try_json_format(secret: &str) -> Result<SecretFormat, ()> {
 fn try_multi_line_format(secret: &str) -> Result<SecretFormat, ()> {
   let secret_size = SecretSize::from(secret);
   if secret_size.number_of_lines > 1 {
-    Ok(SecretFormat::MultiLine(secret_size))
+    Ok(SecretFormat::MultiLine { secret_size })
   } else {
     Err(())
   }
 }
 
-pub fn secret_metadata(secret: &str) -> Vec<SecretMetadata> {
+pub(crate) fn secret_metadata(secret: &str) -> SecretMetadata {
   if secret.trim().is_empty() {
-    vec![SecretMetadata::Empty]
+    SecretMetadata::Empty
   } else if let Ok(pkcs1_private_key) = try_certificates(secret) {
     pkcs1_private_key
   } else if let Some(encrypted_label) = get_encrypted_label(secret) {
-    vec![SecretMetadata::Pki(SecretFormat::Encrypted(SecretSize::from(secret)), false, encrypted_label, None)]
+    SecretMetadata::Pki { secret_format: SecretFormat::Encrypted { secret_size: SecretSize::from(secret) }, private: false, labels: vec![encrypted_label], algorithm: None }
   } else if let Ok(pkcs1_private_key) = try_pkcs1_private_key_metadata(secret) {
-    vec![pkcs1_private_key]
+    pkcs1_private_key
   } else if let Ok(pkcs1_public_key) = try_pkcs1_public_key_metadata(secret) {
-    vec![pkcs1_public_key]
+    pkcs1_public_key
   } else if let Ok(pkcs8_private_key) = try_pkcs8_private_key_metadata(secret) {
-    vec![pkcs8_private_key]
+    pkcs8_private_key
   } else if let Some(labels) = get_pem_labels(secret) {
-    labels
-      .iter()
-      .map(|label| SecretMetadata::Pki(SecretFormat::PemLabel, false, label.to_string(), None))
-      .collect_vec()
-  } else if let Ok(json_format) = try_json_format(secret) {
-    vec![SecretMetadata::Settings(json_format)]
-  } else if let Ok(multi_line_format) = try_multi_line_format(secret) {
-    vec![SecretMetadata::Settings(multi_line_format)]
+    SecretMetadata::Pki { secret_format: SecretFormat::PemLabel, private: false, labels: labels.iter().map(|label| label.to_string()).collect_vec(), algorithm: None }
+  } else if let Ok(secret_format) = try_json_format(secret) {
+    SecretMetadata::Settings { secret_format }
+  } else if let Ok(secret_format) = try_multi_line_format(secret) {
+    SecretMetadata::Settings { secret_format }
   } else {
-    vec![SecretMetadata::Regular(SecretFormat::String(SecretSize { number_of_lines: 1, number_of_characters: secret.trim().len() }))]
+    SecretMetadata::Regular { secret_format: SecretFormat::String { secret_size: SecretSize { number_of_lines: 1, number_of_characters: secret.trim().len() } } }
   }
 }

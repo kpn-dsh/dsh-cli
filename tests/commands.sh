@@ -15,7 +15,9 @@ export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
 export PROXY_UNDER_TEST=broker
 export SECRET_NON_EXISTING=non-existing-secret
-export SECRET_UNDER_TEST=sbcm-ids
+export SECRET_NAME_UNDER_TEST=broker-ca-cert
+export SYSTEM_SECRET_ID_UNDER_TEST="\!rest-api-client"
+export SYSTEM_SECRET_NAME_UNDER_TEST=system/rest-api-client
 export SERVICE_UNDER_TEST=keyring-dev
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
@@ -34,10 +36,10 @@ export SAFE_COMMANDS=(
   "--version"
   #  "--generate-autocomplete-file zsh"
 
-  "api delete secret-configuration $SECRET_UNDER_TEST --force --dry-run"
-  "api get secret $SECRET_UNDER_TEST"
+  "api delete secret-configuration $SECRET_NAME_UNDER_TEST --force --dry-run"
+  "api get secret $SECRET_NAME_UNDER_TEST"
   "api post secret --dry-run < /dev/null"
-  "api put secret $SECRET_UNDER_TEST --dry-run < /dev/null"
+  "api put secret $SECRET_NAME_UNDER_TEST --dry-run < /dev/null"
   "api show > /dev/null"
 
   "app deploy $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION $APP_NON_EXISTING --implicit-defaults --dry-run"
@@ -56,7 +58,9 @@ export SAFE_COMMANDS=(
 
   "certificate list"
   "certificate list --configuration"
+  "certificate list --errors"
   "certificate list --ids"
+  "certificate list --issues"
   "certificate list --status"
   "certificate list --usage"
   "certificate show $CERTIFICATE_UNDER_TEST --status"
@@ -130,18 +134,31 @@ export SAFE_COMMANDS=(
   "proxy list"
   "proxy show $PROXY_UNDER_TEST"
 
+  "secret copy $SECRET_NAME_UNDER_TEST"
   "secret create $SECRET_NON_EXISTING --dry-run < /dev/null"
-  "secret delete $SECRET_UNDER_TEST --force --dry-run"
+  "secret delete $SECRET_NAME_UNDER_TEST --force --dry-run"
   "secret list"
   "secret list --certificates"
+  "secret list --errors"
   "secret list --ids"
+  "secret list --issues"
   "secret list --keys"
   "secret list --status"
   "secret list --system"
   "secret list --usage"
-  "secret show $SECRET_UNDER_TEST --usage"
-  "secret show $SECRET_UNDER_TEST --value"
-  "secret show $SECRET_UNDER_TEST"
+  "secret show $SECRET_NAME_UNDER_TEST"
+  "secret show $SECRET_NAME_UNDER_TEST --status"
+  "secret show $SECRET_NAME_UNDER_TEST --usage"
+  "secret show $SECRET_NAME_UNDER_TEST --value > /dev/null"
+  "secret show $SYSTEM_SECRET_ID_UNDER_TEST"
+  "secret show $SYSTEM_SECRET_ID_UNDER_TEST --status"
+  "secret show $SYSTEM_SECRET_ID_UNDER_TEST --usage"
+  "secret show $SYSTEM_SECRET_ID_UNDER_TEST --value > /dev/null"
+  "secret show $SYSTEM_SECRET_NAME_UNDER_TEST"
+  "secret show $SYSTEM_SECRET_NAME_UNDER_TEST --status"
+  "secret show $SYSTEM_SECRET_NAME_UNDER_TEST --usage"
+  "secret show $SYSTEM_SECRET_NAME_UNDER_TEST --value > /dev/null"
+  "secret update $SECRET_NAME_UNDER_TEST --dry-run < /dev/null"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
   "service export $SERVICE_UNDER_TEST -o json"
