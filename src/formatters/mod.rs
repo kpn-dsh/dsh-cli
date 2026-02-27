@@ -1,5 +1,6 @@
 use crate::err;
 use crate::error::DshCliError;
+use chrono::DateTime;
 use dsh_api::error::DshApiResult;
 use dsh_api::types::Notification;
 use itertools::Itertools;
@@ -367,5 +368,27 @@ pub(crate) fn notification_to_string(notification: &Notification) -> String {
       notification.message,
       notification.args.iter().map(|(key, value)| format!("{}:{}", key, value)).collect_vec().join("\n"),
     )
+  }
+}
+
+/// Convert timestamp to formatted string representation
+///
+/// When the timestamp can be converted to a proper `DateTime<Utc>`, it will be formatted as
+/// `2026-02-28 14:06:48 UTC` or something similar. If it cannot be converted it will be
+/// formatted as a string representing the number of seconds since unix epoch. If the value is
+/// out of range an error string will be returned.
+///
+/// # Parameters
+/// `timestamp` - Timestamp in seconds since unix epoch.
+pub(crate) fn timestamp_to_string(timestamp: i64) -> String {
+  match DateTime::from_timestamp_secs(timestamp) {
+    Some(datetime) => datetime.to_string(),
+    None => {
+      if timestamp < 0 || timestamp > 30000000000 {
+        "!TIMESTAMP".to_string()
+      } else {
+        timestamp.to_string()
+      }
+    }
   }
 }
