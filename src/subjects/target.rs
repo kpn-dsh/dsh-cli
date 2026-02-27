@@ -14,7 +14,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::Settings;
 use crate::subject::{Requirements, Subject};
 use crate::targets::{delete_target, Target};
-use crate::{err, read_single_line, DshCliResult};
+use crate::{err, plain, read_single_line, DshCliResult};
 
 struct TargetSubject {}
 
@@ -248,7 +248,7 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
           Value::empty()
         }
       }
-      TargetFormatterLabel::Platform => Value::plain(format!("{} / {}", self.platform.name(), self.platform.alias())),
+      TargetFormatterLabel::Platform => plain!("{} / {}", self.platform.name(), self.platform.alias()),
       TargetFormatterLabel::Tenant => Value::plain(&self.tenant),
     }
   }

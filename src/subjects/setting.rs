@@ -16,7 +16,7 @@ use crate::subject::{Requirements, Subject};
 use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
 use crate::targets::get_target_password_from_keyring;
 use crate::verbosity::Verbosity;
-use crate::{err, DshCliResult};
+use crate::{err, plain, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
@@ -809,7 +809,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::CsvQuote => Value::option(self.csv_quote),
       SettingLabel::CsvSeparator => Value::option(self.csv_separator.clone()),
       SettingLabel::DefaultPlatform => match self.default_platform.clone().map(|platform| DshPlatform::try_from(platform.as_str())) {
-        Some(Ok(platform)) => Value::plain(format!("{} / {}", platform.name(), platform.alias())),
+        Some(Ok(platform)) => plain!("{} / {}", platform.name(), platform.alias()),
         _ => Value::empty(),
       },
       SettingLabel::DefaultTenant => Value::option(self.default_tenant.clone()),
