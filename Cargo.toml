@@ -10,9 +10,11 @@ license = "Apache-2.0"
 readme = "README_CRATES_IO.md"
 repository = "https://github.com/kpn-dsh/dsh-cli"
 rust-version = "1.86"
-version = "0.8.1"
+version = "0.9.0"
 
 [lints.clippy]
+manual_range_contains = "allow"
+type_complexity = "allow"
 uninlined_format_args = "allow"
 
 [profile.release]
@@ -24,13 +26,13 @@ robot = ["dsh_api/robot"]
 
 [dependencies]
 aes-gcm = { version = "0.10" }
-arboard = { version = "3.4", default-features = false }
+arboard = { version = "3.6", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.5", features = ["color", "derive", "error-context", "string", "wrap_help", "usage"], default-features = false }
 clap_complete = { version = "4.5", default-features = false }
-ctrlc = { version = "3.4" }
+ctrlc = { version = "3.5" }
 env_logger = { version = "0.11", features = ["humantime"], default-features = false }
 futures = { version = "0.3", default-features = false }
 getch-rs = "0.2.0"
@@ -42,20 +44,24 @@ log = { version = "0.4", default-features = false }
 open = { version = "5.3", default-features = false }
 openidconnect = { version = "4.0", features = ["reqwest-blocking"] }
 regex = "1.11.1"
-rpassword = { version = "7.3", default-features = false }
+rpassword = { version = "7.4", default-features = false }
 rsa = { version = "0.9" }
-serde = { version = "1.0", features = ["derive"], default-features = false }
-serde_json = { version = "1.0", default-features = false }
+serde = { version = "1", features = ["derive"], default-features = false }
+serde_json = { version = "1", default-features = false }
 serde_yaml = { version = "0.9.33", default-features = false }
 sha2 = "0.10"
 tabled = { version = "0.20", features = ["ansi"], default-features = false }
 termimad = "0.34"
 terminal_size = { version = "0.4", default-features = false }
-tokio = { version = "1.43", features = ["rt", "rt-multi-thread", "macros"], default-features = false }
+tokio = { version = "1.49", features = ["fs", "rt", "rt-multi-thread", "macros"], default-features = false }
 toml = { version = "0.9", features = ["display", "parse", "serde"], default-features = false }
-x509-parser = { version = "0.18" }
+# x509-parser = { version = "0.18" }
+pkcs1 = { version = "0.7", features = ["pem"] }
+pkcs8 = { version = "0.10", features = ["pem"] }
+x509-cert = { version = "0.2", features = ["pem"] }
+pem-rfc7468 = { version = "1.0.0", features = ["alloc"] }
 
 # When publishing, alway use the crates.io dependency.
-dsh_api = { version = "0.8.1", features = ["generic"] }
+#dsh_api = { version = "0.9.0", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api and enable the manage feature.
-#dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
+dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }

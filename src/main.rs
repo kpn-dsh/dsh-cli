@@ -138,7 +138,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 
 lazy_static! {
-  static ref VERSION: Version = Version::from_str("0.8.1").unwrap();
+  static ref VERSION: Version = Version::from_str("0.9.0").unwrap();
 }
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";

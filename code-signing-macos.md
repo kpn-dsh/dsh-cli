@@ -192,7 +192,7 @@ target/release/dsh: explicit requirement satisfied
 To create a GitHub release, first rename the binary:
 
 ```bash
-> mv target/release/dsh dsh-v0.8.1-aarch64-apple-darwin
+> mv target/release/dsh dsh-v0.9.0-aarch64-apple-darwin
 ```
 
 Then go to [GitHub\releases](https://github.com/kpn-dsh/dsh-cli/releases), click
