@@ -6,6 +6,8 @@
 /.idea
 /demo/
 /.dsh_cli/
-/tests/.dsh_cli*
+/tests/.dsh_cli/
+/tests/.dsh_cli_empty/
+/tests/.dsh_cli_under_test/
 /certificates/
 /dirty/
