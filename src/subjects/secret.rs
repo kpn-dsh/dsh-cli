@@ -293,7 +293,9 @@ impl CommandExecutor for SecretListCertificates {
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, context);
     for (secret_name, _, secret_metadata, _, _) in secrets_with_metadata {
-      formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
+      if matches!(secret_metadata, SecretMetadata::Certificate { .. }) {
+        formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
+      }
     }
     formatter.print(None)?;
     Ok(())
@@ -355,7 +357,7 @@ impl CommandExecutor for SecretListIssues {
 
 async fn list_issues(client: &DshApiClient, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
   pub(crate) static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
-    [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::Subject, IssueLabel::IssueDetails];
+    [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::SubjectDescription, IssueLabel::IssueDetails];
   let start_instant = context.now();
   let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
   context.print_execution_time(start_instant);
@@ -363,7 +365,7 @@ async fn list_issues(client: &DshApiClient, context: &Context, only_errors: bool
     .iter()
     .flat_map(|secret_tuple| has_issues(secret_tuple, EXPIRATION_CHECK_DAYS, only_errors).map(|issues| (secret_tuple.0.clone(), secret_tuple.2.clone(), issues)))
     .collect_vec();
-  let mut formatter = ListFormatter::new(&SECRET_LIST_ISSUES_LABELS_LIST, context);
+  let mut formatter = ListFormatter::new_override_target_id_label(&SECRET_LIST_ISSUES_LABELS_LIST, "secret id", context);
   for (secret_name, secret_metadata, issues) in secrets_issues.into_iter() {
     for issue in issues {
       formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata.clone(), issue));
@@ -475,14 +477,16 @@ impl CommandExecutor for SecretShowAllocationStatus {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
     if secret_id.is_some() {
-      return err!("system secret '{}' has no allocation status", secret_name);
+      context.print_warning(format!("system secret '{}' has no allocation status", secret_name));
+      Ok(())
+    } else {
+      context.print_explanation(format!("show allocation status for secret '{}'", secret_name));
+      let start_instant = context.now();
+      let allocation_status = client.get_secret_status(&secret_name).await;
+      context.print_execution_time(start_instant);
+      context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
+      UnitFormatter::new(secret_name, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status?, None)
     }
-    context.print_explanation(format!("show allocation status for secret '{}'", secret_name));
-    let start_instant = context.now();
-    let allocation_status = client.get_secret_status(&secret_name).await;
-    context.print_execution_time(start_instant);
-    context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
-    UnitFormatter::new(secret_name, &DEFAULT_ALLOCATION_STATUS_LABELS, context).print(&allocation_status?, None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -598,25 +602,22 @@ impl CommandExecutor for SecretUpdate {
 /// * `Option<AllocationStatus>` - Secrets allocation status for non-system secrets,
 ///   empty otherwise.
 pub(crate) async fn secret_with_metadata(secret_name: String, client: &DshApiClient) -> (SecretMetadata, Option<AllocationStatus>) {
-  match join(
-    client.get_secret(&secret_name),
-    client.get_secret_status(&secret_name).map(|allocation_status| allocation_status.ok()),
-  )
-  .await
-  {
-    (Ok(secret_value), allocation_status) => (secret_metadata(&secret_value), allocation_status),
-    (Err(error), allocation_status) => match error {
+  match join(client.get_secret(&secret_name), client.get_secret_status(&secret_name)).await {
+    (Ok(secret_value), Ok(allocation_status)) => (secret_metadata(&secret_value), Some(allocation_status)),
+    (Ok(secret_value), Err(_)) => (secret_metadata(&secret_value), None),
+    (Err(get_secret_error), Ok(allocation_status)) => match get_secret_error {
       DshApiError::NotFound { .. } => (
-        SecretMetadata::NotFound { message: Some("secret not found, possibly pending".to_string()) },
-        allocation_status,
+        SecretMetadata::Misconfiguration { message: "secret not found, possibly pending".to_string() },
+        Some(allocation_status),
       ),
-      DshApiError::BadRequest { .. } => (SecretMetadata::Error { message: "bad request".to_string() }, None),
-      DshApiError::Configuration { .. } => (SecretMetadata::Error { message: "configuration error".to_string() }, None),
-      DshApiError::Conversion { .. } => (SecretMetadata::Error { message: "conversion error".to_string() }, None),
-      DshApiError::NotAuthorized { .. } => (SecretMetadata::Error { message: "not authorized".to_string() }, None),
-      DshApiError::Parameter { .. } => (SecretMetadata::Error { message: "parameter error".to_string() }, None),
-      DshApiError::Unexpected { .. } => (SecretMetadata::Error { message: "unexpected error, possibly a network failure".to_string() }, None),
-      DshApiError::Unprocessable { .. } => (SecretMetadata::Error { message: "unprocessable".to_string() }, None),
+      other_error => (SecretMetadata::from(other_error), Some(allocation_status)),
+    },
+    (Err(get_secret_error), Err(_)) => match get_secret_error {
+      DshApiError::NotFound { .. } => (
+        SecretMetadata::Misconfiguration { message: "secret allocation status not found, possibly pending".to_string() },
+        None,
+      ),
+      other_error => (SecretMetadata::from(other_error), None),
     },
   }
 }
@@ -645,19 +646,20 @@ pub(crate) async fn secrets_with_metadata(
 /// Check if a secret has issues
 ///
 /// # Parameters
-/// * `secret_tuple` - Tuple of secret parameters, coinsisting of
+/// * `secret_tuple` - Tuple of secret parameters, consisting of
 ///   * `String` Secret name.
 ///   * `Option<String>` - Secret id when it is a system secret.
 ///   * `SecretMetadata` - Secret metadata.
 ///   * `Option<AllocationStatus>` - Secret allocation status.
 ///   * `Vec<Dependant<SecretInjection>>` List of apps, applications and proxies that depend
 ///     on the secret.
-/// * `days`
+/// * `days` - Number of days until expiration.
+/// * `only_errors` - If `true` only issues with severity level `Severity::Error` will be returned.
 ///
 /// # Returns
 /// * `Some(Vec<Issue>)` - List of found issues (at least one).
 /// * `None` - No issues where found.
-fn has_issues(
+pub(crate) fn has_issues(
   secret_tuple: &(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>),
   days: Option<u64>,
   only_errors: bool,
@@ -718,13 +720,14 @@ impl SubjectFormatter<IssueLabel> for (SecretMetadata, Issue) {
   fn value(&self, label: &IssueLabel, target_id: &str) -> Value {
     let (secret_metadata, issue) = self;
     match label {
-      IssueLabel::ConfigurationItem => issue.value(label, target_id),
       IssueLabel::IssueDetails => issue.value(label, target_id),
       IssueLabel::IssueKind => issue.value(label, target_id),
-      IssueLabel::Subject => Value::option(secret_metadata.value_description()),
+      IssueLabel::SubjectDescription => Value::option(secret_metadata.value_description()),
       IssueLabel::SubjectKind => Value::option(secret_metadata.kind()),
       IssueLabel::Target => Value::target(target_id),
-      IssueLabel::Value => issue.value(label, target_id),
+      IssueLabel::DependencyName => Value::not_applicable(),
+      IssueLabel::DependencySubject => Value::not_applicable(),
+      IssueLabel::DependencyValue => Value::not_applicable(),
     }
   }
 }
@@ -846,7 +849,7 @@ impl SubjectFormatter<SecretLabel> for SecretMetadata {
         _ => Value::not_applicable(),
       },
       SecretLabel::NotAfter => match self {
-        SecretMetadata::Certificate { not_after, .. } => Value::plain(not_after),
+        SecretMetadata::Certificate { not_after, .. } => Value::timestamp_seconds_expired(*not_after as i64, EXPIRATION_CHECK_DAYS),
         _ => Value::not_applicable(),
       },
       SecretLabel::_NumberOfEntries => Value::option(self.number_of_entries()),

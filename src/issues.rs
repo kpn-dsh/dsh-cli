@@ -1,7 +1,6 @@
 use crate::formatters::{timestamp_to_string, Label, SubjectFormatter, Value};
 use chrono::{DateTime, Days, Utc};
 use dsh_api::types::Notification;
-use itertools::Itertools;
 use serde::Serialize;
 
 #[derive(Clone, Debug, Serialize)]
@@ -18,36 +17,6 @@ pub(crate) enum Issue {
   /// # Fields
   /// * `notification` - Creation/update notification.
   CreationUpdateNotification { notification: Notification },
-
-  /// Configuration item references a dependency that has a creation/update notification
-  ///
-  /// # Fields
-  /// * `subject` - Subject of the notified dependency.
-  /// * `id` - Value of the configuration item that identifies the notified dependency.
-  /// * `notification` - Creation/update notification.
-  DependencyCreationUpdateNotification { subject: &'static str, id: String, notification: Notification },
-
-  /// Configuration item references a dependency that cannot be found
-  ///
-  /// # Fields
-  /// * `subject` - Subject of the missing dependency.
-  /// * `id` - Value of the configuration item that identifies the missing dependency.
-  DependencyNotFound { subject: &'static str, id: String },
-
-  /// Configuration item references a dependency that is not provisioned
-  ///
-  /// # Fields
-  /// * `subject` - Subject of the unprovisioned dependency.
-  /// * `id` - Value of the configuration item that identifies the unprovisioned dependency.
-  DependencyNotProvisioned { subject: &'static str, id: String },
-
-  /// Configuration item references a dependency that has a removal notification
-  ///
-  /// # Fields
-  /// * `subject` - Subject of the notified dependency.
-  /// * `id` - Value of the configuration item that identifies the notified dependency.
-  /// * `notification` - Removal notification.
-  DependencyRemovalNotification { subject: &'static str, id: String, notification: Notification },
 
   /// Mandatory configuration item is empty/missing
   Empty,
@@ -76,6 +45,9 @@ pub(crate) enum Issue {
   /// * `explanation` - Additional explanatory text.
   Misconfiguration { explanation: String },
 
+  /// Configuration item could not be found
+  NotFound,
+
   /// Configuration item is not provisioned
   NotProvisioned,
 
@@ -87,6 +59,12 @@ pub(crate) enum Issue {
   /// # Fields
   /// * `notification` - Removal notification.
   RemovalNotification { notification: Notification },
+
+  /// Something unexpected happened
+  ///
+  /// # Fields
+  /// * `message` - Describes what happened.
+  Unexpected { message: String },
 }
 
 #[derive(Debug, PartialEq)]
@@ -101,18 +79,14 @@ impl Issue {
   pub(crate) fn severity(&self) -> Severity {
     match self {
       Self::Before { .. }
-      | Self::DependencyNotFound { .. }
-      | Self::DependencyNotProvisioned { .. }
       | Self::Expired { .. }
       | Self::IncorrectValue { .. }
       | Self::Misconfiguration { .. }
-      | Self::NotProvisioned => Severity::Error,
+      | Self::NotFound
+      | Self::NotProvisioned
+      | Self::Unexpected { .. } => Severity::Error,
       Self::Empty | Self::NotUsed => Severity::Ignore,
-      Self::CreationUpdateNotification { .. }
-      | Self::DependencyCreationUpdateNotification { .. }
-      | Self::DependencyRemovalNotification { .. }
-      | Self::ExpirationOncoming { .. }
-      | Self::RemovalNotification { .. } => Severity::Warning,
+      Self::CreationUpdateNotification { .. } | Self::ExpirationOncoming { .. } | Self::RemovalNotification { .. } => Severity::Warning,
     }
   }
 
@@ -121,53 +95,33 @@ impl Issue {
     match self {
       Self::Before { .. } => "before",
       Self::CreationUpdateNotification { .. } => "creation/update notification",
-      Self::DependencyCreationUpdateNotification { .. } => "dependency creation/update notification",
-      Self::DependencyNotFound { .. } => "dependency not found",
-      Self::DependencyNotProvisioned { .. } => "dependency not provisioned",
-      Self::DependencyRemovalNotification { .. } => "dependency removal notification",
       Self::Empty { .. } => "empty",
       Self::ExpirationOncoming { .. } => "expiration oncoming",
       Self::Expired { .. } => "expired",
       Self::IncorrectValue { .. } => "incorrect value",
       Self::Misconfiguration { .. } => "misconfiguration",
+      Self::NotFound => "not found",
       Self::NotProvisioned => "not provisioned",
       Self::NotUsed => "not used",
       Self::RemovalNotification { .. } => "removal notification",
+      Self::Unexpected { .. } => "unexpected error",
     }
   }
 
   pub(crate) fn details(&self) -> Option<String> {
     match self {
       Self::Before { not_before, .. } => Some(format!("not before {}", timestamp_to_string(*not_before))),
-      Self::CreationUpdateNotification { notification } => Some(notification_to_string(notification)),
-      Self::DependencyCreationUpdateNotification { notification, .. } => Some(notification_to_string(notification)),
-      Self::DependencyRemovalNotification { notification, .. } => Some(notification_to_string(notification)),
+      Self::CreationUpdateNotification { notification } => Some(notification.render_message()),
+      Self::Empty => None,
       Self::ExpirationOncoming { not_after } => Some(format!("will expire at {}", timestamp_to_string(*not_after))),
       Self::Expired { not_after } => Some(format!("not after {}", timestamp_to_string(*not_after))),
       Self::IncorrectValue { explanation } => Some(explanation.clone()),
       Self::Misconfiguration { explanation } => Some(explanation.clone()),
-      Self::RemovalNotification { notification } => Some(notification_to_string(notification)),
-      _ => None,
-    }
-  }
-
-  pub(crate) fn dependency_subject(&self) -> Option<&'static str> {
-    match self {
-      Self::DependencyCreationUpdateNotification { subject, .. } => Some(subject),
-      Self::DependencyNotFound { subject, .. } => Some(subject),
-      Self::DependencyNotProvisioned { subject, .. } => Some(subject),
-      Self::DependencyRemovalNotification { subject, .. } => Some(subject),
-      _ => None,
-    }
-  }
-
-  pub(crate) fn dependency_id(&self) -> Option<&String> {
-    match self {
-      Self::DependencyCreationUpdateNotification { id, .. } => Some(id),
-      Self::DependencyNotFound { id, .. } => Some(id),
-      Self::DependencyNotProvisioned { id, .. } => Some(id),
-      Self::DependencyRemovalNotification { id, .. } => Some(id),
-      _ => None,
+      Self::NotFound => None,
+      Self::NotProvisioned => None,
+      Self::NotUsed => None,
+      Self::RemovalNotification { notification } => Some(notification.render_message()),
+      Self::Unexpected { message } => Some(message.clone()),
     }
   }
 
@@ -216,25 +170,27 @@ impl Issue {
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum IssueLabel {
-  ConfigurationItem,
+  DependencyName,
+  DependencySubject,
+  DependencyValue,
   IssueDetails,
   IssueKind,
-  Subject,
+  SubjectDescription,
   SubjectKind,
   Target,
-  Value,
 }
 
 impl Label for IssueLabel {
   fn as_str(&self) -> &str {
     match self {
-      Self::ConfigurationItem => "configuration item",
+      Self::DependencyName => "dependency",
+      Self::DependencySubject => "dependency kind",
+      Self::DependencyValue => "dependency value",
       Self::IssueDetails => "issue details",
       Self::IssueKind => "issue",
-      Self::Subject => "subject",
+      Self::SubjectDescription => "subject description",
       Self::SubjectKind => "subject kind",
       Self::Target => "target id",
-      Self::Value => "value",
     }
   }
 
@@ -243,12 +199,36 @@ impl Label for IssueLabel {
   }
 }
 
-impl SubjectFormatter<IssueLabel> for (&str, Issue) {
+/// Tuple that describes an issue:
+/// * `Option<(&str, String)>` - Determines what caused the issue:
+///   * `Some<(&str, &str, String)>` - Issue concerns a dependency of the subject:
+///     * `&str` - Dependency name.
+///     * `String`  - Dependency value.
+///     * `&str` - Dependency subject.
+///   * `None` - Issue concerns the subject itself.
+/// * `Issue` - Describes the issue.
+pub(crate) type IssueDescription<'a> = (Option<(&'a str, String, &'a str)>, Issue);
+
+impl SubjectFormatter<IssueLabel> for IssueDescription<'_> {
   fn value(&self, label: &IssueLabel, target_id: &str) -> Value {
-    let (configuration_item, issue) = self;
-    match label {
-      IssueLabel::ConfigurationItem => Value::plain(configuration_item),
-      _ => issue.value(label, target_id),
+    let (attribute, issue): &(Option<(&str, String, &str)>, Issue) = self;
+    match attribute {
+      Some((dependency_name, dependency_value, dependency_subject)) => match label {
+        IssueLabel::DependencyName => Value::plain(dependency_name),
+        IssueLabel::DependencySubject => Value::plain(dependency_subject),
+        IssueLabel::DependencyValue => Value::plain(dependency_value),
+        IssueLabel::SubjectDescription => Value::empty(),
+        IssueLabel::SubjectKind => Value::empty(),
+        _ => issue.value(label, target_id),
+      },
+      None => match label {
+        IssueLabel::DependencyName => Value::empty(),
+        IssueLabel::DependencySubject => Value::empty(),
+        IssueLabel::DependencyValue => Value::empty(),
+        IssueLabel::SubjectDescription => Value::empty(),
+        IssueLabel::SubjectKind => Value::empty(),
+        _ => issue.value(label, target_id),
+      },
     }
   }
 }
@@ -256,32 +236,29 @@ impl SubjectFormatter<IssueLabel> for (&str, Issue) {
 impl SubjectFormatter<IssueLabel> for Issue {
   fn value(&self, label: &IssueLabel, target_id: &str) -> Value {
     match label {
-      IssueLabel::ConfigurationItem => Value::unreachable(),
+      IssueLabel::DependencyName => Value::unreachable(),
+      IssueLabel::DependencySubject => Value::unreachable(),
+      IssueLabel::DependencyValue => Value::unreachable(),
       IssueLabel::IssueDetails => Value::option(self.details()),
       IssueLabel::IssueKind => match self.severity() {
         Severity::Error => Value::error(self.issue_kind()),
         Severity::Ignore => Value::ignore(self.issue_kind()),
         Severity::Warning => Value::warn(self.issue_kind()),
       },
-      IssueLabel::Subject => Value::option(self.dependency_id()),
-      IssueLabel::SubjectKind => Value::option(self.dependency_subject()),
+      IssueLabel::SubjectDescription => Value::unreachable(),
+      IssueLabel::SubjectKind => Value::unreachable(),
       IssueLabel::Target => Value::target(target_id),
-      IssueLabel::Value => Value::unreachable(),
     }
   }
 }
 
-pub(crate) fn notification_to_string(notification: &Notification) -> String {
-  if notification.args.is_empty() {
-    notification.message.to_string()
-  } else {
-    format!(
-      "{}\n{}",
-      notification.message,
-      notification.args.iter().map(|(key, value)| format!("{}:{}", key, value)).join("\n"),
-    )
-  }
-}
-
-pub(crate) static _ISSUE_LABELS_LIST: [IssueLabel; 6] =
-  [IssueLabel::Target, IssueLabel::ConfigurationItem, IssueLabel::Value, IssueLabel::Subject, IssueLabel::IssueKind, IssueLabel::IssueDetails];
+const _ALL_ISSUE_LABELS: [IssueLabel; 8] = [
+  IssueLabel::Target,
+  IssueLabel::IssueKind,
+  IssueLabel::IssueDetails,
+  IssueLabel::SubjectKind,
+  IssueLabel::SubjectDescription,
+  IssueLabel::DependencyName,
+  IssueLabel::DependencySubject,
+  IssueLabel::DependencyValue,
+];

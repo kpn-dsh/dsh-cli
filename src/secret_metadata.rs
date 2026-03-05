@@ -1,4 +1,5 @@
 use crate::subjects::certificate::distinguished_name_to_map;
+use dsh_api::error::DshApiError;
 use itertools::Itertools;
 use pkcs1::{RsaPrivateKey, RsaPublicKey};
 use pkcs8::PrivateKeyInfo;
@@ -229,7 +230,7 @@ impl SecretMetadata {
   /// Returns the kind of secret
   pub(crate) fn kind(&self) -> Option<&str> {
     match self {
-      Self::Certificate { .. } => Some("cert"),
+      Self::Certificate { .. } => Some("certificate"),
       Self::Empty => Some("empty"),
       Self::Error { .. } => None,
       Self::Misconfiguration { .. } => None,
@@ -315,6 +316,21 @@ impl SecretMetadata {
       Self::Regular { secret_format, .. } => secret_format.number_of_entries(),
       Self::Settings { secret_format, .. } => secret_format.number_of_entries(),
       _ => None,
+    }
+  }
+}
+
+impl From<DshApiError> for SecretMetadata {
+  fn from(dsh_api_error: DshApiError) -> Self {
+    match dsh_api_error {
+      DshApiError::BadRequest { .. } => SecretMetadata::Error { message: "bad request".to_string() },
+      DshApiError::Configuration { .. } => SecretMetadata::Error { message: "configuration error".to_string() },
+      DshApiError::Conversion { .. } => SecretMetadata::Error { message: "conversion error".to_string() },
+      DshApiError::NotAuthorized { .. } => SecretMetadata::Error { message: "not authorized".to_string() },
+      DshApiError::Parameter { .. } => SecretMetadata::Error { message: "parameter error".to_string() },
+      DshApiError::Unexpected { .. } => SecretMetadata::Error { message: "unexpected error, possibly a network failure".to_string() },
+      DshApiError::Unprocessable { .. } => SecretMetadata::Error { message: "unprocessable".to_string() },
+      DshApiError::NotFound { .. } => SecretMetadata::NotFound { message: Some("unprocessable".to_string()) },
     }
   }
 }
