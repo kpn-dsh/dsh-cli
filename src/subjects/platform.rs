@@ -134,7 +134,7 @@ struct PLatformList {}
 impl CommandExecutor for PLatformList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list platforms");
-    let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, context);
+    let mut formatter = ListFormatter::new_override_target_id_label(&DSH_PLATFORM_LABELS_LIST, "platform id", context);
     let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect_vec();
     formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
     formatter.print(None)?;
@@ -375,7 +375,7 @@ enum DshPlatformLabel {
   Description,
   IsProduction,
   IssuerEndpoint,
-  Name,
+  Parameter,
   PrivateDomain,
   PublicDomain,
   Realm,
@@ -422,7 +422,7 @@ impl Label for DshPlatformLabel {
       Self::Description => "description",
       Self::IsProduction => "production",
       Self::IssuerEndpoint => "issuer endpoint",
-      Self::Name => "name",
+      Self::Parameter => "parameter",
       Self::PrivateDomain => "private domain",
       Self::PublicDomain => "public domain",
       Self::Realm => "realm",
@@ -462,7 +462,7 @@ impl Label for DshPlatformLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    matches!(self, Self::Name)
+    matches!(self, Self::Parameter)
   }
 }
 
@@ -476,7 +476,7 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
       DshPlatformLabel::Description => Value::plain(self.description()),
       DshPlatformLabel::IsProduction => Value::plain(self.is_production()),
       DshPlatformLabel::IssuerEndpoint => Value::plain(self.issuer_endpoint()),
-      DshPlatformLabel::Name => Value::target(self.name()),
+      DshPlatformLabel::Parameter => Value::target(self.name()),
       DshPlatformLabel::PrivateDomain => Value::some_or(self.private_domain(), "not configured"),
       DshPlatformLabel::PublicDomain => Value::plain(self.public_domain()),
       DshPlatformLabel::Realm => Value::plain(self.realm()),
@@ -528,7 +528,7 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
 }
 
 static DSH_PLATFORM_LABELS_CONFIGURATION: [DshPlatformLabel; 10] = [
-  DshPlatformLabel::Name,
+  DshPlatformLabel::Parameter,
   DshPlatformLabel::Alias,
   DshPlatformLabel::Description,
   DshPlatformLabel::IsProduction,
@@ -540,7 +540,8 @@ static DSH_PLATFORM_LABELS_CONFIGURATION: [DshPlatformLabel; 10] = [
   DshPlatformLabel::PublicDomain,
 ];
 
-static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 12] = [
+static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 13] = [
+  DshPlatformLabel::Parameter,
   DshPlatformLabel::RestApiDomain,
   DshPlatformLabel::RestTokenEndpoint,
   DshPlatformLabel::RestApiEndpoint,
@@ -555,7 +556,8 @@ static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 12] = [
   DshPlatformLabel::ClientId,
 ];
 
-static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 17] = [
+static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 18] = [
+  DshPlatformLabel::Parameter,
   DshPlatformLabel::BucketName,
   DshPlatformLabel::InternalDomain,
   DshPlatformLabel::InternalServiceDomain,
@@ -576,7 +578,7 @@ static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 17] = [
 ];
 
 static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
-  [DshPlatformLabel::Name, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
+  [DshPlatformLabel::Parameter, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
 
 impl DshPlatformLabel {
   /// Returns the parameters that are required for a `Label` variant.

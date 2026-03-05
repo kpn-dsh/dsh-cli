@@ -13,6 +13,7 @@ use tabled::{builder::Builder as TabledBuilder, settings::Style};
 
 pub(crate) struct ListFormatter<'a, L: Label, V: Clone + SubjectFormatter<L>> {
   labels: &'a [L],
+  target_id_label: Option<&'a str>,
   values: Vec<(String, Cow<'a, V>)>,
   context: &'a Context,
   phantom: PhantomData<&'a V>,
@@ -25,7 +26,16 @@ where
 {
   /// # Creates a new `ListFormatter`
   pub(crate) fn new(labels: &'a [L], context: &'a Context) -> Self {
-    Self { labels, values: vec![], context, phantom: PhantomData }
+    Self { labels, target_id_label: None, values: vec![], context, phantom: PhantomData }
+  }
+
+  /// # Creates a new `ListFormatter`
+  ///
+  /// # Parameters
+  /// * `target_id_label` - Target id label that will override the default
+  ///   target id label.
+  pub(crate) fn new_override_target_id_label(labels: &'a [L], target_id_label: &'a str, context: &'a Context) -> Self {
+    Self { labels, target_id_label: Some(target_id_label), values: vec![], context, phantom: PhantomData }
   }
 
   /// # Pushes target ids and values
@@ -197,7 +207,11 @@ where
     let mut tabled_builder = TabledBuilder::default();
     tabled_builder.push_record(self.labels.iter().map(|label| {
       if label.is_target_label() {
-        self.context.apply_target_label_style(label.as_str_for_list())
+        if let Some(target_id_label) = self.target_id_label {
+          self.context.apply_target_label_style(target_id_label)
+        } else {
+          self.context.apply_target_label_style(label.as_str_for_list())
+        }
       } else {
         self.context.apply_label_style(label.as_str_for_list())
       }
