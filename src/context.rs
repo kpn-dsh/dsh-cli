@@ -21,12 +21,11 @@ use clap::builder::styling::{Color, Style};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::error::DshApiResult;
+use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
-use dsh_api::query_processor::{Part, QueryProcessor, RegexQueryProcessor};
-use dsh_api::types::{AllocationStatus, Notification};
+use dsh_api::types::AllocationStatus;
 use getch_rs::{Getch, Key};
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use log::debug;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
@@ -846,9 +845,10 @@ impl Context {
 
   /// # Prints allocation status to stderr
   ///
-  /// This method is used to print the allocation status to stderr. The verbosity level is `High`
+  /// This method is used to print the allocation status to stderr. The verbosity level
   /// determines the amount of detail that will be printed. If `quiet` is `true`, nothing will be
-  /// printed. When there are no notifications, the target is not derived from anything and the target is provisioned, nothing will be printed (unless verbosity is`high`).
+  /// printed. When there are no notifications, the target is not derived from anything and
+  /// the target is provisioned, nothing will be printed (unless verbosity is`high`).
   /// The standard error device is almost always a tty, but can in special cases also be
   /// a pipe or an output file.
   ///
@@ -856,45 +856,43 @@ impl Context {
   /// * `allocation_status` - Allocation status.
   /// * `subject` - Subject of which the allocation status will be printed.
   pub(crate) fn print_allocation_status<T: Display>(&self, allocation_status: &DshApiResult<AllocationStatus>, subject: T) {
-    match allocation_status {
-      Ok(allocation_status) => {
-        if !self.quiet {
+    if !self.quiet {
+      match allocation_status {
+        Ok(allocation_status) => {
+          if allocation_status.provisioned {
+            if self.verbosity == Verbosity::High {
+              self.eprintln(format!("{} is provisioned", subject));
+            }
+          } else {
+            match self.verbosity {
+              Verbosity::Low | Verbosity::Medium | Verbosity::High => self.eprintln_warning(format!("{} is not provisioned", subject)),
+              _ => {}
+            }
+          }
           for notification in &allocation_status.notifications {
             if notification.remove {
-              self.eprintln_warning(format!("removal notification: {}", format_notification_message(notification)));
+              self.eprintln_warning(format!("removal notification: {}", notification.render_message()));
             } else {
-              self.eprintln_warning(format!("notification: {}", format_notification_message(notification)));
+              self.eprintln_warning(format!("creation/update notification: {}", notification.render_message()));
             }
           }
-          match self.verbosity {
-            Verbosity::Medium | Verbosity::High => {
-              if let Some(derived_from) = &allocation_status.derived_from {
-                self.eprintln(format!("derived from '{}'", derived_from));
-              }
+          if let Some(derived_from) = &allocation_status.derived_from {
+            match self.verbosity {
+              Verbosity::Medium | Verbosity::High => self.eprintln(format!("derived from '{}'", derived_from)),
+              _ => {}
             }
-            _ => {}
-          }
-          match self.verbosity {
-            Verbosity::Low | Verbosity::Medium => {
-              if !allocation_status.provisioned {
-                self.eprintln_warning(format!("{} is provisioned", subject));
-              }
-            }
-            Verbosity::High => {
-              if allocation_status.provisioned {
-                self.eprintln(format!("{} is provisioned", subject));
-              } else {
-                self.eprintln_warning(format!("{} is not provisioned", subject));
-              }
-            }
-            _ => {}
           }
         }
-      }
-      Err(error) => {
-        debug!("could not get allocation status for {} ({})", subject, error);
-        if self.verbosity == Verbosity::High {
-          self.eprintln_warning(format!("could not get allocation status for {}", subject));
+        Err(error) => {
+          debug!("could not get allocation status for {} ({})", subject, error);
+          match self.verbosity {
+            Verbosity::Low | Verbosity::Medium | Verbosity::High => {
+              if self.verbosity == Verbosity::High {
+                self.eprintln_warning(format!("could not get allocation status for {}", subject));
+              }
+            }
+            _ => {}
+          }
         }
       }
     }
@@ -1165,44 +1163,4 @@ impl Context {
       println!("{}{}{:#}", self.stdout_style, text, self.stdout_style)
     }
   }
-}
-
-lazy_static! {
-  static ref NotificationQueryProcessor: RegexQueryProcessor = RegexQueryProcessor::create(r"\$\{[a-zA-Z0-9:_-]+\}").unwrap();
-}
-
-fn format_notification_message(notification: &Notification) -> String {
-  match NotificationQueryProcessor.matching_parts(&notification.message) {
-    Some(parts) => parts
-      .iter()
-      .map(|part| match part {
-        Matching { part } => {
-          let stripped = &part[2..part.len() - 1];
-          if let Some(key) = stripped.strip_prefix("urn:") {
-            match notification.args.get(key) {
-              Some(value) => value.to_string(),
-              None => key.to_string(),
-            }
-          } else {
-            match notification.args.get(stripped) {
-              Some(value) => value.to_string(),
-              None => stripped.to_string(),
-            }
-          }
-        }
-        NonMatching { part } => part.to_string(),
-      })
-      .join(""),
-    None => notification.message.clone(),
-  }
-}
-
-#[test]
-fn test_format_notification_message() {
-  let mut args = std::collections::HashMap::<String, String>::new();
-  args.insert("arg1".to_string(), "ARG1".to_string());
-  args.insert("arg2".to_string(), "ARG2".to_string());
-  let message = "abc${arg1}def${urn:arg2}ghi";
-  let notification = Notification::new(args, message, true);
-  assert_eq!(format_notification_message(&notification), "abcARG1defARG2ghi");
 }

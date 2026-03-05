@@ -326,7 +326,7 @@ impl CommandExecutor for VolumeShowUsage {
     let (dependant_apps, dependant_services): (Vec<DependantApp>, Vec<DependantApplication<VolumeInjection>>) = usages.into_iter().partition_map(|dependant| match dependant {
       Dependant::App { app } => Either::Left(app),
       Dependant::Application { application } => Either::Right(application),
-      Dependant::Proxy { .. } => unreachable!(),
+      _ => unreachable!(),
     });
     if dependant_services.is_empty() {
       context.print_outcome("volume not used in services")

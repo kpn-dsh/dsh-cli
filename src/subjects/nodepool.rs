@@ -120,7 +120,7 @@ impl CommandExecutor for NodepoolListUsage {
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&NODEPOOL_USAGE_LABELS, context);
     for (nodepool_id, nodepool_actual, dependant_applications) in &nodepools_with_dependant_applications {
-      for DependantApplication { application_id, instances, injections } in dependant_applications {
+      for DependantApplication { application_id, instances, injections, .. } in dependant_applications {
         formatter.push_target_id_value_owned(nodepool_id.clone(), (nodepool_actual, application_id, instances, injections));
       }
     }

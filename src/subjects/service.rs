@@ -980,7 +980,7 @@ fn secrets_to_table(secrets: &[ApplicationSecret]) -> String {
   hashmap_to_table(&m)
 }
 
-static SERVICE_LABELS_LIST: [ServiceLabel; 9] = [
+static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
   ServiceLabel::Target,
   ServiceLabel::NeedsToken,
   ServiceLabel::Instances,
@@ -988,7 +988,6 @@ static SERVICE_LABELS_LIST: [ServiceLabel; 9] = [
   ServiceLabel::Mem,
   ServiceLabel::ExposedPorts,
   ServiceLabel::Metrics,
-  ServiceLabel::NodepoolFeatures,
   ServiceLabel::Image,
 ];
 

@@ -360,7 +360,7 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
       BrowserMethod::Open => match response.verification_uri_complete() {
         Some(verification_uri) => match open::that(verification_uri.secret()) {
           Ok(()) => {
-            context.print_explanation(format!("opening login page for platform {}", platform));
+            context.print(format!("opening login page for platform {}", platform));
           }
           Err(_) => {
             context.print_error("could not open your browser");
