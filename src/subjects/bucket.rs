@@ -7,7 +7,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{notifications_to_string, vec_to_table, OutputFormat, Value};
+use crate::formatters::{vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS;
@@ -301,13 +301,7 @@ impl SubjectFormatter<BucketLabel> for (BucketStatus, String) {
       BucketLabel::DerivedFrom => Value::option(bucket_status.status.derived_from.clone()),
       BucketLabel::Encrypted => Value::plain(bucket_status.configuration.as_ref().map(|bs| bs.encrypted).unwrap_or_default()),
       BucketLabel::Name => Value::plain(bucket_name),
-      BucketLabel::Notifications => {
-        if bucket_status.status.notifications.is_empty() {
-          Value::empty()
-        } else {
-          Value::plain(notifications_to_string(&bucket_status.status.notifications))
-        }
-      }
+      BucketLabel::Notifications => Value::warn(bucket_status.status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
       BucketLabel::Provisioned => Value::plain(bucket_status.status.provisioned),
       BucketLabel::Target => Value::target(target_id),
       BucketLabel::Versioned => Value::option(bucket_status.configuration.clone().map(|ref a| a.versioned)),
@@ -325,7 +319,9 @@ fn dependant_to_tuple(dependant: &Dependant<BucketInjection>) -> (String, Vec<St
       format!("service:{}", application.application_id),
       application.injections.iter().map(|injection| injection.to_string()).collect_vec(),
     ),
+    Dependant::Certificate { certificate } => (format!("certificate:{}", certificate.certificate_id), vec![certificate.secret_kind.to_string()]),
     Dependant::Proxy { proxy } => (format!("proxy:{}", proxy.proxy_id), vec!["".to_string()]),
+    Dependant::Trifonius { trifonius } => (format!("trifonius:{}", trifonius.trifonius_id), vec!["".to_string()]),
   }
 }
 

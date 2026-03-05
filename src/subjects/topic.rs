@@ -7,8 +7,8 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
+use crate::formatters::OutputFormat;
 use crate::formatters::{hashmap_to_table, Value};
-use crate::formatters::{notifications_to_string, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
@@ -651,7 +651,7 @@ impl SubjectFormatter<TopicLabel> for TopicStatus {
           .map(|topic| hashmap_to_table(&get_implicit_properties(&topic.kafka_properties))),
       ),
       TopicLabel::MaxMessageBytes => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY))),
-      TopicLabel::Notifications => Value::plain(notifications_to_string(&self.status.notifications)),
+      TopicLabel::Notifications => Value::warn(self.status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
       TopicLabel::Partitions => Value::option(self.actual.as_ref()),
       TopicLabel::Provisioned => Value::plain(self.status.provisioned),
       TopicLabel::ReplicationFactor => Value::option(self.actual.as_ref()),

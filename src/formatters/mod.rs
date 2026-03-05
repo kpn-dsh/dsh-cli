@@ -2,7 +2,6 @@ use crate::err;
 use crate::error::DshCliError;
 use chrono::DateTime;
 use dsh_api::error::DshApiResult;
-use dsh_api::types::Notification;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -347,27 +346,6 @@ pub(crate) fn vec_to_table<K: AsRef<str>, V: AsRef<str>>(rows: &[(K, Vec<V>)]) -
       .collect_vec()
       .join("\n"),
     None => "".to_string(),
-  }
-}
-
-pub(crate) fn notifications_to_string(notifications: &[Notification]) -> String {
-  notifications.iter().map(notification_to_string).collect_vec().join(", ")
-}
-
-pub(crate) fn notification_to_string(notification: &Notification) -> String {
-  if notification.args.is_empty() {
-    format!(
-      "{}\n{}",
-      if notification.remove { "remove".to_string() } else { "create/update".to_string() },
-      notification.message,
-    )
-  } else {
-    format!(
-      "{}\n{}\n{}",
-      if notification.remove { "remove".to_string() } else { "create/update".to_string() },
-      notification.message,
-      notification.args.iter().map(|(key, value)| format!("{}:{}", key, value)).collect_vec().join("\n"),
-    )
   }
 }
 
