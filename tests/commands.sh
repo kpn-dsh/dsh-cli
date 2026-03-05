@@ -52,8 +52,8 @@ export SAFE_COMMANDS=(
   "app show $APP_UNDER_TEST --output-format table-no-border"
   "app undeploy $APP_UNDER_TEST --force --dry-run"
 
-  "bucket list --ids"
   "bucket list"
+  "bucket list --ids"
   "bucket show $BUCKET_UNDER_TEST"
 
   "certificate list"
@@ -135,7 +135,7 @@ export SAFE_COMMANDS=(
   "proxy show $PROXY_UNDER_TEST"
 
   "secret copy $SECRET_NAME_UNDER_TEST"
-  "secret create $SECRET_NON_EXISTING --dry-run < /dev/null"
+  "secret create $SECRET_NON_EXISTING --dry-run --authentication sso < /dev/null"
   "secret delete $SECRET_NAME_UNDER_TEST --force --dry-run"
   "secret list"
   "secret list --certificates"
@@ -158,7 +158,10 @@ export SAFE_COMMANDS=(
   "secret show $SYSTEM_SECRET_NAME_UNDER_TEST --status"
   "secret show $SYSTEM_SECRET_NAME_UNDER_TEST --usage"
   "secret show $SYSTEM_SECRET_NAME_UNDER_TEST --value > /dev/null"
-  "secret update $SECRET_NAME_UNDER_TEST --dry-run < /dev/null"
+  "secret show api-key"
+  "secret show broker-ca-key"
+  "secret show kda-test"
+  "secret update $SECRET_NAME_UNDER_TEST --dry-run --authentication sso < /dev/null"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
   "service export $SERVICE_UNDER_TEST -o json"
