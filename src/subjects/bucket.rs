@@ -7,11 +7,11 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{notifications_to_string, vec_to_table, OutputFormat, Value};
+use crate::formatters::{vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEPENDANT_LABELS;
-use crate::{error, DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::{err, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
 use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::bucket::BucketInjection;
@@ -109,7 +109,7 @@ impl CommandExecutor for BucketCreate {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     let versioned = matches.get_flag(VERSIONED_FLAG);
     if client.get_bucket_configuration(&bucket_id).await.is_ok() {
-      return Err(error!("bucket '{}' already exists", bucket_id));
+      return err!("bucket '{}' already exists", bucket_id);
     }
     context.print_explanation(format!("create new bucket '{}'", bucket_id));
     if context.dry_run() {
@@ -134,7 +134,7 @@ impl CommandExecutor for BucketDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let bucket_id = target.unwrap_or_else(|| unreachable!());
     if client.get_bucket_configuration(&bucket_id).await.is_err() {
-      return Err(error!("bucket '{}' does not exists", bucket_id));
+      return err!("bucket '{}' does not exists", bucket_id);
     }
     if context.confirmed(format!("delete bucket '{}'?", bucket_id))? {
       if context.dry_run() {
@@ -301,13 +301,7 @@ impl SubjectFormatter<BucketLabel> for (BucketStatus, String) {
       BucketLabel::DerivedFrom => Value::option(bucket_status.status.derived_from.clone()),
       BucketLabel::Encrypted => Value::plain(bucket_status.configuration.as_ref().map(|bs| bs.encrypted).unwrap_or_default()),
       BucketLabel::Name => Value::plain(bucket_name),
-      BucketLabel::Notifications => {
-        if bucket_status.status.notifications.is_empty() {
-          Value::empty()
-        } else {
-          Value::plain(notifications_to_string(&bucket_status.status.notifications))
-        }
-      }
+      BucketLabel::Notifications => Value::warn(bucket_status.status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
       BucketLabel::Provisioned => Value::plain(bucket_status.status.provisioned),
       BucketLabel::Target => Value::target(target_id),
       BucketLabel::Versioned => Value::option(bucket_status.configuration.clone().map(|ref a| a.versioned)),
@@ -317,15 +311,17 @@ impl SubjectFormatter<BucketLabel> for (BucketStatus, String) {
 
 fn dependant_to_tuple(dependant: &Dependant<BucketInjection>) -> (String, Vec<String>) {
   match dependant {
-    Dependant::App(app) => (
+    Dependant::App { app } => (
       format!("app:{}", app.app_id),
       app.resources.iter().map(|resource| resource.to_string()).collect_vec(),
     ),
-    Dependant::Application(application) => (
+    Dependant::Application { application } => (
       format!("service:{}", application.application_id),
       application.injections.iter().map(|injection| injection.to_string()).collect_vec(),
     ),
-    Dependant::Proxy(proxy) => (format!("proxy:{}", proxy.proxy_id), vec!["".to_string()]),
+    Dependant::Certificate { certificate } => (format!("certificate:{}", certificate.certificate_id), vec![certificate.secret_kind.to_string()]),
+    Dependant::Proxy { proxy } => (format!("proxy:{}", proxy.proxy_id), vec!["".to_string()]),
+    Dependant::Trifonius { trifonius } => (format!("trifonius:{}", trifonius.trifonius_id), vec!["".to_string()]),
   }
 }
 

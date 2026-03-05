@@ -9,7 +9,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
-use crate::{error, DshCliResult};
+use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -81,7 +81,7 @@ impl CommandExecutor for ProxyDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
-      return Err(error!("proxy '{}' does not exists", proxy_id));
+      return err!("proxy '{}' does not exists", proxy_id);
     }
     if context.confirmed(format!("delete proxy '{}'?", proxy_id))? {
       if context.dry_run() {

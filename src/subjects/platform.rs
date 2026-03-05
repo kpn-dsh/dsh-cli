@@ -1,6 +1,6 @@
 use crate::arguments::{
-  app_id_argument, bucket_id_argument, platform_name_argument, service_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT, BUCKET_ID_ARGUMENT,
-  PLATFORM_NAME_ARGUMENT, SERVICE_ID_ARGUMENT, VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
+  app_id_argument, bucket_id_argument, platform_name_argument, service_id_argument, topic_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT,
+  BUCKET_ID_ARGUMENT, PLATFORM_NAME_ARGUMENT, SERVICE_ID_ARGUMENT, TOPIC_ID_ARGUMENT, VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
 };
 use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
@@ -9,7 +9,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::subject::{Requirements, Subject};
-use crate::{error, get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
+use crate::{err, get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
@@ -104,6 +104,7 @@ lazy_static! {
         app_id_argument().long("app"),
         bucket_id_argument().long("bucket"),
         service_id_argument().long("service"),
+        topic_id_argument().long("topic"),
         vendor_name_argument().long("vendor"),
         vhost_id_argument().long("vhost")
       ])
@@ -133,7 +134,7 @@ struct PLatformList {}
 impl CommandExecutor for PLatformList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list platforms");
-    let mut formatter = ListFormatter::new(&DSH_PLATFORM_LABELS_LIST, context);
+    let mut formatter = ListFormatter::new_override_target_id_label(&DSH_PLATFORM_LABELS_LIST, "platform id", context);
     let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect_vec();
     formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
     formatter.print(None)?;
@@ -160,7 +161,7 @@ impl CommandExecutor for PlatformOpen {
         OPEN_TRACING => Self::open_tracing(arg_matches, context),
         _ => unreachable!(),
       },
-      None => Err(error!("missing target argument")),
+      None => err!("missing target argument"),
     }
   }
 
@@ -177,7 +178,7 @@ impl CommandExecutor for PlatformOpen {
         OPEN_SWAGGER => Self::open_swagger(arg_matches, client, context).await,
         _ => unreachable!(),
       },
-      None => Err(error!("missing target argument")),
+      None => err!("missing target argument"),
     }
   }
 
@@ -237,7 +238,7 @@ impl PlatformOpen {
 
   async fn open_swagger(matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
-    let token = match client.token().await {
+    let bearer_token = match client.raw_token().await {
       Ok(token) => {
         debug!("token fetched");
         Some(token)
@@ -247,19 +248,16 @@ impl PlatformOpen {
         None
       }
     };
-    let opening_target = match token {
-      Some(token) => match token.strip_prefix("Bearer ") {
-        Some(token) => match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(token)) {
-          Ok(_) => {
-            debug!("token copied to clipboard");
-            format!("swagger application for platform '{}' (token on clipboard)", platform)
-          }
-          Err(_) => {
-            warn!("could not copy token to clipboard");
-            format!("swagger application for platform '{}'", platform)
-          }
-        },
-        None => return Err(error!("token has incorrect format")),
+    let opening_target = match bearer_token {
+      Some(token) => match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(token)) {
+        Ok(_) => {
+          debug!("token copied to clipboard");
+          format!("swagger application for platform '{}' (token on clipboard)", platform)
+        }
+        Err(_) => {
+          warn!("could not copy token to clipboard");
+          format!("swagger application for platform '{}'", platform)
+        }
       },
       None => format!("swagger application for platform '{}'", platform),
     };
@@ -283,53 +281,71 @@ impl CommandExecutor for PlatformShow {
       Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
       None => get_target_platform(matches, context.settings())?,
     };
+
+    context.print_explanation(format!("list all configured parameters for platform '{}'", platform));
+    UnitFormatter::new(platform.name(), &DSH_PLATFORM_LABELS_CONFIGURATION, context).print(&platform, None)?;
+
+    context.print_explanation(format!("list all derived parameters for platform '{}'", platform));
+    UnitFormatter::new(platform.name(), &DSH_PLATFORM_LABELS_DERIVED, context).print(&platform, None)?;
+
     let tenant = get_target_tenant_non_interactive(matches, context.settings())?;
     let app_id = matches.get_one::<String>(APP_ID_ARGUMENT).cloned();
     let bucket_id = matches.get_one::<String>(BUCKET_ID_ARGUMENT).cloned();
     let service_id = matches.get_one::<String>(SERVICE_ID_ARGUMENT).cloned();
+    let topic_id = matches.get_one::<String>(TOPIC_ID_ARGUMENT).cloned();
     let vendor_id = matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned();
     let vhost = matches.get_one::<String>(VHOST_ID_ARGUMENT).cloned();
+    let arguments = [
+      tenant.as_ref().map(|tenant| format!("tenant '{}'", tenant)),
+      app_id.as_ref().map(|app_id| format!("app '{}'", app_id)),
+      bucket_id.as_ref().map(|bucket_id| format!("bucket '{}'", bucket_id)),
+      service_id.as_ref().map(|service_id| format!("service '{}'", service_id)),
+      topic_id.as_ref().map(|topic_id| format!("topic '{}'", topic_id)),
+      vendor_id.as_ref().map(|vendor_id| format!("vendor '{}'", vendor_id)),
+      vhost.as_ref().map(|vhost| format!("vhost '{}'", vhost)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect_vec();
 
-    context.print_explanation(
-      [
-        Some(format!("list all parameters for platform '{}'", platform)),
-        tenant.as_ref().map(|tenant| format!("tenant '{}'", tenant)),
-        app_id.as_ref().map(|app_id| format!("app '{}'", app_id)),
-        bucket_id.as_ref().map(|bucket_id| format!("bucket '{}'", bucket_id)),
-        service_id.as_ref().map(|service_id| format!("service '{}'", service_id)),
-        vendor_id.as_ref().map(|vendor_id| format!("vendor '{}'", vendor_id)),
-        vhost.as_ref().map(|vhost| format!("vhost '{}'", vhost)),
-      ]
-      .iter()
-      .flatten()
-      .join(", "),
-    );
+    if !arguments.is_empty() {
+      context.print_explanation(format!(
+        "list all derived parameters for platform '{}' and argument{} {}",
+        platform,
+        if arguments.len() > 1 { "s" } else { "" },
+        arguments.iter().join(", ")
+      ));
 
-    let labels = ALL_DSH_PLATFORM_LABELS
-      .iter()
-      .filter(|label| {
-        let (app_id_required, bucket_id_required, service_id_required, tenant_required, vendor_id_required, vhost_required) = label.requirements();
-        (!app_id_required || app_id.is_some())
-          && (!bucket_id_required || bucket_id.is_some())
-          && (!service_id_required || service_id.is_some())
-          && (!tenant_required || tenant.is_some())
-          && (!vendor_id_required || vendor_id.is_some())
-          && (!vhost_required || vhost.is_some())
-      })
-      .map(|label| label.to_owned())
-      .collect_vec();
-    UnitFormatter::new(platform.name(), labels.as_slice(), context).print_non_serializable(
-      &(
-        platform.clone(),
-        app_id.unwrap_or_default(),
-        bucket_id.unwrap_or_default(),
-        service_id.unwrap_or_default(),
-        tenant.unwrap_or_default(),
-        vendor_id.unwrap_or_default(),
-        vhost.unwrap_or_default(),
-      ),
-      None,
-    )
+      let labels = DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS
+        .iter()
+        .filter(|label| {
+          let (app_id_required, bucket_id_required, service_id_required, tenant_required, topic_required, vendor_id_required, vhost_required) = label.requirements();
+          (!app_id_required || app_id.is_some())
+            && (!bucket_id_required || bucket_id.is_some())
+            && (!service_id_required || service_id.is_some())
+            && (!tenant_required || tenant.is_some())
+            && (!topic_required || topic_id.is_some())
+            && (!vendor_id_required || vendor_id.is_some())
+            && (!vhost_required || vhost.is_some())
+        })
+        .map(|label| label.to_owned())
+        .collect_vec();
+      UnitFormatter::new(platform.name(), labels.as_slice(), context).print_non_serializable(
+        &(
+          platform.clone(),
+          app_id.unwrap_or_default(),
+          bucket_id.unwrap_or_default(),
+          service_id.unwrap_or_default(),
+          tenant.unwrap_or_default(),
+          topic_id.unwrap_or_default(),
+          vendor_id.unwrap_or_default(),
+          vhost.unwrap_or_default(),
+        ),
+        None,
+      )
+    } else {
+      Ok(())
+    }
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -353,26 +369,37 @@ fn get_service_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<String> 
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Debug)]
 enum DshPlatformLabel {
-  AccessTokenEndpoint,
+  // From configuration
   Alias,
-  BucketName,
-  ClientId,
   CloudProvider,
-  ConsoleDomain,
-  ConsoleUrl,
   Description,
-  InternalDomain,
-  InternalServiceDomain,
   IsProduction,
-  MqttTokenEndpoint,
-  Name,
+  IssuerEndpoint,
+  Parameter,
   PrivateDomain,
   PublicDomain,
-  PublicVhostDomain,
   Realm,
+  Region,
+  // Derived from configuration
+  AccessTokenEndpoint,
+  ClientId,
+  ConsoleDomain,
+  ConsoleUrl,
+  MqttMessagingApiEndpoint,
+  MqttMessagingApiPort,
+  MqttTokenEndpoint,
   RestApiDomain,
   RestApiEndpoint,
+  RestTokenEndpoint,
   SwaggerUrl,
+  TracingUrl,
+  // Derived from configuration and arguments
+  BucketName,
+  HttpMessagingApiUrlMulti,
+  HttpMessagingApiUrlSingle,
+  InternalDomain,
+  InternalServiceDomain,
+  PublicVhostDomain,
   TenantAppCatalogAppUrl,
   TenantAppCatalogUrl,
   TenantAppConsoleUrl,
@@ -384,31 +411,39 @@ enum DshPlatformLabel {
   TenantPublicAppDomain,
   TenantPublicAppsDomain,
   TenantServiceConsoleUrl,
-  TracingUrl,
 }
 
 impl Label for DshPlatformLabel {
   fn as_str(&self) -> &str {
     match self {
-      Self::AccessTokenEndpoint => "access token endpoint",
+      // From configuration
       Self::Alias => "alias",
-      Self::BucketName => "bucket name",
-      Self::ClientId => "client id",
       Self::CloudProvider => "cloud provider",
-      Self::ConsoleDomain => "console domain",
-      Self::ConsoleUrl => "console url",
       Self::Description => "description",
       Self::IsProduction => "production",
-      Self::MqttTokenEndpoint => "mqtt token endpoint",
-      Self::Name => "name",
+      Self::IssuerEndpoint => "issuer endpoint",
+      Self::Parameter => "parameter",
       Self::PrivateDomain => "private domain",
       Self::PublicDomain => "public domain",
       Self::Realm => "realm",
+      Self::Region => "region",
+      // Derived from configuration
+      Self::AccessTokenEndpoint => "access token endpoint",
+      Self::ClientId => "client id",
+      Self::ConsoleDomain => "console domain",
+      Self::ConsoleUrl => "console url",
+      Self::MqttMessagingApiEndpoint => "mqtt messaging api endpoint",
+      Self::MqttMessagingApiPort => "mqtt messaging api port",
+      Self::MqttTokenEndpoint => "mqtt token endpoint",
       Self::RestApiDomain => "rest api domain",
       Self::RestApiEndpoint => "rest api endpoint",
+      Self::RestTokenEndpoint => "rest token endpoint",
       Self::SwaggerUrl => "swagger url",
       Self::TracingUrl => "tracing url",
-
+      // Derived from configuration and arguments
+      Self::BucketName => "bucket name",
+      Self::HttpMessagingApiUrlMulti => "http messaging api url (multi)",
+      Self::HttpMessagingApiUrlSingle => "http messaging api url (single)",
       Self::InternalDomain => "internal domain",
       Self::InternalServiceDomain => "internal domain (service)",
       Self::PublicVhostDomain => "public vhost domain",
@@ -427,7 +462,7 @@ impl Label for DshPlatformLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    matches!(self, Self::Name)
+    matches!(self, Self::Parameter)
   }
 }
 
@@ -435,21 +470,28 @@ impl Label for DshPlatformLabel {
 impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
   fn value(&self, label: &DshPlatformLabel, _target_id: &str) -> Value {
     match label {
-      DshPlatformLabel::AccessTokenEndpoint => Value::plain(self.access_token_endpoint()),
+      // From configuration
       DshPlatformLabel::Alias => Value::target(self.alias()),
-      DshPlatformLabel::ClientId => Value::plain(self.client_id()),
       DshPlatformLabel::CloudProvider => Value::plain(self.cloud_provider()),
-      DshPlatformLabel::ConsoleDomain => Value::plain(self.console_domain()),
-      DshPlatformLabel::ConsoleUrl => Value::plain(self.console_url()),
       DshPlatformLabel::Description => Value::plain(self.description()),
       DshPlatformLabel::IsProduction => Value::plain(self.is_production()),
-      DshPlatformLabel::MqttTokenEndpoint => Value::plain(self.mqtt_token_endpoint()),
-      DshPlatformLabel::Name => Value::target(self.name()),
+      DshPlatformLabel::IssuerEndpoint => Value::plain(self.issuer_endpoint()),
+      DshPlatformLabel::Parameter => Value::target(self.name()),
       DshPlatformLabel::PrivateDomain => Value::some_or(self.private_domain(), "not configured"),
       DshPlatformLabel::PublicDomain => Value::plain(self.public_domain()),
       DshPlatformLabel::Realm => Value::plain(self.realm()),
+      DshPlatformLabel::Region => Value::option(self.region()),
+      // Derived from configuration
+      DshPlatformLabel::AccessTokenEndpoint => Value::plain(self.access_token_endpoint()),
+      DshPlatformLabel::ClientId => Value::plain(self.client_id()),
+      DshPlatformLabel::ConsoleDomain => Value::plain(self.console_domain()),
+      DshPlatformLabel::ConsoleUrl => Value::plain(self.console_url()),
+      DshPlatformLabel::MqttMessagingApiEndpoint => Value::plain(self.mqtt_messaging_api_endpoint()),
+      DshPlatformLabel::MqttMessagingApiPort => Value::plain(self.mqtt_messaging_api_port().to_string()),
+      DshPlatformLabel::MqttTokenEndpoint => Value::plain(self.mqtt_token_endpoint()),
       DshPlatformLabel::RestApiDomain => Value::plain(self.rest_api_domain()),
       DshPlatformLabel::RestApiEndpoint => Value::plain(self.rest_api_endpoint()),
+      DshPlatformLabel::RestTokenEndpoint => Value::plain(self.rest_token_endpoint()),
       DshPlatformLabel::SwaggerUrl => Value::plain(self.swagger_url()),
       DshPlatformLabel::TracingUrl => Value::plain(self.tracing_url()),
       _ => unreachable!(),
@@ -458,11 +500,14 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
 }
 
 // Subject formatter for (DshPlatform, app, bucket, service, tenant, vendor, vhost) septets
-impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String, String, String, String) {
+impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String, String, String, String, String) {
   fn value(&self, label: &DshPlatformLabel, target_id: &str) -> Value {
-    let (platform, app_id, bucket_id, service_id, tenant, vendor_id, vhost) = self;
+    let (platform, app_id, bucket_id, service_id, tenant, topic, vendor_id, vhost) = self;
     match label {
+      // Derived from configuration and arguments
       DshPlatformLabel::BucketName => Value::plain(platform.bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID")).unwrap_or_else(|error| error)),
+      DshPlatformLabel::HttpMessagingApiUrlMulti => Value::plain(platform.http_messaging_api_url_multi(topic)),
+      DshPlatformLabel::HttpMessagingApiUrlSingle => Value::plain(platform.http_messaging_api_url_single(topic)),
       DshPlatformLabel::InternalDomain => Value::plain(platform.internal_domain(tenant)),
       DshPlatformLabel::InternalServiceDomain => Value::plain(platform.internal_service_domain(tenant, service_id)),
       DshPlatformLabel::PublicVhostDomain => Value::plain(platform.public_vhost_domain(vhost)),
@@ -482,66 +527,85 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
   }
 }
 
-static ALL_DSH_PLATFORM_LABELS: [DshPlatformLabel; 32] = [
-  // Items from platform configuration file
-  DshPlatformLabel::Name,
-  DshPlatformLabel::Description,
+static DSH_PLATFORM_LABELS_CONFIGURATION: [DshPlatformLabel; 10] = [
+  DshPlatformLabel::Parameter,
   DshPlatformLabel::Alias,
+  DshPlatformLabel::Description,
   DshPlatformLabel::IsProduction,
   DshPlatformLabel::CloudProvider,
+  DshPlatformLabel::Region,
   DshPlatformLabel::Realm,
-  DshPlatformLabel::AccessTokenEndpoint,
-  DshPlatformLabel::PublicDomain,
+  DshPlatformLabel::IssuerEndpoint,
   DshPlatformLabel::PrivateDomain,
-  // Derived items that do not depend on tenant et cetera
+  DshPlatformLabel::PublicDomain,
+];
+
+static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 13] = [
+  DshPlatformLabel::Parameter,
+  DshPlatformLabel::RestApiDomain,
+  DshPlatformLabel::RestTokenEndpoint,
+  DshPlatformLabel::RestApiEndpoint,
+  DshPlatformLabel::MqttTokenEndpoint,
+  DshPlatformLabel::MqttMessagingApiEndpoint,
+  DshPlatformLabel::MqttMessagingApiPort,
   DshPlatformLabel::ConsoleDomain,
   DshPlatformLabel::ConsoleUrl,
-  DshPlatformLabel::ClientId,
-  DshPlatformLabel::RestApiDomain,
-  DshPlatformLabel::MqttTokenEndpoint,
-  DshPlatformLabel::RestApiEndpoint,
   DshPlatformLabel::SwaggerUrl,
   DshPlatformLabel::TracingUrl,
-  // Derived items that do depend on tenant et cetera
+  DshPlatformLabel::AccessTokenEndpoint,
+  DshPlatformLabel::ClientId,
+];
+
+static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 18] = [
+  DshPlatformLabel::Parameter,
   DshPlatformLabel::BucketName,
-  DshPlatformLabel::PublicVhostDomain,
-  DshPlatformLabel::TenantPublicAppsDomain,
-  DshPlatformLabel::TenantPublicAppDomain,
-  DshPlatformLabel::TenantConsoleUrl,
-  DshPlatformLabel::TenantAppCatalogUrl,
-  DshPlatformLabel::TenantAppCatalogAppUrl,
-  DshPlatformLabel::TenantAppConsoleUrl,
-  DshPlatformLabel::TenantServiceConsoleUrl,
-  DshPlatformLabel::TenantDataCatalogUrl,
-  DshPlatformLabel::TenantMonitoringUrl,
-  DshPlatformLabel::TenantClientId,
-  DshPlatformLabel::TenantPrivateVhostDomain,
   DshPlatformLabel::InternalDomain,
   DshPlatformLabel::InternalServiceDomain,
+  DshPlatformLabel::TenantClientId,
+  DshPlatformLabel::HttpMessagingApiUrlMulti,
+  DshPlatformLabel::HttpMessagingApiUrlSingle,
+  DshPlatformLabel::TenantPrivateVhostDomain,
+  DshPlatformLabel::PublicVhostDomain,
+  DshPlatformLabel::TenantPublicAppDomain,
+  DshPlatformLabel::TenantPublicAppsDomain,
+  DshPlatformLabel::TenantConsoleUrl,
+  DshPlatformLabel::TenantAppCatalogUrl,
+  DshPlatformLabel::TenantDataCatalogUrl,
+  DshPlatformLabel::TenantServiceConsoleUrl,
+  DshPlatformLabel::TenantAppConsoleUrl,
+  DshPlatformLabel::TenantAppCatalogAppUrl,
+  DshPlatformLabel::TenantMonitoringUrl,
 ];
 
 static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
-  [DshPlatformLabel::Name, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
+  [DshPlatformLabel::Parameter, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
 
-// Returns the required parameters
-// (app_id_required, bucket_id_required, service_id_required, tenant_required, vendor_id_required, vhost_required)
 impl DshPlatformLabel {
-  fn requirements(&self) -> (bool, bool, bool, bool, bool, bool) {
+  /// Returns the parameters that are required for a `Label` variant.
+  /// * `app_id_required`
+  /// * `bucket_id_required`
+  /// * `service_id_required`
+  /// * `tenant_required`
+  /// * `topic_required`
+  /// * `vendor_id_required`
+  /// * `vhost_required`
+  fn requirements(&self) -> (bool, bool, bool, bool, bool, bool, bool) {
     match self {
-      DshPlatformLabel::BucketName => (false, true, false, true, false, false),
-      DshPlatformLabel::TenantAppCatalogAppUrl => (true, false, false, true, true, false),
-      DshPlatformLabel::TenantAppConsoleUrl | DshPlatformLabel::TenantPublicAppDomain => (true, false, false, true, false, false),
-      DshPlatformLabel::TenantServiceConsoleUrl | DshPlatformLabel::InternalServiceDomain => (false, false, true, true, false, false),
+      DshPlatformLabel::BucketName => (false, true, false, true, false, false, false),
+      DshPlatformLabel::TenantAppCatalogAppUrl => (true, false, false, true, false, true, false),
+      DshPlatformLabel::TenantAppConsoleUrl | DshPlatformLabel::TenantPublicAppDomain => (true, false, false, true, false, false, false),
+      DshPlatformLabel::TenantServiceConsoleUrl | DshPlatformLabel::InternalServiceDomain => (false, false, true, true, false, false, false),
       DshPlatformLabel::InternalDomain
       | DshPlatformLabel::TenantAppCatalogUrl
       | DshPlatformLabel::TenantClientId
       | DshPlatformLabel::TenantConsoleUrl
       | DshPlatformLabel::TenantDataCatalogUrl
       | DshPlatformLabel::TenantMonitoringUrl
-      | DshPlatformLabel::TenantPublicAppsDomain => (false, false, false, true, false, false),
-      DshPlatformLabel::TenantPrivateVhostDomain => (false, false, false, true, false, true),
-      DshPlatformLabel::PublicVhostDomain => (false, false, false, false, false, true),
-      _ => (false, false, false, false, false, false),
+      | DshPlatformLabel::TenantPublicAppsDomain => (false, false, false, true, false, false, false),
+      DshPlatformLabel::HttpMessagingApiUrlMulti | DshPlatformLabel::HttpMessagingApiUrlSingle => (false, false, false, false, true, false, false),
+      DshPlatformLabel::TenantPrivateVhostDomain => (false, false, false, true, false, false, true),
+      DshPlatformLabel::PublicVhostDomain => (false, false, false, false, false, false, true),
+      _ => (false, false, false, false, false, false, false),
     }
   }
 }

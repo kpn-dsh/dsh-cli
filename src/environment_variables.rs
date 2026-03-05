@@ -5,11 +5,12 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::global_arguments::ENVIRONMENT_VARIABLE_ARGUMENT;
-use crate::{error, DshCliResult, TOOL_OPTIONS_HEADING};
+use crate::{err, DshCliResult, TOOL_OPTIONS_HEADING};
 use clap::builder::ValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::{debug, trace, warn};
 use serde::Serialize;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind};
@@ -34,7 +35,7 @@ use std::path::PathBuf;
 /// * `Ok<None>` - When the environment variable `env_var_name` is not specified.
 /// * `Err<message>` - When the command line specifies the environment variable `env_var_name`
 ///   more than once.
-pub fn environment_variable(env_var_name: &str, matches: Option<&ArgMatches>) -> DshCliResult<Option<String>> {
+pub(crate) fn environment_variable(env_var_name: &str, matches: Option<&ArgMatches>) -> DshCliResult<Option<String>> {
   match EnvironmentVariables.iter().find(|env_var| env_var.name == env_var_name) {
     Some(environment_variable) => {
       if environment_variable.override_allowed {
@@ -46,12 +47,11 @@ pub fn environment_variable(env_var_name: &str, matches: Option<&ArgMatches>) ->
               1 => match environment_variable_from_arguments.first().cloned() {
                 Some(env_var_value) => {
                   override_from_argument_warning(env_var_name);
-                  log::debug!("environment variable {}={} from command line argument", env_var_name, env_var_value);
                   Ok(Some(env_var_value))
                 }
                 None => unreachable!(),
               },
-              _ => Err(error!("environment variable {} is specified more than once on the command line", env_var_name)),
+              _ => err!("environment variable '{}' is specified more than once on the command line", env_var_name),
             }
           }
           None => environment_variable_from_file_or_os(env_var_name, matches)?,
@@ -60,7 +60,7 @@ pub fn environment_variable(env_var_name: &str, matches: Option<&ArgMatches>) ->
         environment_variable_from_file_or_os(env_var_name, matches)?
       }
     }
-    None => Err(error!("environment variable {} not recognized", env_var_name)),
+    None => err!("environment variable '{}' not defined", env_var_name),
   }
 }
 
@@ -78,7 +78,7 @@ pub fn environment_variable(env_var_name: &str, matches: Option<&ArgMatches>) ->
 ///   via the command line or as a regular environment variable. Note that the function also
 ///   returns `true` when `env_var_name` is specified on the command line more than once.
 /// * `false` - When the environment variable `env_var_name` is not specified.
-pub fn is_environment_variable_specified(env_var_name: &str, matches: &ArgMatches) -> bool {
+pub(crate) fn is_environment_variable_specified(env_var_name: &str, matches: &ArgMatches) -> bool {
   !environment_variable_from_arguments(env_var_name, matches).is_empty() || get_env_var(env_var_name).is_some()
 }
 
@@ -86,12 +86,12 @@ fn environment_variable_from_file_or_os(env_var_name: &str, matches: Option<&Arg
   Ok(match environment_variable_from_file(env_var_name, matches)? {
     Some((env_var_value, env_var_file)) => {
       override_from_file_warning(env_var_name, &env_var_file);
-      log::debug!("environment variable {}={} from file {}", env_var_name, env_var_value, env_var_file);
+      trace!("environment variable {}={} from file '{}'", env_var_name, env_var_value, env_var_file);
       Ok(Some(env_var_value))
     }
     None => match get_env_var(env_var_name) {
       Some(env_var_value) => {
-        log::debug!("environment variable {}={}", env_var_name, env_var_value);
+        debug!("environment variable {}={}", env_var_name, env_var_value);
         Ok(Some(env_var_value))
       }
       None => Ok(None),
@@ -99,7 +99,7 @@ fn environment_variable_from_file_or_os(env_var_name: &str, matches: Option<&Arg
   })
 }
 
-const REDACTED_SECRET: &str = "********";
+const REDACTED_SECRET: &str = "[redacted]";
 
 /// Returns the currently configured environment variables with their values
 pub(crate) fn get_configured_environment_variables() -> Vec<(&'static str, String)> {
@@ -169,47 +169,50 @@ pub(crate) fn print_environment_variable(env_var: &str, context: &Context) {
 fn get_env_var(env_var_name: &str) -> Option<String> {
   match std::env::var(env_var_name) {
     Ok(env_var_value) => {
-      log::trace!("std::env::var({}) -> Some({})", env_var_name, env_var_value);
+      trace!("read environment variable {}={}", env_var_name, env_var_value);
       Some(env_var_value)
     }
-    Err(_) => {
-      log::trace!("std::env::var({}) -> None", env_var_name);
-      None
-    }
+    Err(_) => None,
   }
 }
 
 fn override_from_argument_warning(env_var_name: &str) {
   if std::env::var(env_var_name).is_ok() {
-    log::warn!("environment variable {} overridden by argument", env_var_name);
+    warn!("environment variable '{}' overridden by argument", env_var_name);
   }
 }
 
 fn override_from_file_warning(env_var_name: &str, filename: &str) {
   if std::env::var(env_var_name).is_ok() {
-    log::warn!("environment variable {} overridden by value from file {}", env_var_name, filename);
+    warn!("environment variable '{}' overridden by value from file '{}'", env_var_name, filename);
   }
 }
 
-// # Get environment variable value from the command line
-//
-// Gets the value(s) of an environment variable if it is configured via the command line.
-//
-// # Parameters
-// * `env_var_name` - Name of the environment variable.
-// * `matches` - Parsed command line arguments.
-//
-// # Returns
-// A vector containing the values of the environment variable when it was specified via de
-// command line. Note that the same environment variable can be configured more than once.
-// If this is the case, the return value of this function will contain all occurring values. If
-// the environment variable was not specified via the command line, this function will return the
-// empty vector.
+/// # Get environment variable value from the command line
+///
+/// Gets the value(s) of an environment variable if it is configured via the command line.
+///
+/// # Parameters
+/// * `env_var_name` - Name of the environment variable.
+/// * `matches` - Parsed command line arguments.
+///
+/// # Returns
+/// A vector containing the values of the environment variable when it was specified via de
+/// command line. Note that the same environment variable can be configured more than once.
+/// If this is the case, the return value of this function will contain all occurring values. If
+/// the environment variable was not specified via the command line, this function will return the
+/// empty vector.
 fn environment_variable_from_arguments(env_var_name: &str, matches: &ArgMatches) -> Vec<String> {
   match matches.get_many::<String>(ENVIRONMENT_VARIABLE_ARGUMENT) {
-    Some(env_var_arguments) => env_var_arguments
-      .filter_map(|env_var_argument| parse_env_var(env_var_name, env_var_argument))
-      .collect_vec(),
+    Some(env_var_arguments) => {
+      let env_var_values = env_var_arguments
+        .filter_map(|env_var_argument| parse_env_var(env_var_name, env_var_argument))
+        .collect_vec();
+      for env_var_value in &env_var_values {
+        trace!("environment variable {}={} specified on command line", env_var_name, env_var_value);
+      }
+      env_var_values
+    }
     None => vec![],
   }
 }
@@ -220,7 +223,7 @@ const DEFAULT_ENV_FILE_NAME: &str = ".dsh_cli.env";
 ///
 /// Gets the value of an environment variable if it is configured in an environment variables file.
 /// If the command line argument `--env-var-file` is provided, its value will be used as the
-/// filename. Else, `./.dsh_cli.env` will be tried.
+/// filename. Else, `./.dsh_cli.env` in the current working directory will be tried.
 ///
 /// # Parameters
 /// * `env_var_name` - Name of the environment variable.
@@ -234,37 +237,45 @@ const DEFAULT_ENV_FILE_NAME: &str = ".dsh_cli.env";
 /// * `Err<message>` - When the selected file does not exist or when the selected or default file
 ///   could not be read.
 fn environment_variable_from_file(env_var_name: &str, matches: Option<&ArgMatches>) -> DshCliResult<Option<(String, String)>> {
-  let env_var_file: Option<(File, String)> = match matches.and_then(|matches| matches.get_one::<PathBuf>(ENV_VAR_FILE_ARGUMENT)) {
+  match matches.and_then(|matches| matches.get_one::<PathBuf>(ENV_VAR_FILE_ARGUMENT)) {
     Some(env_var_file_argument) => match OpenOptions::new().read(true).open(env_var_file_argument) {
-      Ok(file) => Ok(Some((file, env_var_file_argument.display().to_string()))),
+      Ok(file) => read_environment_variable_from_file(env_var_name, file, env_var_file_argument.display().to_string()),
       Err(error) => {
         if error.kind() == ErrorKind::NotFound {
-          Err(error!("environment variables file {} does not exist", env_var_file_argument.display()))
+          err!(
+            "environment variables file '{}' specified in argument does not exist",
+            env_var_file_argument.display()
+          )
         } else {
-          Err(DshCliError::from(error))
+          err!(
+            "environment variables file '{}' specified in argument could not be read ({})",
+            env_var_file_argument.display(),
+            error
+          )
         }
       }
     },
     None => match OpenOptions::new().read(true).open(DEFAULT_ENV_FILE_NAME) {
-      Ok(file) => Ok(Some((file, DEFAULT_ENV_FILE_NAME.to_string()))),
+      Ok(file) => read_environment_variable_from_file(env_var_name, file, DEFAULT_ENV_FILE_NAME.to_string()),
       Err(error) => {
         if error.kind() == ErrorKind::NotFound {
           Ok(None)
         } else {
-          Err(DshCliError::from(error))
+          err!("default environment variables file '{}' could not be read ({})", DEFAULT_ENV_FILE_NAME, error)
         }
       }
     },
-  }?;
-  match env_var_file {
-    Some((file, filename)) => {
-      match BufReader::new(&file)
-        .lines()
-        .find_map(|env_var_argument| env_var_argument.ok().and_then(|line| parse_env_var(env_var_name, &line)))
-      {
-        Some(env_var_value) => Ok(Some((env_var_value, filename))),
-        None => Ok(None),
-      }
+  }
+}
+
+fn read_environment_variable_from_file(env_var_name: &str, file: File, filename: String) -> DshCliResult<Option<(String, String)>> {
+  match BufReader::new(&file)
+    .lines()
+    .find_map(|env_var_argument| env_var_argument.ok().and_then(|line| parse_env_var(env_var_name, &line)))
+  {
+    Some(env_var_value) => {
+      trace!("environment variable {}={} read from file '{}'", env_var_name, env_var_value, filename);
+      Ok(Some((env_var_value, filename)))
     }
     None => Ok(None),
   }
@@ -488,7 +499,7 @@ lazy_static! {
       true,
       None,
       "This environment variable specifies the authentication method that will be used to access \n\
-      the resource management api. The allowed values are 'robot' and 'single-sign-on'. If this \n\
+      the resource management api. The allowed values are 'robot' and 'single-sign-on' (sso). If this \n\
       variable is not provided, the value from the settings file will be used, if it exists. Else, \n\
       the default value will be `single-sign-on` when the cli tool is run interactive ('stdin' is \n\
       a terminal) and 'robot' if not.",

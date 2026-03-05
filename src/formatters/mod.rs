@@ -1,9 +1,7 @@
-use crate::context::Context;
-use crate::error;
+use crate::err;
 use crate::error::DshCliError;
-use chrono::{DateTime, Local, Utc};
-use dsh_api::types::Notification;
-use dsh_api::DshApiResult;
+use chrono::DateTime;
+use dsh_api::error::DshApiResult;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -13,6 +11,9 @@ use std::hash::Hash;
 pub(crate) mod ids_formatter;
 pub(crate) mod list_formatter;
 pub(crate) mod unit_formatter;
+pub(crate) mod value;
+
+pub(crate) use value::Value;
 
 /// # Defines behavior of labels
 ///
@@ -60,136 +61,6 @@ pub(crate) trait Label: Eq + Hash + PartialEq + Serialize {
   /// * `true` - if `self` is the target label for this label type.
   ///   Only one value can return `true`.
   fn is_target_label(&self) -> bool;
-}
-
-#[derive(Debug)]
-pub(crate) enum Value {
-  Empty,
-  Error(String),
-  Ignore(String),
-  Plain(String),
-  Secret,
-  Target(String),
-  Warn(String),
-}
-
-impl Value {
-  pub(crate) fn date_time_expired(date_time: &DateTime<Utc>) -> Self {
-    if date_time < &Local::now() {
-      Self::error(date_time)
-    } else {
-      Self::plain(date_time)
-    }
-  }
-
-  pub(crate) fn date_time_not_yet_passed(date_time: &DateTime<Utc>) -> Self {
-    if date_time > &Local::now() {
-      Self::warn(date_time.to_string())
-    } else {
-      Self::plain(date_time.to_string())
-    }
-  }
-
-  pub(crate) fn empty() -> Self {
-    Self::Empty
-  }
-
-  pub(crate) fn error<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Error(value.to_string())
-  }
-
-  pub(crate) fn ignore<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Ignore(value.to_string())
-  }
-
-  pub(crate) fn ok_or<T, U, E>(value: Result<T, E>, default: U) -> Self
-  where
-    T: ToString,
-    U: ToString,
-  {
-    match value {
-      Ok(v) => Self::plain(v.to_string()),
-      Err(_) => Self::plain(default.to_string()),
-    }
-  }
-
-  pub(crate) fn option<T>(value: Option<T>) -> Self
-  where
-    T: ToString,
-  {
-    match value {
-      Some(v) => Self::plain(v.to_string()),
-      None => Self::empty(),
-    }
-  }
-
-  pub(crate) fn plain<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Plain(value.to_string())
-  }
-
-  pub(crate) fn secret() -> Self {
-    Self::Secret
-  }
-
-  pub(crate) fn some_or<T, U>(value: Option<T>, default: U) -> Self
-  where
-    T: ToString,
-    U: ToString,
-  {
-    match value {
-      Some(v) => Self::plain(v.to_string()),
-      None => Self::plain(default.to_string()),
-    }
-  }
-
-  pub(crate) fn target<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Target(value.to_string())
-  }
-
-  pub(crate) fn warn<T>(value: T) -> Self
-  where
-    T: ToString,
-  {
-    Self::Warn(value.to_string())
-  }
-
-  const REDACTED_SECRET: &'static str = "[redacted]";
-
-  pub(crate) fn to_decorated_string(&self, context: &Context) -> String {
-    match self {
-      Self::Empty => "".to_string(),
-      Self::Error(value) => context.apply_error_style(value),
-      Self::Ignore(value) => context.apply_ignore_style(value),
-      Self::Plain(value) => context.apply_stdout_style(value),
-      Self::Secret => Self::REDACTED_SECRET.to_string(),
-      Self::Target(value) => context.apply_target_style(value),
-      Self::Warn(value) => context.apply_warning_style(value),
-    }
-  }
-
-  pub(crate) fn to_undecorated_string(&self) -> String {
-    match self {
-      Self::Empty => "".to_string(),
-      Self::Error(value) => value.to_string(),
-      Self::Ignore(value) => value.to_string(),
-      Self::Plain(value) => value.to_string(),
-      Self::Secret => Self::REDACTED_SECRET.to_string(),
-      Self::Target(value) => value.to_string(),
-      Self::Warn(value) => value.to_string(),
-    }
-  }
 }
 
 /// # Defines how a data type will be formatted
@@ -390,7 +261,7 @@ impl TryFrom<&str> for OutputFormat {
       "toml" => Ok(Self::Toml),
       "toml-compact" => Ok(Self::TomlCompact),
       "yaml" => Ok(Self::Yaml),
-      _ => Err(error!("invalid output format '{}'", value)),
+      _ => err!("invalid output format '{}'", value),
     }
   }
 }
@@ -478,23 +349,24 @@ pub(crate) fn vec_to_table<K: AsRef<str>, V: AsRef<str>>(rows: &[(K, Vec<V>)]) -
   }
 }
 
-pub(crate) fn notifications_to_string(notifications: &[Notification]) -> String {
-  notifications.iter().map(notification_to_string).collect_vec().join(", ")
-}
-
-pub(crate) fn notification_to_string(notification: &Notification) -> String {
-  if notification.args.is_empty() {
-    format!(
-      "{}\n{}",
-      if notification.remove { "remove".to_string() } else { "create/update".to_string() },
-      notification.message,
-    )
-  } else {
-    format!(
-      "{}\n{}\n{}",
-      if notification.remove { "remove".to_string() } else { "create/update".to_string() },
-      notification.message,
-      notification.args.iter().map(|(key, value)| format!("{}:{}", key, value)).collect_vec().join("\n"),
-    )
+/// Convert timestamp to formatted string representation
+///
+/// When the timestamp can be converted to a proper `DateTime<Utc>`, it will be formatted as
+/// `2026-02-28 14:06:48 UTC` or something similar. If it cannot be converted it will be
+/// formatted as a string representing the number of seconds since unix epoch. If the value is
+/// out of range an error string will be returned.
+///
+/// # Parameters
+/// `timestamp` - Timestamp in seconds since unix epoch.
+pub(crate) fn timestamp_to_string(timestamp: i64) -> String {
+  match DateTime::from_timestamp_secs(timestamp) {
+    Some(datetime) => datetime.to_string(),
+    None => {
+      if timestamp < 0 || timestamp > 30000000000 {
+        "!TIMESTAMP".to_string()
+      } else {
+        timestamp.to_string()
+      }
+    }
   }
 }

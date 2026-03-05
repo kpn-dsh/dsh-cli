@@ -1,13 +1,14 @@
+use crate::cipher::{decrypt, encrypt};
 use crate::context::{BrowserMethod, Context};
+use crate::directory::{delete_refresh_token, read_refresh_token, write_refresh_token};
 use crate::error::DshCliError;
-use crate::refresh_token_store::{delete_stored_refresh_token, get_stored_refresh_token, store_refresh_token};
-use crate::{error, DshCliResult};
-use dsh_api::dsh_jwt::DshJwt;
+use crate::{err, error_map, DshCliResult};
+use dsh_api::dsh_jwt::{jwt_into_header_payload_json, DshJwt};
 use dsh_api::platform::DshPlatform;
 use futures::future::try_join_all;
 use futures::FutureExt;
 use itertools::Itertools;
-use log::{debug, trace};
+use log::{debug, error, log_enabled, trace, warn, Level};
 use openidconnect::core::{
   CoreAuthDisplay, CoreAuthPrompt, CoreClaimName, CoreClaimType, CoreClient, CoreClientAuthMethod, CoreErrorResponseType, CoreGenderClaim, CoreGrantType, CoreJsonWebKey,
   CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm, CoreResponseMode, CoreResponseType, CoreRevocableToken, CoreRevocationErrorResponse, CoreSubjectIdentifierType,
@@ -23,6 +24,7 @@ use openidconnect::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use tokio::task::spawn_blocking;
 
 #[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -31,7 +33,8 @@ pub(crate) enum AuthenticationMethod {
   #[serde(rename = "robot")]
   Robot,
   /// Use single sign on to authenticate and authorize
-  #[serde(rename = "single-sign-on")]
+  #[serde(rename = "sso")]
+  #[value(alias("sso"))]
   SingleSignOn,
 }
 
@@ -41,8 +44,8 @@ impl TryFrom<&str> for AuthenticationMethod {
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
       "robot" => Ok(Self::Robot),
-      "single-sign-on" => Ok(Self::SingleSignOn),
-      _ => Err(error!("invalid authentication method '{}'", value)),
+      "sso" | "single-sign-on" => Ok(Self::SingleSignOn),
+      _ => err!("invalid authentication method '{}'", value),
     }
   }
 }
@@ -68,32 +71,23 @@ impl Default for AuthenticationMethod {
 /// * `platform`
 ///
 /// Returns
-/// * `Ok(Some(access_token))` - Access token was successfully obtained.
+/// * `Ok(Some((access_token, jwt)))` - Access token was successfully obtained.
 /// * `Ok(None)` - User needs to log in.
-pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Option<DshJwt>> {
+pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Option<(String, DshJwt)>> {
   spawn_blocking(move || {
     let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string())?;
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
     let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
+    debug!("provider metadata read from '{}'", &issuer_url);
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
-        let access_token_jwt = DshJwt::from_token(access_token.secret().clone())?;
-        debug!("get access token: {}", access_token_jwt);
-        trace!("{:#}", access_token_jwt);
-        Ok(Some(access_token_jwt))
+        let access_token_jwt = DshJwt::from_str(access_token.secret())?;
+        Ok(Some((access_token.into_secret(), access_token_jwt)))
       }
       None => Ok(None),
     }
   })
   .await?
-}
-
-fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
-  if !&access_token_jwt.tenant_permissions().is_empty() {
-    context.print(format!("authorized tenants: {}", access_token_jwt.authorized_tenants().join(", ")));
-  } else {
-    context.print("you are not authorized for tenants");
-  }
 }
 
 /// Let the user log in
@@ -112,10 +106,10 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
     let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
-        let access_token_jwt = DshJwt::from_token(access_token.secret().clone())?;
+        let access_token_jwt = DshJwt::from_str(access_token.secret())?;
         debug!("get access token from stored refresh token: {}", access_token_jwt);
         trace!("{:#}", access_token_jwt);
-        match &access_token_jwt.payload().preferred_username {
+        match &access_token_jwt.payload.preferred_username {
           Some(preferred_username) => context.print(format!("you are already logged in as {}", preferred_username)),
           None => context.print("you are already logged in"),
         }
@@ -124,20 +118,34 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
       }
       None => match authenticate_and_get_access_and_refresh_tokens(&provider_metadata, &platform, &http_client, &context) {
         Ok((access_token, refresh_token)) => {
-          let _ = store_refresh_token(&refresh_token, &platform);
-          let access_token_jwt = DshJwt::from_token(access_token.secret().to_string())?;
-          match &access_token_jwt.payload().preferred_username {
+          let encrypted_refresh_token = encrypt(refresh_token.secret())?;
+          let _ = write_refresh_token(&platform, &encrypted_refresh_token);
+          let access_token_jwt = DshJwt::from_str(access_token.secret())?;
+          match &access_token_jwt.payload.preferred_username {
             Some(preferred_username) => context.print(format!("you are logged in as {}", preferred_username)),
             None => context.print("you are logged in"),
           }
           print_authorizations(&context, &access_token_jwt);
           Ok(())
         }
-        Err(error) => Err(error!("could not authenticate and get access token: {}", error)),
+        Err(error) => err!("could not authenticate and get access token: {}", error),
       },
     }
   })
   .await?
+}
+
+fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
+  match &access_token_jwt.authorized_tenants() {
+    Some(authorized_tenants) => {
+      if !authorized_tenants.is_empty() {
+        context.print(format!("authorized tenants: {}", authorized_tenants.join(", ")));
+      } else {
+        context.print("you are not authorized for tenants");
+      }
+    }
+    None => context.print_warning("json web token does not provide authorized tenants"),
+  }
 }
 
 /// Let the user log out
@@ -162,12 +170,12 @@ pub(crate) async fn logout(platform: DshPlatform, context: Context) -> DshCliRes
             context.open_url(endpoint, format!("logout page for platform {}", platform));
             Ok(())
           }
-          None => Err(error!("response from provider metadata request has illegal format")),
+          None => err!("response from provider metadata request has illegal format"),
         },
-        None => Err(error!("provider metadata does not contain a end-session endpoint")),
+        None => err!("provider metadata does not contain a end-session endpoint"),
       }
     } else {
-      Err(error!("illegal response from provider metadata request"))
+      err!("illegal response from provider metadata request")
     }
   })
   .await?
@@ -189,7 +197,7 @@ pub(crate) async fn get_access_tokens() -> DshCliResult<Vec<(DshPlatform, DshJwt
   .map(|tokens| {
     tokens
       .into_iter()
-      .filter_map(|(platform, jwt)| jwt.map(|dsh_jwt| (platform, dsh_jwt)))
+      .filter_map(|(platform, jwt)| jwt.map(|(_, dsh_jwt)| (platform, dsh_jwt)))
       .collect_vec()
   })
 }
@@ -221,24 +229,44 @@ fn get_access_token_from_stored_refresh_token(
 ) -> DshCliResult<Option<AccessToken>> {
   match get_stored_refresh_token(platform)? {
     Some(stored_refresh_token) => {
-      let refresh_jwt = DshJwt::from_token(stored_refresh_token.secret().clone())?;
-      if refresh_jwt.expired() {
-        delete_stored_refresh_token(platform)?;
+      let refresh_jwt = DshJwt::from_str(stored_refresh_token.secret())?;
+      if refresh_jwt.expired().is_some_and(|expired| expired) {
+        delete_refresh_token(platform)?;
         Ok(None)
       } else {
         match get_access_token_and_exchanged_refresh_token(provider_metadata, platform, &stored_refresh_token, http_client)? {
           Some((access_token, new_refresh_token)) => {
-            store_refresh_token(&new_refresh_token, platform)?;
+            trace_token_payload("access token payload", access_token.secret());
+            trace_token_payload("refresh token payload", new_refresh_token.secret());
+            let encrypted_refresh_token = encrypt(new_refresh_token.secret())?;
+            let _ = write_refresh_token(platform, &encrypted_refresh_token);
             Ok(Some(access_token))
           }
           None => {
-            delete_stored_refresh_token(platform)?;
+            delete_refresh_token(platform)?;
+
             Ok(None)
           }
         }
       }
     }
     None => Ok(None),
+  }
+}
+
+fn to_pretty_print(json: &str) -> DshCliResult<String> {
+  serde_json::to_string_pretty(&serde_json::from_str::<Value>(json)?).map_err(error_map!("{}"))
+}
+
+fn trace_token_payload(kind: &str, token: &str) {
+  if log_enabled!(Level::Trace) {
+    match jwt_into_header_payload_json(token)
+      .map_err(DshCliError::from)
+      .and_then(|(_, payload)| to_pretty_print(&payload))
+    {
+      Ok(json) => trace!("{} -> {}", kind, json),
+      Err(error) => error!("could not parse {} ({})", kind, error),
+    }
   }
 }
 
@@ -259,18 +287,20 @@ fn get_access_token_and_exchanged_refresh_token(
   refresh_token: &RefreshToken,
   http_client: &BlockingClient,
 ) -> DshCliResult<Option<(AccessToken, RefreshToken)>> {
-  match get_openid_client(provider_metadata, &client_id(platform)).exchange_refresh_token(refresh_token) {
-    Ok(refresh_token_request) => match refresh_token_request.request(http_client) {
-      Ok(token_response) => match token_response.refresh_token() {
-        Some(refresh_token) => Ok(Some((token_response.access_token().clone(), refresh_token.clone()))),
-        None => Ok(None),
-      },
-      Err(error) => match error {
-        RequestTokenError::ServerResponse(_) => Ok(None),
-        _ => Err(error!("refresh token request error: {}", error)),
-      },
+  let openid_connect_client = get_openid_client(provider_metadata, &client_id(platform));
+  let refresh_token_request = openid_connect_client.exchange_refresh_token(refresh_token)?;
+  match refresh_token_request.request(http_client) {
+    Ok(token_response) => match token_response.refresh_token() {
+      Some(refresh_token) => Ok(Some((token_response.access_token().clone(), refresh_token.clone()))),
+      None => {
+        warn!("missing refresh token");
+        Ok(None)
+      }
     },
-    Err(error) => Err(error!("error exchanging token: {}", error)),
+    Err(error) => match error {
+      RequestTokenError::ServerResponse(_) => Ok(None),
+      _ => err!("refresh token request error: {}", error),
+    },
   }
 }
 
@@ -296,13 +326,13 @@ fn authenticate_and_get_access_and_refresh_tokens(
           if let Some(refresh_token) = token_response.refresh_token() {
             Ok((token_response.access_token().clone(), refresh_token.clone()))
           } else {
-            Err(error!("device access token does not contain refresh token"))
+            err!("device access token does not contain refresh token")
           }
         }
-        Err(error) => Err(error!("authentication request failed: {}", error)),
+        Err(error) => err!("authentication request failed: {}", error),
       }
     }
-    Err(error) => Err(error!("authentication request failed: {}", error)),
+    Err(error) => err!("authentication request failed: {}", error),
   }
 }
 
@@ -330,7 +360,7 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
       BrowserMethod::Open => match response.verification_uri_complete() {
         Some(verification_uri) => match open::that(verification_uri.secret()) {
           Ok(()) => {
-            context.print_explanation(format!("opening login page for platform {}", platform));
+            context.print(format!("opening login page for platform {}", platform));
           }
           Err(_) => {
             context.print_error("could not open your browser");
@@ -344,6 +374,34 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
         },
         None => unreachable!(),
       },
+    }
+  }
+}
+
+/// Get stored refresh token
+///
+/// # Parameters
+/// * `platform` - Platform for which the token is requested.
+///
+/// # Returns
+/// `Some(RefreshToken)`
+/// `None`
+pub(crate) fn get_stored_refresh_token(platform: &DshPlatform) -> DshCliResult<Option<RefreshToken>> {
+  match read_refresh_token(platform)? {
+    Some(encrypted_refresh_token) => match decrypt(encrypted_refresh_token.as_str()) {
+      Ok(refresh_token) => {
+        debug!("refresh token for platform '{}' found and decrypted", platform);
+        Ok(Some(RefreshToken::new(refresh_token)))
+      }
+      Err(_) => {
+        warn!("refresh token for platform '{}' found but could not be decrypted", platform);
+        delete_refresh_token(platform)?;
+        err!("error decrypting refresh token for platform '{}', token deleted", platform)
+      }
+    },
+    None => {
+      debug!("refresh token for platform '{}' not found", platform);
+      Ok(None)
     }
   }
 }

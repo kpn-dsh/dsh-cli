@@ -1,5 +1,5 @@
 use crate::directory::dsh_directory_pathbuf;
-use crate::{error, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
+use crate::{cli_error, err, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::version::Version;
 use openidconnect::reqwest::blocking::ClientBuilder;
 use openidconnect::reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
@@ -109,11 +109,11 @@ async fn latest_release() -> DshCliResult<(Version, Release, bool)> {
   };
   match latest_release {
     Some(latest_release) => Ok((
-      latest_release.version.clone().ok_or(error!("latest release version could not be parsed"))?,
+      latest_release.version.clone().ok_or(cli_error!("latest release version could not be parsed"))?,
       latest_release,
       cached,
     )),
-    None => Err(error!("latest release is not available")),
+    None => err!("latest release is not available"),
   }
 }
 

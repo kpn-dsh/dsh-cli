@@ -1,5 +1,6 @@
 use crate::argument_parsers::RangedValueParser;
 use clap::{builder, Arg, ArgAction};
+use std::num::NonZeroU64;
 
 pub(crate) const CERTIFICATE_COUNT_FLAG: &str = "certificate-count";
 pub(crate) const CONSUMER_RATE_FLAG: &str = "consumer-rate";
@@ -21,7 +22,7 @@ pub(crate) fn certificate_count_flag() -> Arg {
   Arg::new(CERTIFICATE_COUNT_FLAG)
     .long(CERTIFICATE_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<i64>::new(1, 40))
+    .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
     .help("Limit for number of certificates")
     .long_help(
@@ -76,7 +77,7 @@ pub(crate) fn mem_flag() -> Arg {
   Arg::new(MEM_FLAG)
     .long(MEM_FLAG)
     .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<i64>::new(1, 131072))
+    .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(131072).unwrap()))
     .value_name("MEM")
     .help("Limit for amount of memory")
     .long_help(
@@ -89,7 +90,7 @@ pub(crate) fn partition_count_flag() -> Arg {
   Arg::new(PARTITION_COUNT_FLAG)
     .long(PARTITION_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<i64>::new(1, 40))
+    .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
     .help("Limit for number of partitions")
     .long_help(
@@ -116,7 +117,7 @@ pub(crate) fn request_rate_flag() -> Arg {
   Arg::new(REQUEST_RATE_FLAG)
     .long(REQUEST_RATE_FLAG)
     .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<i64>::new(1, 100))
+    .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(100).unwrap()))
     .value_name("RATE")
     .help("Limit for request rate")
     .long_help(
@@ -129,7 +130,7 @@ pub(crate) fn secret_count_flag() -> Arg {
   Arg::new(SECRET_COUNT_FLAG)
     .long(SECRET_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<i64>::new(1, 40))
+    .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
     .help("Limit for number of secrets")
     .long_help(
@@ -173,7 +174,7 @@ pub(crate) fn topic_count_flag() -> Arg {
   Arg::new(TOPIC_COUNT_FLAG)
     .long(TOPIC_COUNT_FLAG)
     .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<i64>::new(1, 40))
+    .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
     .help("Limit for number of topics")
     .long_help(

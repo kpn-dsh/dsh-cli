@@ -1,4 +1,4 @@
-use crate::error;
+use crate::err;
 use crate::error::DshCliError;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -34,7 +34,7 @@ impl TryFrom<&str> for Verbosity {
       "low" => Ok(Self::Low),
       "medium" => Ok(Self::Medium),
       "high" => Ok(Self::High),
-      _ => Err(error!("invalid verbosity value '{}'", value)),
+      _ => err!("invalid verbosity value '{}'", value),
     }
   }
 }

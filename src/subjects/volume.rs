@@ -10,7 +10,7 @@ use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_APPS, DEPENDANT_LABELS_LIST, DEPENDANT_LABELS_SERVICES};
-use crate::{error, DshCliResult};
+use crate::{cli_error, err, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -114,13 +114,13 @@ impl CommandExecutor for VolumeCreate {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("create new volume '{}'", volume_id));
     if client.get_volume(&volume_id).await.is_ok() {
-      return Err(error!("volume '{}' already exists", volume_id));
+      return err!("volume '{}' already exists", volume_id);
     }
     let size_gi_b: i64 = match matches.get_one::<i64>(SIZE_FLAG) {
       Some(size) => *size,
       None => {
         let line = context.read_single_line("enter size in gigabytes")?;
-        line.parse::<i64>().map_err(|_| error!("could not parse '{}' as a valid integer", line))?
+        line.parse::<i64>().map_err(|_| cli_error!("could not parse '{}' as a valid integer", line))?
       }
     };
     let volume = Volume { size_gi_b };
@@ -145,7 +145,7 @@ impl CommandExecutor for VolumeDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let volume_id = target.unwrap_or_else(|| unreachable!());
     if client.get_volume(&volume_id).await.is_err() {
-      return Err(error!("volume '{}' does not exists", volume_id));
+      return err!("volume '{}' does not exists", volume_id);
     }
     if context.confirmed(format!("delete volume '{}'?", volume_id))? {
       if context.dry_run() {
@@ -324,9 +324,9 @@ impl CommandExecutor for VolumeShowUsage {
     let (_, usages) = client.volume_with_dependants(&volume_id).await?;
     context.print_execution_time(start_instant);
     let (dependant_apps, dependant_services): (Vec<DependantApp>, Vec<DependantApplication<VolumeInjection>>) = usages.into_iter().partition_map(|dependant| match dependant {
-      Dependant::App(app) => Either::Left(app),
-      Dependant::Application(service) => Either::Right(service),
-      Dependant::Proxy(_) => unreachable!(),
+      Dependant::App { app } => Either::Left(app),
+      Dependant::Application { application } => Either::Right(application),
+      _ => unreachable!(),
     });
     if dependant_services.is_empty() {
       context.print_outcome("volume not used in services")

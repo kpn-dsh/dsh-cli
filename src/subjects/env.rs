@@ -7,7 +7,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::Label;
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
-use crate::{error, include_started_stopped, DshCliResult};
+use crate::{err, include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -82,7 +82,7 @@ impl CommandExecutor for EnvFind {
     let regex = matches.get_flag(ModifierFlagType::Regex.id());
     let match_substring = matches.get_flag(ModifierFlagType::Substring.id());
     if regex && (ignore_case || match_substring) {
-      return Err(error!("option --regex cannot be used together with --ignore-case and/or --substring"));
+      return err!("option --regex cannot be used together with --ignore-case and/or --substring");
     }
     let query_processor: &dyn QueryProcessor =
       if matches.get_flag(ModifierFlagType::Regex.id()) { &RegexQueryProcessor::create(&*query)? } else { &StringQueryProcessor::create(&query, match_substring, ignore_case)? };

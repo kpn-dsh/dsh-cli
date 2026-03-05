@@ -14,7 +14,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::settings::Settings;
 use crate::subject::{Requirements, Subject};
 use crate::targets::{delete_target, Target};
-use crate::{error, read_single_line, DshCliResult};
+use crate::{err, plain, read_single_line, DshCliResult};
 
 struct TargetSubject {}
 
@@ -98,10 +98,10 @@ impl CommandExecutor for TargetCreate {
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
     if let Some(existing_target) = read_target(&platform, &tenant)? {
-      return Err(error!(
+      return err!(
         "target configuration '{}' already exists (first delete the existing target configuration)",
         existing_target
-      ));
+      );
     };
     let password = context.read_single_line_password("enter password")?;
     let target = Target::new(platform, tenant, Some(password), vec![]);
@@ -153,7 +153,7 @@ impl CommandExecutor for TargetDelete {
           context.print_outcome("cancelled");
         }
       }
-      None => return Err(error!("target '{}@{}' does not exist", tenant, platform)),
+      None => return err!("target '{}@{}' does not exist", tenant, platform),
     }
     Ok(())
   }
@@ -248,7 +248,7 @@ impl SubjectFormatter<TargetFormatterLabel> for TargetFormatter {
           Value::empty()
         }
       }
-      TargetFormatterLabel::Platform => Value::plain(format!("{} / {}", self.platform.name(), self.platform.alias())),
+      TargetFormatterLabel::Platform => plain!("{} / {}", self.platform.name(), self.platform.alias()),
       TargetFormatterLabel::Tenant => Value::plain(&self.tenant),
     }
   }

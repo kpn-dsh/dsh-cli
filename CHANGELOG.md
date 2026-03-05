@@ -4,6 +4,27 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-03-05
+
+### Added
+
+* Node pool capabilities.
+* Capability to copy secret to clipboard.
+* Added `debug` and `trace` logging to the generated code.
+* Capability to check secrets and certificates for potential issues or errors.
+* Added Trifonius services as a separate entity.
+* Proper rendering of notifications.
+
+### Changed
+
+* Updated open api specification to version `1.11.1`.
+* Updated `dsh-api` dependency to version `0.9.0`.
+* Show platform parameters in different categories.
+* Improved error handling and logging.
+* Improved rendering of timestamps.
+* Changed rust version to `1.86`.
+* Set dependencies to latest versions.
+
 ## [0.8.1] - 2026-01-15
 
 ### Added

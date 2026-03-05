@@ -1,7 +1,7 @@
 use crate::context::Context;
 use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
-use crate::{error, error_map, DshCliResult};
+use crate::{err, error_map, DshCliResult};
 use itertools::Itertools;
 use serde::Serialize;
 use tabled::settings::peaker::PriorityMax;
@@ -27,7 +27,7 @@ where
       OutputFormat::Csv => self.print_csv(value),
       OutputFormat::Json => self.print_json(value),
       OutputFormat::JsonCompact => self.print_json_compact(value),
-      OutputFormat::Plain => Err(error!("plain unit print not yet implemented")),
+      OutputFormat::Plain => err!("plain unit print not yet implemented"),
       OutputFormat::Quiet => Ok(()),
       OutputFormat::Table => self.print_table(value),
       OutputFormat::TableNoBorder => self.print_table_no_borders(value),
@@ -40,15 +40,15 @@ where
   pub(crate) fn print_non_serializable<V: SubjectFormatter<L>>(&self, value: &V, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
     match self.context.output_format(default_output_format) {
       OutputFormat::Csv => self.print_csv(value),
-      OutputFormat::Json => Err(error!("serialization to json is not supported for this type")),
-      OutputFormat::JsonCompact => Err(error!("serialization to compact json is not supported for this type")),
-      OutputFormat::Plain => Err(error!("plain unit print not yet implemented")),
+      OutputFormat::Json => err!("serialization to json is not supported for this type"),
+      OutputFormat::JsonCompact => err!("serialization to compact json is not supported for this type"),
+      OutputFormat::Plain => err!("plain unit print not yet implemented"),
       OutputFormat::Quiet => Ok(()),
       OutputFormat::Table => self.print_table(value),
       OutputFormat::TableNoBorder => self.print_table_no_borders(value),
-      OutputFormat::Toml => Err(error!("serialization to toml is not supported for this type")),
-      OutputFormat::TomlCompact => Err(error!("serialization to compact toml is not supported for this type")),
-      OutputFormat::Yaml => Err(error!("serialization to yaml is not supported for this type")),
+      OutputFormat::Toml => err!("serialization to toml is not supported for this type"),
+      OutputFormat::TomlCompact => err!("serialization to compact toml is not supported for this type"),
+      OutputFormat::Yaml => err!("serialization to yaml is not supported for this type"),
     }
   }
 

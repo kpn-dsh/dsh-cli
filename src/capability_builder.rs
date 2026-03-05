@@ -195,7 +195,7 @@ impl Capability for CapabilityBuilder<'_> {
     dsh_api_client: &DshApiClient,
     context: &Context,
   ) -> DshCliResult<()> {
-    context.print_target(dsh_api_client.tenant());
+    context.print_target(dsh_api_client);
     for (flag_type, executor, _) in &self.executors {
       if matches.get_flag(flag_type.id()) {
         return {

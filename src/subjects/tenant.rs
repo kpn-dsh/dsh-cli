@@ -19,7 +19,7 @@ use crate::limits_flags::{
   VPN_FLAG,
 };
 use crate::subject::{Requirements, Subject};
-use crate::{error, DshCliResult};
+use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -32,6 +32,7 @@ use futures::{join, try_join};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
+use std::num::NonZeroU64;
 
 struct TenantSubject {}
 
@@ -152,7 +153,7 @@ impl CommandExecutor for TenantCreate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     if client.get_tenant_configuration(&tenant_id).await.is_ok() {
-      return Err(error!("managed tenant '{}' already exists", tenant_id));
+      return err!("managed tenant '{}' already exists", tenant_id);
     }
     let enable_tracing = matches.get_one::<bool>(TRACING_FLAG);
     let enable_vpn = matches.get_one::<bool>(VPN_FLAG);
@@ -189,7 +190,7 @@ impl CommandExecutor for TenantDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
     if client.get_tenant_configuration(&tenant_id).await.is_err() {
-      return Err(error!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id));
+      return err!("tenant '{}' does not exist or you are not authorized to manage it", tenant_id);
     }
     if context.confirmed(format!("delete tenant '{}'?", tenant_id))? {
       if context.dry_run() {
@@ -402,7 +403,7 @@ impl CommandExecutor for TenantUpdateLimit {
       enable_tracing_argument.is_some() || enable_vpn_argument.is_some(),
       !tenant_limits_from_arguments.is_empty(),
     ) {
-      (false, false) => Err(error!("at least one limit or capability argument must be provided")),
+      (false, false) => err!("at least one limit or capability argument must be provided"),
 
       (false, true) => {
         context.print_explanation(format!("update limits of managed tenant '{}'", tenant_id));
@@ -484,7 +485,7 @@ impl CommandExecutor for TenantUpdateLimit {
         }
       }
 
-      (true, true) => Err(error!("provide either limit arguments or capability arguments, but not both")),
+      (true, true) => err!("provide either limit arguments or capability arguments, but not both"),
     }
   }
 
@@ -510,31 +511,31 @@ fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> DshCliResu
   if stream_argument.starts_with(&format!("{}---", managing_tenant)) {
     ManagedStreamId::try_from(stream_argument).map_err(DshCliError::from)
   } else {
-    Err(error!("managed stream id must start with '{}---'", managing_tenant))
+    err!("managed stream id must start with '{}---'", managing_tenant)
   }
 }
 
 fn tenant_limits_try_from_matches(matches: &ArgMatches) -> DshCliResult<TenantLimits> {
   Ok(TenantLimits {
-    certificate_count: matches.get_one::<i64>(CERTIFICATE_COUNT_FLAG).cloned(),
+    certificate_count: matches.get_one::<NonZeroU64>(CERTIFICATE_COUNT_FLAG).cloned(),
     consumer_rate: matches.get_one::<i64>(CONSUMER_RATE_FLAG).cloned(),
     cpu: match matches.get_one::<f64>(CPU_FLAG).cloned() {
       Some(cpus) => {
         if (0.01..=16.0).contains(&cpus) {
           Some(cpus)
         } else {
-          return Err(error!("number of cpus should be greater than or equal to 0.01 and lower than or equal to 16.0"));
+          return err!("number of cpus should be greater than or equal to 0.01 and lower than or equal to 16.0");
         }
       }
       None => None,
     },
     kafka_acl_group_count: matches.get_one::<i64>(KAFKA_ACL_GROUP_COUNT_FLAG).cloned(),
-    mem: matches.get_one::<i64>(MEM_FLAG).cloned(),
-    partition_count: matches.get_one::<i64>(PARTITION_COUNT_FLAG).cloned(),
+    mem: matches.get_one::<NonZeroU64>(MEM_FLAG).cloned(),
+    partition_count: matches.get_one::<NonZeroU64>(PARTITION_COUNT_FLAG).cloned(),
     producer_rate: matches.get_one::<i64>(PRODUCER_RATE_FLAG).cloned(),
-    request_rate: matches.get_one::<i64>(REQUEST_RATE_FLAG).cloned(),
-    secret_count: matches.get_one::<i64>(SECRET_COUNT_FLAG).cloned(),
-    topic_count: matches.get_one::<i64>(TOPIC_COUNT_FLAG).cloned(),
+    request_rate: matches.get_one::<NonZeroU64>(REQUEST_RATE_FLAG).cloned(),
+    secret_count: matches.get_one::<NonZeroU64>(SECRET_COUNT_FLAG).cloned(),
+    topic_count: matches.get_one::<NonZeroU64>(TOPIC_COUNT_FLAG).cloned(),
   })
 }
 
@@ -718,12 +719,12 @@ impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRig
   fn value(&self, label: &StreamAccessLabel, target_id: &str) -> Value {
     match label {
       StreamAccessLabel::Partitions => match &self.1 {
-        Stream::Internal(internal) => Value::plain(internal.partitions),
-        Stream::Public(public) => Value::plain(public.partitions),
+        Stream::Internal { internal_stream } => Value::plain(internal_stream.partitions),
+        Stream::Public { public_stream } => Value::plain(public_stream.partitions),
       },
       StreamAccessLabel::ReplicationFactor => match &self.1 {
-        Stream::Internal(internal) => Value::plain(internal.replication_factor),
-        Stream::Public(public) => Value::plain(public.replication_factor),
+        Stream::Internal { internal_stream } => Value::plain(internal_stream.replication_factor),
+        Stream::Public { public_stream } => Value::plain(public_stream.replication_factor),
       },
       StreamAccessLabel::ReadAccess => {
         if self.2.has_read_access() {
@@ -734,8 +735,8 @@ impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRig
       }
       StreamAccessLabel::StreamId => Value::plain(&self.0),
       StreamAccessLabel::StreamKind => match self.1 {
-        Stream::Internal(_) => Value::plain("internal"),
-        Stream::Public(_) => Value::plain("public"),
+        Stream::Internal { .. } => Value::plain("internal"),
+        Stream::Public { .. } => Value::plain("public"),
       },
       StreamAccessLabel::Tenant => Value::target(target_id),
       StreamAccessLabel::WriteAccess => {

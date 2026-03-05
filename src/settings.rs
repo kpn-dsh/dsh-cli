@@ -5,14 +5,14 @@ use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
 use crate::style::{DshColor, DshStyle};
 use crate::verbosity::Verbosity;
-use crate::{error, DshCliResult};
+use crate::{cli_error, err, DshCliResult};
 use itertools::Itertools;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Debug;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub(crate) struct Settings {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) authentication: Option<AuthenticationMethod>,
@@ -89,7 +89,7 @@ impl Settings {
     let file_name = &self.file_name;
     let mut valued_attributes: Vec<(String, String)> = serde_json::from_str::<Value>(serde_json::to_string(self)?.as_str())?
       .as_object()
-      .ok_or(error!(""))?
+      .ok_or(cli_error!(""))?
       .iter()
       .map(|(attribute, value)| {
         (
@@ -119,6 +119,115 @@ where
       debug!("updated settings");
       write_settings(upserted_settings)
     }
-    Err(error) => Err(error!("unable to update settings ({})", error)),
+    Err(error) => err!("unable to update settings ({})", error),
+  }
+}
+
+impl Debug for Settings {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut builder = f.debug_struct("Settings");
+    if let Some(authentication) = &self.authentication {
+      builder.field("authentication", authentication);
+    }
+    if let Some(browser) = &self.browser {
+      builder.field("browser", browser);
+    }
+    if let Some(csv_quote) = &self.csv_quote {
+      builder.field("csv_quote", csv_quote);
+    }
+    if let Some(csv_separator) = &self.csv_separator {
+      builder.field("csv_separator", csv_separator);
+    }
+    if let Some(default_platform) = &self.default_platform {
+      builder.field("default_platform", default_platform);
+    }
+    if let Some(default_tenant) = &self.default_tenant {
+      builder.field("default_tenant", default_tenant);
+    }
+    if let Some(dry_run) = &self.dry_run {
+      builder.field("dry_run", dry_run);
+    }
+    if let Some(error_color) = &self.error_color {
+      builder.field("error_color", error_color);
+    }
+    if let Some(error_style) = &self.error_style {
+      builder.field("error_style", error_style);
+    }
+    if let Some(label_color) = &self.label_color {
+      builder.field("label_color", label_color);
+    }
+    if let Some(label_style) = &self.label_style {
+      builder.field("label_style", label_style);
+    }
+    if let Some(log_color) = &self.log_color {
+      builder.field("log_color", log_color);
+    }
+    if let Some(log_level) = &self.log_level {
+      builder.field("log_level", log_level);
+    }
+    if let Some(log_level_api) = &self.log_level_api {
+      builder.field("log_level_api", log_level_api);
+    }
+    if let Some(log_style) = &self.log_style {
+      builder.field("log_style", log_style);
+    }
+    if let Some(matching_color) = &self.matching_color {
+      builder.field("matching_color", matching_color);
+    }
+    if let Some(matching_style) = &self.matching_style {
+      builder.field("matching_style", matching_style);
+    }
+    if let Some(no_csv_headers) = &self.no_csv_headers {
+      builder.field("no_csv_headers", no_csv_headers);
+    }
+    if let Some(no_escape) = &self.no_escape {
+      builder.field("no_escape", no_escape);
+    }
+    if let Some(output_format) = &self.output_format {
+      builder.field("output_format", output_format);
+    }
+    if let Some(quiet) = &self.quiet {
+      builder.field("quiet", quiet);
+    }
+    if let Some(show_execution_time) = &self.show_execution_time {
+      builder.field("show_execution_time", show_execution_time);
+    }
+    if let Some(stderr_color) = &self.stderr_color {
+      builder.field("stderr_color", stderr_color);
+    }
+    if let Some(stderr_style) = &self.stderr_style {
+      builder.field("stderr_style", stderr_style);
+    }
+    if let Some(stdout_color) = &self.stdout_color {
+      builder.field("stdout_color", stdout_color);
+    }
+    if let Some(stdout_style) = &self.stdout_style {
+      builder.field("stdout_style", stdout_style);
+    }
+    if let Some(suppress_exit_status) = &self.suppress_exit_status {
+      builder.field("suppress_exit_status", suppress_exit_status);
+    }
+    if let Some(target_color) = &self.target_color {
+      builder.field("target_color", target_color);
+    }
+    if let Some(target_style) = &self.target_style {
+      builder.field("target_style", target_style);
+    }
+    if let Some(terminal_width) = &self.terminal_width {
+      builder.field("terminal_width", terminal_width);
+    }
+    if let Some(verbosity) = &self.verbosity {
+      builder.field("verbosity", verbosity);
+    }
+    if let Some(file_name) = &self.file_name {
+      builder.field("file_name", file_name);
+    }
+    if let Some(warning_color) = &self.warning_color {
+      builder.field("warning_color", warning_color);
+    }
+    if let Some(warning_style) = &self.warning_style {
+      builder.field("warning_style", warning_style);
+    }
+    builder.finish()
   }
 }

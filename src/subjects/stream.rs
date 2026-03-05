@@ -2,11 +2,12 @@ use crate::subject::Requirements;
 
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
-use dsh_api::{AccessRights, DshApiError};
+use dsh_api::AccessRights;
 use futures::try_join;
 use lazy_static::lazy_static;
 
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::error::DshApiError;
 use dsh_api::stream::Stream;
 use dsh_api::types::{
   ManagedStream, ManagedStreamId, PublicManagedStreamContract, PublicManagedStreamKafkaDefaultPartitioner, PublicManagedStreamKafkaDefaultPartitionerKind,
@@ -30,7 +31,7 @@ use crate::subjects::topic::{
   retention_bytes_flag, retention_ms_flag, segment_bytes_flag, CLEANUP_POLICY_PROPERTY, COMPRESSION_TYPE_PROPERTY, DELETE_RETENTION_MS_PROPERTY, MAX_MESSAGE_BYTES_PROPERTY,
   MESSAGE_TIMESTAMP_PROPERTY, RETENTION_BYTES_PROPERTY, RETENTION_MS_PROPERTY, SEGMENT_BYTES_PROPERTY,
 };
-use crate::{error, error_map, read_single_line, Context, DshCliResult};
+use crate::{err, error_map, plain, read_single_line, Context, DshCliResult};
 use dsh_api::types::{PublicManagedStream, PublicManagedStreamContractPartitioner};
 use itertools::Itertools;
 use serde::Serialize;
@@ -180,8 +181,8 @@ impl CommandExecutor for StreamCreate {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     if let Some(managed_stream) = client.managed_stream_configuration(&managed_stream_id).await? {
       match managed_stream {
-        Stream::Internal(_) => return Err(error!("internal managed stream '{}' already exists", managed_stream_id)),
-        Stream::Public(_) => return Err(error!("public managed stream '{}' already exists", managed_stream_id)),
+        Stream::Internal { .. } => return err!("internal managed stream '{}' already exists", managed_stream_id),
+        Stream::Public { .. } => return err!("public managed stream '{}' already exists", managed_stream_id),
       }
     }
     let topic = create_topic(matches)?;
@@ -203,7 +204,7 @@ impl CommandExecutor for StreamCreate {
       if context.dry_run() {
         context.print_warning("dry-run mode, public managed stream not created");
       } else {
-        client.post_stream_public_configuration(&managed_stream_id, &public_managed_stream).await?;
+        client.post_stream_public_configuration(managed_stream_id.as_str(), &public_managed_stream).await?;
         context.print_outcome(format!("public managed stream '{}' created", managed_stream_id));
       }
     } else {
@@ -212,7 +213,7 @@ impl CommandExecutor for StreamCreate {
       if context.dry_run() {
         context.print_warning("dry-run mode, internal managed stream not created");
       } else {
-        client.post_stream_internal_configuration(&managed_stream_id, &managed_stream).await?;
+        client.post_stream_internal_configuration(managed_stream_id.as_str(), &managed_stream).await?;
         context.print_outcome(format!("internal managed stream '{}' created", managed_stream_id));
       }
     }
@@ -231,12 +232,12 @@ impl CommandExecutor for StreamDelete {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let managed_stream_id = get_managed_stream_id(matches, client.tenant_name())?;
     match client.managed_stream_configuration(&managed_stream_id).await? {
-      Some(Stream::Internal(_)) => {
+      Some(Stream::Internal { .. }) => {
         if context.confirmed(format!("delete internal managed stream '{}'?", managed_stream_id))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, internal managed stream not deleted");
           } else {
-            client.delete_stream_internal_configuration(&managed_stream_id).await?;
+            client.delete_stream_internal_configuration(managed_stream_id.as_str()).await?;
             context.print_outcome(format!("internal managed stream '{}' deleted", managed_stream_id));
           }
         } else {
@@ -244,12 +245,12 @@ impl CommandExecutor for StreamDelete {
         }
         Ok(())
       }
-      Some(Stream::Public(_)) => {
+      Some(Stream::Public { .. }) => {
         if context.confirmed(format!("delete public managed stream '{}'?", managed_stream_id))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, public managed stream not deleted");
           } else {
-            client.delete_stream_public_configuration(&managed_stream_id).await?;
+            client.delete_stream_public_configuration(managed_stream_id.as_str()).await?;
             context.print_outcome(format!("public managed stream '{}' deleted", managed_stream_id));
           }
         } else {
@@ -257,7 +258,7 @@ impl CommandExecutor for StreamDelete {
         }
         Ok(())
       }
-      None => Err(error!("managed stream '{}' does not exist", managed_stream_id)),
+      None => err!("managed stream '{}' does not exist", managed_stream_id),
     }
   }
 
@@ -277,7 +278,7 @@ impl CommandExecutor for StreamListAll {
         let start_instant = context.now();
         let streams = client.managed_stream_configurations().await?;
         context.print_execution_time(start_instant);
-        let mut formatter = if streams.iter().any(|(_, stream)| matches!(stream, Stream::Public(_))) {
+        let mut formatter = if streams.iter().any(|(_, stream)| matches!(stream, Stream::Public { .. })) {
           ListFormatter::new(&LIST_PUBLIC_STREAM_LABELS, context)
         } else {
           ListFormatter::new(&LIST_INTERNAL_STREAM_LABELS, context)
@@ -365,24 +366,24 @@ impl CommandExecutor for StreamShow {
       client.managed_stream_configuration(&managed_stream_id),
       client.managed_stream_tenants_with_access_rights(&managed_stream_id)
     ) {
-      Ok((Some(Stream::Internal(internal_managed_stream)), access_rights)) => {
+      Ok((Some(Stream::Internal { internal_stream }), access_rights)) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(managed_stream_id, &INTERNAL_STREAM_LABELS, context).print(&(Stream::Internal(internal_managed_stream), &access_rights), None)
+        UnitFormatter::new(managed_stream_id, &INTERNAL_STREAM_LABELS, context).print(&(Stream::Internal { internal_stream }, &access_rights), None)
       }
-      Ok((Some(Stream::Public(public_managed_stream)), access_rights)) => {
+      Ok((Some(Stream::Public { public_stream }), access_rights)) => {
         context.print_execution_time(start_instant);
-        UnitFormatter::new(managed_stream_id, &PUBLIC_STREAM_LABELS, context).print(&(Stream::Public(public_managed_stream), &access_rights), None)
+        UnitFormatter::new(managed_stream_id, &PUBLIC_STREAM_LABELS, context).print(&(Stream::Public { public_stream }, &access_rights), None)
       }
       Ok((None, _)) => {
         context.print_error(format!("stream '{}' does not exist", managed_stream_id));
         Ok(())
       }
       Err(error) => match error {
-        DshApiError::NotFound(_) => {
+        DshApiError::NotFound { .. } => {
           context.print_error(format!("stream '{}' does not exist", managed_stream_id));
           Ok(())
         }
-        DshApiError::BadRequest(_) => {
+        DshApiError::BadRequest { .. } => {
           context.print_error(format!("you are not authorized to manage stream '{}'", managed_stream_id));
           Ok(())
         }
@@ -470,8 +471,8 @@ impl Label for ManagedStreamLabel {
 impl SubjectFormatter<ManagedStreamLabel> for Stream {
   fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> Value {
     match self {
-      Stream::Internal(internal) => internal.value(label, target_id),
-      Stream::Public(public) => public.value(label, target_id),
+      Stream::Internal { internal_stream } => internal_stream.value(label, target_id),
+      Stream::Public { public_stream } => public_stream.value(label, target_id),
     }
   }
 }
@@ -509,7 +510,7 @@ impl SubjectFormatter<ManagedStreamLabel> for PublicManagedStream {
       ManagedStreamLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.kafka_properties))),
       ManagedStreamLabel::MaxMessageBytes => Value::option(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned()),
       ManagedStreamLabel::Partitioner => match self.contract.partitioner {
-        PublicManagedStreamContractPartitioner::TopicLevelPartitioner(ref topic_level_partitioner) => Value::plain(format!("topic level {}", topic_level_partitioner.topic_level)),
+        PublicManagedStreamContractPartitioner::TopicLevelPartitioner(ref topic_level_partitioner) => plain!("topic level {}", topic_level_partitioner.topic_level),
         PublicManagedStreamContractPartitioner::KafkaDefaultPartitioner(_) => Value::plain("kafka default"),
       },
       ManagedStreamLabel::Partitions => Value::plain(self.partitions),

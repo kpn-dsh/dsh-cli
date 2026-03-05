@@ -1,5 +1,5 @@
 use crate::DshCliResult;
-use dsh_api::DshApiError;
+use dsh_api::error::DshApiError;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -21,13 +21,13 @@ pub(crate) enum DshCliError {
   TokioJoin(String),
   UrlParse(String),
   Utf8(String),
-  X509(String),
+  _X509(String),
 }
 
 impl DshCliError {
   pub(crate) fn accept_not_found(error: DshApiError, print: impl Fn()) -> DshCliResult<()> {
     match error {
-      DshApiError::NotFound(None) => {
+      DshApiError::NotFound { message: None } => {
         print();
         Ok(())
       }
@@ -38,13 +38,35 @@ impl DshCliError {
 
 impl Error for DshCliError {}
 
+/// Creates an `Err(DshCliError::String)` with a formatted string.
+///
+/// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
+/// The values must all implement `Display`. The macro will create an
+/// [`Err<DshCliError::String>`], where the message will be generated from the format string.
+///
+/// # Examples
+/// ```
+/// fn divide(numerator: i64, denominator: i64) -> Result<i64, DshCliError> {
+///   if denominator == 0 {
+///     err!("cannot divide {} by zero", numerator)
+///   } else {
+///     Ok(numerator / denominator)
+///   }
+/// }
+/// assert_eq!(divide(42, 0), DshCliError::String("cannot divide 42 by zero".to_string()));
+/// ```
+#[macro_export]
+macro_rules! err {
+  ($($t:tt)*) => {{
+    Err($crate::error::DshCliError::String(format!($($t)*)))
+  }};
+}
+
 /// Creates a `DshCliError::String` with a formatted string.
 ///
-/// The arguments for the `error!` macro must be one literal format string, containing zero or
-/// more `{}` placeholders, plus as many values as there are placeholders in the format string.
-/// The values must all implement `Display`. The macro will then create a [DshCliError::String],
-/// where the message will be generated from the format string and the values using the `format!`
-/// macro.
+/// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
+/// The values must all implement `Display`. The macro will create an
+/// [`DshCliError::String`], where the message will be generated from the format string.
 ///
 /// # Examples
 /// ```
@@ -58,7 +80,7 @@ impl Error for DshCliError {}
 /// assert_eq!(divide(42, 0), DshCliError::String("cannot divide 42 by zero".to_string()));
 /// ```
 #[macro_export]
-macro_rules! error {
+macro_rules! cli_error {
   ($($t:tt)*) => {{
     $crate::error::DshCliError::String(format!($($t)*))
   }};
@@ -68,10 +90,10 @@ macro_rules! error {
 ///
 /// The argument for the `error_map!` macro must be a literal format string, which must contain
 /// exactly one `{}` placeholder. The macro will then create a closure that maps a value (which
-/// must implement `Display`) to an instance of a [DshCliError::String], where the message will
+/// must implement `Display`) to an instance of a [`DshCliError::String`], where the message will
 /// be generated from the format string and the value using the `format!` macro.
 ///
-/// The intended use for `error_map!` is as a closure for the [Result::map_err] method, mapping
+/// The intended use for `error_map!` is as a closure for the [`Result::map_err`] method, mapping
 /// any error value (as long as its type implements `Display`) into a `DshCliError::String`.
 ///
 /// # Examples
@@ -89,15 +111,15 @@ macro_rules! error_map {
 
 /// Creates a closure that will map a single argument into an `DshCliError::String`.
 ///
-/// The arguments for the `error_append!` macro must be a literal format string, which must contain
-/// zero or more `{}` placeholders and zero or more parameters that implement `Display`. The macro
-/// will then create a closure that maps a value (which must implement `Display`) to an instance
-/// of a [DshCliError::String], where the message will be generated from the format string and the
-/// parameters using the `format!` macro, post-fixed by the closure's argument converted to a
+/// The arguments for the `error_append!` macro are the same as the arguments for the [`format!`]
+/// macro. The values must all implement `Display`. The macro will create a closure that maps a
+/// value (which must implement `Display`) to an instance of a [`DshCliError::String`], where
+/// the message will be generated from the format string and the parameters using the `format!`
+/// macro, post-fixed by the closure's argument converted to a
 /// `String`.
 ///
-/// The intended use for `error_append!` is as a closure for the [Result::map_err] method, mapping
-/// any error value (as long as its type implements `Display`) into a `DshCliError::String`.
+/// The intended use for `error_append!` is as a closure for the [`Result::map_err`] method,
+/// mapping any error value (as long as its type implements `Display`) into a `DshCliError::String`.
 ///
 /// # Examples
 /// ```
@@ -131,7 +153,7 @@ impl Debug for DshCliError {
       Self::TokioJoin(message) => write!(f, "DshCliError(tokio join, {})", message),
       Self::UrlParse(message) => write!(f, "DshCliError(url parse, {})", message),
       Self::Utf8(message) => write!(f, "DshCliError(utf8, {})", message),
-      Self::X509(message) => write!(f, "DshCliError(x509, {})", message),
+      Self::_X509(message) => write!(f, "DshCliError(x509, {})", message),
     }
   }
 }
@@ -155,7 +177,7 @@ impl Display for DshCliError {
       Self::TokioJoin(message) => write!(f, "{}", message),
       Self::UrlParse(message) => write!(f, "{}", message),
       Self::Utf8(message) => write!(f, "{}", message),
-      Self::X509(message) => write!(f, "{}", message),
+      Self::_X509(message) => write!(f, "{}", message),
     }
   }
 }
@@ -190,8 +212,8 @@ impl From<dsh_api::types::error::ConversionError> for DshCliError {
   }
 }
 
-impl From<dsh_api::DshApiError> for DshCliError {
-  fn from(dsh_api_error: dsh_api::DshApiError) -> Self {
+impl From<DshApiError> for DshCliError {
+  fn from(dsh_api_error: dsh_api::error::DshApiError) -> Self {
     Self::DshApi(dsh_api_error.to_string())
   }
 }
@@ -253,12 +275,6 @@ impl From<tokio::task::JoinError> for DshCliError {
 impl From<openidconnect::url::ParseError> for DshCliError {
   fn from(parse_error: openidconnect::url::ParseError) -> Self {
     Self::UrlParse(parse_error.to_string())
-  }
-}
-
-impl From<x509_parser::error::PEMError> for DshCliError {
-  fn from(x509_parser_error: x509_parser::error::PEMError) -> Self {
-    Self::X509(x509_parser_error.to_string())
   }
 }
 

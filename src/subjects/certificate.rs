@@ -2,27 +2,33 @@ use crate::arguments::certificate_id_argument;
 use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
+use crate::issues::{Issue, IssueDescription, IssueLabel, Severity};
+use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
-use crate::subjects::secret::{secret_entries_from, SECRET_LABELS_LIST};
-use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
+use crate::subjects::secret::{secrets_with_metadata, SECRET_LABELS_LIST};
+use crate::subjects::{secret, DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::error::{DshApiError, DshApiResult};
+use dsh_api::secret::SecretInjection;
 use dsh_api::types::CertificateStatus;
-use dsh_api::types::{ActualCertificate, Certificate};
-use dsh_api::{Dependant, DshApiError, DshApiResult};
+use dsh_api::types::{ActualCertificate, AllocationStatus, Certificate};
+use dsh_api::Dependant;
 use futures::future::{join_all, try_join_all};
 use futures::join;
-use itertools::Itertools;
+use itertools::{multizip, Itertools};
 use lazy_static::lazy_static;
 use serde::Serialize;
+use std::collections::HashMap;
 
 struct CertificateSubject {}
 
@@ -70,7 +76,9 @@ lazy_static! {
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
         (FlagType::Configuration, &CertificateListConfiguration {}, None),
+        (FlagType::Errors, &CertificateListErrors {}, None),
         (FlagType::Ids, &CertificateListIds {}, None),
+        (FlagType::Issues, &CertificateListIssues {}, None),
         (FlagType::Usage, &CertificateListUsage {}, None),
       ])
   );
@@ -78,6 +86,7 @@ lazy_static! {
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &CertificateShow {}, "Show certificate configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
+        // (FlagType::Issues, &CertificateShowIssues {}, None),
         (FlagType::Usage, &CertificateShowUsage {}, None)
       ])
       .add_target_argument(certificate_id_argument().required(true))
@@ -85,21 +94,24 @@ lazy_static! {
   static ref CERTIFICATE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()];
 }
 
+const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
+
 struct CertificateList {}
 
 #[async_trait]
 impl CommandExecutor for CertificateList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
     context.print_explanation("list all certificates with their parameters");
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
     let certificate_statuses = join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate(certificate_id))).await;
     context.print_execution_time(start_instant);
-    let actual_certificates: Vec<DshApiResult<ActualCertificate>> = certificate_statuses
+    let actual_certificates: Vec<DshApiResult<(ActualCertificate, Option<u64>)>> = certificate_statuses
       .into_iter()
       .map(|certificate_status| match certificate_status {
         Ok(status) => match status.actual {
-          Some(actual_status) => Ok(actual_status),
+          Some(actual_status) => Ok((actual_status, EXPIRATION_CHECK_DAYS)),
           None => Err(DshApiError::from("")),
         },
         Err(error) => Err(error),
@@ -126,7 +138,7 @@ impl CommandExecutor for CertificateListAllocationStatus {
     let certificate_ids = client.get_certificate_ids().await?;
     let allocation_statuses = try_join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate_status(certificate_id))).await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEFAULT_ALLOCATION_STATUS_LABELS, context);
+    let mut formatter = ListFormatter::new_override_target_id_label(&DEFAULT_ALLOCATION_STATUS_LABELS, "certificate id", context);
     formatter.push_target_ids_and_values(certificate_ids.as_slice(), allocation_statuses.as_slice());
     formatter.print(None)?;
     Ok(())
@@ -158,6 +170,20 @@ impl CommandExecutor for CertificateListConfiguration {
   }
 }
 
+struct CertificateListErrors {}
+
+#[async_trait]
+impl CommandExecutor for CertificateListErrors {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    context.print_explanation("list all certificates that have errors");
+    list_certificates(client, context, true).await?
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
 struct CertificateListIds {}
 
 #[async_trait]
@@ -178,6 +204,49 @@ impl CommandExecutor for CertificateListIds {
   }
 }
 
+async fn list_certificates(client: &DshApiClient, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
+  const CERTIFICATE_ISSUE_LABELS_LIST: [IssueLabel; 6] =
+    [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::DependencyName, IssueLabel::DependencySubject, IssueLabel::DependencyValue, IssueLabel::IssueDetails];
+  let start_instant = context.now();
+  let certificate_ids = client.get_certificate_ids().await?;
+  let (certificates_statuses, secrets): (Vec<DshApiResult<CertificateStatus>>, DshCliResult<Vec<SecretTuple>>) = join!(
+    join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate(certificate_id))),
+    secrets_with_metadata(client),
+  );
+  context.print_execution_time(start_instant);
+  let secrets = secrets?;
+  let certificate_issues: Vec<(String, Vec<IssueDescription>)> = multizip((certificate_ids, certificates_statuses))
+    .collect_vec()
+    .into_iter()
+    .flat_map(|(certificate_id, certificate_status)| {
+      let issues: Option<Vec<IssueDescription>> = has_issues(certificate_status, &secrets, EXPIRATION_CHECK_DAYS, only_errors);
+      issues.map(|issues| (certificate_id, issues))
+    })
+    .collect_vec();
+  let mut formatter = ListFormatter::new_override_target_id_label(&CERTIFICATE_ISSUE_LABELS_LIST, "certificate id", context);
+  for (certificate_id, certificate_issues) in certificate_issues.into_iter() {
+    for certificate_issue in certificate_issues {
+      formatter.push_target_id_value_owned(certificate_id.clone(), certificate_issue);
+    }
+  }
+  formatter.print(None)?;
+  Ok(Ok(()))
+}
+
+struct CertificateListIssues {}
+
+#[async_trait]
+impl CommandExecutor for CertificateListIssues {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    context.print_explanation("list all certificates that have potential issues");
+    list_certificates(client, context, false).await?
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
 struct CertificateListUsage {}
 
 #[async_trait]
@@ -187,7 +256,7 @@ impl CommandExecutor for CertificateListUsage {
     let start_instant = context.now();
     let certificates_with_dependants: Vec<(String, CertificateStatus, Vec<Dependant<String>>)> = client.certificates_with_dependants::<String>().await?;
     context.print_execution_time(start_instant);
-    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST, context);
+    let mut formatter = ListFormatter::new_override_target_id_label(&DEPENDANT_LABELS_LIST, "certificate id", context);
     for (certificate_id, _, dependants) in certificates_with_dependants.into_iter() {
       if dependants.is_empty() {
         formatter.push_target_id_value_owned(certificate_id.clone(), None::<Dependant<_>>);
@@ -212,13 +281,14 @@ struct CertificateShow {}
 impl CommandExecutor for CertificateShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
+    const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let start_instant = context.now();
     let (certificate_status, allocation_status) = join!(client.get_certificate(&certificate_id), client.get_certificate_status(&certificate_id));
     context.print_allocation_status(&allocation_status, CERTIFICATE_SUBJECT_TARGET);
     let certificate_status = certificate_status?;
     if let Some(actual_certificate) = &certificate_status.actual {
-      UnitFormatter::new(certificate_id.clone(), &CERTIFICATE_LABELS_SHOW, context).print(actual_certificate, None)?;
+      UnitFormatter::new(certificate_id.clone(), &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, EXPIRATION_CHECK_DAYS), None)?;
       let certificate_secret_ids = if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
         vec![actual_certificate.cert_chain_secret.clone(), actual_certificate.key_secret.clone(), passphrase_secret.clone()]
       } else {
@@ -228,9 +298,7 @@ impl CommandExecutor for CertificateShow {
       context.print_execution_time(start_instant);
       let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
       for (secret_id, secret) in certificate_secret_ids.iter().zip(certificate_secrets) {
-        for secret_entry in secret_entries_from(&secret, false) {
-          formatter.push_target_id_value_owned(secret_id.clone(), secret_entry);
-        }
+        formatter.push_target_id_value_owned(secret_id.clone(), secret_metadata(&secret));
       }
       formatter.print(None)?;
       if let Some(certificate) = &certificate_status.configuration {
@@ -344,19 +412,27 @@ impl Label for CertificateLabel {
   }
 }
 
-impl SubjectFormatter<CertificateLabel> for ActualCertificate {
+impl SubjectFormatter<CertificateLabel> for (&ActualCertificate, Option<u64>) {
   fn value(&self, label: &CertificateLabel, target_id: &str) -> Value {
+    let (actual_certificate, days) = self;
     match label {
-      CertificateLabel::CertChainSecret => Value::plain(&self.cert_chain_secret),
-      CertificateLabel::DistinguishedName => Value::plain(format_distinguished_name(&self.distinguished_name)),
-      CertificateLabel::DnsNames => Value::plain(self.dns_names.join("\n")),
-      CertificateLabel::KeySecret => Value::plain(&self.key_secret),
-      CertificateLabel::NotAfter => Value::date_time_expired(&self.not_after),
-      CertificateLabel::NotBefore => Value::date_time_not_yet_passed(&self.not_before),
-      CertificateLabel::PassphraseSecret => Value::option(self.passphrase_secret.clone()),
-      CertificateLabel::SerialNumber => Value::plain(&self.serial_number),
+      CertificateLabel::CertChainSecret => Value::plain(&actual_certificate.cert_chain_secret),
+      CertificateLabel::DistinguishedName => Value::plain(format_distinguished_name(&actual_certificate.distinguished_name)),
+      CertificateLabel::DnsNames => Value::plain(actual_certificate.dns_names.join("\n")),
+      CertificateLabel::KeySecret => Value::plain(&actual_certificate.key_secret),
+      CertificateLabel::NotAfter => Value::datetime_expired(&actual_certificate.not_after, *days),
+      CertificateLabel::NotBefore => Value::datetime_not_before(&actual_certificate.not_before),
+      CertificateLabel::PassphraseSecret => Value::option(actual_certificate.passphrase_secret.clone()),
+      CertificateLabel::SerialNumber => Value::plain(&actual_certificate.serial_number),
       CertificateLabel::Target => Value::target(target_id),
     }
+  }
+}
+
+impl SubjectFormatter<CertificateLabel> for (ActualCertificate, Option<u64>) {
+  fn value(&self, label: &CertificateLabel, target_id: &str) -> Value {
+    let (actual_certificate, days) = self;
+    (actual_certificate, *days).value(label, target_id)
   }
 }
 
@@ -372,6 +448,118 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
   }
 }
 
+/// Check if a certificate has issues
+///
+/// # Parameters
+/// * `certificate_status`
+/// * `secrets` - List of [`SecretTuple`]s describing all secrets. Each tuple consists of:
+///   * `String` - Secret name.
+///   * `Option<String>` - Secret id when it is a system secret.
+///   * `SecretMetadata` - Secret metadata.
+///   * `Option<AllocationStatus>` - Secret allocation status.
+///   * `Vec<Dependant<SecretInjection>>` - List of apps, applications and proxies that depend
+///     on the secret.
+/// * `days` - Number of days until expiration.
+/// * `only_errors` - If `true` only issues with severity level `Severity::Error` will be returned.
+///
+/// # Returns
+/// * `Some(Vec<IssueDescription>)` - List of tuples describing the issues found
+///   (at least one).
+/// * `None` - No issues where found.
+fn has_issues(certificate_status: DshApiResult<CertificateStatus>, secrets: &[SecretTuple], days: Option<u64>, only_errors: bool) -> Option<Vec<IssueDescription>> {
+  let certificate_status = match certificate_status {
+    Ok(certificate_status) => certificate_status,
+    Err(_) => return Some(vec![(None, Issue::Unexpected { message: "could not get certificate status".to_string() })]),
+  };
+
+  let mut issues: Vec<IssueDescription> = vec![];
+
+  if !certificate_status.status.provisioned {
+    issues.push((None, Issue::NotProvisioned))
+  }
+  for notification in &certificate_status.status.notifications {
+    if notification.remove {
+      issues.push((None, Issue::RemovalNotification { notification: notification.clone() }));
+    } else {
+      issues.push((None, Issue::CreationUpdateNotification { notification: notification.clone() }));
+    }
+  }
+
+  if let Some(actual_certificate) = certificate_status.actual {
+    let mut cert_chain_secret_issues = secret_issues(&actual_certificate.cert_chain_secret, days, only_errors, "cert chain", secrets);
+    if !cert_chain_secret_issues.iter().any(|(_, issue)| matches!(issue, Issue::Expired { .. })) {
+      if let Some(issue) = Issue::datetime_expired(&actual_certificate.not_after, days) {
+        if !only_errors || issue.severity() == Severity::Error {
+          issues.push((None, issue));
+        }
+      }
+    }
+
+    if !cert_chain_secret_issues.iter().any(|(_, issue)| matches!(issue, Issue::Before { .. })) {
+      if let Some(issue) = Issue::datetime_before(&actual_certificate.not_before) {
+        if !only_errors || issue.severity() == Severity::Error {
+          issues.push((None, issue));
+        }
+      }
+    }
+    if secret_is_certificate(&actual_certificate.cert_chain_secret, secrets).is_some_and(|a| !a) {
+      cert_chain_secret_issues.push((
+        Some(("cert chain", actual_certificate.cert_chain_secret.to_string(), "secret")),
+        Issue::Misconfiguration { explanation: "".to_string() },
+      ))
+    }
+    issues.append(&mut cert_chain_secret_issues);
+
+    issues.append(&mut secret_issues(&actual_certificate.key_secret, days, only_errors, "key", secrets));
+
+    if let Some(passphrase_secret) = actual_certificate.passphrase_secret {
+      issues.append(&mut secret_issues(&passphrase_secret, days, only_errors, "passphrase", secrets));
+    }
+  }
+
+  if only_errors {
+    issues.retain(|(_, issue)| issue.severity() == Severity::Error);
+  }
+  if issues.is_empty() {
+    None
+  } else {
+    Some(issues)
+  }
+}
+
+/// Tuple describing a secret, consisting of:
+/// * `String` - Secret name.
+/// * `Option<String>` - Secret id when it is a system secret.
+/// * `SecretMetadata` - Secret metadata.
+/// * `Option<AllocationStatus>` - Secret allocation status.
+/// * `Vec<Dependant<SecretInjection>>` - List of apps, applications and proxies that depend
+///   on the secret.
+type SecretTuple = (String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>);
+
+fn secret_issues<'a>(secret: &str, days: Option<u64>, only_errors: bool, secret_attribute: &'static str, secrets: &[SecretTuple]) -> Vec<IssueDescription<'a>> {
+  let mut issues: Vec<IssueDescription<'_>> = vec![];
+  match secrets.iter().find(|(secret_id, _, _, _, _)| secret_id == secret) {
+    Some(secret_tuple) => {
+      if let Some(cert_chain_secret_issues) = secret::has_issues(secret_tuple, days, only_errors) {
+        for issue in cert_chain_secret_issues {
+          issues.push((Some((secret_attribute, secret.to_string(), "secret")), issue));
+        }
+      }
+    }
+    None => {
+      issues.push((Some((secret_attribute, secret.to_string(), "secret")), Issue::NotFound {}));
+    }
+  }
+  issues
+}
+
+fn secret_is_certificate(secret: &str, secrets: &[SecretTuple]) -> Option<bool> {
+  secrets
+    .iter()
+    .find(|(secret_id, _, _, _, _)| secret_id == secret)
+    .map(|(_, _, secret_metadata, _, _)| matches!(secret_metadata, SecretMetadata::Certificate { .. }))
+}
+
 static CERTIFICATE_CONFIGURATION_LABELS: [CertificateLabel; 4] =
   [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
 
@@ -380,16 +568,16 @@ static CERTIFICATE_LABELS_LIST: [CertificateLabel; 4] = [CertificateLabel::Targe
 pub(crate) static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
   CertificateLabel::Target,
   CertificateLabel::CertChainSecret,
-  CertificateLabel::KeySecret,
-  CertificateLabel::PassphraseSecret,
-  CertificateLabel::NotAfter,
-  CertificateLabel::NotBefore,
-  CertificateLabel::SerialNumber,
   CertificateLabel::DistinguishedName,
   CertificateLabel::DnsNames,
+  CertificateLabel::KeySecret,
+  CertificateLabel::NotAfter,
+  CertificateLabel::NotBefore,
+  CertificateLabel::PassphraseSecret,
+  CertificateLabel::SerialNumber,
 ];
 
-fn format_distinguished_name(distinguished_name: &str) -> String {
+pub(crate) fn format_distinguished_name(distinguished_name: &str) -> String {
   vec_to_table(
     &distinguished_name
       .split(",")
@@ -402,4 +590,17 @@ fn format_distinguished_name(distinguished_name: &str) -> String {
       })
       .collect_vec(),
   )
+}
+
+pub(crate) fn distinguished_name_to_map(distinguished_name: &str) -> HashMap<String, String> {
+  distinguished_name
+    .split(",")
+    .map(|relative_distinguished_name| {
+      let attribute_value = relative_distinguished_name.split("=").map(|s| s.trim().to_string()).collect_vec();
+      (
+        attribute_value.first().cloned().unwrap_or_default().to_string(),
+        attribute_value.get(1).cloned().unwrap_or_default().to_string(),
+      )
+    })
+    .collect::<HashMap<_, _>>()
 }

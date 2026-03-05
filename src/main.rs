@@ -19,6 +19,7 @@ use crate::global_arguments::{
 };
 use crate::releases::{newer_release, newer_release_notification};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
+use crate::subjects::nodepool::NODE_POOL_SUBJECT;
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
@@ -40,7 +41,7 @@ use global_arguments::{
 };
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::{debug, trace};
+use log::{debug, error, trace};
 use log_arguments::{log_level_api_argument, log_level_argument};
 use log_level::initialize_logger;
 use rpassword::prompt_password;
@@ -96,13 +97,14 @@ mod filter_flags;
 mod flags;
 mod formatters;
 mod global_arguments;
+mod issues;
 #[cfg(feature = "manage")]
 mod limits_flags;
 mod log_arguments;
 mod log_level;
 mod modifier_flags;
-mod refresh_token_store;
 mod releases;
+mod secret_metadata;
 mod settings;
 mod style;
 mod subject;
@@ -136,7 +138,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 
 lazy_static! {
-  static ref VERSION: Version = Version::from_str("0.8.1").unwrap();
+  static ref VERSION: Version = Version::from_str("0.9.0").unwrap();
 }
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
@@ -249,6 +251,7 @@ async fn inner_main() -> DshCliExit {
     IMAGE_SUBJECT.as_ref(),
     MANIFEST_SUBJECT.as_ref(),
     METRIC_SUBJECT.as_ref(),
+    NODE_POOL_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
@@ -397,8 +400,8 @@ async fn inner_main() -> DshCliExit {
             Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
           };
           for client in &clients {
-            if clients.len() > 1 {
-              context.print(format!("# target {}", client.tenant()))
+            if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
+              context.print(format!("# {}", client.tenant()))
             }
             match subject.execute_subject_command_with_client(sub_matches, client, &context).await {
               Ok(_) => {}
@@ -427,8 +430,8 @@ async fn inner_main() -> DshCliExit {
               Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
             };
             for client in &clients {
-              if clients.len() > 1 {
-                context.print(format!("# target {}", client.tenant()))
+              if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
+                context.print(format!("# {}", client.tenant()))
               }
               match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
                 Ok(_) => {}
@@ -536,20 +539,21 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
     if !access_tokens.is_empty() {
       let access_tokens: Vec<(&str, String)> = access_tokens
         .iter()
-        .map(|(platform, access_token)| {
-          (platform.name(), {
-            access_token
-              .tenant_permissions()
-              .iter()
-              .map(|permission| permission.tenant.to_string())
-              .collect_vec()
-              .chunks(6)
-              .collect_vec()
-              .iter()
-              .map(|tenants| tenants.join(", "))
-              .collect_vec()
-              .iter()
-              .join(",\n")
+        .flat_map(|(platform, access_token)| {
+          access_token.tenant_permissions.as_ref().map(|tenant_permissions| {
+            (platform.name(), {
+              tenant_permissions
+                .iter()
+                .map(|permission| permission.tenant.to_string())
+                .collect_vec()
+                .chunks(6)
+                .collect_vec()
+                .iter()
+                .map(|tenants| tenants.join(", "))
+                .collect_vec()
+                .iter()
+                .join(",\n")
+            })
           })
         })
         .collect_vec();
@@ -575,7 +579,7 @@ fn read_single_line(prompt: impl AsRef<str>) -> DshCliResult<String> {
 fn read_single_line_password(prompt: impl AsRef<str>) -> DshCliResult<String> {
   match prompt_password(prompt.as_ref()) {
     Ok(line) => Ok(line.trim().to_string()),
-    Err(_) => Err(error!("empty input")),
+    Err(_) => err!("empty input"),
   }
 }
 
@@ -677,7 +681,7 @@ fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> DshCliResul
       if stdin().is_terminal() {
         DshPlatform::try_from(read_single_line("target platform: ")?.as_str()).map_err(error_map!("{}"))
       } else {
-        Err(error!("could not determine target platform, please check configuration"))
+        err!("could not determine target platform, please check configuration")
       }
     }
   }
@@ -763,12 +767,12 @@ fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> DshCliResult<
       if stdin().is_terminal() {
         let tenant_name_from_console = read_single_line("target tenant: ")?;
         if tenant_name_from_console.is_empty() {
-          Err(error!("target tenant name cannot be empty"))
+          err!("target tenant name cannot be empty")
         } else {
           Ok(tenant_name_from_console)
         }
       } else {
-        Err(error!("could not determine target tenant, please check configuration"))
+        err!("could not determine target tenant, please check configuration")
       }
     }
   }
@@ -817,7 +821,7 @@ fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> D
             if stdin().is_terminal() {
               read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
             } else {
-              Err(error!("could not determine password and unable to to prompt user, please check configuration"))
+              err!("could not determine password and unable to to prompt user, please check configuration")
             }
           }
         },
@@ -831,13 +835,13 @@ fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> DshCliResult<S
     Ok(password_string) => {
       let trimmed_password = password_string.trim();
       if trimmed_password.is_empty() {
-        Err(error!("target password file '{}' is empty", password_file.as_ref().display()))
+        err!("target password file '{}' is empty", password_file.as_ref().display())
       } else {
         debug!("target password (file '{}')", password_file.as_ref().display());
         Ok(trimmed_password.to_string())
       }
     }
-    Err(_) => Err(error!("target password file '{}' could not be read", password_file.as_ref().display())),
+    Err(_) => err!("target password file '{}' could not be read", password_file.as_ref().display()),
   }
 }
 
@@ -850,7 +854,7 @@ where
       Ok(deserialized_toml) => Ok(Some(deserialized_toml)),
       Err(de_error) => {
         let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().display(), de_error.message());
-        log::error!("{}", &message);
+        error!("{}", &message);
         Err(DshCliError::from(message))
       }
     },
@@ -858,7 +862,7 @@ where
       NotFound => Ok(None),
       _ => {
         let message = format!("could not read file '{}'", toml_file.as_ref().display());
-        log::error!("{}", &message);
+        error!("{}", &message);
         Err(DshCliError::from(message))
       }
     },
@@ -874,13 +878,13 @@ where
       Ok(_) => Ok(()),
       Err(io_error) => {
         let message = format!("could not write file '{}' ({})", toml_file.as_ref().display(), io_error);
-        log::error!("{}", &message);
+        error!("{}", &message);
         Err(DshCliError::from(message))
       }
     },
     Err(ser_error) => {
       let message = format!("could not serialize data ({})", ser_error);
-      log::error!("{}", &message);
+      error!("{}", &message);
       Err(DshCliError::from(message))
     }
   }
@@ -924,7 +928,7 @@ where
         ))
       }
     }
-    None => Err(error!("environment variable 'EDITOR' is not set")),
+    None => err!("environment variable 'EDITOR' is not set"),
   }
 }
 
@@ -995,13 +999,16 @@ async fn create_clients_access_token(matches: &ArgMatches, context: &Context) ->
       None => {
         let target_tenant_name = get_target_tenant(matches, context.settings())?;
         match get_access_token(target_platform.clone()).await {
-          Ok(Some(access_token)) => {
-            if access_token.authorized_tenants().contains(&target_tenant_name.as_str()) {
+          Ok(Some((access_token, jwt))) => {
+            if jwt
+              .authorized_tenants()
+              .is_some_and(|authorized_tenants| authorized_tenants.contains(&target_tenant_name.as_str()))
+            {
               let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
-              let dsh_api_client_factory = DshApiClientFactory::create_from_access_token(dsh_api_tenant, access_token.token().secret().clone());
+              let dsh_api_client_factory = DshApiClientFactory::create_from_static_token(dsh_api_tenant, access_token);
               Ok(Some(vec![dsh_api_client_factory.client().await?]))
             } else {
-              Err(error!("not authorized for tenant '{}' at platform '{}'", target_tenant_name, target_platform))
+              err!("not authorized for tenant '{}' at platform '{}'", target_tenant_name, target_platform)
             }
           }
           Ok(None) => {
@@ -1029,18 +1036,22 @@ async fn create_clients_access_token(matches: &ArgMatches, context: &Context) ->
 /// * `Ok(None)` - User needs to log in.
 async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_names: &[String], context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   match get_access_token(target_platform.clone()).await {
-    Ok(Some(access_token)) => {
+    Ok(Some((access_token, jwt))) => {
       let unauthorized_tenants = target_tenant_names
         .iter()
-        .filter(|target_tenant_name| !access_token.authorized_tenants().contains(&target_tenant_name.as_str()))
+        .filter(|target_tenant_name| {
+          !jwt
+            .authorized_tenants()
+            .is_some_and(|authorized_tenants| authorized_tenants.contains(&target_tenant_name.as_str()))
+        })
         .collect_vec();
       if !unauthorized_tenants.is_empty() {
         for unauthorized_tenant in &unauthorized_tenants {
           context.print_error(format!("not authorized for tenant {}@{}", unauthorized_tenant, target_platform));
         }
-        return Err(error!("not authorized for tenants {}", unauthorized_tenants.iter().join(", ")));
+        return err!("not authorized for tenants {}", unauthorized_tenants.iter().join(", "));
       }
-      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_access_token(target_platform.clone(), access_token.token().secret().clone())?;
+      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_static_token(target_platform.clone(), access_token)?;
       let clients = try_join_all(target_tenant_names.iter().map(|target_tenant_name| {
         debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
         dsh_api_platform_client_factory.client(target_tenant_name)
@@ -1068,18 +1079,20 @@ async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_
 async fn create_clients_for_all_authorized_tenants(target_platform: DshPlatform) -> DshCliResult<Option<Vec<DshApiClient>>> {
   debug!("create client with static access token for all tenants at platform '{}'", target_platform);
   match get_access_token(target_platform.clone()).await {
-    Ok(Some(access_token)) => {
-      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_access_token(target_platform, access_token.token().secret().clone())?;
-      let clients = try_join_all(
-        access_token
-          .authorized_tenants()
-          .into_iter()
-          .map(|authorized_tenant| dsh_api_platform_client_factory.client(authorized_tenant)),
-      )
-      .await?;
-      debug!("clients created");
-      Ok(Some(clients))
-    }
+    Ok(Some((access_token, jwt))) => match jwt.authorized_tenants() {
+      Some(authorized_tenants) => {
+        let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_static_token(target_platform, access_token)?;
+        let clients = try_join_all(
+          authorized_tenants
+            .iter()
+            .map(|authorized_tenant| dsh_api_platform_client_factory.client(*authorized_tenant)),
+        )
+        .await?;
+        debug!("clients created");
+        Ok(Some(clients))
+      }
+      None => err!("json web token does not provide authorized tenants"),
+    },
     Ok(None) => Ok(None),
     Err(error) => Err(error),
   }
@@ -1123,10 +1136,10 @@ fn enabled_features() -> Option<Vec<&'static str>> {
 
 #[test]
 fn test_open_api_version() {
-  assert_eq!(openapi_version(), "1.10.0");
+  assert_eq!(openapi_version(), &Version::new(1, 11, 1, None));
 }
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), "0.8.1");
+  assert_eq!(crate_version(), &Version::new(0, 9, 0, None));
 }

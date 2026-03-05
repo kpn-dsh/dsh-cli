@@ -11,6 +11,7 @@ pub(crate) const MANAGED_STREAM_ARGUMENT: &str = "managed-stream-argument";
 #[cfg(feature = "manage")]
 pub(crate) const MANAGED_TENANT_NAME_ARGUMENT: &str = "managed-tenant-name-argument";
 pub(crate) const MANIFEST_ID_ARGUMENT: &str = "manifest-id-argument";
+pub(crate) const NODEPOOL_ID_ARGUMENT: &str = "node-pool-id-argument";
 pub(crate) const PLATFORM_NAME_ARGUMENT: &str = "platform-name-argument";
 pub(crate) const PROXY_ID_ARGUMENT: &str = "proxy-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
@@ -169,6 +170,15 @@ pub(crate) fn manifest_version_argument() -> Arg {
     .value_name("VERSION")
     .help("App manifest version")
     .long_help("Identifies the version of an app manifest from the app catalog.")
+}
+
+pub(crate) fn nodepool_id_argument() -> Arg {
+  Arg::new(NODEPOOL_ID_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("NODEPOOL")
+    .help("Node pool identifier")
+    .long_help("Identifies a node pool on the DSH.")
 }
 
 pub(crate) fn vhost_id_argument() -> Arg {

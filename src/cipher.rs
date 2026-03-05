@@ -16,9 +16,11 @@ use aes_gcm::aes::Aes256;
 use aes_gcm::Key;
 use aes_gcm::{Aes256Gcm, AesGcm};
 
-use crate::{error, DshCliResult};
+use crate::error::DshCliError;
+use crate::{err, DshCliResult};
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
+use log::warn;
 
 pub(crate) fn encrypt(plain_text: &String) -> DshCliResult<String> {
   let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
@@ -39,10 +41,15 @@ pub(crate) fn decrypt(encoded_ciphertext_nonce: &str) -> DshCliResult<String> {
     #[allow(deprecated)] // TODO
     let nonce = Nonce::<Aes256Gcm>::clone_from_slice(&decoded_nonce);
     let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
-    let plaintext: Vec<u8> = cipher.decrypt(&nonce, ciphertext.as_ref())?;
-    Ok(String::from_utf8(plaintext)?)
+    match cipher.decrypt(&nonce, ciphertext.as_ref()) {
+      Ok(plaintext) => Ok(String::from_utf8(plaintext)?),
+      Err(error) => {
+        warn!("refresh key could not be decrypted");
+        Err(DshCliError::from(error))
+      }
+    }
   } else {
-    Err(error!("illegal ciphertext nonce pair"))
+    err!("illegal ciphertext nonce pair")
   }
 }
 
@@ -71,9 +78,9 @@ fn get_system_hash() -> DshCliResult<Sha256> {
         }
         Ok(hasher)
       }
-      Err(_) => Err(error!("could not determine user home directory")),
+      Err(_) => err!("could not determine user home directory"),
     },
-    _ => Err(error!("could not determine user home directory")),
+    _ => err!("could not determine user home directory"),
   }
 }
 

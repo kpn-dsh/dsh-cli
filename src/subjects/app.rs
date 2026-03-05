@@ -20,7 +20,7 @@ use crate::subjects::service::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
 use crate::subjects::vhost::VHOST_LABELS;
 use crate::subjects::volume::VOLUME_LABELS;
-use crate::{error, get_target_platform, get_target_tenant, DshCliResult};
+use crate::{cli_error, err, get_target_platform, get_target_tenant, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -137,13 +137,13 @@ impl CommandExecutor for AppDeploy {
     let manifest_version = Version::from_str(sub_argument.unwrap_or_else(|| unreachable!()).as_str())?;
     let app_id = matches.get_one::<String>(APP_ID_ARGUMENT).unwrap_or_else(|| unreachable!());
     if client.get_appcatalog_app_configuration(app_id).await.is_ok() {
-      return Err(error!("app '{}' already exists", app_id));
+      return err!("app '{}' already exists", app_id);
     }
     let implicit_defaults = matches.get_flag(ModifierFlagType::ImplicitDefaults.id());
     context.print_explanation(format!("get manifest '{}', version {}", manifest_id, manifest_version));
     let ((gid, uid), manifest) = try_join(client.guid(), client.manifest(manifest_id.as_str(), &manifest_version))
       .await
-      .map_err(|_| error!("manifest '{}:{}' does not exist", manifest_id, manifest_version))?;
+      .map_err(|_| cli_error!("manifest '{}:{}' does not exist", manifest_id, manifest_version))?;
     let command_line_app_parameters = match matches.get_many::<String>(APP_PARAMETER_ARGUMENT) {
       Some(app_parameters) => app_parameters
         .map(|app_parameter| parse_app_parameter(app_parameter.as_str()))
@@ -177,10 +177,10 @@ impl CommandExecutor for AppDeploy {
             } else if implicit_defaults {
               match property.default.clone() {
                 Some(property_default) => Ok(property_default),
-                None => Err(error!("no default for property")),
+                None => err!("no default for property"),
               }
             } else {
-              Err(error!("no default for property"))
+              err!("no default for property")
             }
           }
         };
@@ -196,9 +196,9 @@ impl CommandExecutor for AppDeploy {
       }
     }
     if missing_or_invalid_parameters == 1 {
-      return Err(error!("missing or invalid parameter"));
+      return err!("missing or invalid parameter");
     } else if missing_or_invalid_parameters > 1 {
-      return Err(error!("{} missing or invalid parameters", missing_or_invalid_parameters));
+      return err!("{} missing or invalid parameters", missing_or_invalid_parameters);
     }
     let app_catalog_app_configuration = AppCatalogAppConfiguration {
       configuration: app_configuration,
@@ -227,7 +227,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
       if enumeration.contains(parameter) {
         Ok(parameter.clone())
       } else {
-        Err(error!(
+        err!(
           "property {} has illegal value \"{}\", should be one of {}",
           property_name,
           parameter,
@@ -235,7 +235,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
             .iter()
             .map(|enumeration_value| if property.kind == PropertyKind::Number { enumeration_value.to_string() } else { format!("\"{}\"", enumeration_value) })
             .join(", ")
-        ))
+        )
       }
     }
     None => match property.kind {
@@ -243,10 +243,11 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
         if parameter == "private" || parameter == "public" {
           Ok(parameter.clone())
         } else {
-          Err(error!(
+          err!(
             "dns-zone property {} has illegal value \"{}\", should be \"private\" or \"public\"",
-            property_name, parameter
-          ))
+            property_name,
+            parameter
+          )
         }
       }
       PropertyKind::Number => {
@@ -255,7 +256,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
         }
         match NUMBER_REGEX.captures(parameter) {
           Some(_) => Ok(parameter.clone()),
-          None => Err(error!("property {} has illegal value \"{}\", should be a number", property_name, parameter)),
+          None => err!("property {} has illegal value \"{}\", should be a number", property_name, parameter),
         }
       }
       PropertyKind::String => Ok(parameter.clone()),
@@ -272,7 +273,7 @@ fn parse_app_parameter(app_parameter: &str) -> DshCliResult<(String, String)> {
       captures.get(1).unwrap_or_else(|| unreachable!()).as_str().to_string(),
       captures.get(2).unwrap_or_else(|| unreachable!()).as_str().to_string(),
     )),
-    None => Err(error!("illegal app parameter {}", app_parameter)),
+    None => err!("illegal app parameter {}", app_parameter),
   }
 }
 
@@ -427,7 +428,7 @@ impl CommandExecutor for AppUndeploy {
   async fn execute_with_client(&self, target: Option<String>, _sub_argument: Option<String>, _matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let app_id = target.unwrap_or_else(|| unreachable!());
     if client.get_appcatalog_app_configuration(&app_id).await.is_err() {
-      return Err(error!("app '{}' does not exist", app_id));
+      return err!("app '{}' does not exist", app_id);
     }
     if context.confirmed(format!("undeploy app '{}'?", app_id))? {
       if context.dry_run() {

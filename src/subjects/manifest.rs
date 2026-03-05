@@ -11,13 +11,13 @@ use crate::formatters::{hashmap_to_table, hashmap_to_vec, vec_to_table};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
-use crate::{error, DshCliResult};
+use crate::{cli_error, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::error::DshApiError;
 use dsh_api::manifest::{Manifest, Property, PropertyKind, Resource};
 use dsh_api::version::Version;
-use dsh_api::DshApiError;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -141,11 +141,11 @@ impl CommandExecutor for ManifestExplain {
       Some(version) => client
         .manifest(manifest_id.as_str(), &version)
         .await
-        .map_err(|_| error!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
+        .map_err(|_| cli_error!("app catalog manifest '{}:{}' does not exist", manifest_id, version))?,
       None => client
         .manifest_latest_version(manifest_id.as_str(), false)
         .await
-        .map_err(|_| error!("app catalog manifest '{}' does not exist", manifest_id))?,
+        .map_err(|_| cli_error!("app catalog manifest '{}' does not exist", manifest_id))?,
     };
     context.print_execution_time(start_instant);
     context.print(manifest.name);
@@ -201,12 +201,12 @@ impl CommandExecutor for ManifestExport {
         .await
         .map(|(raw_manifest, draft)| (version.clone(), raw_manifest, draft))
         .map_err(|error| match error {
-          DshApiError::NotFound(_) => error!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
-          _ => error!("{}", error),
+          DshApiError::NotFound { .. } => cli_error!("app catalog manifest '{}:{}' does not exist", manifest_id, version),
+          _ => cli_error!("{}", error),
         })?,
       None => client.manifest_raw_latest(manifest_id.as_str(), false).await.map_err(|error| match error {
-        DshApiError::NotFound(_) => error!("app catalog manifest '{}' does not exist", manifest_id),
-        _ => error!("{}", error),
+        DshApiError::NotFound { .. } => cli_error!("app catalog manifest '{}' does not exist", manifest_id),
+        _ => cli_error!("{}", error),
       })?,
     };
     context.print_execution_time(start_instant);
@@ -482,20 +482,20 @@ fn property_value_explanation(property: &Property, kind: &str, separator: &str) 
 
 fn resource_to_key(resource: &Resource) -> String {
   match resource {
-    Resource::Application(application) => format!("application: {}", application.name),
-    Resource::Bucket(bucket) => format!("bucket: {}", bucket.name),
-    Resource::Certificate(certificate) => format!("certificate: {}", certificate.unformatted_representation),
-    Resource::Database(database) => format!("database: {}", database.name),
-    Resource::Secret(secret) => format!("secret: {}", secret.unformatted_representation),
-    Resource::Topic(topic) => format!("topic: {}", topic.name),
-    Resource::Vhost(vhost) => format!("vhost: {}", vhost.unformatted_representation),
-    Resource::Volume(volume) => format!("volume: {}", volume.name),
+    Resource::Application { application } => format!("application: {}", application.name),
+    Resource::Bucket { bucket } => format!("bucket: {}", bucket.name),
+    Resource::Certificate { certificate } => format!("certificate: {}", certificate.unformatted_representation),
+    Resource::Database { database } => format!("database: {}", database.name),
+    Resource::Secret { secret } => format!("secret: {}", secret.unformatted_representation),
+    Resource::Topic { topic } => format!("topic: {}", topic.name),
+    Resource::Vhost { vhost } => format!("vhost: {}", vhost.unformatted_representation),
+    Resource::Volume { volume } => format!("volume: {}", volume.name),
   }
 }
 
 fn resource_to_strings(resource: &Resource) -> Vec<String> {
   match resource {
-    Resource::Application(application) => {
+    Resource::Application { application } => {
       let mut strings = vec![];
       strings.push(format!("image: {}", application.image));
       strings.push(format!("cpus: {}", application.cpus));
@@ -531,14 +531,14 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
       }
       strings
     }
-    Resource::Bucket(bucket) => {
+    Resource::Bucket { bucket } => {
       let mut strings = vec![];
       strings.push(format!("encrypted: {}", &bucket.encrypted));
       strings.push(format!("versioned: {}", &bucket.versioned));
       strings
     }
-    Resource::Certificate(certificate) => vec![certificate.unformatted_representation.to_string()],
-    Resource::Database(database) => {
+    Resource::Certificate { certificate } => vec![certificate.unformatted_representation.to_string()],
+    Resource::Database { database } => {
       let mut strings = vec![];
       strings.push(format!("cpus: {}", database.cpus));
       strings.push(format!("mem: {}", database.mem));
@@ -549,8 +549,8 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
       strings.push(format!("volume size: {}", database.volume_size));
       strings
     }
-    Resource::Secret(secret) => vec![secret.unformatted_representation.to_string()],
-    Resource::Topic(topic) => {
+    Resource::Secret { secret } => vec![secret.unformatted_representation.to_string()],
+    Resource::Topic { topic } => {
       let mut strings = vec![];
       strings.push(format!("partitions: {}", topic.partitions));
       strings.push(format!("replication factor: {}", topic.replication_factor));
@@ -559,8 +559,8 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
       }
       strings
     }
-    Resource::Vhost(vhost) => vec![vhost.unformatted_representation.to_string()],
-    Resource::Volume(volume) => {
+    Resource::Vhost { vhost } => vec![vhost.unformatted_representation.to_string()],
+    Resource::Volume { volume } => {
       let mut strings = vec![];
       strings.push(format!("size: {} (GB)", volume.size));
       strings
