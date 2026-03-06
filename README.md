@@ -35,7 +35,7 @@ The following features are defined:
 
 ## Installation
 
-If you have the `rust` tool-chain installed, the DSH Api Command Line Tool (`dsh`) can be
+If you have the Rust tool-chain installed, the DSH Api Command Line Tool (`dsh`) can be
 installed on your local machine directly from `crates.io` by executing the following command.
 
 ```bash

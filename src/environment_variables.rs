@@ -920,7 +920,7 @@ lazy_static! {
     ),
     EnvironmentVariable::new(
       ENV_VAR_RUST_LOG,
-      "Specifies the log level of the rust env_logger crate.",
+      "Specifies the log level of the Rust env_logger crate.",
       false,
       true,
       Some("off"),

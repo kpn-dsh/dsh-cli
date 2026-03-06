@@ -22,7 +22,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Show platform parameters in different categories.
 * Improved error handling and logging.
 * Improved rendering of timestamps.
-* Changed rust version to `1.86`.
+* Changed Rust version to `1.86`.
 * Set dependencies to latest versions.
 
 ## [0.8.1] - 2026-01-15
