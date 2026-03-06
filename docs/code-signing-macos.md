@@ -1,4 +1,6 @@
-# Codesign for macOS
+# Codesign and notarize for macOS
+
+[&#x2190; Release](release.md)
 
 On devices with macOS 10.15 or higher all apps distributed outside the App Store must be signed
 by the developer using an Apple-issued Developer ID certificate and notarised by Apple to run
@@ -138,7 +140,8 @@ This creates the file `dsh.zip` containing only the `dsh` binary.
 This zip file can then be submitted to be notarised by the following command:
 
 ```bash
-> xcrun notarytool submit dsh.zip --apple-id your.name@kpn.com --team-id B86ZND72C8 --password abcd-efgh-ijkl-mnop
+> xcrun notarytool submit dsh.zip --apple-id your.name@kpn.com \
+        --team-id B86ZND72C8 --password abcd-efgh-ijkl-mnop
 Conducting pre-submission checks for dsh.zip and initiating connection to the Apple notary service...
 Submission ID received
   id: abcdef01-2345-6789-abcd-ef0123456789
@@ -155,7 +158,8 @@ Notarisation usually takes less than 5 minutes, but in some cases it can take qu
 In order to poll the status of the process you can use the following command:
 
 ```bash
-> xcrun notarytool log abcdef01-2345-6789-abcd-ef0123456789 --apple-id your.name@kpn.com --team-id B86ZND72C8  --password abcd-efgh-ijkl-mnop
+> xcrun notarytool log abcdef01-2345-6789-abcd-ef0123456789 --apple-id your.name@kpn.com \
+        --team-id B86ZND72C8  --password abcd-efgh-ijkl-mnop
 {
   "logFormatVersion": 1,
   "jobId": "abcdef01-2345-6789-abcd-ef0123456789",
@@ -187,18 +191,6 @@ target/release/dsh: satisfies its Designated Requirement
 target/release/dsh: explicit requirement satisfied
 ```
 
-## Create a GitHub release
-
-To create a GitHub release, first rename the binary:
-
-```bash
-> mv target/release/dsh dsh-v0.9.0-aarch64-apple-darwin
-```
-
-Then go to [GitHub\releases](https://github.com/kpn-dsh/dsh-cli/releases), click
-`Draft a new release` and follow the steps, attaching the renamed binary by dropping it on the
-page or by selecting it.
-
 ## Tool
 
 A useful tool is [What' s Your Sign](https://objective-see.org/products/whatsyoursign.html).
@@ -206,7 +198,6 @@ It allows you to check the status by right-clicking the `dsh` binary in the Find
 `Signing Info` context menu. When codesigning and notarising are both completed the tool will show
 this as follows:
 
-<img src="docs/images/whats-your-sign.png" width="600" />
+<img src="images/whats-your-sign.png" width="600" />
 
-rtzo-wmei-anqk-rrpw
-2a7903a3-3248-4b0c-8c69-ac3438d42aa2
+[Release &#x2192;](release.md)

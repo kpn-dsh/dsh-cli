@@ -147,4 +147,4 @@ to `stdout` and `stderr`.
 This script will run the `dsh service list` command with different ways of providing the
 target platform, tenant and password.
 
-[README &#x2192;](README.md)
+[Publish &#x2192;](publish.md)

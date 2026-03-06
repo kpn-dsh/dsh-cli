@@ -1,6 +1,6 @@
 # Quick start
 
-[&#x2190; README](README.md)
+[&#x2190; README](../README.md)
 
 ### Prompts
 

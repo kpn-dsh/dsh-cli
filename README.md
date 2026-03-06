@@ -55,10 +55,13 @@ You can also use the `--all-features` flag to install all features.
 
 ## Next steps
 
-* [Quick start](quick_start.md)
-* [User guide](user_guide.md)
-* [Environment variables](environment_variables.md)
-* [Settings and targets](settings_targets.md)
-* [Platforms specification](platforms-specification.md)
-* [Set up autocompletion](autocompletion.md)
-* [Developers](developers.md)
+* [Quick start](docs/quick_start.md)
+* [User guide](docs/user_guide.md)
+* [Environment variables](docs/environment_variables.md)
+* [Settings and targets](docs/settings_targets.md)
+* [Platforms specification](docs/platforms-specification.md)
+* [Set up autocompletion](docs/autocompletion.md)
+* [Developers](docs/developers.md)
+* [Publish](docs/publish.md)
+* [Release](docs/release.md)
+* [Codesign and notarize for macOS](docs/code-signing-macos.md)
