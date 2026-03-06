@@ -4,6 +4,16 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.1] - YYYY-MM-DD
+
+### Added
+
+* Descriptions for publish and release steps.
+
+### Changed
+
+* Directory structure for docs.
+
 ## [0.9.0] - 2026-03-05
 
 ### Added
