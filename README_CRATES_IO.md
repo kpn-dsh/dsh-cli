@@ -35,7 +35,7 @@ The following features are defined:
 ## Installation
 
 The DSH Api Command Line Tool (`dsh`) can be installed on your local machine
-(assuming you have the `rust` tool-chain installed),
+(assuming you have the Rust tool-chain installed),
 by executing the following command.
 
 ```bash
@@ -65,6 +65,7 @@ Subjects/commands:
   logout       Logout from single sign on
   manifest     Show App Catalog manifests.
   metric       Show metric exports.
+  nodepool     Show node pool resources.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
   secret       Show, manage and list DSH secrets.

@@ -21,6 +21,7 @@ Subjects/commands:
   logout       Logout from single sign on
   manifest     Show App Catalog manifests.
   metric       Show metric exports.
+  nodepool     Show node pool resources.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
   secret       Show, manage and list DSH secrets.
