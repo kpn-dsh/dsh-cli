@@ -9,6 +9,7 @@ pub(crate) mod metric;
 pub(crate) mod nodepool;
 pub(crate) mod platform;
 pub(crate) mod proxy;
+pub(crate) mod robot;
 pub(crate) mod secret;
 pub(crate) mod service;
 pub(crate) mod setting;

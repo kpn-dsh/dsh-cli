@@ -55,6 +55,7 @@ termimad = "0.34"
 terminal_size = { version = "0.4", default-features = false }
 tokio = { version = "1.49", features = ["fs", "rt", "rt-multi-thread", "macros"], default-features = false }
 toml = { version = "0.9", features = ["display", "parse", "serde"], default-features = false }
+whoami = "2"
 # x509-parser = { version = "0.18" }
 pkcs1 = { version = "0.7", features = ["pem"] }
 pkcs8 = { version = "0.10", features = ["pem"] }

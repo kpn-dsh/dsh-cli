@@ -6,6 +6,7 @@
 )]
 extern crate core;
 
+use crate::arguments::PLATFORM_NAME_ARGUMENT;
 use crate::authentication::{get_access_token, get_access_tokens, AuthenticationMethod};
 use crate::directory::{get_settings, init_dsh_directory, read_target, supports_dsh_directory};
 use crate::environment_variables::{
@@ -68,6 +69,8 @@ use subjects::manifest::MANIFEST_SUBJECT;
 use subjects::metric::METRIC_SUBJECT;
 use subjects::platform::PLATFORM_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
+#[cfg(feature = "robot")]
+use subjects::robot::ROBOT_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
 use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
@@ -98,6 +101,7 @@ mod flags;
 mod formatters;
 mod global_arguments;
 mod issues;
+mod keyring;
 #[cfg(feature = "manage")]
 mod limits_flags;
 mod log_arguments;
@@ -254,6 +258,8 @@ async fn inner_main() -> DshCliExit {
     NODE_POOL_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
+    #[cfg(feature = "robot")]
+    ROBOT_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     SERVICE_SUBJECT.as_ref(),
     #[cfg(feature = "manage")]
@@ -601,12 +607,12 @@ fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
 /// 1. Else return with `None`.
 ///
 /// ## Parameters
-/// * `settings` - contents of the settings file or default settings
+/// * `settings` - Contents of the settings file or default settings.
 ///
 /// ## Returns
-/// `Ok(Some<Platform>)` - target platforms
-/// `Ok(None)` - when no implicit platform is available
-/// `Err<String>` - when invalid platform name was found
+/// * `Ok(Some<Platform>)` - Target platforms.
+/// * `Ok(None)` - When no implicit platform is available.
+/// * `Err<String>` - When an invalid platform name was found.
 fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
   match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, Some(matches))? {
     Some(platform_name_from_env_var) => {
@@ -638,13 +644,13 @@ fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> Ds
 /// 1. Else return with `None`.
 ///
 /// ## Parameters
-/// * `matches` - parsed clap command line arguments
-/// * `settings` - optional contents of the settings file, if available
+/// * `matches` - Parsed clap command line arguments,
+/// * `settings` - Contents of the settings file.
 ///
 /// ## Returns
-/// `Ok(Option<Platform>)` - containing the platforms
-/// `Ok(None)` - when no implicit target platform is available
-/// `Err<String>` - when an invalid platform name was found
+/// * `Ok(Option<Platform>)` - The platform.
+/// * `Ok(None)` - When no implicit target platform is available.
+/// * `Err<String>` - When an invalid platform name was found.
 fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
   match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
     Some(target_platform_name_from_argument) => {
@@ -668,12 +674,12 @@ fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings
 /// 1. Else return with an error.
 ///
 /// ## Parameters
-/// * `matches` - parsed clap command line arguments
-/// * `settings` - optional contents of the settings file, if available
+/// * `matches` - Parsed clap command line arguments.
+/// * `settings` - Contents of the settings file.
 ///
 /// ## Returns
-/// `Ok<Platform>`  - target platform
-/// `Err<String>` - error message
+/// * `Ok<Platform>`  - Target platform.
+/// * `Err<String>` - Error message.
 fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> DshCliResult<DshPlatform> {
   match get_target_platform_non_interactive(matches, settings)? {
     Some(platforms_non_interactive) => Ok(platforms_non_interactive),
@@ -696,11 +702,11 @@ fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> DshCliResul
 /// 1. Else return with `None`.
 ///
 /// ## Parameters
-/// * `settings` - contents of the settings file or default settings
+/// * `settings` - Contents of the settings file or default settings.
 ///
 /// ## Returns
-/// `Some<String>` - containing the tenant name
-/// `None` - when no implicit tenant name is available
+/// * `Some<String>` - Tenant name.
+/// * `None` - When no implicit tenant name is available.
 fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
   match environment_variable(ENV_VAR_DSH_CLI_TENANT, Some(matches))? {
     Some(tenant_name_from_env_var) => {
@@ -727,12 +733,12 @@ fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> DshC
 /// 1. Else return with `None`.
 ///
 /// ## Parameters
-/// * `matches` - parsed clap command line arguments
-/// * `settings` - optional contents of the settings file, if available
+/// * `matches` - Parsed clap command line arguments.
+/// * `settings` - Contents of the settings file.
 ///
 /// ## Returns
-/// `Some<String>` - tenant name
-/// `None` - when no tenant name is available without asking the user
+/// * `Some<String>` - Tenant name.
+/// * `None` - When no tenant name is available without asking the user.
 fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
   match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
     Some(target_tenant_name_from_argument) => {
@@ -754,12 +760,12 @@ fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) 
 /// 1. Else return with an error.
 ///
 /// ## Parameters
-/// * `matches` - parsed clap command line arguments
-/// * `settings` - optional contents of the settings file, if available
+/// * `matches` - Parsed clap command line arguments.
+/// * `settings` - Contents of the settings file.
 ///
 /// ## Returns
-/// An `Ok<String>` tenant name
-/// An `Err<String>` error message
+/// * `Ok<String>` Tenant name.
+/// * `Err<String>` - Error message.
 fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> DshCliResult<String> {
   match get_target_tenant_non_interactive(matches, settings)? {
     Some(tenant_names_non_interactive) => Ok(tenant_names_non_interactive),
@@ -778,6 +784,26 @@ fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> DshCliResult<
   }
 }
 
+/// # Get the target platform and tenant name
+///
+/// This method will get the target platform and tenant name.
+///
+/// ## Parameters
+/// * `matches` - Parsed clap command line arguments.
+/// * `settings` - Contents of the settings file.
+///
+/// ## Returns
+/// * `Ok<(DshPlatform, String)>` - Target platform and tenant name.
+/// * `Err<String>` - Error message.
+fn get_platform_and_tenant(matches: &ArgMatches, settings: &Settings) -> Result<(DshPlatform, String), DshCliError> {
+  let platform = match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
+    Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
+    None => get_target_platform(matches, settings)?,
+  };
+  let tenant = get_target_tenant(matches, settings)?;
+  Ok((platform, tenant))
+}
+
 /// # Get the target password
 ///
 /// This method will get the target password.
@@ -794,11 +820,11 @@ fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> DshCliResult<
 /// 1. Else return with an error.
 ///
 /// ## Parameters
-/// * `matches` - parsed clap command line arguments
-/// * `dsh_api_tenant` - used to determine the target settings file
+/// * `matches` - Parsed clap command line arguments.
+/// * `dsh_api_tenant` - Used to determine the target settings file.
 ///
 /// ## Returns
-/// An `Ok<String>` containing the password, or an `Err<String>`.
+/// * `Ok<String>` - Password.
 fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> DshCliResult<String> {
   match matches.get_one::<PathBuf>(TARGET_PASSWORD_FILE_ARGUMENT) {
     Some(password_file_from_arg) => read_target_password_file(password_file_from_arg),

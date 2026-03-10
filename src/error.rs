@@ -21,6 +21,7 @@ pub(crate) enum DshCliError {
   TokioJoin(String),
   UrlParse(String),
   Utf8(String),
+  Whoami(String),
   _X509(String),
 }
 
@@ -153,6 +154,7 @@ impl Debug for DshCliError {
       Self::TokioJoin(message) => write!(f, "DshCliError(tokio join, {})", message),
       Self::UrlParse(message) => write!(f, "DshCliError(url parse, {})", message),
       Self::Utf8(message) => write!(f, "DshCliError(utf8, {})", message),
+      Self::Whoami(message) => write!(f, "DshCliError(whoami, {})", message),
       Self::_X509(message) => write!(f, "DshCliError(x509, {})", message),
     }
   }
@@ -177,6 +179,7 @@ impl Display for DshCliError {
       Self::TokioJoin(message) => write!(f, "{}", message),
       Self::UrlParse(message) => write!(f, "{}", message),
       Self::Utf8(message) => write!(f, "{}", message),
+      Self::Whoami(message) => write!(f, "{}", message),
       Self::_X509(message) => write!(f, "{}", message),
     }
   }
@@ -281,6 +284,12 @@ impl From<openidconnect::url::ParseError> for DshCliError {
 impl From<std::string::FromUtf8Error> for DshCliError {
   fn from(utf8_error: std::string::FromUtf8Error) -> Self {
     Self::Utf8(utf8_error.to_string())
+  }
+}
+
+impl From<whoami::Error> for DshCliError {
+  fn from(whoami_error: whoami::Error) -> Self {
+    Self::Whoami(whoami_error.to_string())
   }
 }
 
