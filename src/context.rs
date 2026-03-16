@@ -357,10 +357,10 @@ impl Context {
   /// 1. When not run from a terminal confirmation is always false.
   pub(crate) fn confirmed(&self, prompt: impl Display) -> DshCliResult<bool> {
     if self.force {
-      self.eprintln(format!("{}, confirmed by --force option", prompt));
+      self.wprintln(format!("{}, confirmed by --force option", prompt));
       Ok(true)
     } else if self.stdin_is_terminal {
-      self.eprint(format!("{} [y/N]", prompt));
+      self.wprint(format!("{} [y/N]", prompt));
       let _ = stdout().lock().flush();
       match Getch::new().getch() {
         Ok(key) => match key {
@@ -1143,12 +1143,36 @@ impl Context {
   /// Print a text to stderr
   ///
   /// If `stderr_no_escape` is not set, the `error_style` will be applied to the provided string,
-  /// and it will be post-fixed with an escape sequence to set the `stderr_style`.
+  /// and it will be post-fixed with an escape sequence to reset the `stderr_style`.
   fn eprintln<T: Display>(&self, text: T) {
     if self.stderr_no_escape {
       eprintln!("{}", text)
     } else {
       eprintln!("{}{}{:#}", self.stderr_style, text, self.stderr_style)
+    }
+  }
+
+  /// Print a warning to stderr without newline
+  ///
+  /// If `stderr_no_escape` is not set, the `warning_style` will be applied to the provided
+  /// string, and it will be post-fixed with an escape sequence to reset the `warning_style`.
+  fn wprint<T: Display>(&self, text: T) {
+    if self.stderr_no_escape {
+      eprint!("{}", text)
+    } else {
+      eprint!("{}{}{:#}", self.warning_style, text, self.warning_style)
+    }
+  }
+
+  /// Print a warning to stderr
+  ///
+  /// If `stderr_no_escape` is not set, the `warning_style` will be applied to the provided
+  /// string, and it will be post-fixed with an escape sequence to reset the `warning_style`.
+  fn wprintln<T: Display>(&self, text: T) {
+    if self.stderr_no_escape {
+      eprintln!("{}", text)
+    } else {
+      eprintln!("{}{}{:#}", self.warning_style, text, self.warning_style)
     }
   }
 
