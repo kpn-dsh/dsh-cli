@@ -3,24 +3,24 @@ use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{BrowserMethod, Context};
-use crate::directory::{get_settings, read_target};
+use crate::directory::get_settings;
 use crate::environment_variables::get_configured_environment_variables;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
+use crate::keyring::get_secret_from_keyring;
 use crate::log_level::LogLevel;
 use crate::settings::{upsert_settings, Settings};
 use crate::style::{DshColor, DshStyle};
 use crate::subject::{Requirements, Subject};
-use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
-use crate::targets::get_target_password_from_keyring;
 use crate::verbosity::Verbosity;
-use crate::{err, plain, DshCliResult};
+use crate::{err, get_platform_argument_or_prompt, get_tenant_argument_or_prompt, plain, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 use dsh_api::platform::DshPlatform;
+use dsh_api::secret::ROBOT_SECRET;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::fmt::Display;
@@ -356,10 +356,7 @@ impl CommandExecutor for SettingDefault {
     context.print_explanation("set default platform and tenant");
     let platform = get_platform_argument_or_prompt(matches)?;
     let tenant = get_tenant_argument_or_prompt(matches)?;
-    if read_target(&platform, &tenant)?.is_none() {
-      return err!("target '{}@{}' does not exist", tenant, platform);
-    };
-    if get_target_password_from_keyring(&platform, &tenant)?.is_none() {
+    if get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)?.is_none() {
       return err!("keyring contains no password for target '{}@{}'", tenant, platform);
     }
     upsert_settings(|settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
