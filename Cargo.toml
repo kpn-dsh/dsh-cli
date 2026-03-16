@@ -63,6 +63,6 @@ x509-cert = { version = "0.2", features = ["pem"] }
 pem-rfc7468 = { version = "1.0.0", features = ["alloc"] }
 
 # When publishing, alway use the crates.io dependency.
-dsh_api = { version = "0.9.0", features = ["generic"] }
+#dsh_api = { version = "0.9.0", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api and enable the manage feature.
-#dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
+dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
