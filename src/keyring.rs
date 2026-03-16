@@ -5,11 +5,12 @@ use itertools::Itertools;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 
 /// Maps platform name to `PlatformEntry`
 type KeyringEntry = HashMap<String, PlatformEntry>;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct PlatformEntry {
   /// Maps tenant name to `TenantEntry`
   tenants: HashMap<String, TenantEntry>,
@@ -19,6 +20,14 @@ struct PlatformEntry {
 struct TenantEntry {
   /// Maps secret names to their value
   secrets: HashMap<String, String>,
+}
+
+impl Debug for TenantEntry {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    let mut builder = f.debug_struct("TenantEntry");
+    builder.field("secrets", &self.secrets.keys().map(|key| (key, "[redacted]")).collect::<HashMap<_, _>>());
+    builder.finish()
+  }
 }
 
 /// # Get secret from keyring
@@ -120,13 +129,22 @@ pub(crate) fn upsert_secret_to_keyring(platform: &DshPlatform, tenant_name: &str
   let target = format!("{}@{}", tenant_name, platform);
   match get_keyring_entry()? {
     Some(mut keyring_entry) => {
-      let platform_entry = keyring_entry.entry(platform.name().to_string());
-      platform_entry.and_modify(|pe| {
-        let tenant_entry = pe.tenants.entry(tenant_name.to_string());
-        tenant_entry.and_modify(|tenant| {
-          _ = tenant.secrets.insert(secret_name.to_string(), secret_value.to_string());
+      keyring_entry
+        .entry(platform.name().to_string())
+        .and_modify(|pe| {
+          let tenant_entry = pe.tenants.entry(tenant_name.to_string());
+          tenant_entry
+            .and_modify(|tenant| {
+              _ = tenant.secrets.insert(secret_name.to_string(), secret_value.to_string());
+            })
+            .or_insert(TenantEntry { secrets: HashMap::from([(secret_name.to_string(), secret_value.to_string())]) });
+        })
+        .or_insert(PlatformEntry {
+          tenants: HashMap::from([(
+            tenant_name.to_string(),
+            TenantEntry { secrets: HashMap::from([(secret_name.to_string(), secret_value.to_string())]) },
+          )]),
         });
-      });
       debug!("secret '{}' for '{}' upserted in keyring", secret_name, target);
       set_keyring_entry(&keyring_entry)
     }

@@ -245,7 +245,7 @@ impl Label for RobotLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    false
+    matches!(self, Self::PlatformName)
   }
 }
 
