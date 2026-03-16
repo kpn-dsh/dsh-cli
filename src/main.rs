@@ -1052,7 +1052,7 @@ async fn create_clients_access_token(matches: &ArgMatches, requirements: &Requir
     if requirements.all_tenants_allowed() {
       create_clients_for_all_authorized_tenants(target_platform).await
     } else {
-      return Err(DshCliError::String("command is not allowed to run for all tenants".to_string()));
+      Err(DshCliError::String("command is not allowed to run for all tenants".to_string()))
     }
   } else {
     match matches.get_one::<String>(TARGET_TENANTS_ARGUMENT) {
