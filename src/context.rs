@@ -357,7 +357,8 @@ impl Context {
   /// 1. When not run from a terminal confirmation is always false.
   pub(crate) fn confirmed(&self, prompt: impl Display) -> DshCliResult<bool> {
     if self.force {
-      self.wprintln(format!("{}, confirmed by --force option", prompt));
+      self.wprintln(format!("{}", prompt));
+      self.wprintln("confirmed by --force option");
       Ok(true)
     } else if self.stdin_is_terminal {
       self.wprint(format!("{} [y/N]", prompt));
