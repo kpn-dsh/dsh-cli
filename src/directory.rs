@@ -36,7 +36,6 @@
 
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
 use crate::settings::Settings;
-use crate::targets::{upsert_password_to_keyring, Target};
 use crate::{err, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::platform::DshPlatform;
 use homedir::my_home;
@@ -229,153 +228,6 @@ pub(crate) fn write_settings(settings: Settings) -> DshCliResult<()> {
   }
 }
 
-/// # Delete target directory
-///
-/// This function will delete a target directory (if it exists).
-///
-/// ## Parameters
-/// * `platform` - Target platform.
-/// * `tenant` - Target tenant name.
-///
-/// ## Returns
-/// * `Ok(())` - Indicates that deleting the target directory was successful.
-pub(crate) fn delete_target_directory(platform: &DshPlatform, tenant: &str) -> DshCliResult<bool> {
-  match target_directory_pathbuf(platform, tenant)? {
-    Some(target_directory) => {
-      if target_directory.exists() {
-        if target_directory.is_dir() {
-          fs::remove_dir_all(&target_directory)?;
-          debug!("target directory '{}' deleted", target_directory.display());
-          Ok(true)
-        } else {
-          err!("'{}' is not a directory", target_directory.display())
-        }
-      } else {
-        Ok(false)
-      }
-    }
-    None => err!("dsh directory disabled, target directory cannot be deleted"),
-  }
-}
-
-/// # Read target directory
-///
-/// This function will read the target parameters from the target directory (if it exists).
-/// The `password` field of the returned `Target` will always be `None`.
-///
-/// ## Parameters
-/// * `platform` - target platform
-/// * `tenant` - target tenant name
-///
-/// ## Returns
-/// * `Ok(Some(target))` - If the target directory exists a `Target` will be returned.
-/// * `Ok(None)` - If the target directory does not exist.
-/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
-pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> DshCliResult<Option<Target>> {
-  match target_directory_pathbuf(platform, tenant)? {
-    Some(target_directory) => {
-      if target_directory.exists() {
-        if target_directory.is_dir() {
-          debug!("target read from target directory '{}'", target_directory.display());
-          Ok(Some(Target::new(platform.clone(), tenant.to_string(), None, vec![])))
-        } else {
-          err!("'{}' is not a target directory", target_directory.display())
-        }
-      } else {
-        debug!("target directory '{}' does not exist", target_directory.display());
-        Ok(None)
-      }
-    }
-    None => err!("dsh directory disabled, target cannot be read"),
-  }
-}
-
-/// # Create or update target
-///
-/// This function will create a target settings file if it does not already exist,
-/// or it will update it if it is already there.
-/// If the `Target` has a non-empty `password` field, the password will be stored in the keyring.
-/// Note that this function is not transaction safe in the sense that when
-/// upserting the settings file is successful but storing the password in the keyring is not,
-/// the settings file will not be rolled back.
-/// The function will return an `Err` in this case, describing the situation.
-/// If upserting the settings file fails, the password will not be stored in the keyring.
-///
-/// ## Parameters
-/// * `target` - target to create or update a settings file for
-///
-/// ## Returns
-/// * `Ok(())` - if the target's setting file was successfully created or updated
-/// * `Err(message)` - if an error occurred in either upserting the target's settings file
-///   or the password in the keyring
-pub(crate) fn upsert_target(target: &Target) -> DshCliResult<()> {
-  match target_directory_pathbuf(&target.platform, &target.tenant)? {
-    Some(target_directory_pathbuf) => {
-      let target_file = target_directory_pathbuf.join(format!("{}.{}.toml", &target.platform, &target.tenant));
-      serialize_and_write_to_toml_file(&target_file, target)?;
-      match target.password {
-        Some(ref password) => match upsert_password_to_keyring(password, &target.platform, &target.tenant) {
-          Ok(_) => {
-            debug!("target file '{}' and keyring upserted with target '{}'", target_file.display(), target);
-            Ok(())
-          }
-          Err(keyring_error) => {
-            warn!(
-              "target file '{}' upserted with target '{}', but keyring update failed ({})",
-              target_file.display(),
-              target,
-              keyring_error
-            );
-            Err(keyring_error)
-          }
-        },
-        None => {
-          warn!("target file '{}' upserted with target '{}', but password is empty", target_file.display(), target);
-          Ok(())
-        }
-      }
-    }
-    None => err!("dsh directory disabled, target cannot be upserted"),
-  }
-}
-
-/// # List target directories
-///
-/// This function will read the target parameters from the target directory (if it exists).
-/// The `password` field of the returned `Target` will always be `None`.
-///
-/// ## Parameters
-/// * `platform` - target platform
-/// * `tenant` - target tenant name
-///
-/// ## Returns
-/// * `Ok<Vec<(platform, directory)>>` - If the target directory exists a `Target` will be returned.
-/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
-pub(crate) fn list_targets() -> DshCliResult<Vec<(DshPlatform, String)>> {
-  match dsh_directory_pathbuf(TARGETS_SUBDIRECTORY)? {
-    Some(targets_directory) => {
-      let mut targets = vec![];
-      if targets_directory.exists() && targets_directory.is_dir() {
-        for target_directory_entry in targets_directory.read_dir()?.flatten() {
-          if let Ok(platform) = DshPlatform::try_from(target_directory_entry.file_name().to_string_lossy().to_string().as_str()) {
-            let platform_directory = targets_directory.join(platform.name());
-            if platform_directory.exists() && platform_directory.is_dir() {
-              for tenant_directory_entry in platform_directory.read_dir()?.flatten() {
-                if tenant_directory_entry.path().is_dir() {
-                  targets.push((platform.clone(), tenant_directory_entry.file_name().into_string().unwrap()))
-                }
-              }
-            }
-          }
-        }
-      }
-      targets.sort();
-      Ok(targets)
-    }
-    None => err!("dsh directory disabled, targets cannot be listed"),
-  }
-}
-
 /// # Returns the root dsh directory pathbuf
 ///
 /// This function returns a `Pathbuf` pointing at the root dsh directory, if it is available.
@@ -422,22 +274,6 @@ pub(crate) fn dsh_directory_pathbuf(subdirectory: &str) -> DshCliResult<Option<P
 /// * `Err<DshCliError>` -  Ssh directory could not be determined.
 fn refresh_token_pathbuf(platform: &DshPlatform) -> DshCliResult<Option<PathBuf>> {
   dsh_directory_pathbuf(&format!("{}/{}/{}", TARGETS_SUBDIRECTORY, platform.name(), REFRESH_TOKEN_FILENAME))
-}
-
-/// Returns `PathBuf` for target directory
-///
-/// Return the [PathBuf] for the target directory for the provided `platform` and `tenant`.
-/// The directory name will be "$HOME/.dsh_cli/targets/\[platform.name\]/\[target\]".
-///
-/// * `platform` - Target platform.
-/// * `tenant` - Target tenant name.
-///
-/// ## Returns
-/// * `Ok<Some<PathBuf>>` - Pathbuf of the target directory for `platform` and `tenant`.
-/// * `Ok<PathBuf>` - Dsh tool does not support storing state and settings.
-/// * `Err<DshCliError>` -  Dsh directory could not be determined.
-fn target_directory_pathbuf(platform: &DshPlatform, tenant: &str) -> DshCliResult<Option<PathBuf>> {
-  dsh_directory_pathbuf(&format!("{}/{}/{}", TARGETS_SUBDIRECTORY, platform.name(), tenant))
 }
 
 /// Create parent directory

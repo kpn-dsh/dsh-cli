@@ -15,7 +15,6 @@ pub(crate) mod service;
 pub(crate) mod setting;
 #[cfg(feature = "manage")]
 pub(crate) mod stream;
-pub(crate) mod target;
 #[cfg(feature = "manage")]
 pub(crate) mod tenant;
 pub(crate) mod token;
