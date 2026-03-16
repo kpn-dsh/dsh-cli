@@ -534,7 +534,7 @@ impl CommandExecutor for SecretShowValue {
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
+    Requirements::new(false, true)
   }
 }
 

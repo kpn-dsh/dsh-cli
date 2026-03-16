@@ -6,9 +6,9 @@
 )]
 extern crate core;
 
-use crate::arguments::PLATFORM_NAME_ARGUMENT;
+use crate::arguments::{PLATFORM_NAME_ARGUMENT, TENANT_NAME_ARGUMENT};
 use crate::authentication::{get_access_token, get_access_tokens, AuthenticationMethod};
-use crate::directory::{get_settings, init_dsh_directory, read_target, supports_dsh_directory};
+use crate::directory::{get_settings, init_dsh_directory, supports_dsh_directory};
 use crate::environment_variables::{
   env_var_argument, env_var_file_argument, env_vars_argument, environment_variable, get_configured_environment_variables, print_environment_variable, print_environment_variables,
   ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
@@ -18,8 +18,10 @@ use crate::global_arguments::{
   authentication_argument, browser_argument, environment_variable_argument, no_csv_headers_argument, target_tenants_all_argument, target_tenants_argument,
   TARGET_TENANTS_ALL_ARGUMENT, TARGET_TENANTS_ARGUMENT,
 };
+use crate::keyring::get_secret_from_keyring;
 use crate::releases::{newer_release, newer_release_notification};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
+use crate::subject::Requirements;
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -31,6 +33,7 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::dsh_api_client_factory::{DshApiClientFactory, DshApiPlatformClientFactory};
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
+use dsh_api::secret::ROBOT_SECRET;
 use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
@@ -76,14 +79,12 @@ use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
 #[cfg(feature = "manage")]
 use subjects::stream::STREAM_SUBJECT;
-use subjects::target::TARGET_SUBJECT;
 #[cfg(feature = "manage")]
 use subjects::tenant::TENANT_SUBJECT;
 use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
 use subjects::vhost::VHOST_SUBJECT;
 use subjects::volume::VOLUME_SUBJECT;
-use targets::get_target_password_from_keyring;
 
 mod argument_parsers;
 mod arguments;
@@ -113,7 +114,6 @@ mod settings;
 mod style;
 mod subject;
 mod subjects;
-mod targets;
 mod verbosity;
 
 lazy_static! {
@@ -271,7 +271,6 @@ async fn inner_main() -> DshCliExit {
     VHOST_SUBJECT.as_ref(),
     VOLUME_SUBJECT.as_ref(),
     SETTING_SUBJECT.as_ref(),
-    TARGET_SUBJECT.as_ref(),
   ];
 
   let mut subject_registry: HashMap<String, &(dyn Subject + Send + Sync)> = HashMap::new();
@@ -400,7 +399,7 @@ async fn inner_main() -> DshCliExit {
         let requirements = subject.requirements(sub_matches);
         debug!("{}", requirements);
         if requirements.needs_dsh_api_client() {
-          let clients = match create_clients(&matches, &context).await {
+          let clients = match create_clients(&matches, &requirements, &context).await {
             Ok(Some(clients)) => clients,
             Ok(None) => return DshCliExit::ErrContext("user is not authenticated".to_string(), Box::new(context)),
             Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
@@ -430,7 +429,7 @@ async fn inner_main() -> DshCliExit {
           let requirements = subject_list_shortcut.requirements_list_shortcut(sub_matches);
           debug!("{}", requirements);
           if requirements.needs_dsh_api_client() {
-            let clients = match create_clients(&matches, &context).await {
+            let clients = match create_clients(&matches, &requirements, &context).await {
               Ok(Some(clients)) => clients,
               Ok(None) => return DshCliExit::ErrContext("user is not authenticated".to_string(), Box::new(context)),
               Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
@@ -804,6 +803,46 @@ fn get_platform_and_tenant(matches: &ArgMatches, settings: &Settings) -> Result<
   Ok((platform, tenant))
 }
 
+/// # Get platform from argument or prompt
+///
+/// This method will get the target platform. It will try the sources listed below and returns
+/// at the first match.
+/// 1. Command line argument `--platform`.
+/// 1. Ask the user to enter the value.
+///
+/// ## Parameters
+/// * `matches` - Parsed clap command line arguments.
+///
+/// ## Returns
+/// * `Ok<Platform>`  - Platform.
+/// * `Err<DshCliError>` - Error message.
+pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<DshPlatform> {
+  match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
+    Some(dsh_platform) => Ok(DshPlatform::try_from(dsh_platform.as_str())?),
+    None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
+  }
+}
+
+/// # Get tenant from argument or prompt
+///
+/// This method will get the tenant name. It will try the sources listed below and returns
+/// at the first match.
+/// 1. Command line argument `--platform`.
+/// 1. Ask the user to enter the value.
+///
+/// ## Parameters
+/// * `matches` - Parsed clap command line arguments.
+///
+/// ## Returns
+/// * `Ok<String>`  - Tenant name.
+/// * `Err<DshCliError>` - Error message.
+pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<String> {
+  match matches.get_one::<String>(TENANT_NAME_ARGUMENT) {
+    Some(tenant_argument) => Ok(tenant_argument.to_string()),
+    None => Ok(read_single_line("enter tenant: ")?),
+  }
+}
+
 /// # Get the target password
 ///
 /// This method will get the target password.
@@ -835,15 +874,12 @@ fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> D
           debug!("target password (environment variable '{}')", ENV_VAR_DSH_CLI_PASSWORD);
           Ok(password_from_env_var)
         }
-        None => match (
-          read_target(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
-          get_target_password_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name())?,
-        ) {
-          (Some(_), Some(password_from_keyring)) => {
+        None => match get_secret_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name(), ROBOT_SECRET)? {
+          Some(password_from_keyring) => {
             debug!("target exists, password read (keyring)");
             Ok(password_from_keyring)
           }
-          _ => {
+          None => {
             if stdin().is_terminal() {
               read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
             } else {
@@ -968,10 +1004,10 @@ where
 /// * `Ok(Some(Vec<Client>))` - Client were successfully created. Note that there will always be at
 ///   least one client created, else an error is returned.
 /// * `Ok(None)` - User needs to log in.
-async fn create_clients(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
+async fn create_clients(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   match context.authentication_method() {
     AuthenticationMethod::Robot => create_client_robot_password(matches, context).await.map(Some),
-    AuthenticationMethod::SingleSignOn => create_clients_access_token(matches, context).await,
+    AuthenticationMethod::SingleSignOn => create_clients_access_token(matches, requirements, context).await,
   }
 }
 
@@ -1000,19 +1036,24 @@ async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -
 ///
 /// # Parameters
 /// * `matches`
+/// * `requirements`
 /// * `context`
 ///
 /// Returns
 /// * `Ok(Some(Vec<Client>))` - Clients were successfully created. Note that there will always be at
 ///   least one client created, else an error is returned.
 /// * `Ok(None)` - User needs to log in.
-async fn create_clients_access_token(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
+async fn create_clients_access_token(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   if !supports_dsh_directory() {
     return Err(DshCliError::String("single-sign-on requires dsh directory to be enabled".to_string()));
   }
   let target_platform = get_target_platform(matches, context.settings())?;
   if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
-    create_clients_for_all_authorized_tenants(target_platform).await
+    if requirements.all_tenants_allowed() {
+      create_clients_for_all_authorized_tenants(target_platform).await
+    } else {
+      return Err(DshCliError::String("command is not allowed to run for all tenants".to_string()));
+    }
   } else {
     match matches.get_one::<String>(TARGET_TENANTS_ARGUMENT) {
       Some(target_tenants_string) => {

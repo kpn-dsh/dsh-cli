@@ -8,20 +8,25 @@ use std::fmt::{Display, Formatter};
 
 #[derive(PartialEq)]
 pub(crate) struct Requirements {
+  all_tenants_allowed: bool,
   needs_dsh_api_client: bool,
 }
 
 impl Requirements {
-  pub(crate) fn new(needs_dsh_api_client: bool) -> Self {
-    Self { needs_dsh_api_client }
+  pub(crate) fn new(all_tenants_allowed: bool, needs_dsh_api_client: bool) -> Self {
+    Self { all_tenants_allowed, needs_dsh_api_client }
   }
 
   pub(crate) fn standard_with_api() -> Self {
-    Self::new(true)
+    Self::new(true, true)
   }
 
   pub(crate) fn standard_without_api() -> Self {
-    Self::new(false)
+    Self::new(true, false)
+  }
+
+  pub(crate) fn all_tenants_allowed(&self) -> bool {
+    self.all_tenants_allowed
   }
 
   pub(crate) fn needs_dsh_api_client(&self) -> bool {
