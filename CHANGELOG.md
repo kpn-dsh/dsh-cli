@@ -8,10 +8,13 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Added
 
+* Capability to store robot secrets in keyring.
+* Capability to renew the robot secret.
 * Descriptions for publish and release steps.
 
 ### Changed
 
+* Removed the `target` capabilities.
 * Directory structure for docs.
 
 ## [0.9.0] - 2026-03-05
