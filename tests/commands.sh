@@ -134,6 +134,17 @@ export SAFE_COMMANDS=(
   "proxy list"
   "proxy show $PROXY_UNDER_TEST"
 
+  "robot copy -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST"
+  "robot copy"
+  "robot list -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST"
+  "robot list"
+  "robot set --dry-run --authentication sso < /dev/null"
+  "robot set -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST --dry-run --authentication sso < /dev/null"
+  "robot unset --force --dry-run"
+  "robot unset -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST --force --dry-run"
+  "robots -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST"
+  "robots"
+
   "secret copy $SECRET_NAME_UNDER_TEST"
   "secret create $SECRET_NON_EXISTING --dry-run --authentication sso < /dev/null"
   "secret delete $SECRET_NAME_UNDER_TEST --force --dry-run"
