@@ -21,6 +21,7 @@ pub(crate) const FIND_COMMAND: &str = "find";
 pub(crate) const FIND_COMMAND_ALIAS: &str = "f";
 #[cfg(feature = "manage")]
 pub(crate) const GRANT_COMMAND: &str = "grant";
+pub(crate) const IMPORT_COMMAND: &str = "import";
 pub(crate) const LIST_COMMAND: &str = "list";
 pub(crate) const LIST_COMMAND_ALIAS: &str = "l";
 pub(crate) const OPEN_COMMAND: &str = "open";
