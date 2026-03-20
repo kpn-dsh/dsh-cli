@@ -50,8 +50,8 @@ the file `$HOME/.dsh_cli/targets/np-aws-lz-dsh/greenbox-dev`:
 
 When using the `robot` authentication method, each platform/tenant combination also needs a
 password. These passwords are not stored in the target files. For security reasons, passwords
-are stored in your computers keychain, supported for Mac OsX and Windows. Support for the linux
-keychain is available, but not tested yet.
+are stored in your computers keyring, supported for Mac OsX and Windows. Support for the linux
+keyring is available, but not tested yet.
 
 When using the `single-sign-on` authentication method, an encrypted refresh token for the
 platform needs to be stored in the platforms directory.

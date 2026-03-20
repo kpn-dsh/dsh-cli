@@ -12,7 +12,7 @@ DUT=.dsh_cli_under_test
 #
 # * Tenant $TUT exists at platform $PUT
 # * Password file $PFUT exists and contains the password for tenant $TUT at platform $PUT
-# * You will be asked to enter your keychain password (use "Always Allow" or you'll have to provide it multiple times)
+# * You will be asked to enter your keyring password (use "Always Allow" or you'll have to provide it multiple times)
 
 PUT_NA=prod-azure-dsh
 TUT_NE=nope

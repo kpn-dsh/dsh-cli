@@ -16,7 +16,7 @@ Below in an overview of the capabilities of the `dsh` tool:
 * Extensive help information on each level using the `--help` and `-h` flags,
   including listings of all available operations.
 * Configuring platform and tenant credentials interactively via the `dsh` tool.
-  Sensitive passwords are stored in your computer's keychain, if available.
+  Sensitive passwords are stored in your computer's keyring, if available.
 * Retrieving information about the available platforms.
 * Opening web applications (e.g. the console, the swagger ui or the vhost of your app or service)
   from the command line.
