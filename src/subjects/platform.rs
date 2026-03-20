@@ -1,13 +1,15 @@
 use crate::arguments::{
-  app_id_argument, bucket_id_argument, platform_name_argument, service_id_argument, topic_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT,
-  BUCKET_ID_ARGUMENT, PLATFORM_NAME_ARGUMENT, SERVICE_ID_ARGUMENT, TOPIC_ID_ARGUMENT, VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
+  app_id_argument, bucket_id_argument, platform_name_argument, proxy_id_argument, service_id_argument, topic_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT,
+  BUCKET_ID_ARGUMENT, PLATFORM_NAME_ARGUMENT, PROXY_ID_ARGUMENT, SERVICE_ID_ARGUMENT, TOPIC_ID_ARGUMENT, VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
 };
 use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
+use crate::settings::Settings;
 use crate::subject::{Requirements, Subject};
 use crate::{err, get_target_platform, get_target_tenant, get_target_tenant_non_interactive, read_single_line, DshCliResult};
 use arboard::Clipboard;
@@ -103,6 +105,7 @@ lazy_static! {
       .add_extra_arguments(vec![
         app_id_argument().long("app"),
         bucket_id_argument().long("bucket"),
+        proxy_id_argument().long("proxy"),
         service_id_argument().long("service"),
         topic_id_argument().long("topic"),
         vendor_name_argument().long("vendor"),
@@ -281,68 +284,19 @@ impl CommandExecutor for PlatformShow {
       Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
       None => get_target_platform(matches, context.settings())?,
     };
-
     context.print_explanation(format!("list all configured parameters for platform '{}'", platform));
     UnitFormatter::new(platform.name(), &DSH_PLATFORM_LABELS_CONFIGURATION, context).print(&platform, None)?;
-
     context.print_explanation(format!("list all derived parameters for platform '{}'", platform));
     UnitFormatter::new(platform.name(), &DSH_PLATFORM_LABELS_DERIVED, context).print(&platform, None)?;
-
-    let tenant = get_target_tenant_non_interactive(matches, context.settings())?;
-    let app_id = matches.get_one::<String>(APP_ID_ARGUMENT).cloned();
-    let bucket_id = matches.get_one::<String>(BUCKET_ID_ARGUMENT).cloned();
-    let service_id = matches.get_one::<String>(SERVICE_ID_ARGUMENT).cloned();
-    let topic_id = matches.get_one::<String>(TOPIC_ID_ARGUMENT).cloned();
-    let vendor_id = matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned();
-    let vhost = matches.get_one::<String>(VHOST_ID_ARGUMENT).cloned();
-    let arguments = [
-      tenant.as_ref().map(|tenant| format!("tenant '{}'", tenant)),
-      app_id.as_ref().map(|app_id| format!("app '{}'", app_id)),
-      bucket_id.as_ref().map(|bucket_id| format!("bucket '{}'", bucket_id)),
-      service_id.as_ref().map(|service_id| format!("service '{}'", service_id)),
-      topic_id.as_ref().map(|topic_id| format!("topic '{}'", topic_id)),
-      vendor_id.as_ref().map(|vendor_id| format!("vendor '{}'", vendor_id)),
-      vhost.as_ref().map(|vhost| format!("vhost '{}'", vhost)),
-    ]
-    .into_iter()
-    .flatten()
-    .collect_vec();
-
-    if !arguments.is_empty() {
-      context.print_explanation(format!(
-        "list all derived parameters for platform '{}' and argument{} {}",
-        platform,
-        if arguments.len() > 1 { "s" } else { "" },
-        arguments.iter().join(", ")
-      ));
-
+    let provided_arguments = ProvidedArguments::try_from((matches, context.settings()))?;
+    if let Some(description) = provided_arguments.describe() {
+      context.print_explanation(format!("list all derived parameters for platform '{}' and arguments {}", platform, description));
       let labels = DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS
         .iter()
-        .filter(|label| {
-          let (app_id_required, bucket_id_required, service_id_required, tenant_required, topic_required, vendor_id_required, vhost_required) = label.requirements();
-          (!app_id_required || app_id.is_some())
-            && (!bucket_id_required || bucket_id.is_some())
-            && (!service_id_required || service_id.is_some())
-            && (!tenant_required || tenant.is_some())
-            && (!topic_required || topic_id.is_some())
-            && (!vendor_id_required || vendor_id.is_some())
-            && (!vhost_required || vhost.is_some())
-        })
+        .filter(|label| label.all_required_arguments_provided(&provided_arguments))
         .map(|label| label.to_owned())
         .collect_vec();
-      UnitFormatter::new(platform.name(), labels.as_slice(), context).print_non_serializable(
-        &(
-          platform.clone(),
-          app_id.unwrap_or_default(),
-          bucket_id.unwrap_or_default(),
-          service_id.unwrap_or_default(),
-          tenant.unwrap_or_default(),
-          topic_id.unwrap_or_default(),
-          vendor_id.unwrap_or_default(),
-          vhost.unwrap_or_default(),
-        ),
-        None,
-      )
+      UnitFormatter::new(platform.name(), labels.as_slice(), context).print_non_serializable(&(platform.clone(), provided_arguments), None)
     } else {
       Ok(())
     }
@@ -364,6 +318,58 @@ fn get_service_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<String> 
   match matches.get_one::<String>(SERVICE_ID_ARGUMENT) {
     Some(service_argument) => Ok(service_argument.to_string()),
     None => Ok(read_single_line("enter service: ")?),
+  }
+}
+
+struct ProvidedArguments {
+  app_id: Option<String>,
+  bucket_id: Option<String>,
+  proxy_id: Option<String>,
+  service_id: Option<String>,
+  tenant: Option<String>,
+  topic_id: Option<String>,
+  vendor_id: Option<String>,
+  vhost: Option<String>,
+}
+
+impl ProvidedArguments {
+  fn describe(&self) -> Option<String> {
+    let arguments = [
+      self.tenant.as_ref().map(|tenant| format!("tenant '{}'", tenant)),
+      self.app_id.as_ref().map(|app_id| format!("app '{}'", app_id)),
+      self.bucket_id.as_ref().map(|bucket_id| format!("bucket '{}'", bucket_id)),
+      self.proxy_id.as_ref().map(|proxy_id| format!("proxy '{}'", proxy_id)),
+      self.service_id.as_ref().map(|service_id| format!("service '{}'", service_id)),
+      self.topic_id.as_ref().map(|topic_id| format!("topic '{}'", topic_id)),
+      self.vendor_id.as_ref().map(|vendor_id| format!("vendor '{}'", vendor_id)),
+      self.vhost.as_ref().map(|vhost| format!("vhost '{}'", vhost)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect_vec();
+    if arguments.is_empty() {
+      None
+    } else {
+      Some(arguments.join(", "))
+    }
+  }
+}
+
+impl TryFrom<(&ArgMatches, &Settings)> for ProvidedArguments {
+  type Error = DshCliError;
+
+  fn try_from(value: (&ArgMatches, &Settings)) -> Result<Self, Self::Error> {
+    let (matches, settings) = value;
+    Ok(Self {
+      app_id: matches.get_one::<String>(APP_ID_ARGUMENT).cloned(),
+      bucket_id: matches.get_one::<String>(BUCKET_ID_ARGUMENT).cloned(),
+      proxy_id: matches.get_one::<String>(PROXY_ID_ARGUMENT).cloned(),
+      service_id: matches.get_one::<String>(SERVICE_ID_ARGUMENT).cloned(),
+      tenant: get_target_tenant_non_interactive(matches, settings)?,
+      topic_id: matches.get_one::<String>(TOPIC_ID_ARGUMENT).cloned(),
+      vendor_id: matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned(),
+      vhost: matches.get_one::<String>(VHOST_ID_ARGUMENT).cloned(),
+    })
   }
 }
 
@@ -399,6 +405,12 @@ enum DshPlatformLabel {
   HttpMessagingApiUrlSingle,
   InternalDomain,
   InternalServiceDomain,
+  ProxyBrokerVhost,
+  ProxyCommonName,
+  ProxyConsumerName,
+  ProxyConsumerNameAclGroup,
+  ProxySchemaStoreVhost,
+  ProxyVhostDomain,
   PublicVhostDomain,
   TenantAppCatalogAppUrl,
   TenantAppCatalogUrl,
@@ -408,6 +420,10 @@ enum DshPlatformLabel {
   TenantDataCatalogUrl,
   TenantMonitoringUrl,
   TenantPrivateVhostDomain,
+  TenantProxyPrivateBootstrapServers,
+  TenantProxyPrivateSchemaStoreHost,
+  TenantProxyPublicBootstrapServers,
+  TenantProxyPublicSchemaStoreHost,
   TenantPublicAppDomain,
   TenantPublicAppsDomain,
   TenantServiceConsoleUrl,
@@ -446,6 +462,12 @@ impl Label for DshPlatformLabel {
       Self::HttpMessagingApiUrlSingle => "http messaging api url (single)",
       Self::InternalDomain => "internal domain",
       Self::InternalServiceDomain => "internal domain (service)",
+      Self::ProxyBrokerVhost => "proxy broker vhost",
+      Self::ProxyCommonName => "proxy common name",
+      Self::ProxyConsumerName => "proxy consumer name",
+      Self::ProxyConsumerNameAclGroup => "proxy consumer name acl group",
+      Self::ProxySchemaStoreVhost => "proxy schema store vhost",
+      Self::ProxyVhostDomain => "proxy vhost domain",
       Self::PublicVhostDomain => "public vhost domain",
       Self::TenantAppCatalogAppUrl => "app catalog url (app/tenant)",
       Self::TenantAppCatalogUrl => "app catalog url (tenant)",
@@ -455,6 +477,10 @@ impl Label for DshPlatformLabel {
       Self::TenantDataCatalogUrl => "data catalog url (tenant)",
       Self::TenantMonitoringUrl => "monitoring url (tenant)",
       Self::TenantPrivateVhostDomain => "private domain (tenant/vhost)",
+      Self::TenantProxyPrivateBootstrapServers => "tenant proxy private bootstrap servers",
+      Self::TenantProxyPrivateSchemaStoreHost => "tenant proxy private schema store host",
+      Self::TenantProxyPublicBootstrapServers => "tenant proxy public bootstrap servers",
+      Self::TenantProxyPublicSchemaStoreHost => "tenant proxy public schema store host",
       Self::TenantPublicAppDomain => "public domain (app/tenant)",
       Self::TenantPublicAppsDomain => "public apps domain (tenant)",
       Self::TenantServiceConsoleUrl => "console url (service/tenant)",
@@ -499,10 +525,18 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
   }
 }
 
-// Subject formatter for (DshPlatform, app, bucket, service, tenant, vendor, vhost) septets
-impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String, String, String, String, String) {
+// Subject formatter for (DshPlatform, ProvidedArguments) tuple
+impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
   fn value(&self, label: &DshPlatformLabel, target_id: &str) -> Value {
-    let (platform, app_id, bucket_id, service_id, tenant, topic, vendor_id, vhost) = self;
+    let (platform, provided_arguments) = self;
+    let app_id = provided_arguments.app_id.clone().unwrap_or_default();
+    let bucket_id = provided_arguments.bucket_id.clone().unwrap_or_default();
+    let proxy_name = provided_arguments.proxy_id.clone().unwrap_or_default();
+    let service_id = provided_arguments.service_id.clone().unwrap_or_default();
+    let tenant = provided_arguments.tenant.clone().unwrap_or_default();
+    let topic = provided_arguments.topic_id.clone().unwrap_or_default();
+    let vendor_id = provided_arguments.vendor_id.clone().unwrap_or_default();
+    let vhost = provided_arguments.vhost.clone().unwrap_or_default();
     match label {
       // Derived from configuration and arguments
       DshPlatformLabel::BucketName => Value::plain(platform.bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID")).unwrap_or_else(|error| error)),
@@ -510,6 +544,12 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
       DshPlatformLabel::HttpMessagingApiUrlSingle => Value::plain(platform.http_messaging_api_url_single(topic)),
       DshPlatformLabel::InternalDomain => Value::plain(platform.internal_domain(tenant)),
       DshPlatformLabel::InternalServiceDomain => Value::plain(platform.internal_service_domain(tenant, service_id)),
+      DshPlatformLabel::ProxyBrokerVhost => Value::plain(platform.proxy_broker_vhost(tenant, proxy_name, 0)),
+      DshPlatformLabel::ProxyCommonName => Value::plain(platform.proxy_common_name(tenant)),
+      DshPlatformLabel::ProxyConsumerName => Value::plain(platform.proxy_consumer_name(tenant, proxy_name, 0)),
+      DshPlatformLabel::ProxyConsumerNameAclGroup => Value::plain(platform.proxy_consumer_name_acl_group(tenant, "acl-group-name", proxy_name, 0)),
+      DshPlatformLabel::ProxySchemaStoreVhost => Value::plain(platform.proxy_schema_store_vhost(tenant, proxy_name)),
+      DshPlatformLabel::ProxyVhostDomain => Value::plain(platform.proxy_vhost_domain(tenant)),
       DshPlatformLabel::PublicVhostDomain => Value::plain(platform.public_vhost_domain(vhost)),
       DshPlatformLabel::TenantAppCatalogAppUrl => Value::plain(platform.tenant_app_catalog_app_url(tenant, vendor_id, app_id)),
       DshPlatformLabel::TenantAppCatalogUrl => Value::plain(platform.tenant_app_catalog_url(tenant)),
@@ -518,6 +558,15 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, String, String, String
       DshPlatformLabel::TenantConsoleUrl => Value::plain(platform.tenant_console_url(tenant)),
       DshPlatformLabel::TenantDataCatalogUrl => Value::plain(platform.tenant_data_catalog_url(tenant)),
       DshPlatformLabel::TenantMonitoringUrl => Value::plain(platform.tenant_monitoring_url(tenant)),
+      DshPlatformLabel::TenantProxyPrivateBootstrapServers => Value::option(
+        platform
+          .tenant_proxy_private_bootstrap_servers(tenant, proxy_name, 2)
+          .ok()
+          .map(|server| server.join("\n")),
+      ),
+      DshPlatformLabel::TenantProxyPrivateSchemaStoreHost => Value::option(platform.tenant_proxy_private_schema_store_host(tenant, proxy_name).ok()),
+      DshPlatformLabel::TenantProxyPublicBootstrapServers => Value::plain(platform.tenant_proxy_public_bootstrap_servers(tenant, proxy_name, 2).join("\n")),
+      DshPlatformLabel::TenantProxyPublicSchemaStoreHost => Value::plain(platform.tenant_proxy_public_schema_store_host(tenant, proxy_name)),
       DshPlatformLabel::TenantPrivateVhostDomain => Value::ok_or(platform.tenant_private_vhost_domain(tenant, vhost), "private domain not configured"),
       DshPlatformLabel::TenantPublicAppDomain => Value::plain(platform.tenant_public_app_domain(tenant, app_id)),
       DshPlatformLabel::TenantPublicAppsDomain => Value::plain(platform.tenant_public_domain(tenant)),
@@ -556,7 +605,7 @@ static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 13] = [
   DshPlatformLabel::ClientId,
 ];
 
-static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 18] = [
+static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 28] = [
   DshPlatformLabel::Parameter,
   DshPlatformLabel::BucketName,
   DshPlatformLabel::InternalDomain,
@@ -565,6 +614,16 @@ static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 18] = [
   DshPlatformLabel::HttpMessagingApiUrlMulti,
   DshPlatformLabel::HttpMessagingApiUrlSingle,
   DshPlatformLabel::TenantPrivateVhostDomain,
+  DshPlatformLabel::ProxyBrokerVhost,
+  DshPlatformLabel::ProxyCommonName,
+  DshPlatformLabel::ProxyConsumerName,
+  DshPlatformLabel::ProxyConsumerNameAclGroup,
+  DshPlatformLabel::ProxySchemaStoreVhost,
+  DshPlatformLabel::ProxyVhostDomain,
+  DshPlatformLabel::TenantProxyPrivateBootstrapServers,
+  DshPlatformLabel::TenantProxyPrivateSchemaStoreHost,
+  DshPlatformLabel::TenantProxyPublicBootstrapServers,
+  DshPlatformLabel::TenantProxyPublicSchemaStoreHost,
   DshPlatformLabel::PublicVhostDomain,
   DshPlatformLabel::TenantPublicAppDomain,
   DshPlatformLabel::TenantPublicAppsDomain,
@@ -580,32 +639,168 @@ static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 18] = [
 static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
   [DshPlatformLabel::Parameter, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
 
+/// Defines the parameters that are required for a `Label` variant.
+/// * `app_id_required`
+/// * `bucket_id_required`
+/// * `proxy_id_required`
+/// * `service_id_required`
+/// * `tenant_required`
+/// * `topic_required`
+/// * `vendor_id_required`
+/// * `vhost_required`
+struct RequiredArguments {
+  app_id_required: bool,
+  bucket_id_required: bool,
+  proxy_id_required: bool,
+  service_id_required: bool,
+  tenant_required: bool,
+  topic_required: bool,
+  vendor_id_required: bool,
+  vhost_required: bool,
+}
+
 impl DshPlatformLabel {
-  /// Returns the parameters that are required for a `Label` variant.
-  /// * `app_id_required`
-  /// * `bucket_id_required`
-  /// * `service_id_required`
-  /// * `tenant_required`
-  /// * `topic_required`
-  /// * `vendor_id_required`
-  /// * `vhost_required`
-  fn requirements(&self) -> (bool, bool, bool, bool, bool, bool, bool) {
+  fn required_arguments(&self) -> RequiredArguments {
     match self {
-      DshPlatformLabel::BucketName => (false, true, false, true, false, false, false),
-      DshPlatformLabel::TenantAppCatalogAppUrl => (true, false, false, true, false, true, false),
-      DshPlatformLabel::TenantAppConsoleUrl | DshPlatformLabel::TenantPublicAppDomain => (true, false, false, true, false, false, false),
-      DshPlatformLabel::TenantServiceConsoleUrl | DshPlatformLabel::InternalServiceDomain => (false, false, true, true, false, false, false),
+      DshPlatformLabel::BucketName => REQUIRED_ARGUMENTS_BUCKET_TENANT,
+      DshPlatformLabel::TenantAppCatalogAppUrl => REQUIRED_ARGUMENTS_APP_TENANT_VENDOR,
+      DshPlatformLabel::TenantAppConsoleUrl | DshPlatformLabel::TenantPublicAppDomain => REQUIRED_ARGUMENTS_APP_TENANT,
+      DshPlatformLabel::TenantServiceConsoleUrl | DshPlatformLabel::InternalServiceDomain => REQUIRED_ARGUMENTS_SERVICE_TENANT,
       DshPlatformLabel::InternalDomain
       | DshPlatformLabel::TenantAppCatalogUrl
       | DshPlatformLabel::TenantClientId
       | DshPlatformLabel::TenantConsoleUrl
       | DshPlatformLabel::TenantDataCatalogUrl
       | DshPlatformLabel::TenantMonitoringUrl
-      | DshPlatformLabel::TenantPublicAppsDomain => (false, false, false, true, false, false, false),
-      DshPlatformLabel::HttpMessagingApiUrlMulti | DshPlatformLabel::HttpMessagingApiUrlSingle => (false, false, false, false, true, false, false),
-      DshPlatformLabel::TenantPrivateVhostDomain => (false, false, false, true, false, false, true),
-      DshPlatformLabel::PublicVhostDomain => (false, false, false, false, false, false, true),
-      _ => (false, false, false, false, false, false, false),
+      | DshPlatformLabel::TenantPublicAppsDomain
+      | DshPlatformLabel::ProxyCommonName
+      | DshPlatformLabel::ProxyVhostDomain => REQUIRED_ARGUMENTS_TENANT,
+      DshPlatformLabel::HttpMessagingApiUrlMulti | DshPlatformLabel::HttpMessagingApiUrlSingle => REQUIRED_ARGUMENTS_TOPIC,
+      DshPlatformLabel::TenantPrivateVhostDomain => REQUIRED_ARGUMENTS_TENANT_VHOST,
+      DshPlatformLabel::ProxyBrokerVhost
+      | DshPlatformLabel::ProxyConsumerName
+      | DshPlatformLabel::ProxyConsumerNameAclGroup
+      | DshPlatformLabel::ProxySchemaStoreVhost
+      | DshPlatformLabel::TenantProxyPrivateBootstrapServers
+      | DshPlatformLabel::TenantProxyPrivateSchemaStoreHost
+      | DshPlatformLabel::TenantProxyPublicBootstrapServers
+      | DshPlatformLabel::TenantProxyPublicSchemaStoreHost => REQUIRED_ARGUMENTS_PROXY_TENANT,
+      DshPlatformLabel::PublicVhostDomain => REQUIRED_ARGUMENTS_VHOST,
+      _ => REQUIRED_ARGUMENTS_NONE,
     }
   }
+
+  fn all_required_arguments_provided(&self, provided_argument: &ProvidedArguments) -> bool {
+    let RequiredArguments { app_id_required, bucket_id_required, proxy_id_required, service_id_required, tenant_required, topic_required, vendor_id_required, vhost_required } =
+      self.required_arguments();
+    (!app_id_required || provided_argument.app_id.is_some())
+      && (!bucket_id_required || provided_argument.bucket_id.is_some())
+      && (!proxy_id_required || provided_argument.proxy_id.is_some())
+      && (!service_id_required || provided_argument.service_id.is_some())
+      && (!tenant_required || provided_argument.tenant.is_some())
+      && (!topic_required || provided_argument.topic_id.is_some())
+      && (!vendor_id_required || provided_argument.vendor_id.is_some())
+      && (!vhost_required || provided_argument.vhost.is_some())
+  }
 }
+
+const REQUIRED_ARGUMENTS_BUCKET_TENANT: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: true,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: true,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: false,
+};
+const REQUIRED_ARGUMENTS_APP_TENANT_VENDOR: RequiredArguments = RequiredArguments {
+  app_id_required: true,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: true,
+  topic_required: false,
+  vendor_id_required: true,
+  vhost_required: false,
+};
+const REQUIRED_ARGUMENTS_APP_TENANT: RequiredArguments = RequiredArguments {
+  app_id_required: true,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: true,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: false,
+};
+const REQUIRED_ARGUMENTS_SERVICE_TENANT: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: true,
+  tenant_required: true,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: false,
+};
+const REQUIRED_ARGUMENTS_TENANT: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: true,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: false,
+};
+const REQUIRED_ARGUMENTS_TOPIC: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: false,
+  topic_required: true,
+  vendor_id_required: false,
+  vhost_required: false,
+};
+const REQUIRED_ARGUMENTS_TENANT_VHOST: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: true,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: true,
+};
+const REQUIRED_ARGUMENTS_PROXY_TENANT: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: false,
+  proxy_id_required: true,
+  service_id_required: false,
+  tenant_required: true,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: false,
+};
+const REQUIRED_ARGUMENTS_VHOST: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: false,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: true,
+};
+const REQUIRED_ARGUMENTS_NONE: RequiredArguments = RequiredArguments {
+  app_id_required: false,
+  bucket_id_required: false,
+  proxy_id_required: false,
+  service_id_required: false,
+  tenant_required: false,
+  topic_required: false,
+  vendor_id_required: false,
+  vhost_required: false,
+};
