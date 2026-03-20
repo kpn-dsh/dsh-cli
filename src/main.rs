@@ -92,6 +92,7 @@ mod authentication;
 mod autocomplete;
 mod capability;
 mod capability_builder;
+mod certificates;
 mod cipher;
 mod context;
 mod directory;
@@ -666,7 +667,7 @@ fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings
 ///
 /// This method will get the target platform.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--platform`.
+/// 1. Command line argument `--platform` or `-p`.
 /// 1. Environment variable `DSH_CLI_PLATFORM`.
 /// 1. Parameter `default-platform` from settings file.
 /// 1. If stdin is a terminal, ask the user to enter the value.
@@ -1086,6 +1087,39 @@ async fn create_clients_access_token(matches: &ArgMatches, requirements: &Requir
         }
       }
     }
+  }
+}
+
+/// Create client for explicit platform and tenant from single sign on
+///
+/// # Parameters
+/// * `api_platform`
+/// * `api_tenant`
+/// * `context`
+///
+/// Returns
+/// * `Ok(Some(Vec<Client>))` - Client successfully created.
+/// * `Ok(None)` - User needs to log in.
+pub(crate) async fn create_client_access_token_from_platform_tenant(api_platform: &DshPlatform, api_tenant: &str, context: &Context) -> DshCliResult<Option<DshApiClient>> {
+  if supports_dsh_directory() {
+    match get_access_token(api_platform.clone()).await {
+      Ok(Some((access_token, jwt))) => {
+        if jwt.authorized_tenants().is_some_and(|authorized_tenants| authorized_tenants.contains(&api_tenant)) {
+          let dsh_api_tenant = DshApiTenant::new(api_tenant, api_platform.clone());
+          let dsh_api_client_factory = DshApiClientFactory::create_from_static_token(dsh_api_tenant, access_token);
+          Ok(Some(dsh_api_client_factory.client().await?))
+        } else {
+          err!("not authorized for tenant '{}' at platform '{}'", api_tenant, api_platform)
+        }
+      }
+      Ok(None) => {
+        context.print_warning(format!("please log in to platform '{}' using the 'dsh login' command", api_platform));
+        Ok(None)
+      }
+      Err(error) => Err(error),
+    }
+  } else {
+    Err(DshCliError::String("single-sign-on requires dsh directory to be enabled".to_string()))
   }
 }
 
