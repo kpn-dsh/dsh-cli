@@ -1,12 +1,13 @@
 use crate::arguments::{platform_name_argument, tenant_name_argument};
-use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND, UPDATE_COMMAND};
+use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND, UPDATE_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::flags::FlagType;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
-use crate::keyring::{get_secret_from_keyring, get_secret_targets, remove_secret_from_keyring, upsert_secret_to_keyring};
+use crate::keyring::{get_secret_from_keyring, get_secrets_from_keyring, remove_secret_from_keyring, upsert_secret_to_keyring};
 use crate::subject::{Requirements, Subject};
-use crate::{get_platform_and_tenant, DshCliResult};
+use crate::{create_client_access_token_from_platform_tenant, get_platform_argument_or_prompt, get_tenant_argument_or_prompt, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -42,6 +43,7 @@ impl Subject for RobotSubject {
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       COPY_COMMAND => Some(ROBOT_COPY_CAPABILITY.as_ref()),
+      IMPORT_COMMAND => Some(ROBOT_IMPORT_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(ROBOT_LIST_CAPABILITY.as_ref()),
       SET_COMMAND => Some(ROBOT_SET_CAPABILITY.as_ref()),
       UNSET_COMMAND => Some(ROBOT_UNSET_CAPABILITY.as_ref()),
@@ -65,6 +67,11 @@ lazy_static! {
   static ref ROBOT_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &RobotList {}, "List stored robot secrets")
   );
+  static ref ROBOT_IMPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(IMPORT_COMMAND, None, &RobotImport {}, "Import the robot secret from the platform secret store")
+    .add_target_argument(platform_name_argument())
+    .add_target_argument(tenant_name_argument())
+  );
   static ref ROBOT_SET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SET_COMMAND, None, &RobotSet {}, "Store robot secret to keyring")
     .add_target_argument(platform_name_argument())
@@ -84,6 +91,7 @@ lazy_static! {
   );
   static ref ROBOT_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     ROBOT_COPY_CAPABILITY.as_ref(),
+    ROBOT_IMPORT_CAPABILITY.as_ref(),
     ROBOT_LIST_CAPABILITY.as_ref(),
     ROBOT_SET_CAPABILITY.as_ref(),
     ROBOT_UNSET_CAPABILITY.as_ref(),
@@ -97,7 +105,8 @@ struct RobotCopy {}
 #[async_trait]
 impl CommandExecutor for RobotCopy {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_platform_and_tenant(matches, context.settings())?;
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
     context.print_explanation(format!("copy robot secret for '{}@{}' to clipboard", platform, tenant));
     match get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)? {
       Some(robot_secret) => match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(robot_secret)) {
@@ -117,6 +126,43 @@ impl CommandExecutor for RobotCopy {
   }
 }
 
+struct RobotImport {}
+
+#[async_trait]
+impl CommandExecutor for RobotImport {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
+    let start_instant = context.now();
+    let robot_secret = client.get_secret(ROBOT_SECRET).await?;
+    context.print_execution_time(start_instant);
+    if context.stdin_is_terminal() {
+      context.print_explanation(format!("copy robot secret for '{}@{}' from platform secret store to keyring", platform, tenant));
+      if get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)?.is_some() {
+        if !context.confirmed(format!("overwrite existing robot secret for '{}@{}' in keyring?", platform, tenant))? {
+          context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored to keyring", platform, tenant));
+          return Ok(());
+        }
+      }
+      if context.dry_run() {
+        context.print_warning("dry-run mode, secret not stored in keyring");
+      } else {
+        match upsert_secret_to_keyring(&platform, &tenant, ROBOT_SECRET, &robot_secret) {
+          Ok(_) => context.print_outcome("robot secret stored in keyring"),
+          Err(_) => context.print_error("robot secret could not be stored in keyring"),
+        }
+      }
+    } else {
+      context.print_warning("command is only available in interactive mode");
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
 struct RobotList {}
 
 #[async_trait]
@@ -124,7 +170,7 @@ impl CommandExecutor for RobotList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     const ROBOT_LABELS_LIST: [RobotLabel; 2] = [RobotLabel::PlatformName, RobotLabel::TenantName];
     context.print_explanation("list all robot secret targets from keyring");
-    let secret_targets = get_secret_targets()?;
+    let secret_targets = get_secrets_from_keyring()?;
     let targets: Vec<(&String, &String)> = secret_targets
       .iter()
       .flat_map(|(platform_name, tenants)| tenants.iter().map(|tenant| (platform_name, tenant)).collect_vec())
@@ -145,7 +191,8 @@ struct RobotSet {}
 #[async_trait]
 impl CommandExecutor for RobotSet {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_platform_and_tenant(matches, context.settings())?;
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
     context.print_explanation(format!("store robot secret for '{}@{}' in keyring", platform, tenant));
     if context.stdin_is_terminal() {
       let robot_secret = context.read_single_line_password("enter robot secret")?;
@@ -173,7 +220,8 @@ struct RobotUnset {}
 #[async_trait]
 impl CommandExecutor for RobotUnset {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_platform_and_tenant(matches, context.settings())?;
+    let platform = get_platform_argument_or_prompt(matches)?;
+    let tenant = get_tenant_argument_or_prompt(matches)?;
     context.print_explanation(format!("remove robot secret for '{}@{}' from keyring", platform, tenant));
     if context.stdin_is_terminal() {
       if context.confirmed(format!("remove robot secret for '{}@{}'?", platform, tenant))? {
@@ -205,28 +253,39 @@ struct RobotUpdate {}
 #[cfg(feature = "robot")]
 #[async_trait]
 impl CommandExecutor for RobotUpdate {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_platform_and_tenant(matches, context.settings())?;
-    context.print_explanation(format!("renew the robot secret for '{}@{}'", platform, tenant));
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let api_platform = get_platform_argument_or_prompt(matches)?;
+    let api_tenant = get_tenant_argument_or_prompt(matches)?;
+    context.print_explanation(format!("renew the robot secret for '{}@{}'", api_platform, api_tenant));
     context.print_warning("this will automatically invalidate the existing robot secret");
-
-    if context.confirmed(format!("renew robot secret for '{}@{}'?", platform, tenant))? {
+    if context.confirmed(format!("renew robot secret for '{}@{}'?", api_platform, api_tenant))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, robot secret not renewed");
       } else {
-        let robot_secret = client.post_robot_generate_secret().await?;
-        context.print_outcome(format!("robot secret for '{}@{}' renewed", platform, tenant));
-        upsert_secret_to_keyring(&platform, &tenant, ROBOT_SECRET, &robot_secret.value)?;
-        context.print_outcome(format!("robot secret for '{}@{}' stored in keyring", platform, tenant));
+        match create_client_access_token_from_platform_tenant(&api_platform, &api_tenant, context).await? {
+          Some(client) => {
+            let new_robot_secret = client.post_robot_generate_secret().await?;
+            context.print_outcome(format!("robot secret for '{}@{}' renewed", api_platform, api_tenant));
+            if context.confirmed(format!("store new robot secret for '{}@{}' in keyring?", api_platform, api_tenant))? {
+              upsert_secret_to_keyring(&api_platform, &api_tenant, ROBOT_SECRET, &new_robot_secret.value)?;
+              context.print_outcome(format!("robot secret for '{}@{}' stored in keyring", api_platform, api_tenant));
+            } else {
+              context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored in keyring", api_platform, api_tenant));
+            }
+          }
+          None => {
+            context.print_warning(format!("please log in to platform '{}' using the 'dsh login' command", api_platform));
+          }
+        }
       }
     } else {
-      context.print_outcome(format!("cancelled, robot secret for '{}@{}' not renewed", platform, tenant));
+      context.print_outcome(format!("cancelled, robot secret for '{}@{}' not renewed", api_platform, api_tenant));
     }
     Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
+    Requirements::standard_without_api()
   }
 }
 
