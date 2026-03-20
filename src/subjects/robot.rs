@@ -139,11 +139,11 @@ impl CommandExecutor for RobotImport {
     context.print_execution_time(start_instant);
     if context.stdin_is_terminal() {
       context.print_explanation(format!("copy robot secret for '{}@{}' from platform secret store to keyring", platform, tenant));
-      if get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)?.is_some() {
-        if !context.confirmed(format!("overwrite existing robot secret for '{}@{}' in keyring?", platform, tenant))? {
-          context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored to keyring", platform, tenant));
-          return Ok(());
-        }
+      if get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)?.is_some()
+        && !context.confirmed(format!("overwrite existing robot secret for '{}@{}' in keyring?", platform, tenant))?
+      {
+        context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored to keyring", platform, tenant));
+        return Ok(());
       }
       if context.dry_run() {
         context.print_warning("dry-run mode, secret not stored in keyring");

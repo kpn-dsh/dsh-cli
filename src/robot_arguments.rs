@@ -13,57 +13,6 @@ use std::fs;
 use std::io::{stdin, IsTerminal};
 use std::path::{Path, PathBuf};
 
-/// # Get the robot platform from implicit sources
-///
-/// This method will get try to find the robot platform from the implicit sources listed below,
-/// and returns at the first match.
-/// 1. Environment variable `DSH_CLI_ROBOT_PLATFORM`.
-/// 1. Else return with `None`.
-///
-/// ## Returns
-/// * `Ok(Some<Platform>)` - Robot platforms.
-/// * `Ok(None)` - When no implicit robot platform is available.
-/// * `Err<String>` - When an invalid robot platform name was found.
-fn get_robot_platform_implicit(matches: &ArgMatches) -> DshCliResult<Option<DshPlatform>> {
-  match environment_variable(ENV_VAR_DSH_CLI_ROBOT_PLATFORM, Some(matches))? {
-    Some(robot_platform_name_from_env_var) => {
-      debug!(
-        "robot platform '{}' (environment variable '{}')",
-        robot_platform_name_from_env_var, ENV_VAR_DSH_CLI_ROBOT_PLATFORM
-      );
-      DshPlatform::try_from(robot_platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
-    }
-    None => Ok(None),
-  }
-}
-
-/// # Get the robot platform without user interaction
-///
-/// This method will get the robot platform.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--robot-platform`.
-/// 1. Environment variable `DSH_CLI_ROBOT_PLATFORM`.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments,
-///
-/// ## Returns
-/// * `Ok(Option<Platform>)` - The robot platform.
-/// * `Ok(None)` - When no implicit robot platform is available.
-/// * `Err<String>` - When an invalid robot platform name was found.
-fn get_robot_platform_non_interactive(matches: &ArgMatches) -> DshCliResult<Option<DshPlatform>> {
-  match matches.get_one::<String>(ROBOT_PLATFORM_ARGUMENT) {
-    Some(robot_platform_name_from_argument) => {
-      debug!("robot platform '{}' (argument)", robot_platform_name_from_argument);
-      DshPlatform::try_from(robot_platform_name_from_argument.as_str())
-        .map_err(error_map!("{}"))
-        .map(Some)
-    }
-    None => get_robot_platform_implicit(matches),
-  }
-}
-
 /// # Get the robot platform
 ///
 /// This method will get the robot platform.
@@ -89,53 +38,6 @@ pub(crate) fn get_robot_platform(matches: &ArgMatches) -> DshCliResult<DshPlatfo
         err!("could not determine robot platform, please check configuration")
       }
     }
-  }
-}
-
-/// # Get the robot tenant from implicit sources
-///
-/// This method will get try to find the robot tenant from the implicit sources listed below,
-/// and returns at the first match.
-/// 1. Environment variable `DSH_CLI_ROBOT_TENANT`.
-/// 1. Else return with `None`.
-///
-/// ## Returns
-/// * `Some<String>` - Tenant name.
-/// * `None` - When no implicit tenant name is available.
-fn get_robot_tenant_implicit(matches: &ArgMatches) -> DshCliResult<Option<String>> {
-  match environment_variable(ENV_VAR_DSH_CLI_ROBOT_TENANT, Some(matches))? {
-    Some(robot_name_from_env_var) => {
-      debug!(
-        "robot tenant '{}' (environment variable '{}')",
-        robot_name_from_env_var, ENV_VAR_DSH_CLI_ROBOT_TENANT
-      );
-      Ok(Some(robot_name_from_env_var))
-    }
-    None => Ok(None),
-  }
-}
-
-/// # Get the robot tenant without user interaction
-///
-/// This method will get the robot tenant.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--robot-tenant`.
-/// 1. Environment variable `DSH_CLI_ROBOT_TENANT`.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-///
-/// ## Returns
-/// * `Some<String>` - Robot tenant name.
-/// * `None` - When no robot tenant name is available without asking the user.
-fn get_robot_tenant_non_interactive(matches: &ArgMatches) -> DshCliResult<Option<String>> {
-  match matches.get_one::<String>(ROBOT_TENANT_ARGUMENT) {
-    Some(robot_tenant_name_from_argument) => {
-      debug!("robot tenant '{}' (argument)", robot_tenant_name_from_argument);
-      Ok(Some(robot_tenant_name_from_argument.clone()))
-    }
-    None => get_robot_tenant_implicit(matches),
   }
 }
 
@@ -217,6 +119,104 @@ pub(crate) fn get_robot_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTe
         },
       },
     },
+  }
+}
+
+/// # Get the robot platform from implicit sources
+///
+/// This method will get try to find the robot platform from the implicit sources listed below,
+/// and returns at the first match.
+/// 1. Environment variable `DSH_CLI_ROBOT_PLATFORM`.
+/// 1. Else return with `None`.
+///
+/// ## Returns
+/// * `Ok(Some<Platform>)` - Robot platforms.
+/// * `Ok(None)` - When no implicit robot platform is available.
+/// * `Err<String>` - When an invalid robot platform name was found.
+fn get_robot_platform_implicit(matches: &ArgMatches) -> DshCliResult<Option<DshPlatform>> {
+  match environment_variable(ENV_VAR_DSH_CLI_ROBOT_PLATFORM, Some(matches))? {
+    Some(robot_platform_name_from_env_var) => {
+      debug!(
+        "robot platform '{}' (environment variable '{}')",
+        robot_platform_name_from_env_var, ENV_VAR_DSH_CLI_ROBOT_PLATFORM
+      );
+      DshPlatform::try_from(robot_platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
+    }
+    None => Ok(None),
+  }
+}
+
+/// # Get the robot platform without user interaction
+///
+/// This method will get the robot platform.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--robot-platform`.
+/// 1. Environment variable `DSH_CLI_ROBOT_PLATFORM`.
+/// 1. Else return with `None`.
+///
+/// ## Parameters
+/// * `matches` - Parsed clap command line arguments,
+///
+/// ## Returns
+/// * `Ok(Option<Platform>)` - The robot platform.
+/// * `Ok(None)` - When no implicit robot platform is available.
+/// * `Err<String>` - When an invalid robot platform name was found.
+fn get_robot_platform_non_interactive(matches: &ArgMatches) -> DshCliResult<Option<DshPlatform>> {
+  match matches.get_one::<String>(ROBOT_PLATFORM_ARGUMENT) {
+    Some(robot_platform_name_from_argument) => {
+      debug!("robot platform '{}' (argument)", robot_platform_name_from_argument);
+      DshPlatform::try_from(robot_platform_name_from_argument.as_str())
+        .map_err(error_map!("{}"))
+        .map(Some)
+    }
+    None => get_robot_platform_implicit(matches),
+  }
+}
+
+/// # Get the robot tenant from implicit sources
+///
+/// This method will get try to find the robot tenant from the implicit sources listed below,
+/// and returns at the first match.
+/// 1. Environment variable `DSH_CLI_ROBOT_TENANT`.
+/// 1. Else return with `None`.
+///
+/// ## Returns
+/// * `Some<String>` - Tenant name.
+/// * `None` - When no implicit tenant name is available.
+fn get_robot_tenant_implicit(matches: &ArgMatches) -> DshCliResult<Option<String>> {
+  match environment_variable(ENV_VAR_DSH_CLI_ROBOT_TENANT, Some(matches))? {
+    Some(robot_name_from_env_var) => {
+      debug!(
+        "robot tenant '{}' (environment variable '{}')",
+        robot_name_from_env_var, ENV_VAR_DSH_CLI_ROBOT_TENANT
+      );
+      Ok(Some(robot_name_from_env_var))
+    }
+    None => Ok(None),
+  }
+}
+
+/// # Get the robot tenant without user interaction
+///
+/// This method will get the robot tenant.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--robot-tenant`.
+/// 1. Environment variable `DSH_CLI_ROBOT_TENANT`.
+/// 1. Else return with `None`.
+///
+/// ## Parameters
+/// * `matches` - Parsed clap command line arguments.
+///
+/// ## Returns
+/// * `Some<String>` - Robot tenant name.
+/// * `None` - When no robot tenant name is available without asking the user.
+fn get_robot_tenant_non_interactive(matches: &ArgMatches) -> DshCliResult<Option<String>> {
+  match matches.get_one::<String>(ROBOT_TENANT_ARGUMENT) {
+    Some(robot_tenant_name_from_argument) => {
+      debug!("robot tenant '{}' (argument)", robot_tenant_name_from_argument);
+      Ok(Some(robot_tenant_name_from_argument.clone()))
+    }
+    None => get_robot_tenant_implicit(matches),
   }
 }
 

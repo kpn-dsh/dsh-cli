@@ -320,7 +320,7 @@ fn authenticate_and_get_access_and_refresh_tokens(
     Ok(device_authorization_response) => {
       open_login_page(&device_authorization_response, platform, context);
       if context.dry_run() {
-        context.print_warning(format!("dry-run mode, not waiting for login"));
+        context.print_warning("dry-run mode, not waiting for login".to_string());
         Err(DshCliError::String("dry-run mode".to_string()))
       } else {
         let device_access_token_request: DeviceAccessTokenRequest<CoreTokenResponse, EmptyExtraDeviceAuthorizationFields> =

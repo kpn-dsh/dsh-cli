@@ -9,71 +9,6 @@ use dsh_api::platform::DshPlatform;
 use log::debug;
 use std::io::{stdin, IsTerminal};
 
-/// # Get the target platform from implicit sources
-///
-/// This method will get try to find the target platform from the implicit sources listed below,
-/// and returns at the first match.
-/// 1. Environment variable `DSH_CLI_PLATFORM`.
-/// 1. Parameter `default-platform` from settings file, if available.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `settings` - Contents of the settings file or default settings.
-///
-/// ## Returns
-/// * `Ok(Some<Platform>)` - Target platforms.
-/// * `Ok(None)` - When no implicit platform is available.
-/// * `Err<String>` - When an invalid platform name was found.
-fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
-  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, Some(matches))? {
-    Some(platform_name_from_env_var) => {
-      debug!(
-        "target platform '{}' (environment variable '{}')",
-        platform_name_from_env_var, ENV_VAR_DSH_CLI_PLATFORM
-      );
-      DshPlatform::try_from(platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
-    }
-    None => match settings.default_platform.clone() {
-      Some(default_platform_name_from_settings) => {
-        debug!("default target platform '{}' (settings)", default_platform_name_from_settings);
-        DshPlatform::try_from(default_platform_name_from_settings.as_str())
-          .map_err(error_map!("{}"))
-          .map(Some)
-      }
-      None => Ok(None),
-    },
-  }
-}
-
-/// # Get the target platform without user interaction
-///
-/// This method will get the target platform.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--platform`.
-/// 1. Environment variable `DSH_CLI_PLATFORM`.
-/// 1. Parameter `default-platform` from settings file, if available.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments,
-/// * `settings` - Contents of the settings file.
-///
-/// ## Returns
-/// * `Ok(Option<Platform>)` - The platform.
-/// * `Ok(None)` - When no implicit target platform is available.
-/// * `Err<String>` - When an invalid platform name was found.
-fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
-  match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
-    Some(target_platform_name_from_argument) => {
-      debug!("target platform '{}' (argument)", target_platform_name_from_argument);
-      DshPlatform::try_from(target_platform_name_from_argument.as_str())
-        .map_err(error_map!("{}"))
-        .map(Some)
-    }
-    None => get_target_platform_implicit(matches, settings),
-  }
-}
-
 /// # Get the target platform
 ///
 /// This method will get the target platform.
@@ -101,36 +36,6 @@ pub(crate) fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> 
         err!("could not determine target platform, please check configuration")
       }
     }
-  }
-}
-
-/// # Get the target tenant from implicit sources
-///
-/// This method will get try to find the target tenant from the implicit sources listed below,
-/// and returns at the first match.
-/// 1. Environment variable `DSH_CLI_TENANT`.
-/// 1. Parameter `default-tenant` from settings file, if available.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `settings` - Contents of the settings file or default settings.
-///
-/// ## Returns
-/// * `Some<String>` - Tenant name.
-/// * `None` - When no implicit tenant name is available.
-fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
-  match environment_variable(ENV_VAR_DSH_CLI_TENANT, Some(matches))? {
-    Some(tenant_name_from_env_var) => {
-      debug!("target tenant '{}' (environment variable '{}')", tenant_name_from_env_var, ENV_VAR_DSH_CLI_TENANT);
-      Ok(Some(tenant_name_from_env_var))
-    }
-    None => match settings.default_tenant.clone() {
-      Some(default_tenant_name_from_settings) => {
-        debug!("default target tenant '{}' (settings)", default_tenant_name_from_settings);
-        Ok(Some(default_tenant_name_from_settings))
-      }
-      None => Ok(None),
-    },
   }
 }
 
@@ -252,5 +157,100 @@ pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> DshCliResul
   match matches.get_one::<String>(TENANT_NAME_ARGUMENT) {
     Some(tenant_argument) => Ok(tenant_argument.to_string()),
     None => Ok(read_single_line("enter tenant: ")?),
+  }
+}
+
+/// # Get the target platform from implicit sources
+///
+/// This method will get try to find the target platform from the implicit sources listed below,
+/// and returns at the first match.
+/// 1. Environment variable `DSH_CLI_PLATFORM`.
+/// 1. Parameter `default-platform` from settings file, if available.
+/// 1. Else return with `None`.
+///
+/// ## Parameters
+/// * `settings` - Contents of the settings file or default settings.
+///
+/// ## Returns
+/// * `Ok(Some<Platform>)` - Target platforms.
+/// * `Ok(None)` - When no implicit platform is available.
+/// * `Err<String>` - When an invalid platform name was found.
+fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
+  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, Some(matches))? {
+    Some(platform_name_from_env_var) => {
+      debug!(
+        "target platform '{}' (environment variable '{}')",
+        platform_name_from_env_var, ENV_VAR_DSH_CLI_PLATFORM
+      );
+      DshPlatform::try_from(platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
+    }
+    None => match settings.default_platform.clone() {
+      Some(default_platform_name_from_settings) => {
+        debug!("default target platform '{}' (settings)", default_platform_name_from_settings);
+        DshPlatform::try_from(default_platform_name_from_settings.as_str())
+          .map_err(error_map!("{}"))
+          .map(Some)
+      }
+      None => Ok(None),
+    },
+  }
+}
+
+/// # Get the target platform without user interaction
+///
+/// This method will get the target platform.
+/// This function will try the potential sources listed below, and returns at the first match.
+/// 1. Command line argument `--platform`.
+/// 1. Environment variable `DSH_CLI_PLATFORM`.
+/// 1. Parameter `default-platform` from settings file, if available.
+/// 1. Else return with `None`.
+///
+/// ## Parameters
+/// * `matches` - Parsed clap command line arguments,
+/// * `settings` - Contents of the settings file.
+///
+/// ## Returns
+/// * `Ok(Option<Platform>)` - The platform.
+/// * `Ok(None)` - When no implicit target platform is available.
+/// * `Err<String>` - When an invalid platform name was found.
+fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
+  match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
+    Some(target_platform_name_from_argument) => {
+      debug!("target platform '{}' (argument)", target_platform_name_from_argument);
+      DshPlatform::try_from(target_platform_name_from_argument.as_str())
+        .map_err(error_map!("{}"))
+        .map(Some)
+    }
+    None => get_target_platform_implicit(matches, settings),
+  }
+}
+
+/// # Get the target tenant from implicit sources
+///
+/// This method will get try to find the target tenant from the implicit sources listed below,
+/// and returns at the first match.
+/// 1. Environment variable `DSH_CLI_TENANT`.
+/// 1. Parameter `default-tenant` from settings file, if available.
+/// 1. Else return with `None`.
+///
+/// ## Parameters
+/// * `settings` - Contents of the settings file or default settings.
+///
+/// ## Returns
+/// * `Some<String>` - Tenant name.
+/// * `None` - When no implicit tenant name is available.
+fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
+  match environment_variable(ENV_VAR_DSH_CLI_TENANT, Some(matches))? {
+    Some(tenant_name_from_env_var) => {
+      debug!("target tenant '{}' (environment variable '{}')", tenant_name_from_env_var, ENV_VAR_DSH_CLI_TENANT);
+      Ok(Some(tenant_name_from_env_var))
+    }
+    None => match settings.default_tenant.clone() {
+      Some(default_tenant_name_from_settings) => {
+        debug!("default target tenant '{}' (settings)", default_tenant_name_from_settings);
+        Ok(Some(default_tenant_name_from_settings))
+      }
+      None => Ok(None),
+    },
   }
 }
