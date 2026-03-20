@@ -1,5 +1,5 @@
-use crate::arguments::certificate_id_argument;
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::arguments::{certificate_id_argument, platform_name_argument, tenant_name_argument};
+use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::error::DshCliError;
@@ -14,7 +14,7 @@ use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::secret::{secrets_with_metadata, SECRET_LABELS_LIST};
 use crate::subjects::{secret, DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
-use crate::DshCliResult;
+use crate::{get_platform_and_tenant, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -58,6 +58,7 @@ impl Subject for CertificateSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      CREATE_COMMAND => Some(CERTIFICATE_CREATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(CERTIFICATE_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(CERTIFICATE_SHOW_CAPABILITY.as_ref()),
       _ => None,
@@ -70,6 +71,12 @@ impl Subject for CertificateSubject {
 }
 
 lazy_static! {
+  static ref CERTIFICATE_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+    CapabilityBuilder::new(CREATE_COMMAND, None, &CertificateCreate {}, "Create self signed certificate")
+      .add_target_argument(certificate_id_argument().required(true))
+      .add_target_argument(platform_name_argument())
+      .add_target_argument(tenant_name_argument())
+  );
   static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &CertificateList {}, "List certificates")
       .set_long_about("Lists all available certificates.")
@@ -91,17 +98,39 @@ lazy_static! {
       ])
       .add_target_argument(certificate_id_argument().required(true))
   );
-  static ref CERTIFICATE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()];
+  static ref CERTIFICATE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![CERTIFICATE_CREATE_CAPABILITY.as_ref(), CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()];
 }
 
 const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
+
+struct CertificateCreate {}
+
+#[async_trait]
+impl CommandExecutor for CertificateCreate {
+  async fn execute_without_client(&self, target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let (platform, tenant) = get_platform_and_tenant(matches, context.settings())?;
+    let certificate_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("create self signed certificate '{}' for {}@{}", certificate_id, tenant, platform));
+
+    if context.dry_run() {
+      context.print_warning("dry-run mode, certificate not created");
+    } else {
+      context.print_outcome(format!("certificate '{}' created", certificate_id));
+    }
+
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
+  }
+}
 
 struct CertificateList {}
 
 #[async_trait]
 impl CommandExecutor for CertificateList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
     context.print_explanation("list all certificates with their parameters");
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
@@ -281,7 +310,6 @@ struct CertificateShow {}
 impl CommandExecutor for CertificateShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
-    const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let start_instant = context.now();
     let (certificate_status, allocation_status) = join!(client.get_certificate(&certificate_id), client.get_certificate_status(&certificate_id));

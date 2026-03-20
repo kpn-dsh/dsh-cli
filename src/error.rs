@@ -14,6 +14,7 @@ pub(crate) enum DshCliError {
   Home(String),
   Io(String),
   Keyring(String),
+  Rcgen(String),
   Reqwest(String),
   SerdeJson(String),
   String(String),
@@ -147,6 +148,7 @@ impl Debug for DshCliError {
       Self::Home(message) => write!(f, "DshCliError(home, {})", message),
       Self::Io(message) => write!(f, "DshCliError(io, {})", message),
       Self::Keyring(message) => write!(f, "DshCliError(ikeyring, {})", message),
+      Self::Rcgen(message) => write!(f, "DshCliError(rcgen, {})", message),
       Self::Reqwest(message) => write!(f, "DshCliError(reqwest, {})", message),
       Self::SerdeJson(message) => write!(f, "DshCliError(json, {})", message),
       Self::String(message) => write!(f, "DshCliError({})", message),
@@ -172,6 +174,7 @@ impl Display for DshCliError {
       Self::Home(message) => write!(f, "{}", message),
       Self::Io(message) => write!(f, "{}", message),
       Self::Keyring(message) => write!(f, "{}", message),
+      Self::Rcgen(message) => write!(f, "{}", message),
       Self::Reqwest(message) => write!(f, "{}", message),
       Self::SerdeJson(message) => write!(f, "{}", message),
       Self::String(message) => write!(f, "{}", message),
@@ -278,6 +281,12 @@ impl From<tokio::task::JoinError> for DshCliError {
 impl From<openidconnect::url::ParseError> for DshCliError {
   fn from(parse_error: openidconnect::url::ParseError) -> Self {
     Self::UrlParse(parse_error.to_string())
+  }
+}
+
+impl From<rcgen::Error> for DshCliError {
+  fn from(rcgen_error: rcgen::Error) -> Self {
+    Self::Rcgen(rcgen_error.to_string())
   }
 }
 

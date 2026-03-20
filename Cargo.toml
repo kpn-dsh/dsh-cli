@@ -43,9 +43,10 @@ lazy_static = { version = "1.5", default-features = false }
 log = { version = "0.4", default-features = false }
 open = { version = "5.3", default-features = false }
 openidconnect = { version = "4.0", features = ["reqwest-blocking"] }
+rcgen = { version = "0.13", features = ["aws_lc_rs", "pem", "x509-parser"] }
 regex = "1.11.1"
 rpassword = { version = "7.4", default-features = false }
-rsa = { version = "0.9" }
+#rsa = { version = "0.9" }
 serde = { version = "1", features = ["derive"], default-features = false }
 serde_json = { version = "1", default-features = false }
 serde_yaml = { version = "0.9.33", default-features = false }
@@ -53,6 +54,7 @@ sha2 = "0.10"
 tabled = { version = "0.20", features = ["ansi"], default-features = false }
 termimad = "0.34"
 terminal_size = { version = "0.4", default-features = false }
+time = "0.3"
 tokio = { version = "1.49", features = ["fs", "rt", "rt-multi-thread", "macros"], default-features = false }
 toml = { version = "0.9", features = ["display", "parse", "serde"], default-features = false }
 whoami = "2"
@@ -60,7 +62,7 @@ whoami = "2"
 pkcs1 = { version = "0.7", features = ["pem"] }
 pkcs8 = { version = "0.10", features = ["pem"] }
 x509-cert = { version = "0.2", features = ["pem"] }
-pem-rfc7468 = { version = "1.0.0", features = ["alloc"] }
+#pem-rfc7468 = { version = "1.0.0", features = ["alloc"] }
 
 # When publishing, alway use the crates.io dependency.
 #dsh_api = { version = "0.9.0", features = ["generic"] }
