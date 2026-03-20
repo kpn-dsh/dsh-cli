@@ -1,13 +1,14 @@
 use crate::arguments::{platform_name_argument, tenant_name_argument};
 use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND, UPDATE_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
+use crate::clients::create_client_access_token_from_platform_tenant;
 use crate::context::Context;
-use crate::flags::FlagType;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::keyring::{get_secret_from_keyring, get_secrets_from_keyring, remove_secret_from_keyring, upsert_secret_to_keyring};
 use crate::subject::{Requirements, Subject};
-use crate::{create_client_access_token_from_platform_tenant, get_platform_argument_or_prompt, get_tenant_argument_or_prompt, DshCliResult};
+use crate::target_arguments::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
+use crate::DshCliResult;
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -87,7 +88,7 @@ lazy_static! {
     CapabilityBuilder::new(UPDATE_COMMAND, None, &RobotUpdate {}, "Request a new robot secret")
     .add_target_argument(platform_name_argument())
     .add_target_argument(tenant_name_argument())
-    .set_long_about("Triggers the generation of a new robot secret for the tenant’s robot account. This automatically invalidates the existing client secret. The new secret will be stored in DSH secret store and in your local keychain.")
+    .set_long_about("Triggers the generation of a new robot secret for the tenant’s robot account. This automatically invalidates the existing client secret. The new secret will be stored in DSH secret store and in your local keyring.")
   );
   static ref ROBOT_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     ROBOT_COPY_CAPABILITY.as_ref(),

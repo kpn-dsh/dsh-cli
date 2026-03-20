@@ -6,42 +6,34 @@
 )]
 extern crate core;
 
-use crate::arguments::{PLATFORM_NAME_ARGUMENT, TENANT_NAME_ARGUMENT};
-use crate::authentication::{get_access_token, get_access_tokens, AuthenticationMethod};
-use crate::directory::{get_settings, init_dsh_directory, supports_dsh_directory};
+use crate::authentication::get_access_tokens;
+use crate::clients::create_clients;
+use crate::directory::{get_settings, init_dsh_directory};
 use crate::environment_variables::{
   env_var_argument, env_var_file_argument, env_vars_argument, environment_variable, get_configured_environment_variables, print_environment_variable, print_environment_variables,
-  ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT,
+  ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
 };
 use crate::error::DshCliError;
 use crate::global_arguments::{
-  authentication_argument, browser_argument, environment_variable_argument, no_csv_headers_argument, target_tenants_all_argument, target_tenants_argument,
-  TARGET_TENANTS_ALL_ARGUMENT, TARGET_TENANTS_ARGUMENT,
+  authentication_argument, browser_argument, environment_variable_argument, no_csv_headers_argument, robot_password_file_argument, robot_platform_argument, robot_tenant_argument,
+  target_tenants_all_argument, target_tenants_argument, TARGET_TENANTS_ALL_ARGUMENT,
 };
-use crate::keyring::get_secret_from_keyring;
 use crate::releases::{newer_release, newer_release_notification};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
-use crate::subject::Requirements;
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
+use crate::target_arguments::{get_target_platform, get_target_tenant};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
 use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
 use context::Context;
-use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::dsh_api_client_factory::{DshApiClientFactory, DshApiPlatformClientFactory};
-use dsh_api::dsh_api_tenant::DshApiTenant;
-use dsh_api::platform::DshPlatform;
-use dsh_api::secret::ROBOT_SECRET;
 use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
-use futures::future::try_join_all;
 use global_arguments::{
   dry_run_argument, force_argument, no_escape_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
-  suppress_exit_status_argument, target_password_file_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument,
-  TARGET_PASSWORD_FILE_ARGUMENT, TARGET_PLATFORM_ARGUMENT, TARGET_TENANT_ARGUMENT, VERSION_ARGUMENT,
+  suppress_exit_status_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument, VERSION_ARGUMENT,
 };
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -56,8 +48,8 @@ use std::env::temp_dir;
 use std::error::Error;
 use std::fmt::Debug;
 use std::io::ErrorKind::NotFound;
-use std::io::{stdin, stdout, IsTerminal, Write};
-use std::path::{Path, PathBuf};
+use std::io::{stdin, stdout, Write};
+use std::path::Path;
 use std::process::{ExitCode, Termination};
 use std::str::FromStr;
 use std::{fs, process};
@@ -94,6 +86,7 @@ mod capability;
 mod capability_builder;
 mod certificates;
 mod cipher;
+mod clients;
 mod context;
 mod directory;
 mod environment_variables;
@@ -110,11 +103,13 @@ mod log_arguments;
 mod log_level;
 mod modifier_flags;
 mod releases;
+mod robot_arguments;
 mod secret_metadata;
 mod settings;
 mod style;
 mod subject;
 mod subjects;
+mod target_arguments;
 mod verbosity;
 
 lazy_static! {
@@ -497,11 +492,13 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       dry_run_argument(),
       environment_variable_argument(),
       force_argument(),
-      target_password_file_argument(),
+      robot_password_file_argument(),
+      robot_platform_argument(),
+      robot_tenant_argument(),
       target_platform_argument(),
       target_tenant_argument(),
-      target_tenants_argument(),
       target_tenants_all_argument(),
+      target_tenants_argument(),
       // Output options
       no_csv_headers_argument(),
       no_escape_argument(),
@@ -598,316 +595,6 @@ fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {
   }
 }
 
-/// # Get the target platform from implicit sources
-///
-/// This method will get try to find the target platform from the implicit sources listed below,
-/// and returns at the first match.
-/// 1. Environment variable `DSH_CLI_PLATFORM`.
-/// 1. Parameter `default-platform` from settings file, if available.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `settings` - Contents of the settings file or default settings.
-///
-/// ## Returns
-/// * `Ok(Some<Platform>)` - Target platforms.
-/// * `Ok(None)` - When no implicit platform is available.
-/// * `Err<String>` - When an invalid platform name was found.
-fn get_target_platform_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
-  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, Some(matches))? {
-    Some(platform_name_from_env_var) => {
-      debug!(
-        "target platform '{}' (environment variable '{}')",
-        platform_name_from_env_var, ENV_VAR_DSH_CLI_PLATFORM
-      );
-      DshPlatform::try_from(platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
-    }
-    None => match settings.default_platform.clone() {
-      Some(default_platform_name_from_settings) => {
-        debug!("default target platform '{}' (settings)", default_platform_name_from_settings);
-        DshPlatform::try_from(default_platform_name_from_settings.as_str())
-          .map_err(error_map!("{}"))
-          .map(Some)
-      }
-      None => Ok(None),
-    },
-  }
-}
-
-/// # Get the target platform without user interaction
-///
-/// This method will get the target platform.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--platform`.
-/// 1. Environment variable `DSH_CLI_PLATFORM`.
-/// 1. Parameter `default-platform` from settings file, if available.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments,
-/// * `settings` - Contents of the settings file.
-///
-/// ## Returns
-/// * `Ok(Option<Platform>)` - The platform.
-/// * `Ok(None)` - When no implicit target platform is available.
-/// * `Err<String>` - When an invalid platform name was found.
-fn get_target_platform_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<DshPlatform>> {
-  match matches.get_one::<String>(TARGET_PLATFORM_ARGUMENT) {
-    Some(target_platform_name_from_argument) => {
-      debug!("target platform '{}' (argument)", target_platform_name_from_argument);
-      DshPlatform::try_from(target_platform_name_from_argument.as_str())
-        .map_err(error_map!("{}"))
-        .map(Some)
-    }
-    None => get_target_platform_implicit(matches, settings),
-  }
-}
-
-/// # Get the target platform
-///
-/// This method will get the target platform.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--platform` or `-p`.
-/// 1. Environment variable `DSH_CLI_PLATFORM`.
-/// 1. Parameter `default-platform` from settings file.
-/// 1. If stdin is a terminal, ask the user to enter the value.
-/// 1. Else return with an error.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-/// * `settings` - Contents of the settings file.
-///
-/// ## Returns
-/// * `Ok<Platform>`  - Target platform.
-/// * `Err<String>` - Error message.
-fn get_target_platform(matches: &ArgMatches, settings: &Settings) -> DshCliResult<DshPlatform> {
-  match get_target_platform_non_interactive(matches, settings)? {
-    Some(platforms_non_interactive) => Ok(platforms_non_interactive),
-    None => {
-      if stdin().is_terminal() {
-        DshPlatform::try_from(read_single_line("target platform: ")?.as_str()).map_err(error_map!("{}"))
-      } else {
-        err!("could not determine target platform, please check configuration")
-      }
-    }
-  }
-}
-
-/// # Get the target tenant from implicit sources
-///
-/// This method will get try to find the target tenant from the implicit sources listed below,
-/// and returns at the first match.
-/// 1. Environment variable `DSH_CLI_TENANT`.
-/// 1. Parameter `default-tenant` from settings file, if available.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `settings` - Contents of the settings file or default settings.
-///
-/// ## Returns
-/// * `Some<String>` - Tenant name.
-/// * `None` - When no implicit tenant name is available.
-fn get_target_tenant_implicit(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
-  match environment_variable(ENV_VAR_DSH_CLI_TENANT, Some(matches))? {
-    Some(tenant_name_from_env_var) => {
-      debug!("target tenant '{}' (environment variable '{}')", tenant_name_from_env_var, ENV_VAR_DSH_CLI_TENANT);
-      Ok(Some(tenant_name_from_env_var))
-    }
-    None => match settings.default_tenant.clone() {
-      Some(default_tenant_name_from_settings) => {
-        debug!("default target tenant '{}' (settings)", default_tenant_name_from_settings);
-        Ok(Some(default_tenant_name_from_settings))
-      }
-      None => Ok(None),
-    },
-  }
-}
-
-/// # Get the target tenant without user interaction
-///
-/// This method will get the target tenant.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--tenant`.
-/// 1. Environment variable `DSH_CLI_TENANT`.
-/// 1. Parameter `default-tenant` from settings file, if available.
-/// 1. Else return with `None`.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-/// * `settings` - Contents of the settings file.
-///
-/// ## Returns
-/// * `Some<String>` - Tenant name.
-/// * `None` - When no tenant name is available without asking the user.
-fn get_target_tenant_non_interactive(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<String>> {
-  match matches.get_one::<String>(TARGET_TENANT_ARGUMENT) {
-    Some(target_tenant_name_from_argument) => {
-      debug!("target tenant '{}' (argument)", target_tenant_name_from_argument);
-      Ok(Some(target_tenant_name_from_argument.clone()))
-    }
-    None => get_target_tenant_implicit(matches, settings),
-  }
-}
-
-/// # Get the target tenant
-///
-/// This method will get the target tenant.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--tenant`.
-/// 1. Environment variable `DSH_CLI_TENANT`.
-/// 1. Parameter `default-tenant` from settings file, if available.
-/// 1. If stdin is a terminal, ask the user to enter the value.
-/// 1. Else return with an error.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-/// * `settings` - Contents of the settings file.
-///
-/// ## Returns
-/// * `Ok<String>` Tenant name.
-/// * `Err<String>` - Error message.
-fn get_target_tenant(matches: &ArgMatches, settings: &Settings) -> DshCliResult<String> {
-  match get_target_tenant_non_interactive(matches, settings)? {
-    Some(tenant_names_non_interactive) => Ok(tenant_names_non_interactive),
-    None => {
-      if stdin().is_terminal() {
-        let tenant_name_from_console = read_single_line("target tenant: ")?;
-        if tenant_name_from_console.is_empty() {
-          err!("target tenant name cannot be empty")
-        } else {
-          Ok(tenant_name_from_console)
-        }
-      } else {
-        err!("could not determine target tenant, please check configuration")
-      }
-    }
-  }
-}
-
-/// # Get the target platform and tenant name
-///
-/// This method will get the target platform and tenant name.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-/// * `settings` - Contents of the settings file.
-///
-/// ## Returns
-/// * `Ok<(DshPlatform, String)>` - Target platform and tenant name.
-/// * `Err<String>` - Error message.
-fn get_platform_and_tenant(matches: &ArgMatches, settings: &Settings) -> Result<(DshPlatform, String), DshCliError> {
-  let platform = match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
-    Some(platform_name_from_argument) => DshPlatform::try_from(platform_name_from_argument.as_str())?,
-    None => get_target_platform(matches, settings)?,
-  };
-  let tenant = get_target_tenant(matches, settings)?;
-  Ok((platform, tenant))
-}
-
-/// # Get platform from argument or prompt
-///
-/// This method will get the target platform. It will try the sources listed below and returns
-/// at the first match.
-/// 1. Command line argument `--platform`.
-/// 1. Ask the user to enter the value.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-///
-/// ## Returns
-/// * `Ok<Platform>`  - Platform.
-/// * `Err<DshCliError>` - Error message.
-pub(crate) fn get_platform_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<DshPlatform> {
-  match matches.get_one::<String>(PLATFORM_NAME_ARGUMENT) {
-    Some(dsh_platform) => Ok(DshPlatform::try_from(dsh_platform.as_str())?),
-    None => Ok(DshPlatform::try_from(read_single_line("enter platform: ")?.as_str())?),
-  }
-}
-
-/// # Get tenant from argument or prompt
-///
-/// This method will get the tenant name. It will try the sources listed below and returns
-/// at the first match.
-/// 1. Command line argument `--platform`.
-/// 1. Ask the user to enter the value.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-///
-/// ## Returns
-/// * `Ok<String>`  - Tenant name.
-/// * `Err<DshCliError>` - Error message.
-pub(crate) fn get_tenant_argument_or_prompt(matches: &ArgMatches) -> DshCliResult<String> {
-  match matches.get_one::<String>(TENANT_NAME_ARGUMENT) {
-    Some(tenant_argument) => Ok(tenant_argument.to_string()),
-    None => Ok(read_single_line("enter tenant: ")?),
-  }
-}
-
-/// # Get the target password
-///
-/// This method will get the target password.
-/// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--password-file`, which should reference a file that
-///    contains the password.
-/// 1. Environment variable `DSH_CLI_PASSWORD_FILE`.
-/// 1. Environment variable `DSH_CLI_PASSWORD`. Note that this environment variable must be a
-///    regular environment variable and cannot be specified via the command line.
-/// 1. If target file `[platform].[tenant_name].toml` exists,
-///    check entry `dsh.[platform].[tenant_name]` from the keychain, if available.
-///    This can result in a pop-up where the user must authenticate for the keychain.
-/// 1. If stdin is a terminal, ask the user to enter the password.
-/// 1. Else return with an error.
-///
-/// ## Parameters
-/// * `matches` - Parsed clap command line arguments.
-/// * `dsh_api_tenant` - Used to determine the target settings file.
-///
-/// ## Returns
-/// * `Ok<String>` - Password.
-fn get_target_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> DshCliResult<String> {
-  match matches.get_one::<PathBuf>(TARGET_PASSWORD_FILE_ARGUMENT) {
-    Some(password_file_from_arg) => read_target_password_file(password_file_from_arg),
-    None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD_FILE, Some(matches))? {
-      Some(password_file_from_env) => read_target_password_file(password_file_from_env),
-      None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD, None)? {
-        Some(password_from_env_var) => {
-          debug!("target password (environment variable '{}')", ENV_VAR_DSH_CLI_PASSWORD);
-          Ok(password_from_env_var)
-        }
-        None => match get_secret_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name(), ROBOT_SECRET)? {
-          Some(password_from_keyring) => {
-            debug!("target exists, password read (keyring)");
-            Ok(password_from_keyring)
-          }
-          None => {
-            if stdin().is_terminal() {
-              read_single_line_password(format!("password for tenant {}: ", dsh_api_tenant).as_str())
-            } else {
-              err!("could not determine password and unable to to prompt user, please check configuration")
-            }
-          }
-        },
-      },
-    },
-  }
-}
-
-fn read_target_password_file<T: AsRef<Path>>(password_file: T) -> DshCliResult<String> {
-  match fs::read_to_string(&password_file) {
-    Ok(password_string) => {
-      let trimmed_password = password_string.trim();
-      if trimmed_password.is_empty() {
-        err!("target password file '{}' is empty", password_file.as_ref().display())
-      } else {
-        debug!("target password (file '{}')", password_file.as_ref().display());
-        Ok(trimmed_password.to_string())
-      }
-    }
-    Err(_) => err!("target password file '{}' could not be read", password_file.as_ref().display()),
-  }
-}
-
 fn read_and_deserialize_from_toml_file<T>(toml_file: impl AsRef<Path>) -> DshCliResult<Option<T>>
 where
   T: for<'de> Deserialize<'de>,
@@ -992,210 +679,6 @@ where
       }
     }
     None => err!("environment variable 'EDITOR' is not set"),
-  }
-}
-
-/// Create clients
-///
-/// # Parameters
-/// * `matches`
-/// * `context`
-///
-/// Returns
-/// * `Ok(Some(Vec<Client>))` - Client were successfully created. Note that there will always be at
-///   least one client created, else an error is returned.
-/// * `Ok(None)` - User needs to log in.
-async fn create_clients(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
-  match context.authentication_method() {
-    AuthenticationMethod::Robot => create_client_robot_password(matches, context).await.map(Some),
-    AuthenticationMethod::SingleSignOn => create_clients_access_token(matches, requirements, context).await,
-  }
-}
-
-/// Create client from robot password
-///
-/// # Parameters
-/// * `matches`
-/// * `context`
-///
-/// Returns
-/// * `Ok(Vec<Client>)` - Client was successfully created. Note that there always be only one
-///   client created.
-async fn create_client_robot_password(matches: &ArgMatches, context: &Context) -> DshCliResult<Vec<DshApiClient>> {
-  let target_platform = get_target_platform(matches, context.settings())?;
-  let target_tenant_name = get_target_tenant(matches, context.settings())?;
-  debug!("create client with token fetcher for target '{}@{}'", target_tenant_name, target_platform);
-  let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
-  let robot_password = get_target_password(matches, &dsh_api_tenant)?;
-  let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_password);
-  let dsh_api_client = dsh_api_client_factory.client().await?;
-  debug!("api client created");
-  Ok(vec![dsh_api_client])
-}
-
-/// Create client from single sign on
-///
-/// # Parameters
-/// * `matches`
-/// * `requirements`
-/// * `context`
-///
-/// Returns
-/// * `Ok(Some(Vec<Client>))` - Clients were successfully created. Note that there will always be at
-///   least one client created, else an error is returned.
-/// * `Ok(None)` - User needs to log in.
-async fn create_clients_access_token(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
-  if !supports_dsh_directory() {
-    return Err(DshCliError::String("single-sign-on requires dsh directory to be enabled".to_string()));
-  }
-  let target_platform = get_target_platform(matches, context.settings())?;
-  if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
-    if requirements.all_tenants_allowed() {
-      create_clients_for_all_authorized_tenants(target_platform).await
-    } else {
-      Err(DshCliError::String("command is not allowed to run for all tenants".to_string()))
-    }
-  } else {
-    match matches.get_one::<String>(TARGET_TENANTS_ARGUMENT) {
-      Some(target_tenants_string) => {
-        let target_tenant_names = target_tenants_string.split(",").map(|s| s.to_string()).collect_vec();
-        for target_tenant_name in &target_tenant_names {
-          debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
-        }
-        create_clients_for_tenants(target_platform, &target_tenant_names, context).await
-      }
-      None => {
-        let target_tenant_name = get_target_tenant(matches, context.settings())?;
-        match get_access_token(target_platform.clone()).await {
-          Ok(Some((access_token, jwt))) => {
-            if jwt
-              .authorized_tenants()
-              .is_some_and(|authorized_tenants| authorized_tenants.contains(&target_tenant_name.as_str()))
-            {
-              let dsh_api_tenant = DshApiTenant::new(target_tenant_name, target_platform);
-              let dsh_api_client_factory = DshApiClientFactory::create_from_static_token(dsh_api_tenant, access_token);
-              Ok(Some(vec![dsh_api_client_factory.client().await?]))
-            } else {
-              err!("not authorized for tenant '{}' at platform '{}'", target_tenant_name, target_platform)
-            }
-          }
-          Ok(None) => {
-            context.print_warning(format!("please log in to platform {} using the 'dsh login' command", target_platform));
-            Ok(None)
-          }
-          Err(error) => Err(error),
-        }
-      }
-    }
-  }
-}
-
-/// Create client for explicit platform and tenant from single sign on
-///
-/// # Parameters
-/// * `api_platform`
-/// * `api_tenant`
-/// * `context`
-///
-/// Returns
-/// * `Ok(Some(Vec<Client>))` - Client successfully created.
-/// * `Ok(None)` - User needs to log in.
-pub(crate) async fn create_client_access_token_from_platform_tenant(api_platform: &DshPlatform, api_tenant: &str, context: &Context) -> DshCliResult<Option<DshApiClient>> {
-  if supports_dsh_directory() {
-    match get_access_token(api_platform.clone()).await {
-      Ok(Some((access_token, jwt))) => {
-        if jwt.authorized_tenants().is_some_and(|authorized_tenants| authorized_tenants.contains(&api_tenant)) {
-          let dsh_api_tenant = DshApiTenant::new(api_tenant, api_platform.clone());
-          let dsh_api_client_factory = DshApiClientFactory::create_from_static_token(dsh_api_tenant, access_token);
-          Ok(Some(dsh_api_client_factory.client().await?))
-        } else {
-          err!("not authorized for tenant '{}' at platform '{}'", api_tenant, api_platform)
-        }
-      }
-      Ok(None) => {
-        context.print_warning(format!("please log in to platform '{}' using the 'dsh login' command", api_platform));
-        Ok(None)
-      }
-      Err(error) => Err(error),
-    }
-  } else {
-    Err(DshCliError::String("single-sign-on requires dsh directory to be enabled".to_string()))
-  }
-}
-
-/// Create multiple clients from single sign on
-///
-/// # Parameters
-/// * `target_platform`
-/// * `target_tenant_names`
-/// * `context`
-///
-/// Returns
-/// * `Ok(Some(Vec<Client>))` - User is logged in and all clients were successfully created.
-/// * `Ok(Some([]))` - User is logged in but no clients were created because the
-///   user is not authorized for the requested tenants.
-/// * `Ok(None)` - User needs to log in.
-async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_names: &[String], context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
-  match get_access_token(target_platform.clone()).await {
-    Ok(Some((access_token, jwt))) => {
-      let unauthorized_tenants = target_tenant_names
-        .iter()
-        .filter(|target_tenant_name| {
-          !jwt
-            .authorized_tenants()
-            .is_some_and(|authorized_tenants| authorized_tenants.contains(&target_tenant_name.as_str()))
-        })
-        .collect_vec();
-      if !unauthorized_tenants.is_empty() {
-        for unauthorized_tenant in &unauthorized_tenants {
-          context.print_error(format!("not authorized for tenant {}@{}", unauthorized_tenant, target_platform));
-        }
-        return err!("not authorized for tenants {}", unauthorized_tenants.iter().join(", "));
-      }
-      let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_static_token(target_platform.clone(), access_token)?;
-      let clients = try_join_all(target_tenant_names.iter().map(|target_tenant_name| {
-        debug!("create client with static access token for target '{}@{}'", target_tenant_name, target_platform);
-        dsh_api_platform_client_factory.client(target_tenant_name)
-      }))
-      .await?;
-      debug!("api clients created");
-      Ok(Some(clients))
-    }
-    Ok(None) => {
-      context.print_warning(format!("please log in to platform '{}' using the 'dsh login' command", target_platform));
-      Ok(None)
-    }
-    Err(error) => Err(error),
-  }
-}
-
-/// Create clients for all authorized tenants from single sign on
-///
-/// # Parameters
-/// * `target_platform`
-///
-/// Returns
-/// * `Ok(Some(Vec<Client>))` - Clients were successfully created.
-/// * `Ok(None)` - User needs to log in.
-async fn create_clients_for_all_authorized_tenants(target_platform: DshPlatform) -> DshCliResult<Option<Vec<DshApiClient>>> {
-  debug!("create client with static access token for all tenants at platform '{}'", target_platform);
-  match get_access_token(target_platform.clone()).await {
-    Ok(Some((access_token, jwt))) => match jwt.authorized_tenants() {
-      Some(authorized_tenants) => {
-        let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_static_token(target_platform, access_token)?;
-        let clients = try_join_all(
-          authorized_tenants
-            .iter()
-            .map(|authorized_tenant| dsh_api_platform_client_factory.client(*authorized_tenant)),
-        )
-        .await?;
-        debug!("clients created");
-        Ok(Some(clients))
-      }
-      None => err!("json web token does not provide authorized tenants"),
-    },
-    Ok(None) => Ok(None),
-    Err(error) => Err(error),
   }
 }
 
