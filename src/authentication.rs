@@ -319,17 +319,22 @@ fn authenticate_and_get_access_and_refresh_tokens(
   match device_authorization_request.request(http_client) {
     Ok(device_authorization_response) => {
       open_login_page(&device_authorization_response, platform, context);
-      let device_access_token_request: DeviceAccessTokenRequest<CoreTokenResponse, EmptyExtraDeviceAuthorizationFields> =
-        openid_connect_client.exchange_device_access_token(&device_authorization_response)?;
-      match device_access_token_request.request(http_client, std::thread::sleep, None) {
-        Ok(token_response) => {
-          if let Some(refresh_token) = token_response.refresh_token() {
-            Ok((token_response.access_token().clone(), refresh_token.clone()))
-          } else {
-            err!("device access token does not contain refresh token")
+      if context.dry_run() {
+        context.print_warning(format!("dry-run mode, not waiting for login"));
+        Err(DshCliError::String("dry-run mode".to_string()))
+      } else {
+        let device_access_token_request: DeviceAccessTokenRequest<CoreTokenResponse, EmptyExtraDeviceAuthorizationFields> =
+          openid_connect_client.exchange_device_access_token(&device_authorization_response)?;
+        match device_access_token_request.request(http_client, std::thread::sleep, None) {
+          Ok(token_response) => {
+            if let Some(refresh_token) = token_response.refresh_token() {
+              Ok((token_response.access_token().clone(), refresh_token.clone()))
+            } else {
+              err!("device access token does not contain refresh token")
+            }
           }
+          Err(error) => err!("authentication request failed: {}", error),
         }
-        Err(error) => err!("authentication request failed: {}", error),
       }
     }
     Err(error) => err!("authentication request failed: {}", error),
@@ -345,36 +350,32 @@ fn get_openid_client(provider_metadata: &DeviceProviderMetadata, client_id: &Cli
 
 /// Open login page in the system browser
 fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthorizationFields>, platform: &DshPlatform, context: &Context) {
-  if context.dry_run() {
-    context.print_warning(format!("dry-run mode, login page for platform {} not opened", platform));
-  } else {
-    match context.browser_method() {
-      BrowserMethod::Instruct => {
-        context.print_explanation(format!(
-          "open login page for platform {} in your browser and enter the provided user code",
-          platform
-        ));
-        context.print(format!("login page: {}", response.verification_uri()));
-        context.print(format!("user code: {}", response.user_code().secret()));
-      }
-      BrowserMethod::Open => match response.verification_uri_complete() {
-        Some(verification_uri) => match open::that(verification_uri.secret()) {
-          Ok(()) => {
-            context.print(format!("opening login page for platform {}", platform));
-          }
-          Err(_) => {
-            context.print_error("could not open your browser");
-            context.print_explanation(format!(
-              "open login page for platform {} in your browser and enter the provided user code",
-              platform
-            ));
-            context.print(format!("login page: {}", response.verification_uri()));
-            context.print(format!("user code: {}", response.user_code().secret()));
-          }
-        },
-        None => unreachable!(),
-      },
+  match context.browser_method() {
+    BrowserMethod::Instruct => {
+      context.print_explanation(format!(
+        "open login page for platform {} in your browser and enter the provided user code",
+        platform
+      ));
+      context.print(format!("login page: {}", response.verification_uri()));
+      context.print(format!("user code: {}", response.user_code().secret()));
     }
+    BrowserMethod::Open => match response.verification_uri_complete() {
+      Some(verification_uri) => match open::that(verification_uri.secret()) {
+        Ok(()) => {
+          context.print(format!("opening login page for platform {}", platform));
+        }
+        Err(_) => {
+          context.print_error("could not open your browser");
+          context.print_explanation(format!(
+            "open login page for platform {} in your browser and enter the provided user code",
+            platform
+          ));
+          context.print(format!("login page: {}", response.verification_uri()));
+          context.print(format!("user code: {}", response.user_code().secret()));
+        }
+      },
+      None => unreachable!(),
+    },
   }
 }
 
