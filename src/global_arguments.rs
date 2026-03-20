@@ -19,13 +19,15 @@ pub(crate) const NO_CSV_HEADERS_ARGUMENT: &str = "no-csv-headers-argument";
 pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
 pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
 pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
+pub(crate) const ROBOT_PASSWORD_FILE_ARGUMENT: &str = "robot-password-file-argument";
+pub(crate) const ROBOT_PLATFORM_ARGUMENT: &str = "robot-platform-argument";
+pub(crate) const ROBOT_TENANT_ARGUMENT: &str = "robot-tenant-argument";
 pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
 pub(crate) const SUPPRESS_EXIT_STATUS_ARGUMENT: &str = "suppress-exit-status-argument";
-pub(crate) const TARGET_PASSWORD_FILE_ARGUMENT: &str = "target-password-file-argument";
 pub(crate) const TARGET_PLATFORM_ARGUMENT: &str = "target-platform-argument";
 pub(crate) const TARGET_TENANT_ARGUMENT: &str = "target-tenant-argument";
-pub(crate) const TARGET_TENANTS_ARGUMENT: &str = "target-tenants-argument";
 pub(crate) const TARGET_TENANTS_ALL_ARGUMENT: &str = "target-tenants-all-argument";
+pub(crate) const TARGET_TENANTS_ARGUMENT: &str = "target-tenants-argument";
 pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
 // pub(crate) const TO_CLIPBOARD_ARGUMENT: &str = "to-clipboard-argument";
 pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
@@ -180,6 +182,61 @@ pub(crate) fn output_format_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
+pub(crate) fn robot_password_file_argument() -> Arg {
+  Arg::new(ROBOT_PASSWORD_FILE_ARGUMENT)
+    .long("robot-password-file")
+    .action(ArgAction::Set)
+    .value_parser(ValueParser::path_buf())
+    .value_name("FILE")
+    .help("Provide robot password file name")
+    .long_help(
+      "This option specifies the name of a file that contains the robot password. \
+          If this flag is not provided, the environment variable DSH_CLI_ROBOT_PASSWORD_FILE \
+          will be tried. Else, the user will be prompted for the password.",
+    )
+    .global(true)
+}
+
+pub(crate) fn robot_platform_argument() -> Arg {
+  let possible_values = DshPlatform::all()
+    .iter()
+    .map(|platform| {
+      PossibleValue::new(platform.name())
+        .alias(platform.alias())
+        .help(format!("{} ({})", platform.description(), platform.alias()))
+    })
+    .collect_vec();
+  Arg::new(ROBOT_PLATFORM_ARGUMENT)
+    .long("robot-platform")
+    .action(ArgAction::Set)
+    .value_parser(possible_values)
+    .value_name("PLATFORM")
+    .help("Provide robot platform")
+    .long_help(
+      "This option specifies the name of the robot platform which is required when \
+          authenticating via the robot access pattern. If this argument is not provided, \
+          the robot platform can also be specified via the environment variable \
+          DSH_CLI_ROBOT_PLATFORM, or else the user will be prompted.",
+    )
+    .global(true)
+}
+
+pub(crate) fn robot_tenant_argument() -> Arg {
+  Arg::new(ROBOT_TENANT_ARGUMENT)
+    .long("robot-tenant")
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("TENANT")
+    .help("Provide robot tenant")
+    .long_help(
+      "This option specifies the name of the robot tenant which is required when \
+          authenticating via the robot access pattern. If this argument is not provided, \
+          the tenant should be specified via the environment variable DSH_CLI_ROBOT_TENANT, \
+          or else the user will be prompted.",
+    )
+    .global(true)
+}
+
 pub(crate) fn quiet_argument() -> Arg {
   Arg::new(QUIET_ARGUMENT)
     .long("quiet")
@@ -237,23 +294,6 @@ pub(crate) fn suppress_exit_status_argument() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn target_password_file_argument() -> Arg {
-  Arg::new(TARGET_PASSWORD_FILE_ARGUMENT)
-    .long("password-file")
-    .action(ArgAction::Set)
-    .value_parser(ValueParser::path_buf())
-    .value_name("FILE")
-    .help("Provide target password file name")
-    .long_help(
-      "This option specifies the name of a file that contains the target password. \
-          If this flag is not provided, the environment variable \
-          DSH_CLI_PASSWORD_FILE will be tried. Else, if the platform and tenant are known, \
-          the target settings file will be checked. \
-          Finally, the user will be prompted for the password.",
-    )
-    .global(true)
-}
-
 pub(crate) fn target_platform_argument() -> Arg {
   let possible_values = DshPlatform::all()
     .iter()
@@ -271,9 +311,9 @@ pub(crate) fn target_platform_argument() -> Arg {
     .value_name("PLATFORM")
     .help("Provide target platform")
     .long_help(
-      "This option specifies the name of the target platform. \
-          If this argument is not provided, \
-          the platform must be specified via the environment variable DSH_CLI_PLATFORM, \
+      "This option specifies the name of the target platform, which specifies on which \
+          platform a command will be executed. If this argument is not provided, \
+          the platform can also be specified via the environment variable DSH_CLI_PLATFORM, \
           as a default setting in the settings file, or else the user will be prompted. \
           The value between parentheses can be used as an alias for the platform name.",
     )

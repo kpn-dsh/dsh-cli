@@ -437,7 +437,6 @@ pub(crate) fn env_var_file_argument() -> Arg {
 const ENV_VAR_DSH_API_PLATFORMS_FILE: &str = "DSH_API_PLATFORMS_FILE";
 
 pub(crate) const ENV_VAR_DSH_CLI_AUTHENTICATION: &str = "DSH_CLI_AUTHENTICATION";
-
 pub(crate) const ENV_VAR_DSH_CLI_BROWSER: &str = "DSH_CLI_BROWSER";
 pub(crate) const ENV_VAR_DSH_CLI_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
 pub(crate) const ENV_VAR_DSH_CLI_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
@@ -457,10 +456,12 @@ pub(crate) const ENV_VAR_DSH_CLI_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE"
 pub(crate) const ENV_VAR_DSH_CLI_NO_CSV_HEADERS: &str = "DSH_CLI_NO_CSV_HEADERS";
 pub(crate) const ENV_VAR_DSH_CLI_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
 pub(crate) const ENV_VAR_DSH_CLI_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
-pub(crate) const ENV_VAR_DSH_CLI_PASSWORD: &str = "DSH_CLI_PASSWORD";
-pub(crate) const ENV_VAR_DSH_CLI_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
 pub(crate) const ENV_VAR_DSH_CLI_PLATFORM: &str = "DSH_CLI_PLATFORM";
 pub(crate) const ENV_VAR_DSH_CLI_QUIET: &str = "DSH_CLI_QUIET";
+pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PASSWORD: &str = "DSH_CLI_ROBOT_PASSWORD";
+pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PASSWORD_FILE: &str = "DSH_CLI_ROBOT_PASSWORD_FILE";
+pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PLATFORM: &str = "DSH_CLI_ROBOT_PLATFORM";
+pub(crate) const ENV_VAR_DSH_CLI_ROBOT_TENANT: &str = "DSH_CLI_ROBOT_TENANT";
 pub(crate) const ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
 pub(crate) const ENV_VAR_DSH_CLI_STDERR_COLOR: &str = "DSH_CLI_STDERR_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
@@ -478,7 +479,7 @@ pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
 
 lazy_static! {
-  static ref EnvironmentVariables: [EnvironmentVariable; 40] = [
+  static ref EnvironmentVariables: [EnvironmentVariable; 42] = [
     EnvironmentVariable::new(
       ENV_VAR_DSH_API_PLATFORMS_FILE,
       "Overrides the default list of available platforms.",
@@ -723,30 +724,6 @@ lazy_static! {
       overridden via the --output-format command line argument.",
     ),
     EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_PASSWORD,
-      "Specifies the secret api token/password for the target tenant.",
-      true,
-      false,
-      None,
-      "This environment variable specifies the secret api token/password for the target tenant. \n\
-      Note that when the environment variable 'DSH_CLI_PASSWORD_FILE' or the argument \n\
-      --password-file command line argument is provided, this environment variable will never be \n\
-      used. For better security, consider using one of these two options instead of defining \n\
-      'DSH_CLI_PASSWORD'. This environment variable cannot be overridden via the \n\
-      --environment-variable command line argument.",
-    ),
-    EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_PASSWORD_FILE,
-      "Specifies the location of a file containing the secret api token/password \
-       for the target tenant.",
-      false,
-      true,
-      None,
-      "This environment variable specifies a file containing the secret api token/password for the \n\
-      target tenant. Note that when the --password-file command line argument is provided, this \n\
-      environment variable will not be used.",
-    ),
-    EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_PLATFORM,
       "Specifies the target platform on which the target tenant environments live.",
       false,
@@ -766,6 +743,50 @@ lazy_static! {
       "When this environment variable is set (to any value) the dsh tool will run in quiet mode, \n\
       meaning that no output will be produced to the terminal (stdout and stderr). This \n\
       environment variable can be overridden via the --quiet command line argument.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_ROBOT_PASSWORD,
+      "Specifies the robot password for the robot access pattern.",
+      true,
+      false,
+      None,
+      "This environment variable specifies the robot password for the robot access pattern. \n\
+      Note that when the environment variable 'DSH_CLI_ROBOT_PASSWORD_FILE' or the argument \n\
+      --robot-password-file command line argument is provided, this environment variable will \n\
+      never be used. For better security, consider using one of these two options instead of \n\
+      defining 'DSH_CLI_ROBOT_PASSWORD'. This environment variable cannot be overridden via the \n\
+      --environment-variable command line argument.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_ROBOT_PASSWORD_FILE,
+      "Specifies the location of a file containing the robot password for the robot access pattern.",
+      false,
+      true,
+      None,
+      "This environment variable specifies a file containing the robot password for the robot \n\
+      access pattern. Note that when the --robot-password-file command line argument is \n\
+      provided, this environment variable will not be used.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_ROBOT_PLATFORM,
+      "Specifies the robot platform on which the target tenant environments live.",
+      false,
+      true,
+      None,
+      "Robot platform used when authenticating via the robot access pattern. The supported \n\
+       platforms are: 'np-aws-lz-dsh' / 'nplz', 'poc-aws-dsh' / 'poc', 'prod-aws-dsh' / 'prod', \n\
+      'prod-aws-lz-dsh' / 'prodlz', 'prod-aws-lz-laas' / 'prodls' or 'prod-azure-dsh' / 'prodaz'. \n\
+      This environment variable can be overridden via the --robot-platform command line argument.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_ROBOT_TENANT,
+      "Specifies the robot tenant name.",
+      false,
+      true,
+      None,
+      "Tenant name for the robot tenant. The robot tenant is used to authenticate via the \n\
+       robot access pattern. This environment variable can be overridden via the --robot-tenant \n\
+      command line argument.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME,
