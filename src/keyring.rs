@@ -85,7 +85,7 @@ pub(crate) fn get_secret_from_keyring(platform: &DshPlatform, tenant_name: &str,
 ///   each tuple consists of
 ///   * `String` - Platform name.
 ///   * `Vec(String)` - Sorted list of tenants for the platform.
-pub(crate) fn get_secret_targets() -> DshCliResult<Vec<(String, Vec<String>)>> {
+pub(crate) fn get_secrets_from_keyring() -> DshCliResult<Vec<(String, Vec<String>)>> {
   match get_keyring_entry()? {
     Some(keyring_entry) => {
       let mut secret_targets: Vec<(String, Vec<String>)> = keyring_entry
