@@ -46,7 +46,7 @@ pub(crate) enum SecretFormat {
 
   /// Secret contains an encrypted value
   ///
-  /// # Fields
+  /// ## Fields
   /// * `secret_size` - Size of the encrypted value.
   Encrypted { secret_size: SecretSize },
 
@@ -55,14 +55,14 @@ pub(crate) enum SecretFormat {
 
   /// Secret contains a json array
   ///
-  /// # Fields
+  /// ## Fields
   /// * `number_of_elements` - Number of array elements.
   /// * `secret_size` - Size of the json array.
   JsonArray { number_of_elements: usize, secret_size: SecretSize },
 
   /// Secret contains a json object
   ///
-  /// # Fields
+  /// ## Fields
   /// * `number_of_fields` - Number of object elements.
   /// * `secret_size` - Size of the json object.
   JsonObject { number_of_fields: usize, secret_size: SecretSize },
@@ -159,7 +159,7 @@ impl Display for SecretFormat {
 pub(crate) enum SecretMetadata {
   /// Secret contains a certificate
   ///
-  /// # Fields
+  /// ## Fields
   /// * `subject` - Subject or distinguished name.
   /// * `not_after` - Timestamp value of the configuration item in seconds since epoch.
   /// * `not_before` - Timestamp at which the configuration item becomes valid in seconds.
@@ -174,25 +174,25 @@ pub(crate) enum SecretMetadata {
 
   /// Secret metadata could not be determined
   ///
-  /// # Fields
+  /// ## Fields
   /// * `message` - Message that describes the error.
   Error { message: String },
 
   /// Secret metadata could not be determined caused by misconfiguration
   ///
-  /// # Fields
+  /// ## Fields
   /// * `message` - Message that describes the misconfiguration.
   Misconfiguration { message: String },
 
   /// Secret could not be found
   ///
-  /// # Fields
+  /// ## Fields
   /// * `message` - Message that describes the error.
   NotFound { message: Option<String> },
 
   /// Secrets is a private or public key
   ///
-  /// # Fields
+  /// ## Fields
   /// * `secret_format` - Format of the secret.
   /// * `private` - Whether the key is a private key or a public key.
   /// * `label` - Label in the pem file that contained the certificate.
@@ -201,13 +201,13 @@ pub(crate) enum SecretMetadata {
 
   /// Regular secret
   ///
-  /// # Fields
+  /// ## Fields
   /// * `secret_format` - Describes the format of the key.
   Regular { secret_format: SecretFormat },
 
   /// Secret contains settings data
   ///
-  /// # Fields
+  /// ## Fields
   /// * `secret_format` - Describes the format of the key.
   Settings { secret_format: SecretFormat },
 }
@@ -337,10 +337,10 @@ impl From<DshApiError> for SecretMetadata {
 
 /// Try if the secret contains certificates
 ///
-/// # Parameters
+/// ## Parameters
 /// `secret`
 ///
-/// # Returns
+/// ## Returns
 /// List of certificates
 pub(crate) fn try_certificates(secret: &str) -> Result<SecretMetadata, ()> {
   match Certificate::load_pem_chain(secret.as_bytes()) {

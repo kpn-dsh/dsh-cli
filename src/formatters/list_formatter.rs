@@ -31,7 +31,7 @@ where
 
   /// # Creates a new `ListFormatter`
   ///
-  /// # Parameters
+  /// ## Parameters
   /// * `target_id_label` - Target id label that will override the default
   ///   target id label.
   pub(crate) fn new_override_target_id_label(labels: &'a [L], target_id_label: &'a str, context: &'a Context) -> Self {

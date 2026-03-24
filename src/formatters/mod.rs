@@ -56,7 +56,7 @@ pub(crate) trait Label: Eq + Hash + PartialEq + Serialize {
   /// If a target label does not make sense or is undefined for the label type,
   /// `false` must be returned.
   ///
-  /// # Returns
+  /// ## Returns
   /// * `false` - target label does not make sense or is not defined for this `Label` type
   /// * `true` - if `self` is the target label for this label type.
   ///   Only one value can return `true`.
@@ -356,7 +356,7 @@ pub(crate) fn vec_to_table<K: AsRef<str>, V: AsRef<str>>(rows: &[(K, Vec<V>)]) -
 /// formatted as a string representing the number of seconds since unix epoch. If the value is
 /// out of range an error string will be returned.
 ///
-/// # Parameters
+/// ## Parameters
 /// `timestamp` - Timestamp in seconds since unix epoch.
 pub(crate) fn timestamp_to_string(timestamp: i64) -> String {
   match DateTime::from_timestamp_secs(timestamp) {

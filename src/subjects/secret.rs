@@ -592,11 +592,11 @@ impl CommandExecutor for SecretUpdate {
 /// Gets the secret value and optional allocation status. The value will be converted to a
 /// `SecretMetadata` struct. Note that system secrets do not have an allocation status.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `secret_name` - Secret name.
 /// * `client` - Dsh api client.
 ///
-/// # Returns
+/// ## Returns
 /// Tuple consisting of:
 /// * `Vec<SecretMetadata>` - List containing the metadata items.
 /// * `Option<AllocationStatus>` - Secrets allocation status for non-system secrets,
@@ -624,7 +624,7 @@ pub(crate) async fn secret_with_metadata(secret_name: String, client: &DshApiCli
 
 /// Get all secrets with metadata and allocation status
 ///
-/// # Returns
+/// ## Returns
 /// List of tuples, each consisting of:
 /// * `String` - Secret name.
 /// * `Option<String>` - Secret id when secret is a system secret, empty otherwise.
@@ -645,7 +645,7 @@ pub(crate) async fn secrets_with_metadata(
 
 /// Check if a secret has issues
 ///
-/// # Parameters
+/// ## Parameters
 /// * `secret_tuple` - Tuple of secret parameters, consisting of
 ///   * `String` Secret name.
 ///   * `Option<String>` - Secret id when it is a system secret.
@@ -656,7 +656,7 @@ pub(crate) async fn secrets_with_metadata(
 /// * `days` - Number of days until expiration.
 /// * `only_errors` - If `true` only issues with severity level `Severity::Error` will be returned.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some(Vec<Issue>)` - List of found issues (at least one).
 /// * `None` - No issues where found.
 pub(crate) fn has_issues(

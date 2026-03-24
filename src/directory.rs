@@ -281,10 +281,10 @@ fn refresh_token_pathbuf(platform: &DshPlatform) -> DshCliResult<Option<PathBuf>
 /// Create the parent directory or directories for the provided `path`. If the parent directory
 /// already exists, nothing will happen.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `path` - Path for which the parent directory or directories will be created.
 ///
-/// # Returns
+/// ## Returns
 /// * `Ok<()>` - Parent directory already exists or was successfully created.
 /// * `Err<DshCliError>` - Pasrent directory or directories could not be created.
 fn create_parent_directories(path: &Path) -> DshCliResult<()> {

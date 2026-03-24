@@ -67,7 +67,7 @@ impl Default for AuthenticationMethod {
 
 /// Get access token using stored refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform`
 ///
 /// Returns
@@ -92,7 +92,7 @@ pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Opti
 
 /// Let the user log in
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform`
 /// * `context`
 ///
@@ -150,7 +150,7 @@ fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
 
 /// Let the user log out
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform`
 /// * `context`
 ///
@@ -213,7 +213,7 @@ fn client_id(platform: &DshPlatform) -> ClientId {
 /// * Get access token and new refresh token
 /// * Replace old refresh token with new refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `provider_metadata` - Device provider metadata.
 /// * `platform` - Platform.
 /// * `http_client` - Http client (blocking).
@@ -272,7 +272,7 @@ fn trace_token_payload(kind: &str, token: &str) {
 
 /// Get access token and exchanged refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `provider_metadata` - Device provider metadata.
 /// * `platform` - Platform.
 /// * `refresh_token` - Previous refresh token which will be replaced by a new one.
@@ -381,10 +381,10 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
 
 /// Get stored refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform` - Platform for which the token is requested.
 ///
-/// # Returns
+/// ## Returns
 /// `Some(RefreshToken)`
 /// `None`
 pub(crate) fn get_stored_refresh_token(platform: &DshPlatform) -> DshCliResult<Option<RefreshToken>> {

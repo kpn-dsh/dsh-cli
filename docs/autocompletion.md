@@ -2,7 +2,7 @@
 
 [&#x2190; Platforms specification](platforms-specification.md)
 
-The `dsh` tool has a hidden argument `--generate-autocomplete-file`, which can be used
+The `dsh` tool has a hidden option `--generate-autocomplete-file`, which can be used
 to generate an autocompletion file for the following shells:
 
 * `bash` - Bourne-again shell

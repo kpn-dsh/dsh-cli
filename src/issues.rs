@@ -7,14 +7,14 @@ use serde::Serialize;
 pub(crate) enum Issue {
   /// Configuration item is not yet valid
   ///
-  /// # Fields
+  /// ## Fields
   /// * `not_before` - Timestamp at which the configuration item becomes valid in seconds
   ///   since epoch.
   Before { not_before: i64 },
 
   /// Configuration item has a creation/update notification
   ///
-  /// # Fields
+  /// ## Fields
   /// * `notification` - Creation/update notification.
   CreationUpdateNotification { notification: Notification },
 
@@ -23,25 +23,25 @@ pub(crate) enum Issue {
 
   /// Configuration item has expired
   ///
-  /// # Fields
+  /// ## Fields
   /// * `not_after` - Not after timestamp value of the configuration item in seconds since epoch.
   Expired { not_after: i64 },
 
   /// Configuration item is about to expire
   ///
-  /// # Fields
+  /// ## Fields
   /// * `not_after` - Not after timestamp value of the configuration item in seconds since epoch.
   ExpirationOncoming { not_after: i64 },
 
   /// Configuration item has an incorrect/illegal value
   ///
-  /// # Fields
+  /// ## Fields
   /// * `explanation` - Additional explanatory text.
   IncorrectValue { explanation: String },
 
   /// Configuration item is not properly configured
   ///
-  /// # Fields
+  /// ## Fields
   /// * `explanation` - Additional explanatory text.
   Misconfiguration { explanation: String },
 
@@ -56,13 +56,13 @@ pub(crate) enum Issue {
 
   /// Configuration item has a removal notification
   ///
-  /// # Fields
+  /// ## Fields
   /// * `notification` - Removal notification.
   RemovalNotification { notification: Notification },
 
   /// Something unexpected happened
   ///
-  /// # Fields
+  /// ## Fields
   /// * `message` - Describes what happened.
   Unexpected { message: String },
 }

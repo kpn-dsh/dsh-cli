@@ -46,7 +46,7 @@ impl Error for DshCliError {}
 /// The values must all implement `Display`. The macro will create an
 /// [`Err<DshCliError::String>`], where the message will be generated from the format string.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn divide(numerator: i64, denominator: i64) -> Result<i64, DshCliError> {
 ///   if denominator == 0 {
@@ -70,7 +70,7 @@ macro_rules! err {
 /// The values must all implement `Display`. The macro will create an
 /// [`DshCliError::String`], where the message will be generated from the format string.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn divide(numerator: i64, denominator: i64) -> Result<i64, DshCliError> {
 ///   if denominator == 0 {
@@ -98,7 +98,7 @@ macro_rules! cli_error {
 /// The intended use for `error_map!` is as a closure for the [`Result::map_err`] method, mapping
 /// any error value (as long as its type implements `Display`) into a `DshCliError::String`.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn save(path: PathBuf, data: &[u8]) -> Result<(), DshCliError> {
 ///   fs::write(path, data).map_err(error_map!("write failed with error: {}"))
@@ -123,7 +123,7 @@ macro_rules! error_map {
 /// The intended use for `error_append!` is as a closure for the [`Result::map_err`] method,
 /// mapping any error value (as long as its type implements `Display`) into a `DshCliError::String`.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn save(path: PathBuf, data: &[u8]) -> Result<(), DshCliError> {
 ///   fs::write(path, data).map_err(error_append!("writing {} failed with error: ", path))

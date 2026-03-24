@@ -45,10 +45,10 @@ pub(crate) struct ReleaseAsset {
 ///
 /// Return the latest release when it is newer than the current version.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `current_version` - Version number of the current application.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some(Release)` - When a newer release than the current version is available.
 /// * `None` - When the current version is the latest (or newer than the latest version).
 pub(crate) async fn newer_release(current_version: &Version) -> DshCliResult<Option<Release>> {
@@ -66,10 +66,10 @@ pub(crate) async fn newer_release(current_version: &Version) -> DshCliResult<Opt
 /// release information is not from the cache but from GitHub. This can be used to notify the
 /// user that a newer release exists, but only once per day.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `current_version` - Version number of the current application.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some(Release)` - When the user should be notified that there is a newer version.
 /// * `None` - No newer release is available or the user should not be notified.
 pub(crate) async fn newer_release_notification(current_version: &Version) -> Option<Release> {
@@ -89,7 +89,7 @@ const NUMBER_OF_SECONDS_IN_A_DAY: u64 = 24 * 60 * 60;
 
 /// Get the latest release of the tool
 ///
-/// # Returns
+/// ## Returns
 /// Tuple `(version, release, cached)` consisting of:
 /// * `version` - Version of the latest release.
 /// * `release` - Latest release.
@@ -129,7 +129,7 @@ fn write_latest_release_to_file(latest_release: &Release) -> DshCliResult<()> {
 
 /// Get stored latest release
 ///
-/// # Returns
+/// ## Returns
 /// * `Some((Release, SystemTime))` - When stored latest release information was found, it is
 ///   returned together with the timestamp when it was created.
 /// * `None` - No stored latest release information was found.
@@ -149,7 +149,7 @@ fn latest_release_from_file() -> DshCliResult<Option<(Release, SystemTime)>> {
 /// When the latest release is found, as a side effect it will be stored in the
 /// "latest-release.toml" file.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some((Release, SystemTime))` - When stored latest release information was found, it is
 ///   returned together with the timestamp when it was created.
 /// * `None` - No stored latest release information was found.
@@ -170,7 +170,7 @@ async fn latest_release_from_github() -> DshCliResult<Option<Release>> {
 
 /// Get releases information from GitHub
 ///
-/// # Returns
+/// ## Returns
 /// * `Vec<Release>` - Vector describing all releases of the application found at GitHub.
 async fn releases_from_github() -> DshCliResult<Vec<Release>> {
   spawn_blocking(move || {
