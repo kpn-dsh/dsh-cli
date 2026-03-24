@@ -602,12 +602,12 @@ impl SubjectFormatter<TopicLabel> for Topic {
   fn value(&self, label: &TopicLabel, target_id: &str) -> Value {
     match label {
       TopicLabel::CleanupPolicy => Value::option(self.kafka_properties.get(CLEANUP_POLICY_PROPERTY)),
-      TopicLabel::DerivedFrom => Value::empty(), // TODO
+      TopicLabel::DerivedFrom => Value::unreachable(),
       TopicLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.kafka_properties))),
       TopicLabel::MaxMessageBytes => Value::option(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY)),
-      TopicLabel::Notifications => Value::empty(), // TODO
+      TopicLabel::Notifications => Value::unreachable(),
       TopicLabel::Partitions => Value::plain(self.partitions),
-      TopicLabel::Provisioned => Value::empty(), // TODO
+      TopicLabel::Provisioned => Value::unreachable(),
       TopicLabel::ReplicationFactor => Value::plain(self.replication_factor),
       TopicLabel::SegmentBytes => Value::option(self.kafka_properties.get(SEGMENT_BYTES_PROPERTY)),
       TopicLabel::Target => Value::target(target_id),
