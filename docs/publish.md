@@ -7,7 +7,7 @@ In this explanation it is assumed that all your local code is committed, pushed 
 merged to `github`.
 
 Before publishing, it is a good idea to create a tag in your repository for the
-published version. Use the version number without any prefix as the tag name, e.g. `0.9.1`.
+published version. Use the version number without any prefix as the tag name, e.g. `0.10.0`.
 This tag is required when creating a `GitHub` release on the next page.
 
 ## Publish `dsh_api`

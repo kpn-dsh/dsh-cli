@@ -4,7 +4,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.9.1] - YYYY-MM-DD
+## [0.10.0] - YYYY-MM-DD
 
 ### Added
 
@@ -14,6 +14,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Changed
 
+* Changed configuration for robot authentication.
 * Removed the `target` capabilities.
 * Directory structure for docs.
 
