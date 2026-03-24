@@ -1,4 +1,4 @@
-use crate::arguments::{certificate_id_argument, platform_name_argument, tenant_name_argument};
+use crate::arguments::certificate_id_argument;
 use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -14,7 +14,8 @@ use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::secret::{secrets_with_metadata, SECRET_LABELS_LIST};
 use crate::subjects::{secret, DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
-use crate::target_arguments::get_platform_and_tenant;
+use crate::target_platform::{get_target_platform_explicit, platform_name_argument};
+use crate::target_tenant::{get_target_tenant_explicit, tenant_name_argument};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -108,8 +109,9 @@ struct CertificateCreate {}
 
 #[async_trait]
 impl CommandExecutor for CertificateCreate {
-  async fn execute_without_client(&self, target: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_platform_and_tenant(matches, context.settings())?;
+  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform_explicit(matches)?;
+    let tenant = get_target_tenant_explicit(matches)?;
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("create self signed certificate '{}' for {}@{}", certificate_id, tenant, platform));
 
@@ -479,7 +481,7 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
 
 /// Check if a certificate has issues
 ///
-/// # Parameters
+/// ## Parameters
 /// * `certificate_status`
 /// * `secrets` - List of [`SecretTuple`]s describing all secrets. Each tuple consists of:
 ///   * `String` - Secret name.
@@ -491,7 +493,7 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
 /// * `days` - Number of days until expiration.
 /// * `only_errors` - If `true` only issues with severity level `Severity::Error` will be returned.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some(Vec<IssueDescription>)` - List of tuples describing the issues found
 ///   (at least one).
 /// * `None` - No issues where found.

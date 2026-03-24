@@ -20,7 +20,8 @@ use crate::subjects::service::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
 use crate::subjects::vhost::VHOST_LABELS;
 use crate::subjects::volume::VOLUME_LABELS;
-use crate::{cli_error, err, get_target_platform, get_target_tenant, DshCliResult};
+use crate::target_tenant::get_target_tenant;
+use crate::{cli_error, err, get_target_platform, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -387,7 +388,6 @@ impl CommandExecutor for AppShow {
     context.print_allocation_status(&allocation_status, APP_SUBJECT_TARGET);
     let app = app_catalog_app?;
     UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, context).print(&app, None)?;
-    // UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, Some("app id"), context).print(&app, None)?;
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(service) => {
