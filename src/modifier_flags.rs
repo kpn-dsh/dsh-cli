@@ -12,15 +12,15 @@ pub(crate) enum ModifierFlagType {
 impl ModifierFlagType {
   pub(crate) fn id(&self) -> &'static str {
     match &self {
-      Self::IgnoreCase => "ignore-case",
+      Self::IgnoreCase => "ignore-case-flag",
       Self::ImplicitDefaults => "implicit-defaults-flag",
       Self::MultiLine => "multi-line-flag",
       Self::Regex => "regex-flag",
-      Self::Substring => "substring",
+      Self::Substring => "substring-flag",
     }
   }
 
-  pub(crate) fn option(&self) -> &'static str {
+  fn flag(&self) -> &'static str {
     match &self {
       Self::IgnoreCase => "ignore-case",
       Self::ImplicitDefaults => "implicit-defaults",
@@ -30,7 +30,7 @@ impl ModifierFlagType {
     }
   }
 
-  pub(crate) fn shortcut(&self) -> Option<char> {
+  fn shortcut(&self) -> Option<char> {
     match &self {
       Self::IgnoreCase => Some('i'),
       Self::ImplicitDefaults => None,
@@ -46,12 +46,12 @@ pub(crate) fn create_modifier_flag(flag_type: &ModifierFlagType, subject: &str) 
     ModifierFlagType::IgnoreCase => create_clap_modifier_flag(
       ModifierFlagType::IgnoreCase,
       "Ignore case when matching values".to_string(),
-      "If this option is provided matching will ignore case.".to_string(),
+      "If this flag is provided matching will ignore case.".to_string(),
     ),
     ModifierFlagType::ImplicitDefaults => create_clap_modifier_flag(
       ModifierFlagType::ImplicitDefaults,
       "Implicitly use default values for optional parameters".to_string(),
-      "If this option is provided the user will not be prompted for optional parameters. Instead the default value will be used.".to_string(),
+      "If this flag is provided the user will not be prompted for optional parameters. Instead the default value will be used.".to_string(),
     ),
     ModifierFlagType::MultiLine => create_clap_modifier_flag(
       ModifierFlagType::MultiLine,
@@ -71,14 +71,14 @@ pub(crate) fn create_modifier_flag(flag_type: &ModifierFlagType, subject: &str) 
     ModifierFlagType::Substring => create_clap_modifier_flag(
       ModifierFlagType::Substring,
       "Match substrings".to_string(),
-      "If this option is provided substring matching will be used.".to_string(),
+      "If this flag is provided substring matching will be used.".to_string(),
     ),
   }
 }
 
 fn create_clap_modifier_flag(flag_type: ModifierFlagType, help: String, long_help: String) -> Arg {
   let mut flag_arg = Arg::new(flag_type.id())
-    .long(flag_type.option())
+    .long(flag_type.flag())
     .action(ArgAction::SetTrue)
     .help(help)
     .long_help(long_help);

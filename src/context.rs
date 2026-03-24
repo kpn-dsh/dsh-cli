@@ -10,8 +10,8 @@ use crate::environment_variables::{
 use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::global_arguments::{
-  AUTHENTICATION_ARGUMENT, BROWSER_ARGUMENT, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_CSV_HEADERS_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
-  SHOW_EXECUTION_TIME_ARGUMENT, SUPPRESS_EXIT_STATUS_ARGUMENT, TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
+  AUTHENTICATION_OPTION, BROWSER_OPTION, DRY_RUN_FLAG, FORCE_FLAG, NO_CSV_HEADERS_FLAG, NO_ESCAPE_FLAG, OUTPUT_FORMAT_OPTION, QUIET_FLAG, SHOW_EXECUTION_TIME_FLAG,
+  SUPPRESS_EXIT_STATUS_FLAG, TERMINAL_WIDTH_OPTION, VERBOSITY_OPTION,
 };
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
@@ -217,7 +217,7 @@ impl Context {
       &Self::get_color(ENV_VAR_DSH_CLI_WARNING_COLOR, matches, &settings.warning_color, DshColor::Blue)?,
     );
     let quiet = Self::get_quiet(matches, &settings);
-    let force = Self::get_force(matches, &settings);
+    let force = Self::get_force(matches);
     let suppress_exit_status = Self::get_suppress_exit_status(matches, &settings);
     let output_format_specification = Self::get_output_format_specification(matches, &settings)?;
     let show_execution_time = Self::get_show_execution_time(matches, &settings);
@@ -306,7 +306,7 @@ impl Context {
   /// 1. If stdin is a terminal, default to `AuthenticationMethod::SingleSignOn`
   /// 1. Else default to `AuthenticationMethod::Robot`
   fn get_authentication_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> DshCliResult<AuthenticationMethod> {
-    match matches.get_one::<AuthenticationMethod>(AUTHENTICATION_ARGUMENT) {
+    match matches.get_one::<AuthenticationMethod>(AUTHENTICATION_OPTION) {
       Some(authentication_argument) => Ok(authentication_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_AUTHENTICATION, Some(matches))? {
         Some(authentication_env_var) => AuthenticationMethod::try_from(authentication_env_var.as_str()),
@@ -332,7 +332,7 @@ impl Context {
   /// 1. If stdin is a terminal, default to `BrowserMethod::Open`
   /// 1. Else default to `BrowserMethod::Instruct`
   fn get_browser_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> DshCliResult<BrowserMethod> {
-    match matches.get_one::<BrowserMethod>(BROWSER_ARGUMENT) {
+    match matches.get_one::<BrowserMethod>(BROWSER_OPTION) {
       Some(browser_argument) => Ok(browser_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_BROWSER, Some(matches))? {
         Some(browser_env_var) => BrowserMethod::try_from(browser_env_var.as_str()),
@@ -437,15 +437,15 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_dry_run(matches: &ArgMatches, settings: &Settings) -> bool {
-    if matches.get_flag(DRY_RUN_ARGUMENT) {
-      debug!("dry run mode enabled (argument)");
+    if matches.get_flag(DRY_RUN_FLAG) {
+      debug!("dry run mode enabled (from command line flag)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      debug!("dry run mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
+      debug!("dry run mode enabled (from environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
       true
     } else if let Some(dry_run) = settings.dry_run {
       if dry_run {
-        debug!("dry run mode enabled (settings)");
+        debug!("dry run mode enabled (from settings file)");
       }
       dry_run
     } else {
@@ -456,21 +456,11 @@ impl Context {
   /// Gets force context value
   ///
   /// 1. Try flag `--force`
-  /// 1. Try if environment variable `DSH_CLI_FORCE` exists
-  /// 1. Try settings file
   /// 1. Default to `false`
-  fn get_force(matches: &ArgMatches, settings: &Settings) -> bool {
-    if matches.get_flag(FORCE_ARGUMENT) {
-      debug!("force mode enabled (argument)");
+  fn get_force(matches: &ArgMatches) -> bool {
+    if matches.get_flag(FORCE_FLAG) {
+      debug!("force mode enabled (from command line flag)");
       true
-    } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      debug!("force mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
-      true
-    } else if let Some(dry_run) = settings.dry_run {
-      if dry_run {
-        debug!("force mode enabled (settings)");
-      }
-      dry_run
     } else {
       false
     }
@@ -483,15 +473,18 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_suppress_exit_status(matches: &ArgMatches, settings: &Settings) -> bool {
-    if matches.get_flag(SUPPRESS_EXIT_STATUS_ARGUMENT) {
-      debug!("suppress exit status enabled (argument)");
+    if matches.get_flag(SUPPRESS_EXIT_STATUS_FLAG) {
+      debug!("suppress exit status enabled (from command line flag)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, matches) {
-      debug!("suppress exit status enabled (environment variable '{}')", ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS);
+      debug!(
+        "suppress exit status enabled (from environment variable '{}')",
+        ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS
+      );
       true
     } else if let Some(suppress_exit_status) = settings.suppress_exit_status {
       if suppress_exit_status {
-        debug!("suppress exit status enabled (settings)");
+        debug!("suppress exit status enabled (from settings file)");
       }
       suppress_exit_status
     } else {
@@ -537,7 +530,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_no_escape(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(NO_ESCAPE_ARGUMENT)
+    matches.get_flag(NO_ESCAPE_FLAG)
       || is_environment_variable_specified(ENV_VAR_NO_COLOR, matches)
       || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_ESCAPE, matches)
       || settings.no_escape.unwrap_or(false)
@@ -550,7 +543,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_no_csv_headers(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(NO_CSV_HEADERS_ARGUMENT) || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_CSV_HEADERS, matches) || settings.no_csv_headers.unwrap_or(false)
+    matches.get_flag(NO_CSV_HEADERS_FLAG) || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_CSV_HEADERS, matches) || settings.no_csv_headers.unwrap_or(false)
   }
 
   /// Gets output format specification
@@ -560,7 +553,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Else default to `None`
   fn get_output_format_specification(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<OutputFormat>> {
-    match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
+    match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_OPTION) {
       Some(output_format_argument) => Ok(Some(output_format_argument.to_owned())),
       None => match environment_variable(ENV_VAR_DSH_CLI_OUTPUT_FORMAT, Some(matches))? {
         Some(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str())
@@ -595,7 +588,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_quiet(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(QUIET_ARGUMENT) || is_environment_variable_specified(ENV_VAR_DSH_CLI_QUIET, matches) || settings.quiet.unwrap_or(false)
+    matches.get_flag(QUIET_FLAG) || is_environment_variable_specified(ENV_VAR_DSH_CLI_QUIET, matches) || settings.quiet.unwrap_or(false)
   }
 
   /// Gets show_execution_time context value
@@ -605,9 +598,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_show_execution_time(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT)
-      || is_environment_variable_specified(ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, matches)
-      || settings.show_execution_time.unwrap_or(false)
+    matches.get_flag(SHOW_EXECUTION_TIME_FLAG) || is_environment_variable_specified(ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, matches) || settings.show_execution_time.unwrap_or(false)
   }
 
   /// Gets terminal width context value
@@ -617,7 +608,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. If stdout is a terminal use actual terminal width, else default to `None`
   fn get_terminal_width(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<usize>> {
-    match matches.get_one::<usize>(TERMINAL_WIDTH_ARGUMENT) {
+    match matches.get_one::<usize>(TERMINAL_WIDTH_OPTION) {
       Some(terminal_width_argument) => Ok(Some(terminal_width_argument.to_owned())),
       None => match environment_variable(ENV_VAR_DSH_CLI_TERMINAL_WIDTH, Some(matches))? {
         Some(terminal_width_env_var) => match terminal_width_env_var.parse::<usize>() {
@@ -661,7 +652,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `Verbosity::Low`
   fn get_verbosity(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Verbosity> {
-    match matches.get_one::<Verbosity>(VERBOSITY_ARGUMENT) {
+    match matches.get_one::<Verbosity>(VERBOSITY_OPTION) {
       Some(verbosity_argument) => Ok(verbosity_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_VERBOSITY, Some(matches))? {
         Some(verbosity_env_var) => Verbosity::try_from(verbosity_env_var.as_str()).map_err(error_append!("error in environment variable {}: ", ENV_VAR_DSH_CLI_VERBOSITY)),

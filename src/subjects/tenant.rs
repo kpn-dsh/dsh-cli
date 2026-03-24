@@ -12,11 +12,11 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
-use crate::limits_flags::{
+use crate::limits_options::{
   certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
-  stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_FLAG, CONSUMER_RATE_FLAG, CPU_FLAG, KAFKA_ACL_GROUP_COUNT_FLAG,
-  MEM_FLAG, PARTITION_COUNT_FLAG, PRODUCER_RATE_FLAG, REQUEST_RATE_FLAG, SECRET_COUNT_FLAG, STREAM_READ_FLAG, STREAM_RW_FLAG, STREAM_WRITE_FLAG, TOPIC_COUNT_FLAG, TRACING_FLAG,
-  VPN_FLAG,
+  stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_OPTION, CONSUMER_RATE_OPTION, CPU_OPTION,
+  KAFKA_ACL_GROUP_COUNT_OPTION, MEM_OPTION, PARTITION_COUNT_OPTION, PRODUCER_RATE_OPTION, REQUEST_RATE_OPTION, SECRET_COUNT_OPTION, STREAM_READ_OPTION, STREAM_RW_OPTION,
+  STREAM_WRITE_OPTION, TOPIC_COUNT_OPTION, TRACING_OPTION, VPN_OPTION,
 };
 use crate::subject::{Requirements, Subject};
 use crate::{err, DshCliResult};
@@ -155,8 +155,8 @@ impl CommandExecutor for TenantCreate {
     if client.get_tenant_configuration(&tenant_id).await.is_ok() {
       return err!("managed tenant '{}' already exists", tenant_id);
     }
-    let enable_tracing = matches.get_one::<bool>(TRACING_FLAG);
-    let enable_vpn = matches.get_one::<bool>(VPN_FLAG);
+    let enable_tracing = matches.get_one::<bool>(TRACING_OPTION);
+    let enable_vpn = matches.get_one::<bool>(VPN_OPTION);
     context.print_explanation(format!("create new managed tenant '{}'", tenant_id));
     let mut services = vec![
       // Monitoring service is mandatory.
@@ -395,8 +395,8 @@ struct TenantUpdateLimit {}
 impl CommandExecutor for TenantUpdateLimit {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
-    let enable_tracing_argument = matches.get_one::<bool>(TRACING_FLAG);
-    let enable_vpn_argument = matches.get_one::<bool>(VPN_FLAG);
+    let enable_tracing_argument = matches.get_one::<bool>(TRACING_OPTION);
+    let enable_vpn_argument = matches.get_one::<bool>(VPN_OPTION);
     let tenant_limits_from_arguments = tenant_limits_try_from_matches(matches)?;
 
     match (
@@ -495,11 +495,11 @@ impl CommandExecutor for TenantUpdateLimit {
 }
 
 fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> DshCliResult<(ManagedStreamId, AccessRights)> {
-  Ok(match matches.get_one::<String>(STREAM_READ_FLAG) {
+  Ok(match matches.get_one::<String>(STREAM_READ_OPTION) {
     Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Read),
-    None => match matches.get_one::<String>(STREAM_RW_FLAG) {
+    None => match matches.get_one::<String>(STREAM_RW_OPTION) {
       Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::ReadWrite),
-      None => match matches.get_one::<String>(STREAM_WRITE_FLAG) {
+      None => match matches.get_one::<String>(STREAM_WRITE_OPTION) {
         Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Write),
         None => unreachable!(),
       },
@@ -517,9 +517,9 @@ fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> DshCliResu
 
 fn tenant_limits_try_from_matches(matches: &ArgMatches) -> DshCliResult<TenantLimits> {
   Ok(TenantLimits {
-    certificate_count: matches.get_one::<NonZeroU64>(CERTIFICATE_COUNT_FLAG).cloned(),
-    consumer_rate: matches.get_one::<i64>(CONSUMER_RATE_FLAG).cloned(),
-    cpu: match matches.get_one::<f64>(CPU_FLAG).cloned() {
+    certificate_count: matches.get_one::<NonZeroU64>(CERTIFICATE_COUNT_OPTION).cloned(),
+    consumer_rate: matches.get_one::<i64>(CONSUMER_RATE_OPTION).cloned(),
+    cpu: match matches.get_one::<f64>(CPU_OPTION).cloned() {
       Some(cpus) => {
         if (0.01..=16.0).contains(&cpus) {
           Some(cpus)
@@ -529,13 +529,13 @@ fn tenant_limits_try_from_matches(matches: &ArgMatches) -> DshCliResult<TenantLi
       }
       None => None,
     },
-    kafka_acl_group_count: matches.get_one::<i64>(KAFKA_ACL_GROUP_COUNT_FLAG).cloned(),
-    mem: matches.get_one::<NonZeroU64>(MEM_FLAG).cloned(),
-    partition_count: matches.get_one::<NonZeroU64>(PARTITION_COUNT_FLAG).cloned(),
-    producer_rate: matches.get_one::<i64>(PRODUCER_RATE_FLAG).cloned(),
-    request_rate: matches.get_one::<NonZeroU64>(REQUEST_RATE_FLAG).cloned(),
-    secret_count: matches.get_one::<NonZeroU64>(SECRET_COUNT_FLAG).cloned(),
-    topic_count: matches.get_one::<NonZeroU64>(TOPIC_COUNT_FLAG).cloned(),
+    kafka_acl_group_count: matches.get_one::<i64>(KAFKA_ACL_GROUP_COUNT_OPTION).cloned(),
+    mem: matches.get_one::<NonZeroU64>(MEM_OPTION).cloned(),
+    partition_count: matches.get_one::<NonZeroU64>(PARTITION_COUNT_OPTION).cloned(),
+    producer_rate: matches.get_one::<i64>(PRODUCER_RATE_OPTION).cloned(),
+    request_rate: matches.get_one::<NonZeroU64>(REQUEST_RATE_OPTION).cloned(),
+    secret_count: matches.get_one::<NonZeroU64>(SECRET_COUNT_OPTION).cloned(),
+    topic_count: matches.get_one::<NonZeroU64>(TOPIC_COUNT_OPTION).cloned(),
   })
 }
 

@@ -3,11 +3,11 @@ use crate::TOOL_OPTIONS_HEADING;
 use builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction};
 
-pub(crate) const LOG_LEVEL_API_ARGUMENT: &str = "log-level-api-argument";
-pub(crate) const LOG_LEVEL_ARGUMENT: &str = "log-level-argument";
+pub(crate) const LOG_LEVEL_API_OPTION: &str = "log-level-api-argument";
+pub(crate) const LOG_LEVEL_OPTION: &str = "log-level-argument";
 
-pub(crate) fn log_level_api_argument() -> Arg {
-  Arg::new(LOG_LEVEL_API_ARGUMENT)
+pub(crate) fn log_level_api_option() -> Arg {
+  Arg::new(LOG_LEVEL_API_OPTION)
     .long("log-level-api")
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<LogLevel>::new())
@@ -22,8 +22,8 @@ pub(crate) fn log_level_api_argument() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn log_level_argument() -> Arg {
-  Arg::new(LOG_LEVEL_ARGUMENT)
+pub(crate) fn log_level_option() -> Arg {
+  Arg::new(LOG_LEVEL_OPTION)
     .long("log-level")
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<LogLevel>::new())

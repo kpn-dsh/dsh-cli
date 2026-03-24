@@ -2,25 +2,25 @@ use crate::argument_parsers::RangedValueParser;
 use clap::{builder, Arg, ArgAction};
 use std::num::NonZeroU64;
 
-pub(crate) const CERTIFICATE_COUNT_FLAG: &str = "certificate-count";
-pub(crate) const CONSUMER_RATE_FLAG: &str = "consumer-rate";
-pub(crate) const CPU_FLAG: &str = "cpu";
-pub(crate) const KAFKA_ACL_GROUP_COUNT_FLAG: &str = "kafka-acl-group-count";
-pub(crate) const MEM_FLAG: &str = "mem";
-pub(crate) const PARTITION_COUNT_FLAG: &str = "partition-count";
-pub(crate) const PRODUCER_RATE_FLAG: &str = "producer-rate";
-pub(crate) const REQUEST_RATE_FLAG: &str = "request-rate";
-pub(crate) const SECRET_COUNT_FLAG: &str = "secret-count";
-pub(crate) const STREAM_READ_FLAG: &str = "stream-read";
-pub(crate) const STREAM_RW_FLAG: &str = "stream-rw";
-pub(crate) const STREAM_WRITE_FLAG: &str = "stream-write";
-pub(crate) const TOPIC_COUNT_FLAG: &str = "topic-count";
-pub(crate) const TRACING_FLAG: &str = "tracing";
-pub(crate) const VPN_FLAG: &str = "vpn";
+pub(crate) const CERTIFICATE_COUNT_OPTION: &str = "certificate-count-option";
+pub(crate) const CONSUMER_RATE_OPTION: &str = "consumer-rate-option";
+pub(crate) const CPU_OPTION: &str = "cpu-option";
+pub(crate) const KAFKA_ACL_GROUP_COUNT_OPTION: &str = "kafka-acl-group-count-option";
+pub(crate) const MEM_OPTION: &str = "mem-option";
+pub(crate) const PARTITION_COUNT_OPTION: &str = "partition-count-option";
+pub(crate) const PRODUCER_RATE_OPTION: &str = "producer-rate-option";
+pub(crate) const REQUEST_RATE_OPTION: &str = "request-rate-option";
+pub(crate) const SECRET_COUNT_OPTION: &str = "secret-count-option";
+pub(crate) const STREAM_READ_OPTION: &str = "stream-read-option";
+pub(crate) const STREAM_RW_OPTION: &str = "stream-rw-option";
+pub(crate) const STREAM_WRITE_OPTION: &str = "stream-write-option";
+pub(crate) const TOPIC_COUNT_OPTION: &str = "topic-count-option";
+pub(crate) const TRACING_OPTION: &str = "tracing-option";
+pub(crate) const VPN_OPTION: &str = "vpn-option";
 
 pub(crate) fn certificate_count_flag() -> Arg {
-  Arg::new(CERTIFICATE_COUNT_FLAG)
-    .long(CERTIFICATE_COUNT_FLAG)
+  Arg::new(CERTIFICATE_COUNT_OPTION)
+    .long("certificate-count")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
@@ -32,8 +32,8 @@ pub(crate) fn certificate_count_flag() -> Arg {
 }
 
 pub(crate) fn consumer_rate_flag() -> Arg {
-  Arg::new(CONSUMER_RATE_FLAG)
-    .long(CONSUMER_RATE_FLAG)
+  Arg::new(CONSUMER_RATE_OPTION)
+    .long("consumer-rate")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<i64>::new(1048576, 1250000000))
     .value_name("RATE")
@@ -46,8 +46,8 @@ pub(crate) fn consumer_rate_flag() -> Arg {
 }
 
 pub(crate) fn cpu_flag() -> Arg {
-  Arg::new(CPU_FLAG)
-    .long(CPU_FLAG)
+  Arg::new(CPU_OPTION)
+    .long("cpu")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<f64>::new(0.01, 16.0))
     .value_name("CPU")
@@ -61,8 +61,8 @@ pub(crate) fn cpu_flag() -> Arg {
 }
 
 pub(crate) fn kafka_acl_group_flag() -> Arg {
-  Arg::new(KAFKA_ACL_GROUP_COUNT_FLAG)
-    .long(KAFKA_ACL_GROUP_COUNT_FLAG)
+  Arg::new(KAFKA_ACL_GROUP_COUNT_OPTION)
+    .long("kafka-acl-group-count")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<i64>::new(0, 100))
     .value_name("COUNT")
@@ -74,8 +74,8 @@ pub(crate) fn kafka_acl_group_flag() -> Arg {
 }
 
 pub(crate) fn mem_flag() -> Arg {
-  Arg::new(MEM_FLAG)
-    .long(MEM_FLAG)
+  Arg::new(MEM_OPTION)
+    .long("mem")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(131072).unwrap()))
     .value_name("MEM")
@@ -87,8 +87,8 @@ pub(crate) fn mem_flag() -> Arg {
 }
 
 pub(crate) fn partition_count_flag() -> Arg {
-  Arg::new(PARTITION_COUNT_FLAG)
-    .long(PARTITION_COUNT_FLAG)
+  Arg::new(PARTITION_COUNT_OPTION)
+    .long("partition-count")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
@@ -100,8 +100,8 @@ pub(crate) fn partition_count_flag() -> Arg {
 }
 
 pub(crate) fn producer_rate_flag() -> Arg {
-  Arg::new(PRODUCER_RATE_FLAG)
-    .long(PRODUCER_RATE_FLAG)
+  Arg::new(PRODUCER_RATE_OPTION)
+    .long("producer-rate")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<i64>::new(1048576, 1250000000))
     .value_name("RATE")
@@ -114,8 +114,8 @@ pub(crate) fn producer_rate_flag() -> Arg {
 }
 
 pub(crate) fn request_rate_flag() -> Arg {
-  Arg::new(REQUEST_RATE_FLAG)
-    .long(REQUEST_RATE_FLAG)
+  Arg::new(REQUEST_RATE_OPTION)
+    .long("request-rate")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(100).unwrap()))
     .value_name("RATE")
@@ -127,8 +127,8 @@ pub(crate) fn request_rate_flag() -> Arg {
 }
 
 pub(crate) fn secret_count_flag() -> Arg {
-  Arg::new(SECRET_COUNT_FLAG)
-    .long(SECRET_COUNT_FLAG)
+  Arg::new(SECRET_COUNT_OPTION)
+    .long("secret-count")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
@@ -140,19 +140,19 @@ pub(crate) fn secret_count_flag() -> Arg {
 }
 
 pub(crate) fn stream_read_flag(action: &str) -> Arg {
-  Arg::new(STREAM_READ_FLAG)
-    .long(STREAM_READ_FLAG)
+  Arg::new(STREAM_READ_OPTION)
+    .long("stream-read")
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("STREAM")
     .help(format!("{} read access", action))
     .long_help(format!("{} the managed tenant read access rights to a managed stream.", action))
-    .conflicts_with_all([STREAM_RW_FLAG, STREAM_WRITE_FLAG])
+    .conflicts_with_all([STREAM_RW_OPTION, STREAM_WRITE_OPTION])
 }
 
 pub(crate) fn stream_rw_flag(action: &str) -> Arg {
-  Arg::new(STREAM_RW_FLAG)
-    .long(STREAM_RW_FLAG)
+  Arg::new(STREAM_RW_OPTION)
+    .long("stream-rw")
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("STREAM")
@@ -161,8 +161,8 @@ pub(crate) fn stream_rw_flag(action: &str) -> Arg {
 }
 
 pub(crate) fn stream_write_flag(action: &str) -> Arg {
-  Arg::new(STREAM_WRITE_FLAG)
-    .long(STREAM_WRITE_FLAG)
+  Arg::new(STREAM_WRITE_OPTION)
+    .long("stream-write")
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("STREAM")
@@ -171,8 +171,8 @@ pub(crate) fn stream_write_flag(action: &str) -> Arg {
 }
 
 pub(crate) fn topic_count_flag() -> Arg {
-  Arg::new(TOPIC_COUNT_FLAG)
-    .long(TOPIC_COUNT_FLAG)
+  Arg::new(TOPIC_COUNT_OPTION)
+    .long("topic-count")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<NonZeroU64>::new(NonZeroU64::new(1).unwrap(), NonZeroU64::new(40).unwrap()))
     .value_name("COUNT")
@@ -184,8 +184,8 @@ pub(crate) fn topic_count_flag() -> Arg {
 }
 
 pub(crate) fn tracing_flag() -> Arg {
-  Arg::new(TRACING_FLAG)
-    .long(TRACING_FLAG)
+  Arg::new(TRACING_OPTION)
+    .long("tracing")
     .action(ArgAction::Set)
     .value_parser(builder::BoolValueParser::new())
     .value_name("TRACING")
@@ -198,8 +198,8 @@ pub(crate) fn tracing_flag() -> Arg {
 }
 
 pub(crate) fn vpn_flag() -> Arg {
-  Arg::new(VPN_FLAG)
-    .long(VPN_FLAG)
+  Arg::new(VPN_OPTION)
+    .long("vpn")
     .action(ArgAction::Set)
     .value_parser(builder::BoolValueParser::new())
     .value_name("VPN")

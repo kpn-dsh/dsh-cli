@@ -26,7 +26,7 @@ impl FilterFlagType {
     }
   }
 
-  fn option(&self) -> &'static str {
+  fn flag(&self) -> &'static str {
     match &self {
       Self::Complete => "complete",
       Self::Draft => "draft",
@@ -54,7 +54,7 @@ impl FilterFlagType {
 }
 
 pub(crate) fn create_filter_flag(flag_type: &FilterFlagType, long_help: Option<&str>) -> Arg {
-  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(flag_type.help());
+  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.flag()).action(ArgAction::SetTrue).help(flag_type.help());
   if let Some(long_help) = long_help {
     flag_arg = flag_arg.long_help(long_help.to_string());
   }

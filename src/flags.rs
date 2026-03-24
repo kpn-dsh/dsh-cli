@@ -44,7 +44,7 @@ impl FlagType {
     }
   }
 
-  pub(crate) fn option(&self) -> &'static str {
+  fn flag(&self) -> &'static str {
     match &self {
       Self::_Actual => "actual",
       Self::AllocationStatus => "status",
@@ -90,7 +90,7 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
 }
 
 fn create_clap_flag(flag_type: FlagType, help: String, long_help: Option<&str>) -> Arg {
-  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help);
+  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.flag()).action(ArgAction::SetTrue).help(help);
   if let Some(long_help) = long_help {
     flag_arg = flag_arg.long_help(long_help.to_string());
   }

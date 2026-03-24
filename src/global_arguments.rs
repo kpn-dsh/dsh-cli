@@ -9,32 +9,28 @@ use clap::{builder, Arg, ArgAction};
 use dsh_api::platform::DshPlatform;
 use itertools::Itertools;
 
-pub(crate) const AUTHENTICATION_ARGUMENT: &str = "authentication";
-pub(crate) const BROWSER_ARGUMENT: &str = "browser";
-pub(crate) const DRY_RUN_ARGUMENT: &str = "dry-run-argument";
-pub(crate) const ENVIRONMENT_VARIABLE_ARGUMENT: &str = "environment-variable-argument";
-pub(crate) const FORCE_ARGUMENT: &str = "force-argument";
-// pub(crate) const FROM_CLIPBOARD_ARGUMENT: &str = "from-clipboard-argument";
-pub(crate) const NO_CSV_HEADERS_ARGUMENT: &str = "no-csv-headers-argument";
-pub(crate) const NO_ESCAPE_ARGUMENT: &str = "no-escape-argument";
-pub(crate) const OUTPUT_FORMAT_ARGUMENT: &str = "output-format-argument";
-pub(crate) const QUIET_ARGUMENT: &str = "quiet-argument";
-pub(crate) const ROBOT_PASSWORD_FILE_ARGUMENT: &str = "robot-password-file-argument";
-pub(crate) const ROBOT_PLATFORM_ARGUMENT: &str = "robot-platform-argument";
-pub(crate) const ROBOT_TENANT_ARGUMENT: &str = "robot-tenant-argument";
-pub(crate) const SHOW_EXECUTION_TIME_ARGUMENT: &str = "show-execution-time-argument";
-pub(crate) const SUPPRESS_EXIT_STATUS_ARGUMENT: &str = "suppress-exit-status-argument";
-pub(crate) const TARGET_PLATFORM_ARGUMENT: &str = "target-platform-argument";
-pub(crate) const TARGET_TENANT_ARGUMENT: &str = "target-tenant-argument";
-pub(crate) const TARGET_TENANTS_ALL_ARGUMENT: &str = "target-tenants-all-argument";
-pub(crate) const TARGET_TENANTS_ARGUMENT: &str = "target-tenants-argument";
-pub(crate) const TERMINAL_WIDTH_ARGUMENT: &str = "terminal-width-argument";
-// pub(crate) const TO_CLIPBOARD_ARGUMENT: &str = "to-clipboard-argument";
-pub(crate) const VERBOSITY_ARGUMENT: &str = "set-verbosity-argument";
-pub(crate) const VERSION_ARGUMENT: &str = "version-argument";
+pub(crate) const AUTHENTICATION_OPTION: &str = "authentication-option";
+pub(crate) const BROWSER_OPTION: &str = "browser-option";
+pub(crate) const DRY_RUN_FLAG: &str = "dry-run-flag";
+pub(crate) const ENVIRONMENT_VARIABLE_OPTION: &str = "environment-variable-option";
+pub(crate) const FORCE_FLAG: &str = "force-flag";
+// pub(crate) const FROM_CLIPBOARD_FLAG: &str = "from-clipboard-flag";
+pub(crate) const NO_CSV_HEADERS_FLAG: &str = "no-csv-headers-flag";
+pub(crate) const NO_ESCAPE_FLAG: &str = "no-escape-flag";
+pub(crate) const OUTPUT_FORMAT_OPTION: &str = "output-format-option";
+pub(crate) const QUIET_FLAG: &str = "quiet-flag";
+pub(crate) const ROBOT_PASSWORD_FILE_OPTION: &str = "robot-password-file-option";
+pub(crate) const ROBOT_PLATFORM_OPTION: &str = "robot-platform-option";
+pub(crate) const ROBOT_TENANT_OPTION: &str = "robot-tenant-option";
+pub(crate) const SHOW_EXECUTION_TIME_FLAG: &str = "show-execution-time-flag";
+pub(crate) const SUPPRESS_EXIT_STATUS_FLAG: &str = "suppress-exit-status-flag";
+pub(crate) const TERMINAL_WIDTH_OPTION: &str = "terminal-width-option";
+// pub(crate) const TO_CLIPBOARD_FLAG: &str = "to-clipboard-flag";
+pub(crate) const VERBOSITY_OPTION: &str = "set-verbosity-option";
+pub(crate) const VERSION_FLAG: &str = "version-flag";
 
-pub(crate) fn authentication_argument() -> Arg {
-  Arg::new(AUTHENTICATION_ARGUMENT)
+pub(crate) fn authentication_option() -> Arg {
+  Arg::new(AUTHENTICATION_OPTION)
     .long("authentication")
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<AuthenticationMethod>::new())
@@ -52,8 +48,8 @@ pub(crate) fn authentication_argument() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn browser_argument() -> Arg {
-  Arg::new(BROWSER_ARGUMENT)
+pub(crate) fn browser_option() -> Arg {
+  Arg::new(BROWSER_OPTION)
     .long("browser")
     .action(ArgAction::Set)
     .value_parser(EnumValueParser::<BrowserMethod>::new())
@@ -72,23 +68,22 @@ pub(crate) fn browser_argument() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn dry_run_argument() -> Arg {
-  Arg::new(DRY_RUN_ARGUMENT)
+pub(crate) fn dry_run_flag() -> Arg {
+  Arg::new(DRY_RUN_FLAG)
     .long("dry-run")
     .action(ArgAction::SetTrue)
     .help("Execute in dry-run mode")
     .long_help(
-      "When this option is provided the dsh tool will run in dry-run mode, \
+      "When this flag is provided the dsh tool will run in dry-run mode, \
           meaning that no changes will be made to the \
           resources and services on the DSH. Dry-run mode can also be set by the \
-          environment variable DSH_CLI_DRY_RUN or in the settings file. \
-          Dry-run mode will take precedence over the --force flag.",
+          environment variable DSH_CLI_DRY_RUN or in the settings file.",
     )
     .global(true)
 }
 
-pub(crate) fn environment_variable_argument() -> Arg {
-  Arg::new(ENVIRONMENT_VARIABLE_ARGUMENT)
+pub(crate) fn environment_variable_option() -> Arg {
+  Arg::new(ENVIRONMENT_VARIABLE_OPTION)
     .long("environment-variable")
     .short('e')
     .action(ArgAction::Append)
@@ -104,26 +99,27 @@ pub(crate) fn environment_variable_argument() -> Arg {
     .global(true)
 }
 
-pub(crate) fn force_argument() -> Arg {
-  Arg::new(FORCE_ARGUMENT)
+pub(crate) fn force_flag() -> Arg {
+  Arg::new(FORCE_FLAG)
     .long("force")
     .action(ArgAction::SetTrue)
     .help("Force changes without confirmation")
     .long_help(
-      "When this option is provided all change, update and delete actions \
+      "When this flag is provided all change, update and delete actions \
           will be executed without asking for confirmation. \
-          Note that dry-run mode will take precedence over the --force flag.",
+          Note that dry-run mode will take precedence over the --force flag and force-mode \
+          cannot be enabled via an environment variable of in settings file.",
     )
     .global(true)
 }
 
-// pub(crate) fn from_clipboard_argument() -> Arg {
-//   Arg::new(FROM_CLIPBOARD_ARGUMENT)
+// pub(crate) fn from_clipboard_flag() -> Arg {
+//   Arg::new(FROM_CLIPBOARD_FLAG)
 //     .long("from-clipboard")
 //     .action(ArgAction::SetTrue)
 //     .help("Read input from clipboard")
 //     .long_help(
-//       "When this option is provided the input for methods that require it \
+//       "When this flag is provided the input for methods that require it \
 //           will be read from the clipboard, \
 //           instead of being read from the terminal, pipes or redirects.",
 //     )
@@ -131,13 +127,13 @@ pub(crate) fn force_argument() -> Arg {
 //     .help_heading(MAIN_OPTIONS_HEADING)
 // }
 
-pub(crate) fn no_escape_argument() -> Arg {
-  Arg::new(NO_ESCAPE_ARGUMENT)
+pub(crate) fn no_escape_flag() -> Arg {
+  Arg::new(NO_ESCAPE_FLAG)
     .long("no-color")
     .alias("no-ansi")
     .action(ArgAction::SetTrue)
     .long_help(
-      "When this option is provided the output will not contain \
+      "When this flag is provided the output will not contain \
           any color or other ansi escape sequences. \
           If this argument is not provided, the environment variable \
           DSH_CLI_NO_ESCAPE or the value from the settings file will be used. \
@@ -148,12 +144,12 @@ pub(crate) fn no_escape_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn no_csv_headers_argument() -> Arg {
-  Arg::new(NO_CSV_HEADERS_ARGUMENT)
+pub(crate) fn no_csv_headers_flag() -> Arg {
+  Arg::new(NO_CSV_HEADERS_FLAG)
     .long("no-csv-headers")
     .action(ArgAction::SetTrue)
     .long_help(
-      "When this option is provided csv output will not contain headers. \
+      "When this flag is provided csv output will not contain headers. \
           If this argument is not provided, the environment variable \
           DSH_CLI_NO_CSV_HEADERS or the value from the settings file will be used. \
           The default behavior is to use headers where applicable.",
@@ -163,8 +159,8 @@ pub(crate) fn no_csv_headers_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn output_format_argument() -> Arg {
-  Arg::new(OUTPUT_FORMAT_ARGUMENT)
+pub(crate) fn output_format_option() -> Arg {
+  Arg::new(OUTPUT_FORMAT_OPTION)
     .long("output-format")
     .short('o')
     .action(ArgAction::Set)
@@ -182,22 +178,25 @@ pub(crate) fn output_format_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn robot_password_file_argument() -> Arg {
-  Arg::new(ROBOT_PASSWORD_FILE_ARGUMENT)
+pub(crate) fn robot_password_file_option() -> Arg {
+  Arg::new(ROBOT_PASSWORD_FILE_OPTION)
     .long("robot-password-file")
     .action(ArgAction::Set)
     .value_parser(ValueParser::path_buf())
     .value_name("FILE")
     .help("Provide robot password file name")
     .long_help(
-      "This option specifies the name of a file that contains the robot password. \
+      "This option specifies the name of a file that contains the robot password, which can \
+          be used when authenticating via the robot access pattern. \
           If this flag is not provided, the environment variable DSH_CLI_ROBOT_PASSWORD_FILE \
           will be tried. Else, the user will be prompted for the password.",
     )
+    .hide_short_help(true)
     .global(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn robot_platform_argument() -> Arg {
+pub(crate) fn robot_platform_option() -> Arg {
   let possible_values = DshPlatform::all()
     .iter()
     .map(|platform| {
@@ -206,7 +205,7 @@ pub(crate) fn robot_platform_argument() -> Arg {
         .help(format!("{} ({})", platform.description(), platform.alias()))
     })
     .collect_vec();
-  Arg::new(ROBOT_PLATFORM_ARGUMENT)
+  Arg::new(ROBOT_PLATFORM_OPTION)
     .long("robot-platform")
     .action(ArgAction::Set)
     .value_parser(possible_values)
@@ -218,11 +217,13 @@ pub(crate) fn robot_platform_argument() -> Arg {
           the robot platform can also be specified via the environment variable \
           DSH_CLI_ROBOT_PLATFORM, or else the user will be prompted.",
     )
+    .hide_short_help(true)
     .global(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn robot_tenant_argument() -> Arg {
-  Arg::new(ROBOT_TENANT_ARGUMENT)
+pub(crate) fn robot_tenant_option() -> Arg {
+  Arg::new(ROBOT_TENANT_OPTION)
     .long("robot-tenant")
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
@@ -234,25 +235,27 @@ pub(crate) fn robot_tenant_argument() -> Arg {
           the tenant should be specified via the environment variable DSH_CLI_ROBOT_TENANT, \
           or else the user will be prompted.",
     )
+    .hide_short_help(true)
     .global(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn quiet_argument() -> Arg {
-  Arg::new(QUIET_ARGUMENT)
+pub(crate) fn quiet_flag() -> Arg {
+  Arg::new(QUIET_FLAG)
     .long("quiet")
     .short('q')
     .action(ArgAction::SetTrue)
     .help("Run in quiet mode")
     .long_help(
-      "When this option is provided the dsh tool will run in quiet mode, \
+      "When this flag is provided the dsh tool will run in quiet mode, \
           meaning that no output will be produced to the terminal (stdout and stderr).",
     )
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn set_verbosity_argument() -> Arg {
-  Arg::new(VERBOSITY_ARGUMENT)
+pub(crate) fn set_verbosity_option() -> Arg {
+  Arg::new(VERBOSITY_OPTION)
     .long("verbosity")
     .short('v')
     .action(ArgAction::Set)
@@ -268,12 +271,12 @@ pub(crate) fn set_verbosity_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn show_execution_time_argument() -> Arg {
-  Arg::new(SHOW_EXECUTION_TIME_ARGUMENT)
+pub(crate) fn show_execution_time_flag() -> Arg {
+  Arg::new(SHOW_EXECUTION_TIME_FLAG)
     .long("show-execution-time")
     .action(ArgAction::SetTrue)
     .long_help(
-      "When this option is provided the execution time of the executed function \
+      "When this flag is provided the execution time of the executed function \
           will be shown, in milliseconds.",
     )
     .hide_short_help(true)
@@ -281,12 +284,12 @@ pub(crate) fn show_execution_time_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn suppress_exit_status_argument() -> Arg {
-  Arg::new(SUPPRESS_EXIT_STATUS_ARGUMENT)
+pub(crate) fn suppress_exit_status_flag() -> Arg {
+  Arg::new(SUPPRESS_EXIT_STATUS_FLAG)
     .long("suppress-exit-status")
     .action(ArgAction::SetTrue)
     .long_help(
-      "When this option is provided the dsh tool will always return exit status 0, \
+      "When this flag is provided the dsh tool will always return exit status 0, \
             even when an error has occurred. This can be useful in scripting environments.",
     )
     .hide_short_help(true)
@@ -294,82 +297,8 @@ pub(crate) fn suppress_exit_status_argument() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn target_platform_argument() -> Arg {
-  let possible_values = DshPlatform::all()
-    .iter()
-    .map(|platform| {
-      PossibleValue::new(platform.name())
-        .alias(platform.alias())
-        .help(format!("{} ({})", platform.description(), platform.alias()))
-    })
-    .collect_vec();
-  Arg::new(TARGET_PLATFORM_ARGUMENT)
-    .long("platform")
-    .short('p')
-    .action(ArgAction::Append)
-    .value_parser(possible_values)
-    .value_name("PLATFORM")
-    .help("Provide target platform")
-    .long_help(
-      "This option specifies the name of the target platform, which specifies on which \
-          platform a command will be executed. If this argument is not provided, \
-          the platform can also be specified via the environment variable DSH_CLI_PLATFORM, \
-          as a default setting in the settings file, or else the user will be prompted. \
-          The value between parentheses can be used as an alias for the platform name.",
-    )
-    .global(true)
-}
-
-pub(crate) fn target_tenant_argument() -> Arg {
-  Arg::new(TARGET_TENANT_ARGUMENT)
-    .long("tenant")
-    .short('t')
-    .action(ArgAction::Append)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("TENANT")
-    .help("Provide target tenant")
-    .long_help(
-      "This option specifies the name of the target tenant. \
-          If this argument is not provided, \
-          the tenant should be specified via the environment variable DSH_CLI_TENANT, \
-          as a default setting in the settings file, or else the user will be prompted.",
-    )
-    .global(true)
-    .conflicts_with_all([TARGET_TENANTS_ARGUMENT, TARGET_TENANTS_ALL_ARGUMENT])
-}
-
-pub(crate) fn target_tenants_argument() -> Arg {
-  Arg::new(TARGET_TENANTS_ARGUMENT)
-    .long("tenants")
-    .action(ArgAction::Append)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("TENANTS")
-    .help("Provide list of target tenants")
-    .long_help(
-      "This option specifies a comma separated list of names of target tenants, without spaces. \
-      If this argument is provided, the selected command will be executed for all tenants in the list.",
-    )
-    .hide_short_help(true)
-    .global(true)
-    .conflicts_with_all([TARGET_TENANT_ARGUMENT, TARGET_TENANTS_ALL_ARGUMENT])
-}
-
-pub(crate) fn target_tenants_all_argument() -> Arg {
-  Arg::new(TARGET_TENANTS_ALL_ARGUMENT)
-    .long("all-tenants")
-    .action(ArgAction::SetTrue)
-    .help("Use list of target tenants")
-    .long_help(
-      "If this option is specified, the selected command will be executed for all \
-      tenants that the user is authenticated for.",
-    )
-    .hide_short_help(true)
-    .global(true)
-    .conflicts_with_all([TARGET_TENANT_ARGUMENT, TARGET_TENANTS_ARGUMENT])
-}
-
-pub(crate) fn terminal_width_argument() -> Arg {
-  Arg::new(TERMINAL_WIDTH_ARGUMENT)
+pub(crate) fn terminal_width_option() -> Arg {
+  Arg::new(TERMINAL_WIDTH_OPTION)
     .long("terminal-width")
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<usize>::from(40..))
@@ -384,25 +313,25 @@ pub(crate) fn terminal_width_argument() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-// pub(crate) fn to_clipboard_argument() -> Arg {
-//   Arg::new(TO_CLIPBOARD_ARGUMENT)
+// pub(crate) fn to_clipboard_flag() -> Arg {
+//   Arg::new(TO_CLIPBOARD_FLAG)
 //     .long("to-clipboard")
 //     .action(ArgAction::SetTrue)
 //     .help("Copy output to clipboard")
 //     .long_help(
-//       "When this option is provided the output will be copied to the clipboard, \
+//       "When this flag is provided the output will be copied to the clipboard, \
 //           instead of being printed to the terminal.",
 //     )
 //     .global(true)
 //     .help_heading(MAIN_OPTIONS_HEADING)
 // }
 
-pub(crate) fn version_argument() -> Arg {
-  Arg::new(VERSION_ARGUMENT)
+pub(crate) fn version_flag() -> Arg {
+  Arg::new(VERSION_FLAG)
     .long("version")
     .action(ArgAction::SetTrue)
     .long_help(
-      "If this option is provided, the dsh tool will show its version number \
+      "If this flag is provided, the dsh tool will show its version number \
           and the versions of some of its dependencies.",
     )
     .exclusive(true)

@@ -2,10 +2,10 @@ use crate::authentication::{get_access_token, AuthenticationMethod};
 use crate::context::Context;
 use crate::directory::supports_dsh_directory;
 use crate::error::DshCliError;
-use crate::global_arguments::{TARGET_TENANTS_ALL_ARGUMENT, TARGET_TENANTS_ARGUMENT};
 use crate::robot_arguments::{get_robot_password, get_robot_platform, get_robot_tenant};
 use crate::subject::Requirements;
-use crate::target_arguments::{get_target_platform, get_target_tenant};
+use crate::target_platform::get_target_platform;
+use crate::target_tenant::{get_target_tenant, TARGET_TENANTS_ALL_FLAG, TARGET_TENANTS_OPTION};
 use crate::{err, DshCliResult};
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -18,7 +18,7 @@ use log::debug;
 
 /// Create clients
 ///
-/// # Parameters
+/// ## Parameters
 /// * `matches`
 /// * `context`
 ///
@@ -29,13 +29,13 @@ use log::debug;
 pub(crate) async fn create_clients(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   match context.authentication_method() {
     AuthenticationMethod::Robot => create_client_robot_password(matches).await.map(Some),
-    AuthenticationMethod::SingleSignOn => create_clients_access_token(matches, requirements, context).await,
+    AuthenticationMethod::SingleSignOn => create_clients_single_sign_on(matches, requirements, context).await,
   }
 }
 
 /// Create client for explicit platform and tenant from single sign on
 ///
-/// # Parameters
+/// ## Parameters
 /// * `api_platform`
 /// * `api_tenant`
 /// * `context`
@@ -68,7 +68,7 @@ pub(crate) async fn create_client_access_token_from_platform_tenant(api_platform
 
 /// Create client from robot password
 ///
-/// # Parameters
+/// ## Parameters
 /// * `matches`
 ///
 /// Returns
@@ -88,7 +88,7 @@ async fn create_client_robot_password(matches: &ArgMatches) -> DshCliResult<Vec<
 
 /// Create client from single sign on
 ///
-/// # Parameters
+/// ## Parameters
 /// * `matches`
 /// * `requirements`
 /// * `context`
@@ -97,19 +97,19 @@ async fn create_client_robot_password(matches: &ArgMatches) -> DshCliResult<Vec<
 /// * `Ok(Some(Vec<Client>))` - Clients were successfully created. Note that there will always be at
 ///   least one client created, else an error is returned.
 /// * `Ok(None)` - User needs to log in.
-async fn create_clients_access_token(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
+async fn create_clients_single_sign_on(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   if !supports_dsh_directory() {
     return Err(DshCliError::String("single-sign-on requires dsh directory to be enabled".to_string()));
   }
   let target_platform = get_target_platform(matches, context.settings())?;
-  if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
+  if matches.get_flag(TARGET_TENANTS_ALL_FLAG) {
     if requirements.all_tenants_allowed() {
       create_clients_for_all_authorized_tenants(target_platform).await
     } else {
       Err(DshCliError::String("command is not allowed to run for all tenants".to_string()))
     }
   } else {
-    match matches.get_one::<String>(TARGET_TENANTS_ARGUMENT) {
+    match matches.get_one::<String>(TARGET_TENANTS_OPTION) {
       Some(target_tenants_string) => {
         let target_tenant_names = target_tenants_string.split(",").map(|s| s.to_string()).collect_vec();
         for target_tenant_name in &target_tenant_names {
@@ -145,7 +145,7 @@ async fn create_clients_access_token(matches: &ArgMatches, requirements: &Requir
 
 /// Create multiple clients from single sign on
 ///
-/// # Parameters
+/// ## Parameters
 /// * `target_platform`
 /// * `target_tenant_names`
 /// * `context`
@@ -191,7 +191,7 @@ async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_
 
 /// Create clients for all authorized tenants from single sign on
 ///
-/// # Parameters
+/// ## Parameters
 /// * `target_platform`
 ///
 /// Returns
