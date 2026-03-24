@@ -62,6 +62,14 @@ pub(crate) trait Capability {
   async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()>;
 }
 
+/// Execute command with client
+///
+/// ## Parameters
+/// * `argument`
+/// * `sub_argument`
+/// * `matches`
+/// * `dsh_api_client`
+/// * `context`
 #[async_trait]
 pub(crate) trait CommandExecutor {
   #[allow(unused_variables)]
@@ -76,6 +84,13 @@ pub(crate) trait CommandExecutor {
     unreachable!()
   }
 
+  /// Execute command without client
+  ///
+  /// ## Parameters
+  /// * `argument`
+  /// * `sub_argument`
+  /// * `matches`
+  /// * `context`
   #[allow(unused_variables)]
   async fn execute_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     unreachable!()
