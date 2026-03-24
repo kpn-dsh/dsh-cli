@@ -1,7 +1,4 @@
-use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction};
-use dsh_api::platform::DshPlatform;
-use itertools::Itertools;
 
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
@@ -12,12 +9,10 @@ pub(crate) const MANAGED_STREAM_ARGUMENT: &str = "managed-stream-argument";
 pub(crate) const MANAGED_TENANT_NAME_ARGUMENT: &str = "managed-tenant-name-argument";
 pub(crate) const MANIFEST_ID_ARGUMENT: &str = "manifest-id-argument";
 pub(crate) const NODEPOOL_ID_ARGUMENT: &str = "node-pool-id-argument";
-pub(crate) const PLATFORM_NAME_ARGUMENT: &str = "platform-name-argument";
 pub(crate) const PROXY_ID_ARGUMENT: &str = "proxy-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 pub(crate) const SECRET_ID_ARGUMENT: &str = "secret-id-argument";
 pub(crate) const SERVICE_ID_ARGUMENT: &str = "service-id-argument";
-pub(crate) const TENANT_NAME_ARGUMENT: &str = "tenant-name-argument";
 pub(crate) const TOPIC_ID_ARGUMENT: &str = "topic-id-argument";
 pub(crate) const VENDOR_NAME_ARGUMENT: &str = "vendor-name-argument";
 pub(crate) const MANIFEST_VERSION_ARGUMENT: &str = "version-argument";
@@ -80,23 +75,6 @@ pub(crate) fn manifest_id_argument() -> Arg {
     .long_help("Identifies an app manifest from the app catalog.")
 }
 
-pub(crate) fn platform_name_argument() -> Arg {
-  let possible_values = DshPlatform::all()
-    .iter()
-    .map(|platform| {
-      PossibleValue::new(platform.name())
-        .alias(platform.alias())
-        .help(format!("{} ({})", platform.description(), platform.alias()))
-    })
-    .collect_vec();
-  Arg::new(PLATFORM_NAME_ARGUMENT)
-    .action(ArgAction::Set)
-    .value_parser(possible_values)
-    .value_name("PLATFORM")
-    .help("Platform")
-    .long_help("The name or alias of the platform.")
-}
-
 pub(crate) fn query_argument(long_help: Option<&str>) -> Arg {
   let mut query_argument = Arg::new(QUERY_ARGUMENT)
     .action(ArgAction::Set)
@@ -134,15 +112,6 @@ pub(crate) fn service_id_argument() -> Arg {
     .value_name("SERVICE")
     .help("Service identifier")
     .long_help("Identifies a service deployed on the DSH.")
-}
-
-pub(crate) fn tenant_name_argument() -> Arg {
-  Arg::new(TENANT_NAME_ARGUMENT)
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("TENANT")
-    .help("Tenant name")
-    .long_help("The name of the tenant.")
 }
 
 pub(crate) fn topic_id_argument() -> Arg {

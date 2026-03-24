@@ -1,5 +1,7 @@
 # User guide
 
+[//]: # (TODO)
+
 [&#x2190; Quick start](quick_start.md)
 
 When installation is complete you should be able to start the `dsh` tool from the command line.
@@ -24,11 +26,11 @@ Subjects/commands:
   nodepool     Show node pool resources.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
+  robot        Manage and store robot secrets.
   secret       Show, manage and list DSH secrets.
   service      Show, manage and list services deployed on the DSH.
   setting      Show, manage and list dsh settings.
   stream       Show, manage and list internal and public managed streams.
-  target       Show, manage and list dsh target configurations.
   tenant       Show and manage tenants on the DSH.
   token        Request DSH tokens.
   topic        Show, manage and list DSH scratch topics.
@@ -36,13 +38,12 @@ Subjects/commands:
   volume       Show, manage and list DSH volumes.
 
 Options:
-      --dry-run               Execute in dry-run mode
-      --force                 Force changes without confirmation
-      --password-file <FILE>  Provide target password file name
-  -p, --platform <PLATFORM>   Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
-                              prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
-  -t, --tenant <TENANT>       Provide target tenant
-  -h, --help                  Print help (see more with '--help')
+      --dry-run              Execute in dry-run mode
+      --force                Force changes without confirmation
+  -p, --platform <PLATFORM>  Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
+                             prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
+  -t, --tenant <TENANT>      Provide target tenant
+  -h, --help                 Print help (see more with '--help')
 
 Output options:
   -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,
@@ -124,18 +125,22 @@ and is not supported.
 If you did not specify the target platform and/or target tenant on the command line,
 the `dsh` tool will try to get the values from environment variables:
 
+[//]: # (TODO)
+
 * `DSH_CLI_PLATFORM` - Specify the target platform by providing either the full name or the alias
   (e.g. `np-aws-lz-dsh` or `nplz`).
 * `DSH_CLI_TENANT` - Specify the tenant name.
-* `DSH_CLI_PASSWORD_FILE` - Specify the name of a file containing the target password.
+* `DSH_CLI_ROBOT_PASSWORD_FILE` - Specify the name of a file containing the target password.
   This can either be an absolute file name
   or a relative file name from the working directory.
-* `DSH_CLI_PASSWORD` - The password can also be specified directly from an environment variable.
+*
+
+`DSH_CLI_ROBOT_PASSWORD` - The password can also be specified directly from an environment variable.
 
 ```bash
 > export DSH_CLI_PLATFORM=np-aws-lz-dsh
 > export DSH_CLI_TENANT=my-tenant
-> export DSH_CLI_PASSWORD="..."
+> export DSH_CLI_ROBOT_PASSWORD="..."
 > dsh secret list
 ...
 ```

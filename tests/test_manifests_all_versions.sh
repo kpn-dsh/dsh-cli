@@ -1,19 +1,17 @@
 #!/bin/bash
 
+# Run dsh manifest commands
+#
+# This script will run a large number of manifest commands and print the output to the console.
+#
+# To run this test the following is expected:
+# * User is logged in via the single sign on authentication pattern at platform $DSH_CLI_PLATFORM
+# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
+# * User is authenticated for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
+
 export DSH_CLI_PLATFORM=np-aws-lz-dsh
 export DSH_CLI_TENANT=greenbox-dev
 
-export DSH_CLI_PASSWORD_FILE=../${DSH_CLI_PLATFORM}.${DSH_CLI_TENANT}.pwd
-#export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
-
-# For this test to run the following is expected:
-#
-# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
-# * Password file $DSH_CLI_PASSWORD_FILE exists and contains the password
-#   for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
-
-#export MANIFEST_SUBCOMMAND=export
-#export MANIFEST_SUBCOMMAND=explain
 export MANIFEST_SUBCOMMAND=show
 
 MANIFEST_EXPORT_COMMANDS=(

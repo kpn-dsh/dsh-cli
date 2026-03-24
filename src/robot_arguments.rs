@@ -1,7 +1,7 @@
 use crate::environment_variables::{
   environment_variable, ENV_VAR_DSH_CLI_ROBOT_PASSWORD, ENV_VAR_DSH_CLI_ROBOT_PASSWORD_FILE, ENV_VAR_DSH_CLI_ROBOT_PLATFORM, ENV_VAR_DSH_CLI_ROBOT_TENANT,
 };
-use crate::global_arguments::{ROBOT_PASSWORD_FILE_ARGUMENT, ROBOT_PLATFORM_ARGUMENT, ROBOT_TENANT_ARGUMENT};
+use crate::global_arguments::{ROBOT_PASSWORD_FILE_OPTION, ROBOT_PLATFORM_OPTION, ROBOT_TENANT_OPTION};
 use crate::keyring::get_secret_from_keyring;
 use crate::{err, error_map, read_single_line, read_single_line_password, DshCliResult};
 use clap::ArgMatches;
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 ///
 /// This method will get the robot platform.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--robot-platform`.
+/// 1. Command line option `--robot-platform`.
 /// 1. Environment variable `DSH_CLI_ROBOT_PLATFORM`.
 /// 1. If stdin is a terminal, ask the user to enter the value.
 /// 1. Else return with an error.
@@ -45,7 +45,7 @@ pub(crate) fn get_robot_platform(matches: &ArgMatches) -> DshCliResult<DshPlatfo
 ///
 /// This method will get the robot tenant.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--robot-tenant`.
+/// 1. Command line option `--robot-tenant`.
 /// 1. Environment variable `DSH_CLI_ROBOT_TENANT`.
 /// 1. If stdin is a terminal, ask the user to enter the value.
 /// 1. Else return with an error.
@@ -78,7 +78,7 @@ pub(crate) fn get_robot_tenant(matches: &ArgMatches) -> DshCliResult<String> {
 ///
 /// This method will get the robot password.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--robot-password-file`, which should reference a file that
+/// 1. Command line option `--robot-password-file`, which should reference a file that
 ///    contains the password.
 /// 1. Environment variable `DSH_CLI_ROBOT_PASSWORD_FILE`.
 /// 1. Environment variable `DSH_CLI_ROBOT_PASSWORD`. Note that this environment variable must be a
@@ -95,18 +95,18 @@ pub(crate) fn get_robot_tenant(matches: &ArgMatches) -> DshCliResult<String> {
 /// ## Returns
 /// * `Ok<String>` - Password.
 pub(crate) fn get_robot_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> DshCliResult<String> {
-  match matches.get_one::<PathBuf>(ROBOT_PASSWORD_FILE_ARGUMENT) {
+  match matches.get_one::<PathBuf>(ROBOT_PASSWORD_FILE_OPTION) {
     Some(password_file_from_arg) => read_robot_password_file(password_file_from_arg),
     None => match environment_variable(ENV_VAR_DSH_CLI_ROBOT_PASSWORD_FILE, Some(matches))? {
       Some(password_file_from_env) => read_robot_password_file(password_file_from_env),
       None => match environment_variable(ENV_VAR_DSH_CLI_ROBOT_PASSWORD, None)? {
         Some(password_from_env_var) => {
-          debug!("robot password (environment variable '{}')", ENV_VAR_DSH_CLI_ROBOT_PASSWORD);
+          debug!("robot password (from environment variable '{}')", ENV_VAR_DSH_CLI_ROBOT_PASSWORD);
           Ok(password_from_env_var)
         }
         None => match get_secret_from_keyring(dsh_api_tenant.platform(), dsh_api_tenant.name(), ROBOT_SECRET)? {
           Some(password_from_keyring) => {
-            debug!("robot password read (keyring)");
+            debug!("robot password (from keyring)");
             Ok(password_from_keyring)
           }
           None => {
@@ -137,7 +137,7 @@ fn get_robot_platform_implicit(matches: &ArgMatches) -> DshCliResult<Option<DshP
   match environment_variable(ENV_VAR_DSH_CLI_ROBOT_PLATFORM, Some(matches))? {
     Some(robot_platform_name_from_env_var) => {
       debug!(
-        "robot platform '{}' (environment variable '{}')",
+        "robot platform '{}' (from environment variable '{}')",
         robot_platform_name_from_env_var, ENV_VAR_DSH_CLI_ROBOT_PLATFORM
       );
       DshPlatform::try_from(robot_platform_name_from_env_var.as_str()).map_err(error_map!("{}")).map(Some)
@@ -150,7 +150,7 @@ fn get_robot_platform_implicit(matches: &ArgMatches) -> DshCliResult<Option<DshP
 ///
 /// This method will get the robot platform.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--robot-platform`.
+/// 1. Command line option `--robot-platform`.
 /// 1. Environment variable `DSH_CLI_ROBOT_PLATFORM`.
 /// 1. Else return with `None`.
 ///
@@ -162,9 +162,12 @@ fn get_robot_platform_implicit(matches: &ArgMatches) -> DshCliResult<Option<DshP
 /// * `Ok(None)` - When no implicit robot platform is available.
 /// * `Err<String>` - When an invalid robot platform name was found.
 fn get_robot_platform_non_interactive(matches: &ArgMatches) -> DshCliResult<Option<DshPlatform>> {
-  match matches.get_one::<String>(ROBOT_PLATFORM_ARGUMENT) {
+  match matches.get_one::<String>(ROBOT_PLATFORM_OPTION) {
     Some(robot_platform_name_from_argument) => {
-      debug!("robot platform '{}' (argument)", robot_platform_name_from_argument);
+      debug!(
+        "robot platform '{}' (from command line argument '--robot-platform')",
+        robot_platform_name_from_argument
+      );
       DshPlatform::try_from(robot_platform_name_from_argument.as_str())
         .map_err(error_map!("{}"))
         .map(Some)
@@ -187,7 +190,7 @@ fn get_robot_tenant_implicit(matches: &ArgMatches) -> DshCliResult<Option<String
   match environment_variable(ENV_VAR_DSH_CLI_ROBOT_TENANT, Some(matches))? {
     Some(robot_name_from_env_var) => {
       debug!(
-        "robot tenant '{}' (environment variable '{}')",
+        "robot tenant '{}' (from environment variable '{}')",
         robot_name_from_env_var, ENV_VAR_DSH_CLI_ROBOT_TENANT
       );
       Ok(Some(robot_name_from_env_var))
@@ -200,7 +203,7 @@ fn get_robot_tenant_implicit(matches: &ArgMatches) -> DshCliResult<Option<String
 ///
 /// This method will get the robot tenant.
 /// This function will try the potential sources listed below, and returns at the first match.
-/// 1. Command line argument `--robot-tenant`.
+/// 1. Command line option `--robot-tenant`.
 /// 1. Environment variable `DSH_CLI_ROBOT_TENANT`.
 /// 1. Else return with `None`.
 ///
@@ -211,9 +214,9 @@ fn get_robot_tenant_implicit(matches: &ArgMatches) -> DshCliResult<Option<String
 /// * `Some<String>` - Robot tenant name.
 /// * `None` - When no robot tenant name is available without asking the user.
 fn get_robot_tenant_non_interactive(matches: &ArgMatches) -> DshCliResult<Option<String>> {
-  match matches.get_one::<String>(ROBOT_TENANT_ARGUMENT) {
+  match matches.get_one::<String>(ROBOT_TENANT_OPTION) {
     Some(robot_tenant_name_from_argument) => {
-      debug!("robot tenant '{}' (argument)", robot_tenant_name_from_argument);
+      debug!("robot tenant '{}' (from command line argument '--robot-tenant')", robot_tenant_name_from_argument);
       Ok(Some(robot_tenant_name_from_argument.clone()))
     }
     None => get_robot_tenant_implicit(matches),
@@ -227,7 +230,7 @@ fn read_robot_password_file<T: AsRef<Path>>(password_file: T) -> DshCliResult<St
       if trimmed_password.is_empty() {
         err!("target password file '{}' is empty", password_file.as_ref().display())
       } else {
-        debug!("target password (file '{}')", password_file.as_ref().display());
+        debug!("target password (from password file '{}')", password_file.as_ref().display());
         Ok(trimmed_password.to_string())
       }
     }

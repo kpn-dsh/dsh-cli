@@ -90,10 +90,10 @@ The following table describes all environment variables.
         <td>
             This environment variable specifies the authentication method that will be used
             to access the resource management api. The allowed values are <code>robot</code> and 
-            <code>single-sign-on</code> (<code>sso</code>). If this variable is not provided, the value from the 
-            settings file will be used, if it exists. Else, the default value will be 
-            <code>single-sign-on</code> when the cli tool is run interactive (<code>stdin</code> 
-            is a terminal) and <code>robot</code> if not.
+            <code>single-sign-on</code> (<code>sso</code>). If this variable is not provided, 
+            the value from the settings file will be used, if it exists. Else, the default value 
+            will be <code>single-sign-on</code> when the cli tool is run interactive 
+            (<code>stdin</code> is a terminal) and <code>robot</code> if not.
         </td>
     </tr>
     <tr valign="top">
@@ -283,21 +283,22 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_CLI_NO_ESCAPE</code><br/><code>NO_COLOR</code></td>
+        <td><code>DSH_CLI_NO_CSV_HEADERS</code></td>
         <td>
-            When either of these environment variables is set (to any value) 
-            the output will not contain any color or other escape sequences.
+            When this environment variables is set (to any value) 
+            csv output will not contain headers.
             This environment variable can be overridden via the 
-            <code>--no-color</code> or <code>--no-ansi</code> command line argument.
+            <code>--no-csv-headers</code> command line argument.
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_CLI_NO_HEADERS</code></td>
+        <td><code>DSH_CLI_NO_ESCAPE</code></td>
         <td>
             When this environment variables is set (to any value) 
-            the output will not contain headers.
+            the output will not contain any color or other escape sequences.
             This environment variable can be overridden via the 
-            <code>--no-headers</code> command line argument.
+            <code>--no-color</code> or <code>--no-ansi</code> command line argument.
+            Note that <code>NO_COLOR</code> is an alias for this environment variable.
         </td>
     </tr>
     <tr valign="top">
@@ -329,30 +330,11 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_CLI_PASSWORD</code></td>
-        <td>
-            This environment variable specifies the secret api token/password for the target 
-            tenant. Note that when the environment variable <code>DSH_CLI_PASSWORD_FILE</code> 
-            or the argument <code>--password-file</code> command line argument is provided,
-            this environment variable will never be used. 
-            For better security, consider using one of these two options instead of 
-            defining <code>DSH_CLI_PASSWORD</code>
-        </td>
-    </tr>
-    <tr valign="top">
-        <td><code>DSH_CLI_PASSWORD_FILE</code></td>
-        <td>
-            This environment variable specifies a file containing the secret api 
-            token/password for the target tenant. 
-            Note that when the <code>--password-file</code> command line argument is provided,
-            this environment variable will not be used. 
-        </td>
-    </tr>
-    <tr valign="top">
         <td><code>DSH_CLI_PLATFORM</code></td>
         <td>
-            Target platform on which the tenants environment lives.
-            The supported platforms are:
+            This environment variable specifies the target platform for which commands will be 
+            executed. Note that this is not necessarily the same platform as used for the robot 
+            access pattern (see <code>DSH_CLI_ROBOT_PLATFORM</code>). The supported platforms are:
             <ul>
                 <li>
                     <code>np-aws-lz-dsh / nplz</code> - 
@@ -391,6 +373,73 @@ The following table describes all environment variables.
             (<code>stdout</code> and <code>stderr</code>).
             This environment variable can be overridden via the 
             <code>--quiet</code> (or <code>-q</code>) command line argument.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_ROBOT_PASSWORD</code></td>
+        <td>
+            This environment variable specifies the secret robot password for the robot access 
+            pattern. Note that when the environment variable
+            <code>DSH_CLI_ROBOT_PASSWORD_FILE</code> or the argument 
+            <code>--robot-password-file</code> command line argument is provided,
+            this environment variable will never be used. 
+            For better security, consider using one of these two options instead of 
+            defining <code>DSH_CLI_ROBOT_PASSWORD</code>
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_ROBOT_PASSWORD_FILE</code></td>
+        <td>
+            This environment variable specifies a file containing the robot password for the 
+            robot access pattern. Note that when the <code>--robot-password-file</code> command 
+            line argument is provided, this environment variable will not be used. 
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_ROBOT_PLATFORM</code></td>
+        <td>
+            This environment variable specifies the platform for the robot access pattern. Note 
+            that this is not necessarily the same platform as the target platform for which 
+            commands will be executed (see <code>DSH_CLI_PLATFORM</code>). The supported platforms 
+            are:
+            <ul>
+                <li>
+                    <code>np-aws-lz-dsh / nplz</code> - 
+                    staging platform for KPN internal tenants,
+                </li>
+                <li>
+                    <code>poc-aws-dsh / poc</code> - 
+                    staging platform for non KPN tenants,
+                </li>
+                <li>
+                    <code>prod-aws-dsh / prod</code> - 
+                    production platform for non KPN tenants,
+                </li>
+                <li>
+                    <code>prod-aws-lz-dsh / prodlz</code> - 
+                    production platform for KPN internal tenants,
+                </li>
+                <li>
+                    <code>prod-aws-lz-laas / prodls</code> - 
+                    production platform for logstash as a service,
+                </li>
+                <li>
+                    <code>prod-azure-dsh / prodaz</code> - 
+                    production platform for non KPN tenants.
+                </li>
+            </ul>
+            This environment variable can be overridden via the 
+            <code>--platform</code> (or <code>-p</code>) command line argument.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_ROBOT_TENANT</code></td>
+        <td>
+            This environment variable specifies the tenant for the robot access pattern. Note 
+            that this is not necessarily the same tenant as the target tenant for which 
+            commands will be executed (see <code>DSH_CLI_TENANT</code>).
+            This environment variable can be overridden via the 
+            <code>--tenant</code> (or <code>-t</code>) command line argument.
         </td>
     </tr>
     <tr valign="top">
@@ -453,9 +502,30 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_TARGET_COLOR</code></td>
+        <td>
+            This environment variable specifies the color to be used when printing target 
+            identifiers. If this variable is not set, the settings file will be checked for the 
+            <code>target-color</code> entry. Else the default color for the terminal will be used.
+            See environment variable <code>DSH_CLI_ERROR_COLOR</code> for the supported colors.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_TARGET_STYLE</code></td>
+        <td>
+            This environment variable specifies the styling to be used when printing target 
+            identifiers. If this variable is not set, the settings file will be checked for the 
+            <code>target-style</code> entry. Else the default value <code>normal</code> 
+            (no styling) will be used.
+            See environment variable <code>DSH_CLI_ERROR_STYLE</code> for the supported styles.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_TENANT</code></td>
-        <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
-            will be managed via the api.
+        <td>
+            This environment variable specifies the target tenant for which commands will be 
+            executed. Note that this is not necessarily the same tenant as used for the robot 
+            access pattern (see <code>DSH_CLI_ROBOT_TENANT</code>).
             This environment variable can be overridden via the 
             <code>--tenant</code> (or <code>-t</code>) command line argument.
         </td>
@@ -504,6 +574,16 @@ The following table describes all environment variables.
             <code>warning-style</code> entry. Else the default value <code>bold</code> will be 
             used. See environment variable <code>DSH_CLI_ERROR_STYLE</code> for the supported 
             styles.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>NO_COLOR</code></td>
+        <td>
+            When this environment variables is set (to any value) 
+            the output will not contain any color or other escape sequences.
+            This environment variable can be overridden via the 
+            <code>--no-color</code> or <code>--no-ansi</code> command line argument.
+            Note that <code>DSH_CLI_NO_ESCAPE</code> is an alias for this environment variable.
         </td>
     </tr>
     <tr valign="top">

@@ -68,11 +68,11 @@ Subjects/commands:
   nodepool     Show node pool resources.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
+  robot        Manage and store robot secrets.
   secret       Show, manage and list DSH secrets.
   service      Show, manage and list services deployed on the DSH.
   setting      Show, manage and list dsh settings.
   stream       Show, manage and list internal and public managed streams.
-  target       Show, manage and list dsh target configurations.
   tenant       Show and manage tenants on the DSH.
   token        Request DSH tokens.
   topic        Show, manage and list DSH scratch topics.
@@ -80,13 +80,12 @@ Subjects/commands:
   volume       Show, manage and list DSH volumes.
 
 Options:
-      --dry-run               Execute in dry-run mode
-      --force                 Force changes without confirmation
-      --password-file <FILE>  Provide target password file name
-  -p, --platform <PLATFORM>   Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
-                              prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
-  -t, --tenant <TENANT>       Provide target tenant
-  -h, --help                  Print help (see more with '--help')
+      --dry-run              Execute in dry-run mode
+      --force                Force changes without confirmation
+  -p, --platform <PLATFORM>  Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
+                             prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
+  -t, --tenant <TENANT>      Provide target tenant
+  -h, --help                 Print help (see more with '--help')
 
 Output options:
   -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,

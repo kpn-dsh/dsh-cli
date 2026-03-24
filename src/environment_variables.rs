@@ -4,7 +4,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
-use crate::global_arguments::ENVIRONMENT_VARIABLE_ARGUMENT;
+use crate::global_arguments::ENVIRONMENT_VARIABLE_OPTION;
 use crate::{err, DshCliResult, TOOL_OPTIONS_HEADING};
 use clap::builder::ValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches};
@@ -25,11 +25,11 @@ use std::path::PathBuf;
 /// 1. Try if `env_var_name` is specified as a regular environment variable.
 /// 1. Default to `None`.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `env_var_name` - Name of the environment variable.
 /// * `matches` - Parsed command line arguments.
 ///
-/// # Returns
+/// ## Returns
 /// * `Ok<Some<value>>` - When the environment variable `env_var_name` is specified either
 ///   via the command line or as a regular environment variable.
 /// * `Ok<None>` - When the environment variable `env_var_name` is not specified.
@@ -69,11 +69,11 @@ pub(crate) fn environment_variable(env_var_name: &str, matches: Option<&ArgMatch
 /// Check if environment variable `env_var_name` is specified either as a command line argument
 /// or as a regular environment variable.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `env_var_name` - Name of the environment variable.
 /// * `matches` - Parsed command line arguments.
 ///
-/// # Returns
+/// ## Returns
 /// * `true` - When the environment variable `env_var_name` is specified either
 ///   via the command line or as a regular environment variable. Note that the function also
 ///   returns `true` when `env_var_name` is specified on the command line more than once.
@@ -192,18 +192,18 @@ fn override_from_file_warning(env_var_name: &str, filename: &str) {
 ///
 /// Gets the value(s) of an environment variable if it is configured via the command line.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `env_var_name` - Name of the environment variable.
 /// * `matches` - Parsed command line arguments.
 ///
-/// # Returns
+/// ## Returns
 /// A vector containing the values of the environment variable when it was specified via de
 /// command line. Note that the same environment variable can be configured more than once.
 /// If this is the case, the return value of this function will contain all occurring values. If
 /// the environment variable was not specified via the command line, this function will return the
 /// empty vector.
 fn environment_variable_from_arguments(env_var_name: &str, matches: &ArgMatches) -> Vec<String> {
-  match matches.get_many::<String>(ENVIRONMENT_VARIABLE_ARGUMENT) {
+  match matches.get_many::<String>(ENVIRONMENT_VARIABLE_OPTION) {
     Some(env_var_arguments) => {
       let env_var_values = env_var_arguments
         .filter_map(|env_var_argument| parse_env_var(env_var_name, env_var_argument))
@@ -222,14 +222,14 @@ const DEFAULT_ENV_FILE_NAME: &str = ".dsh_cli.env";
 /// # Get environment variable value from file
 ///
 /// Gets the value of an environment variable if it is configured in an environment variables file.
-/// If the command line argument `--env-var-file` is provided, its value will be used as the
+/// If the command line option `--env-var-file` is provided, its value will be used as the
 /// filename. Else, `./.dsh_cli.env` in the current working directory will be tried.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `env_var_name` - Name of the environment variable.
 /// * `matches` - Parsed command line arguments.
 ///
-/// # Returns
+/// ## Returns
 /// * `Ok<Some<(value, filename)>>` - When the environment variable `env_var_name` was found in
 ///   the selected or default file.
 /// * `Ok<None>` - When the environment variable `env_var_name` could not be found in the selected
@@ -456,7 +456,6 @@ pub(crate) const ENV_VAR_DSH_CLI_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE"
 pub(crate) const ENV_VAR_DSH_CLI_NO_CSV_HEADERS: &str = "DSH_CLI_NO_CSV_HEADERS";
 pub(crate) const ENV_VAR_DSH_CLI_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
 pub(crate) const ENV_VAR_DSH_CLI_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
-pub(crate) const ENV_VAR_DSH_CLI_PLATFORM: &str = "DSH_CLI_PLATFORM";
 pub(crate) const ENV_VAR_DSH_CLI_QUIET: &str = "DSH_CLI_QUIET";
 pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PASSWORD: &str = "DSH_CLI_ROBOT_PASSWORD";
 pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PASSWORD_FILE: &str = "DSH_CLI_ROBOT_PASSWORD_FILE";
@@ -469,8 +468,9 @@ pub(crate) const ENV_VAR_DSH_CLI_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
 pub(crate) const ENV_VAR_DSH_CLI_TARGET_COLOR: &str = "DSH_CLI_TARGET_COLOR";
+pub(crate) const ENV_VAR_DSH_CLI_TARGET_PLATFORM: &str = "DSH_CLI_PLATFORM";
 pub(crate) const ENV_VAR_DSH_CLI_TARGET_STYLE: &str = "DSH_CLI_TARGET_STYLE";
-pub(crate) const ENV_VAR_DSH_CLI_TENANT: &str = "DSH_CLI_TENANT";
+pub(crate) const ENV_VAR_DSH_CLI_TARGET_TENANT: &str = "DSH_CLI_TENANT";
 pub(crate) const ENV_VAR_DSH_CLI_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
 pub(crate) const ENV_VAR_DSH_CLI_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
 pub(crate) const ENV_VAR_DSH_CLI_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
@@ -724,17 +724,6 @@ lazy_static! {
       overridden via the --output-format command line argument.",
     ),
     EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_PLATFORM,
-      "Specifies the target platform on which the target tenant environments live.",
-      false,
-      true,
-      None,
-      "Target platform on which the tenants environment lives. The supported platforms are: \n\
-      'np-aws-lz-dsh' / 'nplz', 'poc-aws-dsh' / 'poc', 'prod-aws-dsh' / 'prod', \n\
-      'prod-aws-lz-dsh' / 'prodlz', 'prod-aws-lz-laas' / 'prodls' or 'prod-azure-dsh' / 'prodaz'. \n\
-      This environment variable can be overridden via the --platform command line argument.",
-    ),
-    EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_QUIET,
       "Enables quiet mode, which means that no output will be produced to the terminal.",
       false,
@@ -753,7 +742,7 @@ lazy_static! {
       "This environment variable specifies the robot password for the robot access pattern. \n\
       Note that when the environment variable 'DSH_CLI_ROBOT_PASSWORD_FILE' or the argument \n\
       --robot-password-file command line argument is provided, this environment variable will \n\
-      never be used. For better security, consider using one of these two options instead of \n\
+      not be used. For better security, consider using one of these two options instead of \n\
       defining 'DSH_CLI_ROBOT_PASSWORD'. This environment variable cannot be overridden via the \n\
       --environment-variable command line argument.",
     ),
@@ -877,7 +866,18 @@ lazy_static! {
       'DSH_CLI_ERROR_STYLE' for the supported styles.",
     ),
     EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_TENANT,
+      ENV_VAR_DSH_CLI_TARGET_PLATFORM,
+      "Specifies the target platform on which the target tenant environments live.",
+      false,
+      true,
+      None,
+      "Target platform on which the tenants environment lives. The supported platforms are: \n\
+      'np-aws-lz-dsh' / 'nplz', 'poc-aws-dsh' / 'poc', 'prod-aws-dsh' / 'prod', \n\
+      'prod-aws-lz-dsh' / 'prodlz', 'prod-aws-lz-laas' / 'prodls' or 'prod-azure-dsh' / 'prodaz'. \n\
+      This environment variable can be overridden via the --platform command line argument.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_TARGET_TENANT,
       "Specifies the target tenant name.",
       false,
       true,

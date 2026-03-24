@@ -1,4 +1,3 @@
-use crate::arguments::{platform_name_argument, tenant_name_argument};
 use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
@@ -9,19 +8,18 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
-use crate::keyring::get_secret_from_keyring;
 use crate::log_level::LogLevel;
 use crate::settings::{upsert_settings, Settings};
 use crate::style::{DshColor, DshStyle};
 use crate::subject::{Requirements, Subject};
-use crate::target_arguments::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
+use crate::target_platform::{get_target_platform_explicit, platform_name_argument};
+use crate::target_tenant::{get_target_tenant_explicit, tenant_name_argument};
 use crate::verbosity::Verbosity;
 use crate::{err, plain, DshCliResult};
 use async_trait::async_trait;
 use clap::builder::EnumValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 use dsh_api::platform::DshPlatform;
-use dsh_api::secret::ROBOT_SECRET;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::fmt::Display;
@@ -355,11 +353,8 @@ struct SettingDefault {}
 impl CommandExecutor for SettingDefault {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("set default platform and tenant");
-    let platform = get_platform_argument_or_prompt(matches)?;
-    let tenant = get_tenant_argument_or_prompt(matches)?;
-    if get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)?.is_none() {
-      return err!("keyring contains no password for target '{}@{}'", tenant, platform);
-    }
+    let platform = get_target_platform_explicit(matches)?;
+    let tenant = get_target_tenant_explicit(matches)?;
     upsert_settings(|settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
     context.print_outcome(format!("default platform set to {}", platform));
     upsert_settings(|settings| Ok(Settings { default_tenant: Some(tenant.to_string()), ..settings }))?;

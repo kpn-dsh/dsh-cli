@@ -1,20 +1,18 @@
 #!/bin/bash
 set -e
 
-# This script can be used as a run test for dsh.
-# It will run a number of commands that will open a DSH resource or web application.
-# This tests must be run from within the 'tests' directory.
+# Run dsh platform open commands
+#
+# This script will run platform open commands which results in a number of webpages that will be opened in
+# your default browser.
+#
+# To run this test the following is expected:
+# * User is logged in via the single sign on authentication pattern at platform $DSH_CLI_PLATFORM
+# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
+# * User is authenticated for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
 
 export DSH_CLI_PLATFORM=nplz
 export DSH_CLI_TENANT=greenbox-dev
-export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
-
-# For this test to run the following is expected:
-#
-# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
-# * Password file $DSH_CLI_PASSWORD_FILE exists and contains the password
-#   for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
-# * The user is logged in to the console via SSO/Grip prior to running this test
 
 export DSH_CLI_LOG_LEVEL="error"
 export DSH_CLI_OUTPUT_FORMAT="table"

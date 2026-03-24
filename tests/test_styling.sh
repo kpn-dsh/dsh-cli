@@ -1,19 +1,15 @@
 #!/bin/bash
 set -e
 
-# This script can be used as a run test for dsh.
-# It will run a large number of commands from a file and print the output to the console.
-# This tests must be run from within the 'tests' directory.
+# Run dsh commands with various colors and styling
+#
+# To run this test the following is expected:
+# * User is logged in via the single sign on authentication pattern at platform $DSH_CLI_PLATFORM
+# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
+# * User is authenticated for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
 
 export DSH_CLI_PLATFORM=nplz
 export DSH_CLI_TENANT=greenbox-dev
-export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.greenbox-dev.pwd
-
-# For this test to run the following is expected:
-#
-# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
-# * Password file $DSH_CLI_PASSWORD_FILE exists and contains the password
-#   for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
 
 ENV_VAR_QUERY=level
 IMAGE_QUERY=keyring-service

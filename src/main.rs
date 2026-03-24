@@ -15,13 +15,13 @@ use crate::environment_variables::{
 };
 use crate::error::DshCliError;
 use crate::global_arguments::{
-  authentication_argument, browser_argument, environment_variable_argument, no_csv_headers_argument, robot_password_file_argument, robot_platform_argument, robot_tenant_argument,
-  target_tenants_all_argument, target_tenants_argument, TARGET_TENANTS_ALL_ARGUMENT,
+  authentication_option, browser_option, environment_variable_option, no_csv_headers_flag, robot_password_file_option, robot_platform_option, robot_tenant_option,
 };
 use crate::releases::{newer_release, newer_release_notification};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
-use crate::target_arguments::{get_target_platform, get_target_tenant};
+use crate::target_platform::{get_target_platform, get_target_platform_from_all_sources, platform_name_argument, target_platform_option};
+use crate::target_tenant::{target_tenant_option, target_tenants_all_flag, target_tenants_option, TARGET_TENANTS_ALL_FLAG};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
@@ -32,13 +32,13 @@ use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
 use global_arguments::{
-  dry_run_argument, force_argument, no_escape_argument, output_format_argument, quiet_argument, set_verbosity_argument, show_execution_time_argument,
-  suppress_exit_status_argument, target_platform_argument, target_tenant_argument, terminal_width_argument, version_argument, VERSION_ARGUMENT,
+  dry_run_flag, force_flag, no_escape_flag, output_format_option, quiet_flag, set_verbosity_option, show_execution_time_flag, suppress_exit_status_flag, terminal_width_option,
+  version_flag, VERSION_FLAG,
 };
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::{debug, error, trace};
-use log_arguments::{log_level_api_argument, log_level_argument};
+use log_arguments::{log_level_api_option, log_level_option};
 use log_level::initialize_logger;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,7 @@ mod global_arguments;
 mod issues;
 mod keyring;
 #[cfg(feature = "manage")]
-mod limits_flags;
+mod limits_options;
 mod log_arguments;
 mod log_level;
 mod modifier_flags;
@@ -109,7 +109,8 @@ mod settings;
 mod style;
 mod subject;
 mod subjects;
-mod target_arguments;
+mod target_platform;
+mod target_tenant;
 mod verbosity;
 
 lazy_static! {
@@ -325,7 +326,7 @@ async fn inner_main() -> DshCliExit {
     Err(error) => return DshCliExit::CliErr(error),
   };
 
-  if matches.get_flag(VERSION_ARGUMENT) {
+  if matches.get_flag(VERSION_FLAG) {
     match newer_release(&VERSION).await {
       Ok(Some(newer_release)) => {
         context.print(format!(
@@ -372,8 +373,8 @@ async fn inner_main() -> DshCliExit {
   }
 
   match matches.subcommand() {
-    Some(("login", _)) => {
-      return match get_target_platform(&matches, context.settings()) {
+    Some(("login", arg_matches)) => {
+      return match get_target_platform_from_all_sources(arg_matches, context.settings()) {
         Ok(platform) => match authentication::login(platform, context).await {
           Ok(()) => DshCliExit::Ok,
           Err(error) => DshCliExit::from(error),
@@ -381,8 +382,8 @@ async fn inner_main() -> DshCliExit {
         Err(error) => DshCliExit::CliErr(error),
       }
     }
-    Some(("logout", _)) => {
-      return match get_target_platform(&matches, context.settings()) {
+    Some(("logout", arg_matches)) => {
+      return match get_target_platform_from_all_sources(arg_matches, context.settings()) {
         Ok(platform) => match authentication::logout(platform, context).await {
           Ok(()) => DshCliExit::Ok,
           Err(error) => DshCliExit::from(error),
@@ -401,7 +402,7 @@ async fn inner_main() -> DshCliExit {
             Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
           };
           for client in &clients {
-            if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
+            if matches.get_flag(TARGET_TENANTS_ALL_FLAG) {
               context.print(format!("# {}", client.tenant()))
             }
             match subject.execute_subject_command_with_client(sub_matches, client, &context).await {
@@ -431,7 +432,7 @@ async fn inner_main() -> DshCliExit {
               Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
             };
             for client in &clients {
-              if matches.get_flag(TARGET_TENANTS_ALL_ARGUMENT) {
+              if matches.get_flag(TARGET_TENANTS_ALL_FLAG) {
                 context.print(format!("# {}", client.tenant()))
               }
               match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
@@ -459,19 +460,25 @@ async fn inner_main() -> DshCliExit {
 }
 
 fn login_command() -> Command {
-  Command::new("login").about("Login via single sign on").long_about(
-    "Login via single sign on. You will be directed to the login page for the currently \
+  Command::new("login")
+    .about("Login via single sign on")
+    .long_about(
+      "Login via single sign on. You will be directed to the login page for the currently \
         selected platform where you must sign in using your credentials (using two-factor \
         authentication). The platform is either the configured platform, or can be specified \
         via the '--platform' argument.",
-  )
+    )
+    .arg(platform_name_argument())
 }
 
 fn logout_command() -> Command {
-  Command::new("logout").about("Logout from single sign on").long_about(
-    "Logout from single sign on. You will be directed to the logout page for the currently \
+  Command::new("logout")
+    .about("Logout from single sign on")
+    .long_about(
+      "Logout from single sign on. You will be directed to the logout page for the currently \
         selected platform where you must confirm.",
-  )
+    )
+    .arg(platform_name_argument())
 }
 
 async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
@@ -487,35 +494,35 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
     .subcommands(clap_commands)
     .args(vec![
       // Main options
-      authentication_argument(),
-      browser_argument(),
-      dry_run_argument(),
-      environment_variable_argument(),
-      force_argument(),
-      robot_password_file_argument(),
-      robot_platform_argument(),
-      robot_tenant_argument(),
-      target_platform_argument(),
-      target_tenant_argument(),
-      target_tenants_all_argument(),
-      target_tenants_argument(),
+      authentication_option(),
+      browser_option(),
+      dry_run_flag(),
+      environment_variable_option(),
+      force_flag(),
+      target_platform_option(),
+      target_tenant_option(),
+      target_tenants_all_flag(),
+      target_tenants_option(),
       // Output options
-      no_csv_headers_argument(),
-      no_escape_argument(),
-      output_format_argument(),
-      quiet_argument(),
-      set_verbosity_argument(),
-      show_execution_time_argument(),
-      terminal_width_argument(),
+      no_csv_headers_flag(),
+      no_escape_flag(),
+      output_format_option(),
+      quiet_flag(),
+      set_verbosity_option(),
+      show_execution_time_flag(),
+      terminal_width_option(),
       // Tool options
       env_var_argument(),
       env_var_file_argument(),
       env_vars_argument(),
       generate_autocomplete_file_argument(),
-      log_level_argument(),
-      log_level_api_argument(),
-      suppress_exit_status_argument(),
-      version_argument(),
+      log_level_option(),
+      log_level_api_option(),
+      robot_password_file_option(),
+      robot_platform_option(),
+      robot_tenant_option(),
+      suppress_exit_status_flag(),
+      version_flag(),
     ])
     .subcommand_value_name("SUBJECT/COMMAND")
     .subcommand_help_heading("Subjects/commands")
