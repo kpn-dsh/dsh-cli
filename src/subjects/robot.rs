@@ -1,5 +1,8 @@
-use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND, UPDATE_COMMAND};
+#[cfg(feature = "robot")]
+use crate::capability::UPDATE_COMMAND;
+use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
+#[cfg(feature = "robot")]
 use crate::clients::create_client_access_token_from_platform_tenant;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
@@ -16,17 +19,15 @@ use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::DshPlatform;
 use dsh_api::secret::ROBOT_SECRET;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use log::error;
 use serde::Serialize;
+use std::sync::LazyLock;
 
 pub struct RobotSubject {}
 
 const ROBOT_SUBJECT_TARGET: &str = "robot";
 
-lazy_static! {
-  pub(crate) static ref ROBOT_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(RobotSubject {});
-}
+pub(crate) static ROBOT_SUBJECT: LazyLock<Box<dyn Subject + Send + Sync>> = LazyLock::new(|| Box::new(RobotSubject {}));
 
 #[async_trait]
 impl Subject for RobotSubject {
@@ -60,47 +61,68 @@ impl Subject for RobotSubject {
   }
 }
 
-lazy_static! {
-  static ref ROBOT_COPY_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+static ROBOT_COPY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(COPY_COMMAND, None, &RobotCopy {}, "Copy robot secret to clipboard")
-    .add_target_argument(platform_name_argument().required(true))
-    .add_target_argument(tenant_name_argument().required(true))
-  );
-  static ref ROBOT_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &RobotList {}, "List stored robot secrets")
-  );
-  static ref ROBOT_IMPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true)),
+  )
+});
+
+static ROBOT_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(CapabilityBuilder::new(
+    LIST_COMMAND,
+    Some(LIST_COMMAND_ALIAS),
+    &RobotList {},
+    "List stored robot secrets",
+  ))
+});
+
+static ROBOT_IMPORT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(IMPORT_COMMAND, None, &RobotImport {}, "Import the robot secret from the platform secret store")
-    .add_target_argument(platform_name_argument().required(true))
-    .add_target_argument(tenant_name_argument().required(true))
-  );
-  static ref ROBOT_SET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true)),
+  )
+});
+
+static ROBOT_SET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(SET_COMMAND, None, &RobotSet {}, "Store robot secret to keyring")
-    .add_target_argument(platform_name_argument().required(true))
-    .add_target_argument(tenant_name_argument().required(true))
-  );
-  static ref ROBOT_UNSET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true)),
+  )
+});
+
+static ROBOT_UNSET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(UNSET_COMMAND, None, &RobotUnset {}, "Remove robot secret from keyring")
-    .add_target_argument(platform_name_argument().required(true))
-    .add_target_argument(tenant_name_argument().required(true))
-  );
-  #[cfg(feature = "robot")]
-  static ref ROBOT_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true)),
+  )
+});
+
+#[cfg(feature = "robot")]
+static ROBOT_UPDATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &RobotUpdate {}, "Request a new robot secret")
-    .add_target_argument(platform_name_argument().required(true))
-    .add_target_argument(tenant_name_argument().required(true))
-    .set_long_about("Triggers the generation of a new robot secret for the tenant’s robot account. This automatically invalidates the existing client secret. The new secret will be stored in DSH secret store and in your local keyring.")
-  );
-  static ref ROBOT_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true))
+      .set_long_about("Triggers the generation of a new robot secret for the tenant’s robot account. This automatically invalidates the existing client secret. The new secret will be stored in DSH secret store and in your local keyring.")
+  )
+});
+
+static ROBOT_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  vec![
     ROBOT_COPY_CAPABILITY.as_ref(),
     ROBOT_IMPORT_CAPABILITY.as_ref(),
     ROBOT_LIST_CAPABILITY.as_ref(),
     ROBOT_SET_CAPABILITY.as_ref(),
     ROBOT_UNSET_CAPABILITY.as_ref(),
     #[cfg(feature = "robot")]
-    ROBOT_UPDATE_CAPABILITY.as_ref()
-  ];
-}
+    ROBOT_UPDATE_CAPABILITY.as_ref(),
+  ]
+});
 
 fn get_target_platform_and_tenant_from_command_line_arguments(matches: &ArgMatches) -> DshCliResult<(DshPlatform, String)> {
   let platform = get_target_platform_from_command_line_argument(matches)?.unwrap_or_else(|| unreachable!());
