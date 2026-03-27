@@ -80,18 +80,19 @@ Subjects/commands:
   volume       Show, manage and list DSH volumes.
 
 Options:
-      --dry-run              Execute in dry-run mode
-      --force                Force changes without confirmation
-  -p, --platform <PLATFORM>  Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
-                             prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
-  -t, --tenant <TENANT>      Provide target tenant
-  -h, --help                 Print help (see more with '--help')
+      --dry-run  Execute in dry-run mode
+      --force    Force changes without confirmation
+  -h, --help     Print help (see more with '--help')
 
 Output options:
-  -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,
-                                table-no-border, toml, toml-compact, yaml]
+  -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, 
+                                plain, quiet, table, table-no-border, toml, toml-compact, yaml]
   -q, --quiet                   Run in quiet mode
   -v, --verbosity <VERBOSITY>   Set verbosity level [possible values: off, low, medium, high]
+
+
+Settings:
+  file-name  /Users/me/.dsh_cli/settings.toml
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.
