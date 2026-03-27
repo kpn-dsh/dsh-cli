@@ -2,101 +2,84 @@
 
 [&#x2190; README](../README.md)
 
-### Prompts
+When the `dsh` tool is installed properly, you can run it by simply typing a command in your
+favorite shell. When a command requires you to be logged in, the tool will tell you, and when a
+command requires parameters you will be prompted for them. However, there are
+also commands that do not require being logged in or any parameters. For example, to see a
+list of the available platforms, type:
 
-When the `dsh` tool is installed properly, you can run it by simply typing a command and
-the tool will prompt you for the required parameters.
-To get a list of the configured secrets for `my-tenant` on platform `nplz`, just type:
+```bash
+> dsh platforms
+┌────────────────────┬────────┬────────────────────┬────────────┬──────────────────────────────────────────────┬───────────────────────────────────────────────┐
+│ platform id        │ alias  │ realm              │ production │ description                                  │ console url                                   │
+├────────────────────┼────────┼────────────────────┼────────────┼──────────────────────────────────────────────┼───────────────────────────────────────────────┤
+│ k8s-dev-aws-lz-dsh │ devlz  │ k8s-dev-aws-lz-dsh │ false      │ Development platform for Klarrio             │ https://console.dev.dsh-k8s.np.aws.kpn.com    │
+│ np-aws-lz-dsh      │ nplz   │ dev-lz-dsh         │ false      │ Staging platform for KPN internal tenants    │ https://console.dsh-dev.dsh.np.aws.kpn.com    │
+│ poc-aws-dsh        │ poc    │ poc-dsh            │ true       │ Staging platform for non KPN tenants         │ https://console.poc.kpn-dsh.com               │
+│ prod-aws-dsh       │ prod   │ prod-dsh           │ true       │ Production platform for non KPN tenants      │ https://console.kpn-dsh.com                   │
+│ prod-aws-lz-dsh    │ prodlz │ prod-lz-dsh        │ true       │ Production platform for KPN internal tenants │ https://console.dsh-prod.dsh.prod.aws.kpn.com │
+│ prod-azure-dsh     │ prodaz │ prod-azure-dsh     │ true       │ Production platform for non KPN tenants      │ https://console.az.kpn-dsh.com                │
+└────────────────────┴────────┴────────────────────┴────────────┴──────────────────────────────────────────────┴───────────────────────────────────────────────┘
+```
+
+Most commands however do require you to be logged in, and do require parameters. For example,
+to get a list of the configured secrets for `my-tenant` on platform `np-aws-lz-dsh`, just type:
 
 ```bash
 > dsh secret list
-target platform: nplz
+target platform: np-aws-lz-dsh
 target tenant: my-tenant
-please log in to platform np-aws-lz-dsh using the 'dsh login' command
+please log in to platform `np-aws-lz-dsh` using the 'dsh login np-aws-lz-dsh' command
 user is not authenticated
 ```
 
-To login, just type the following command:
+Since you did not provide the name of the platform and the tenant and this command requires them,
+you were prompted for these values. But you also need to be logged in for this command,
+so that will be the next step.
+
+Assuming that you are member of the tenant `my-tenant` on the platform `np-aws-lz-dsh`, you can
+log in by typing the following command in your shell:
 
 ```bash
-dcli> dsh login
-target platform: nplz
-login to platform np-aws-lz-dsh
-opening login page for platform np-aws-lz-dsh
+> dsh login np-aws-lz-dsh
+opening login page for platform 'np-aws-lz-dsh'
 ```
 
-Your browser will open automatically, and you are requested to login using the 2 fase
-authentication process. When login succeeded, you will be notified on the console and the
-tenants that you have access to on this platform will be listed.
+This will direct you to a web page where you can authenticate with your username/password or any
+other means that is available. Most likely a two-factor log in process is required.
+When logging in was successful you will see the following page where you have to grant the
+`dsh` tool the required privilege.
+
+![](grant-access.png)
+
+After confirmation by clicking the `Yes` button, move back to your shell where you will see the
+tenants that you are authorized for.
 
 ```bash
-dcli> dsh login
-target platform: nplz
-login to platform np-aws-lz-dsh
-opening login page for platform np-aws-lz-dsh
-you are logged in as schel104
-authorized tenants: my-tenant, ...
+you are logged in
+authorized tenants: my-tenant, my-tenant1, my-tenant2, my-tenant3, my-tenant4
 ```
 
-No try again, to finally see the results.
+Now we can try again:
 
 ```bash
-> dsh secret list
-target platform: nplz
-target tenant: my-tenant
-target my-tenant@np-aws-lz-dsh
-list all services with their parameters
-┌─────────────────────────────────────────┐
-│ secret ids (1)                          │
-├─────────────────────────────────────────┤
-│ api-key                                 │
-│ ...                                     │
-└─────────────────────────────────────────┘
+> dsh secrets --platform nplz --tenant my-tenant
+┌─────────────┬────────┬─────────┬────────┬──────────┬─────────────┬─────────┬────────┬───────────────┐
+│ secret name │ system │ kind    │ format │ size     │ description │ expires │ status │ notifications │
+├─────────────┼────────┼─────────┼────────┼──────────┼─────────────┼─────────┼────────┼───────────────┤
+│ ...         │        │         │        │          │             │         │        │               │
+│ my-secret   │        │ regular │ string │ 16 chars │             │         │        │               │
+└─────────────┴────────┴─────────┴────────┴──────────┴─────────────┴─────────┴────────┴───────────────┘
 ```
 
-### Command line arguments
+Note that this time we provided the platform name and the tenant name directly on the command line,
+so we were not prompted for them. Also, we used the alias `nplz` for the platform name instead
+of the full name `np-aws-lz-dsh`. Finally, we used the command `secrets`, which is a shortcut for
+the `secret list` command. This postfix `s` is available for all commands that have a `list`
+subcommand.
 
-In most cases, especially when the `dsh` tool is not run from a terminal,
-it is more convenient to provide the required parameters explicitly via the command line.
-
-You can get the above list of all secrets for tenant `my-tenant`
-on platform `np-aws-lz-dsh` by typing the following command:
-
-```bash
-> dsh secret list --platform np-aws-lz-dsh --tenant my-tenant
-...
-```
-
-For the most used arguments there are shortcuts defined. The above command can
-also be run as follows:
-
-```bash
-> dsh secret list -p np-aws-lz-dsh -t my-tenant
-...
-```
-
-### Environment variables
-
-Even more convenient is providing the required parameters via environment variables:
-
-```bash
-> export DSH_CLI_PLATFORM=np-aws-lz-dsh
-> export DSH_CLI_TENANT=my-tenant
-```
-
-Now you can get the same list of secrets by just typing:
-
-```bash
-> dsh secret list
-...
-```
-
-### Settings and targets
-
-If you work with more than one platform and/or tenant,
-providing the parameters and passwords via prompts, command line arguments or
-environment variables quickly becomes tedious.
-Luckily, you can also set a default platform and default tenant:
+Typically, you will be submitting commands for the same platform and tenant quit often.
+In this case you can set the default platform and default tenant via a command:
 
 ```bash
 > dsh setting set default-platform np-aws-lz-dsh
@@ -105,12 +88,22 @@ default platform set to np-aws-lz-dsh
 default tenant set to my-tenant
 ```
 
-Now if you don't provide the platform or tenant via the command line arguments or environment
-variables, the default settings will be used:
+Now you can get the same list of secrets by just typing:
 
 ```bash
-> dsh secret list
+> dsh secrets
 ...
 ```
+
+Alternatively you can also provide the default parameters via environment variables:
+
+```bash
+> export DSH_CLI_PLATFORM=np-aws-lz-dsh
+> export DSH_CLI_TENANT=my-tenant
+```
+
+Note that the environment variables take precedence over the default settings while the
+command line options take precedence over the environment variables. See the
+next page for an overview of all ways to define the platform and tenant names.
 
 [User guide &#x2192;](user_guide.md)

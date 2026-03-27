@@ -8,7 +8,7 @@ Once the `dsh` tool is published to `crates.io` it can easily be installed by ty
 > cargo install dsh
 ```
 
-but this requires that you have a Rust toolchain installed. For people who are not familiar
+But this requires that you have a Rust toolchain installed. For people who are not familiar
 with Rust or do not have the toolchain available, it is convenient to have a binary release
 available as well.
 
@@ -31,7 +31,7 @@ Since we're building for the native platform (macOS, `aarch64-apple-darwin`), th
 commands are simple:
 
 ```bash
-> cargo build --release --all-features
+> cargo build --release
 ...
 > mv target/release/dsh dsh-v0.10.0-aarch64-apple-darwin
 > cargo build --release --all-features
@@ -39,8 +39,8 @@ commands are simple:
 > mv target/release/dsh-manage dsh-manage-v0.10.0-aarch64-apple-darwin
 ```
 
-This will result in two executables in your project directory, one with `stream` and `tenant`
-management capabilities and one without:
+This will result in two executables in your project directory, one with `robot`, `stream` and
+`tenant` features enabled, and one without:
 
 ```bash
 > ls -al

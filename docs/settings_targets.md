@@ -13,19 +13,34 @@ This location can be changed by setting the environment variable `DSH_CLI_HOME`.
 ```
 $HOME/.dsh_cli/
  ├── targets/
- │    ├── platform1/
- │    │    ├── tenant1/
+ │    ├── np-aws-lz-dsh/
+ │    │    ├── my-tenant1/
  │    │    │    └── certificates/
  │    │    │         ├── broker-ca.pem
  │    │    │         ├── broker-client.key
  │    │    │         └── broker-client.pem
- │    │    ├── tenant2/
+ │    │    ├── my-tenant2/
  │    │    │    ...
  │    │    └── refresh-token.encrypted
- │    └── platform2/
+ │    └── prod-aws-lz-dsh/
  │         ...
  └── settings.toml
 ```
+
+## Targets
+
+The target data (platforms and tenants) is stored in files in the directory
+`$HOME/.dsh_cli/targets`.
+E.g., for the platform `np-aws-lz-dsh` and the tenant `my-tenant1` the target data is stored in
+the file `$HOME/.dsh_cli/targets/np-aws-lz-dsh/my-tenant1`:
+
+When using the `robot` authentication method, each platform/tenant combination also needs a
+password. These passwords are not stored in the target files. For security reasons, passwords
+are stored in your computers keyring, supported for Mac OsX and Windows. Support for the linux
+keyring is available, but not tested yet.
+
+When using the `single-sign-on` authentication method, an encrypted refresh token for the
+platform is stored in the file `refresh-token.encrypted` in the platform's directory.
 
 ## Settings
 
@@ -39,21 +54,5 @@ matching-style = "bold"
 show-execution-time = false
 verbosity = "medium"
 ```
-
-## Targets
-
-The target data (platforms and tenants) is stored in files in the directory
-`$HOME/.dsh_cli/targets`.
-For each combination of a platform and a tenant there is a separate subdirectory.
-E.g., for the platform `np-aws-lz-dsh` and the tenant `greenbox-dev` the target data is stored in
-the file `$HOME/.dsh_cli/targets/np-aws-lz-dsh/greenbox-dev`:
-
-When using the `robot` authentication method, each platform/tenant combination also needs a
-password. These passwords are not stored in the target files. For security reasons, passwords
-are stored in your computers keyring, supported for Mac OsX and Windows. Support for the linux
-keyring is available, but not tested yet.
-
-When using the `single-sign-on` authentication method, an encrypted refresh token for the
-platform needs to be stored in the platforms directory.
 
 [Platforms specification &#x2192;](platforms-specification.md)

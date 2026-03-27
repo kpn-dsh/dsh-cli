@@ -23,17 +23,16 @@ Then you can for example install the `dsh` tool on your local machine using:
 ...
 ```
 
-When developing, it is convenient to set some aliases:
+When developing, it is convenient to set an alias:
 
 ```bash
-> alias dsh-dev="cargo run --package dsh --bin dsh --"
-> alias dsh-deva="cargo run --all-features --package dsh --bin dsh --"
+> alias dshd="cargo run --all-features --package dsh --bin dsh --"
 ````
 
 You can then easily run the `dsh` tool without installing it:
 
 ```bash
-> dsh-dev platform list
+> dshd platform list
 ...
 ```
 
@@ -41,7 +40,7 @@ You can then easily run the `dsh` tool without installing it:
 
 ### Dependencies
 
-The `dsh` tool has a strong dependency on the [`dsh_api`](dsh_api) library,
+The `dsh` tool has a strong dependency on the [`dsh_api`](dsh_api) library
 that provides the client and data types for the DSH resource management API.
 This library is published to `crates.io` and your `Cargo.toml` file
 should specify the dependency:
@@ -62,8 +61,8 @@ robot = ["dsh_api/robot"]
 
 Because of the strong dependencies between the `dsh` tool and the library,
 they are often been worked on at the same time.
-In that case it is convenient to set the dependency to the local copy of the library.
-Also you might want to enable the `manage` feature while developing.
+In that case it is convenient to set the dependency to the local copy of the library crate.
+Also, you might want to enable the `manage` feature while developing.
 
 ```toml
 dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
@@ -111,14 +110,18 @@ the default output format will be `json` instead of `table`.
 If you want to check the `table` rendering from a file,
 you have to explicitly change the output format in the script file.
 
+### `test_environment_variables.sh`
+
+This script will run commands related to environment variables.
+
 ### `test_erroneous_commands.sh`
 
-This script will run many erroneous commands and print the error message to `stderr`.
+This script will run erroneous commands and print the error message to `stderr`.
 All commands must produce a controlled error message and never terminate in panic.
 
 ### `test_erroneous_manage_commands.sh`
 
-This script will run many erroneous manage commands and print the error message to `stderr`.
+This script will run erroneous manage commands and print the error message to `stderr`.
 All commands must produce a controlled error message and never terminate in panic.
 
 ### `test_manage_commands.sh`
@@ -129,12 +132,24 @@ All commands must succeed and print output to `stdout` (and possibly `stderr`).
 Commands that would result in changes on the DSH platform
 all have the `--dry-run` argument included, so that no actual changes will be made.
 
+### `test_manifests.sh`
+
+This script will run commands related to manifests.
+
+### `test_manifests_all_versions.sh`
+
+This script will run commands related to all versions of the manifests.
+
 ### `test_platform_open_commands.sh`
 
 This script will run some `dsh platform open` commands which will try to open DSH
 resources and web applications. If you run this script, make sure that you are
 already logged in to the Console for the proper platform and tenant.
 If successful, you will have some open tabs in your browser.
+
+### `test_robot.sh`
+
+This script will run commands related to the robot authentication method.
 
 ### `test_styling.sh`
 

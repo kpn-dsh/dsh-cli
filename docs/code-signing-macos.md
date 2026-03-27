@@ -11,12 +11,13 @@ Code signing is performed by the developer using their Developer ID certificate 
 Verification of this signature proves to the user that a developer’s software hasn’t been tampered
 with since the developer built and signed it.
 
-Notarisation can be performed by anyone in the software distribution chain and proves
+Notarization can be performed by anyone in the software distribution chain and proves
 that Apple has been provided a copy of the code to check for malware and no known malware was found.
-The output of Notarisation is a ticket which is stored on Apple servers and can be optionally stapled to the app
+The output of Notarization is a ticket which is stored on Apple servers and can be optionally
+stapled to the app
 (by anyone) without invalidating the signature of the developer.
 
-More information about codesigning, notarisation and some of the other steps can be found on the
+More information about codesigning, notarization and some of the other steps can be found on the
 following pages:
 
 * [App code signing process in macOS](https://support.apple.com/en-gb/guide/security/sec3ad8e6e53/web)
@@ -154,7 +155,7 @@ Successfully uploaded file
 Be sure to save the provided id (in the example `abcdef01-2345-6789-abcd-ef0123456789`), since you
 might need it to check the status of the process.
 
-Notarisation usually takes less than 5 minutes, but in some cases it can take quite a bit longer.
+Notarization usually takes less than 5 minutes, but in some cases it can take quite a bit longer.
 In order to poll the status of the process you can use the following command:
 
 ```bash

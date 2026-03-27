@@ -4,11 +4,11 @@
 
 This page is targeted at developers who wish to publish the `dsh` tool to `crates.io`.
 In this explanation it is assumed that all your local code is committed, pushed and
-merged to `github`.
+merged to `GitHub`.
 
-Before publishing, it is a good idea to create a tag in your repository for the
+Before publishing, you must create a tag in your repository for the
 published version. Use the version number without any prefix as the tag name, e.g. `0.10.0`.
-This tag is required when creating a `GitHub` release on the next page.
+This tag is required when creating a `GitHub` release as described on the next page.
 
 ## Publish `dsh_api`
 
@@ -19,7 +19,7 @@ version of `dsh_api`. So the first step for releasing `dsh` is making sure that 
 required version of the `dsh_api` crate is published to `crates.io`.
 
 See the [`README.md`](https://github.com/kpn-dsh/dsh-api) file of the `dsh_api`
-repository for an explanation on how to publish the`dsh_api` crate.
+repository for an explanation on how to publish the `dsh_api` crate.
 
 ## Publish `dsh`
 

@@ -1,6 +1,6 @@
 # Environment variables
 
-[&#x2190; User guide](user_guide.md)
+[&#x2190; Authentication and authorization](authentication_authorization.md)
 
 The `dsh` tool can be run entirely from the command line and
 all configurations and parameters can be specified via command line arguments.
@@ -13,7 +13,7 @@ The `dsh` tool can print a list of all used environment variables via the comman
 > dsh --env-vars
 ```
 
-An detailed explanation of an environment variable can be printed via the commands:
+A detailed explanation of an environment variable can be printed via the commands:
 
 ```bash
 > dsh --env-var DSH_CLI_DRY_RUN  # Explains environment variable "DSH_CLI_DRY_RUN"
@@ -22,10 +22,10 @@ An detailed explanation of an environment variable can be printed via the comman
 
 Environment variables can be set in three ways:
 
-#### Shell command
+#### Shell command or shell script
 
-Typically, environment variables are set using shell commands. This makes them available for
-the lifetime of the shell, or until they are explicitly unset.
+Typically, environment variables are set using shell commands or shell scripts. This makes them
+available for the lifetime of the shell, or until they are explicitly unset.
 
 ```
 > export DSH_CLI_LOG_LEVEL=debug
@@ -55,8 +55,8 @@ Be sure that you do not use spaces around the `=` sign and that you do not use q
 the value.
 
 The dsh tool will check the current working directory for a file named `.dsh_cli.env` and if it
-exists it will set the environment variables defined in it. You can also specify another file via
-a command line argument:
+exists it will set the environment variables defined in it. You can also specify an alternative
+file via the command line argument:
 
 ```
 > dsh platforms --env-var-file my-settings.env
@@ -330,35 +330,53 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_PASSWORD</code></td>
+        <td>
+            This environment variable specifies the secret robot password for the robot 
+            authentication method. Note that when the environment variable
+            <code>DSH_CLI_PASSWORD_FILE</code> or the <code>--robot-password-file</code> 
+            command line argument is provided, this environment variable will not be used. 
+            For better security, consider using one of these two options instead of 
+            defining <code>DSH_CLI_PASSWORD</code>
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_PASSWORD_FILE</code></td>
+        <td>
+            This environment variable specifies a file containing the robot password for the 
+            robot authentication method. Note that when the <code>--password-file</code> 
+            command line argument is provided, this environment variable will not be used. 
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_PLATFORM</code></td>
         <td>
             This environment variable specifies the target platform for which commands will be 
-            executed. Note that this is not necessarily the same platform as used for the robot 
-            access pattern (see <code>DSH_CLI_ROBOT_PLATFORM</code>). The supported platforms are:
+            executed. The supported platforms are:
             <ul>
                 <li>
                     <code>np-aws-lz-dsh / nplz</code> - 
-                    staging platform for KPN internal tenants,
+                    Staging platform for KPN internal tenants,
                 </li>
                 <li>
                     <code>poc-aws-dsh / poc</code> - 
-                    staging platform for non KPN tenants,
+                    Staging platform for non KPN tenants,
                 </li>
                 <li>
                     <code>prod-aws-dsh / prod</code> - 
-                    production platform for non KPN tenants,
+                    Production platform for non KPN tenants,
                 </li>
                 <li>
                     <code>prod-aws-lz-dsh / prodlz</code> - 
-                    production platform for KPN internal tenants,
+                    Production platform for KPN internal tenants,
                 </li>
                 <li>
                     <code>prod-aws-lz-laas / prodls</code> - 
-                    production platform for logstash as a service,
+                    Production platform for logstash as a service,
                 </li>
                 <li>
                     <code>prod-azure-dsh / prodaz</code> - 
-                    production platform for non KPN tenants.
+                    Production platform for non KPN tenants.
                 </li>
             </ul>
             This environment variable can be overridden via the 
@@ -373,73 +391,6 @@ The following table describes all environment variables.
             (<code>stdout</code> and <code>stderr</code>).
             This environment variable can be overridden via the 
             <code>--quiet</code> (or <code>-q</code>) command line argument.
-        </td>
-    </tr>
-    <tr valign="top">
-        <td><code>DSH_CLI_ROBOT_PASSWORD</code></td>
-        <td>
-            This environment variable specifies the secret robot password for the robot access 
-            pattern. Note that when the environment variable
-            <code>DSH_CLI_ROBOT_PASSWORD_FILE</code> or the argument 
-            <code>--robot-password-file</code> command line argument is provided,
-            this environment variable will never be used. 
-            For better security, consider using one of these two options instead of 
-            defining <code>DSH_CLI_ROBOT_PASSWORD</code>
-        </td>
-    </tr>
-    <tr valign="top">
-        <td><code>DSH_CLI_ROBOT_PASSWORD_FILE</code></td>
-        <td>
-            This environment variable specifies a file containing the robot password for the 
-            robot access pattern. Note that when the <code>--robot-password-file</code> command 
-            line argument is provided, this environment variable will not be used. 
-        </td>
-    </tr>
-    <tr valign="top">
-        <td><code>DSH_CLI_ROBOT_PLATFORM</code></td>
-        <td>
-            This environment variable specifies the platform for the robot access pattern. Note 
-            that this is not necessarily the same platform as the target platform for which 
-            commands will be executed (see <code>DSH_CLI_PLATFORM</code>). The supported platforms 
-            are:
-            <ul>
-                <li>
-                    <code>np-aws-lz-dsh / nplz</code> - 
-                    staging platform for KPN internal tenants,
-                </li>
-                <li>
-                    <code>poc-aws-dsh / poc</code> - 
-                    staging platform for non KPN tenants,
-                </li>
-                <li>
-                    <code>prod-aws-dsh / prod</code> - 
-                    production platform for non KPN tenants,
-                </li>
-                <li>
-                    <code>prod-aws-lz-dsh / prodlz</code> - 
-                    production platform for KPN internal tenants,
-                </li>
-                <li>
-                    <code>prod-aws-lz-laas / prodls</code> - 
-                    production platform for logstash as a service,
-                </li>
-                <li>
-                    <code>prod-azure-dsh / prodaz</code> - 
-                    production platform for non KPN tenants.
-                </li>
-            </ul>
-            This environment variable can be overridden via the 
-            <code>--platform</code> (or <code>-p</code>) command line argument.
-        </td>
-    </tr>
-    <tr valign="top">
-        <td><code>DSH_CLI_ROBOT_TENANT</code></td>
-        <td>
-            This environment variable specifies the tenant for the robot access pattern. Note 
-            that this is not necessarily the same tenant as the target tenant for which 
-            commands will be executed (see <code>DSH_CLI_TENANT</code>).
-            This environment variable can be overridden via the 
-            <code>--tenant</code> (or <code>-t</code>) command line argument.
         </td>
     </tr>
     <tr valign="top">
@@ -524,9 +475,7 @@ The following table describes all environment variables.
         <td><code>DSH_CLI_TENANT</code></td>
         <td>
             This environment variable specifies the target tenant for which commands will be 
-            executed. Note that this is not necessarily the same tenant as used for the robot 
-            access pattern (see <code>DSH_CLI_ROBOT_TENANT</code>).
-            This environment variable can be overridden via the 
+            executed. This environment variable can be overridden via the 
             <code>--tenant</code> (or <code>-t</code>) command line argument.
         </td>
     </tr>

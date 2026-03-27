@@ -1,10 +1,9 @@
 # User guide
 
-[//]: # (TODO)
-
 [&#x2190; Quick start](quick_start.md)
 
-When installation is complete you should be able to start the `dsh` tool from the command line.
+To see an overview of the most important commands that the `dsh` tool provides, just type
+the tool name without any command, subcommand, options or arguments:
 
 ```bash
 > dsh
@@ -38,25 +37,27 @@ Subjects/commands:
   volume       Show, manage and list DSH volumes.
 
 Options:
-      --dry-run              Execute in dry-run mode
-      --force                Force changes without confirmation
-  -p, --platform <PLATFORM>  Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
-                             prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
-  -t, --tenant <TENANT>      Provide target tenant
-  -h, --help                 Print help (see more with '--help')
+      --dry-run  Execute in dry-run mode
+      --force    Force changes without confirmation
+  -h, --help     Print help (see more with '--help')
 
 Output options:
-  -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,
-                                table-no-border, toml, toml-compact, yaml]
+  -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, 
+                                plain, quiet, table, table-no-border, toml, toml-compact, yaml]
   -q, --quiet                   Run in quiet mode
   -v, --verbosity <VERBOSITY>   Set verbosity level [possible values: off, low, medium, high]
+
+
+Settings:
+  file-name  /Users/me/.dsh_cli/settings.toml
 ```
 
-You can have a more comprehensive explanation by using the `--help` command line option.
-Subcommands also have their own help text.
+You can have a complete list of all command and a more comprehensive explanation by using the
+`--help` command line option. Subcommands also have their own help text.
 
-```
+```bash
 > dsh --help
+> dsh secret
 > dsh secret --help
 > dsh secret list --help
 ```
@@ -64,114 +65,150 @@ Subcommands also have their own help text.
 ## Target platform and tenant
 
 Most functions of the `dsh` tool depend on the DSH resource management api,
-which is a rest web service.
-In order to be authenticated and authorized for this web service,
-three target values are required:
-
-* `platform` - The target platform where the DSH resources and services are deployed.
-  This can either be a development or a production environment,
-  and platforms will typically serve different kinds of tenants.
-  To get a list of all supported platforms, use the command `dsh platform list`.
-* `tenant` - The target tenant that is responsible for the resources and services
-  that are deployed on the DSH. Tenants will often have resources and services
-  on more than one platform, e.g. a development platform and a production platform.
-* `password` - Each combination of a `platform` and a `tenant` is considered
-  a separate entity with respect to authentication and authorization,
-  and therefor needs a separate `password`.
-  This password can be obtained by logging in to the DSH console web application
-  for the `platform` and `tenant`, and selecting the `Resources > Secrets` menu.
-  There it will be listed as `system/rest-api-client`.
-
-Each `dsh` function that needs to access the web service must provide these three values.
-The values can be provided as follows:
-
-1. If the command line argument is given, use its value,
-1. else if the environment variable is specified, use its value,
-1. else if the value is defined in the settings/targets files in the `dsh` tool directory,
-   use that value,
-1. else if the `dsh` tool is used from a terminal, the user will be prompted for the value.
-
-The `dsh` tool will check these possible sources for the target parameters in this order.
-Passwords can also be stored in the computer's keyring
-(currently only available on OsX and Windows).
+which is a rest web service. Each request to the api is targeted at one platform and one
+tenant only. This means that most commands of the `dsh` tool require a platform and tenant
+to be specified.
 
 Functions that do not need to access the web service do not require these target parameters.
 
-### Command line arguments
+### Platform
 
-* `--platform` or `-p` - Specify the target platform by either the full name
-  or the alias (e.g. `np-aws-lz-dsh` or `nplz`).
-* `--tenant` or `-t` - Specify the target tenant name.
-* `--password-file` - Specify the name of a file containing the target password.
-  This can either be an absolute file name
-  or a file name relative to the working directory.
+The target platform specifies where the DSH resources and services are living.
+This can either be a development or a production environment,
+and platforms will typically serve different kinds of tenants.
+To get a list of all supported platforms, use the command `dsh platform list`.
 
-```bash
-> dsh --platform nplz --tenant my-tenant --password-file ~/.password secret list
-list all secret ids
-┌─────────────────────────────────────────┐
-│ secret ids (1)                          │
-├─────────────────────────────────────────┤
-│ api-key                                 │
-│ ...                                     │
-└─────────────────────────────────────────┘
-```
+When invoking a command, the platform can be specified in a number of different ways
+listed below (sorted by decreasing precedence).
 
-Specifying the password directly as a command line argument is a security hazard
-and is not supported.
+1. `--platform` or `-p` command line option
+2. `DSH_CLI_PLATFORM` environment variable
+3. `default-platform` parameter in settings (not available for robot authentication method)
+4. If stdin is a terminal, the user is prompted for the platform
+
+### Tenant
+
+The target tenant is responsible for the resources and services
+that are deployed on the DSH. Tenants will often have resources and services
+on more than one platform, e.g. a development platform and a production platform.
+The tenant name can be specified in different ways (again sorted by decreasing
+precedence):
+
+1. `--all-tenants` command line option (not available in robot authentication method)
+2. `--tenants` command line option (not available in robot authentication method)
+3. `--tenant` or `-t` command line option
+4. `DSH_CLI_TENANT` environment variable
+5. `default-tenant` parameter in settings (not available in robot authentication method)
+6. If stdin is a terminal, the user is prompted for the tenant name
+
+### Command line options
+
+Next to the command line options to specify the platform and tenant there are many more
+options to change the default behavior and settings of the `dsh` tool. Some important options are:
+
+* `--dry-run` - Don't actually execute the command
+* `--log-level` - Set the log level of the tool (`off`, `error`, `warn`, `info`, `debug` or `trace`)
+* `--output-format` or `-o` - Change the default output format (`csv`, `json`, `json-compact`,    
+  `plain`, `quiet`, `table`, `table-no-border`, `toml`, `toml-compact`, `yaml`)
+* `--quiet` - Don't print any output to the console
+* `--verbosity` - Set the amount of metadata generated (`off`, `low`, `medium`, `high`)
+
+For a complete list and detailed information about all command line options use `dsh --help`.
 
 ### Environment variables
 
-If you did not specify the target platform and/or target tenant on the command line,
-the `dsh` tool will try to get the values from environment variables:
+As with the command line options, there are many environment variables used to change the
+default behavior and settings of the `dsh` tool. Some important variables are:
 
-[//]: # (TODO)
+* `DSH_CLI_DRY_RUN` - Don't actually execute the command
+* `DSH_CLI_LOG_LEVEL` - Set the log level of the tool
+* `DSH_CLI_OUTPUT_FORMAT` - Change the default output format
+* `DSH_CLI_QUIET` - Don't print any output to the console
+* `DSH_CLI_VERBOSITY` - Set the amount of metadata generated
 
-* `DSH_CLI_PLATFORM` - Specify the target platform by providing either the full name or the alias
-  (e.g. `np-aws-lz-dsh` or `nplz`).
-* `DSH_CLI_TENANT` - Specify the tenant name.
-* `DSH_CLI_ROBOT_PASSWORD_FILE` - Specify the name of a file containing the target password.
-  This can either be an absolute file name
-  or a relative file name from the working directory.
-*
+Note that command line options take precedence over environment variables for the same
+configuration item.
 
-`DSH_CLI_ROBOT_PASSWORD` - The password can also be specified directly from an environment variable.
+For a complete list and detailed information about all environment variables,
+see [Environment variables](environment_variables.md), or use the following command:
 
 ```bash
-> export DSH_CLI_PLATFORM=np-aws-lz-dsh
-> export DSH_CLI_TENANT=my-tenant
-> export DSH_CLI_ROBOT_PASSWORD="..."
-> dsh secret list
-...
+> dsh --env-vars
 ```
 
-For detailed information about all environment variables,
-see [Environment variables](environment_variables.md).
+For an explanation of a single environment variable (and the value if it is set), use the
+`--env-var` option followed by a (part of) the name of the environment variable:
 
-### Settings and targets
+```bash
+> dsh --env-var tenant
+┌──────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────┐
+│ environment variable │ DSH_CLI_TENANT                                                                             │
+├──────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+│ value                │ me                                                                                         │
+│ secret               │ no                                                                                         │
+│ override             │ allowed                                                                                    │
+│ default value        │                                                                                            │
+│ explanation          │ Target tenant for which commands/capabilities will be executed. This environment variable  │
+│                      │ can be overridden via the --tenant command line argument.                                  │
+└──────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-If you did not specify the target platform and/or target tenant on the command line
-and the environment variables are not defined,
-the `dsh` tool will try the `default-platform` and `default-tenant` values in the settings file
-and the password from the targets files. See [Settings and targets](settings_targets.md)
-for more information.
+### Settings
+
+Many settings with regard to the configuration of the `dsh` tool can also be made in the tool
+itself, using the `setting` command:
+
+```bash
+> dsh setting set default-platform nplz
+> dsh setting set default-tenant my-tenant
+> dsh setting set dry-run true
+> dsh setting set log-level debug
+> dsh setting set output-format json
+> dsh setting set quiet true
+> dsh setting set verbosity
+```
+
+To see all settings (with their current values), use:
+
+```bash
+> dsh settings
+┌────────────────────┬──────────────────────────────────┐
+│ setting            │ value                            │
+├────────────────────┼──────────────────────────────────┤
+│ authentication     │ robot                            │
+│ ...                │                                  │
+│ settings file name │ /Users/me/.dsh_cli/settings.toml │
+│ ...                │                                  │
+└────────────────────┴──────────────────────────────────┘
+```
+
+Settings are stored in the tool directory (`$HOME/.dsh_cli/settings.toml`).
+
+To reset a setting to its default value, use:
+
+```bash
+> dsh setting unset log-level
+```
+
+Note that command line options and environment variables take precedence over settings
+for the same configuration item.
+
+For a complete list and information about all available settings, use `dsh setting set -h`.
 
 ### Prompt
 
-If you did not specify the target platform and/or target tenant on the command line,
-the environment variables are not defined and the `default-platform` and `default-tenant`
-values are not set in the settings and target files,
-the user will be prompted to provide the required values from the terminal.
+If you did not specify the target platform and/or target tenant (or any other mandatory values)
+on the command line, the environment variables or in the settings, the user will be prompted
+to provide the required values.
 
 ```bash
 > dsh secret list
 target platform: nplz
 target tenant: my-tenant
-password for tenant my-tenant@np-aws-lz-dsh: ********
 ...
 ```
 
-In non-interactive use, e.g. in a script, a terminal is not available and an error message
-will be shown.
+In non-interactive use (e.g. in a script), a terminal is not available and an error message
+will be shown if mandatory parameters are not provided.
 
-[Environment variables &#x2192;](environment_variables.md)
+[Authentication and authorization &#x2192;](authentication_authorization.md)
