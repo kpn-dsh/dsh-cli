@@ -40,6 +40,8 @@ impl Debug for TenantEntry {
 /// ## Returns
 /// * `Ok(Some(secret))` - If the secret was found in the keyring.
 /// * `Ok(None)` - If the secret could not be found in the keyring.
+/// * `Err(DshCliError::Canceled)` - User canceled keyring authentication.
+/// * `Err(DshCliError)` - Something went wrong.
 pub(crate) fn get_secret_from_keyring(platform: &DshPlatform, tenant_name: &str, secret_name: &str) -> DshCliResult<Option<String>> {
   let target = format!("{}@{}", tenant_name, platform);
   match get_keyring_entry()? {
@@ -85,6 +87,8 @@ pub(crate) fn get_secret_from_keyring(platform: &DshPlatform, tenant_name: &str,
 ///   each tuple consists of
 ///   * `String` - Platform name.
 ///   * `Vec(String)` - Sorted list of tenants for the platform.
+/// * `Err(DshCliError::Canceled)` - User canceled keyring authentication.
+/// * `Err(DshCliError)` - Something went wrong.
 pub(crate) fn get_secrets_from_keyring() -> DshCliResult<Vec<(String, Vec<String>)>> {
   match get_keyring_entry()? {
     Some(keyring_entry) => {
@@ -125,8 +129,11 @@ pub(crate) fn get_secrets_from_keyring() -> DshCliResult<Vec<(String, Vec<String
 ///
 /// ## Returns
 /// * `Ok(())` - If the secret was successfully written to the keyring.
+/// * `Err(DshCliError::Canceled)` - User canceled keyring authentication.
+/// * `Err(DshCliError)` - Something went wrong.
 pub(crate) fn upsert_secret_to_keyring(platform: &DshPlatform, tenant_name: &str, secret_name: &str, secret_value: &str) -> DshCliResult<()> {
   let target = format!("{}@{}", tenant_name, platform);
+  let secrets_map = HashMap::from([(secret_name.to_string(), secret_value.to_string())]);
   match get_keyring_entry()? {
     Some(mut keyring_entry) => {
       keyring_entry
@@ -137,27 +144,15 @@ pub(crate) fn upsert_secret_to_keyring(platform: &DshPlatform, tenant_name: &str
             .and_modify(|tenant| {
               _ = tenant.secrets.insert(secret_name.to_string(), secret_value.to_string());
             })
-            .or_insert(TenantEntry { secrets: HashMap::from([(secret_name.to_string(), secret_value.to_string())]) });
+            .or_insert(TenantEntry { secrets: secrets_map.clone() });
         })
-        .or_insert(PlatformEntry {
-          tenants: HashMap::from([(
-            tenant_name.to_string(),
-            TenantEntry { secrets: HashMap::from([(secret_name.to_string(), secret_value.to_string())]) },
-          )]),
-        });
+        .or_insert(PlatformEntry { tenants: HashMap::from([(tenant_name.to_string(), TenantEntry { secrets: secrets_map })]) });
       debug!("secret '{}' for '{}' upserted in keyring", secret_name, target);
       set_keyring_entry(&keyring_entry)
     }
     None => {
-      let keyring_entry: KeyringEntry = HashMap::from([(
-        platform.name().to_string(),
-        PlatformEntry {
-          tenants: HashMap::from([(
-            tenant_name.to_string(),
-            TenantEntry { secrets: HashMap::from([(secret_name.to_string(), secret_value.to_string())]) },
-          )]),
-        },
-      )]);
+      let platform_entry = PlatformEntry { tenants: HashMap::from([(tenant_name.to_string(), TenantEntry { secrets: secrets_map })]) };
+      let keyring_entry: KeyringEntry = HashMap::from([(platform.name().to_string(), platform_entry)]);
       set_keyring_entry(&keyring_entry)?;
       debug!("secret '{}' for '{}' written to newly created keyring entry", secret_name, target);
       Ok(())
@@ -178,6 +173,8 @@ pub(crate) fn upsert_secret_to_keyring(platform: &DshPlatform, tenant_name: &str
 ///
 /// ## Returns
 /// * `Ok(())` - If the secret entry was successfully removed from the keyring.
+/// * `Err(DshCliError::Canceled)` - User canceled keyring authentication.
+/// * `Err(DshCliError)` - Something went wrong.
 pub(crate) fn remove_secret_from_keyring(platform: &DshPlatform, tenant_name: &str, secret_name: &str) -> DshCliResult<()> {
   let target = format!("{}@{}", tenant_name, platform);
   match get_keyring_entry()? {
@@ -237,6 +234,8 @@ pub(crate) fn remove_secret_from_keyring(platform: &DshPlatform, tenant_name: &s
 ///
 /// ## Returns
 /// * `Ok(())` - If the tenant entry was successfully deleted from the keyring.
+/// * `Err(DshCliError::Canceled)` - User canceled keyring authentication.
+/// * `Err(DshCliError)` - Something went wrong.
 pub(crate) fn _remove_tenant_from_keyring(platform: &DshPlatform, tenant_name: &str) -> DshCliResult<()> {
   let target = format!("{}@{}", tenant_name, platform);
   match get_keyring_entry()? {
@@ -277,6 +276,8 @@ pub(crate) fn _remove_tenant_from_keyring(platform: &DshPlatform, tenant_name: &
 ///
 /// ## Returns
 /// * `Ok(())` - If the tenant entry was successfully deleted from the keyring.
+/// * `Err(DshCliError::Canceled)` - User canceled keyring authentication.
+/// * `Err(DshCliError)` - Something went wrong.
 pub(crate) fn _remove_platform_from_keyring(platform: &DshPlatform) -> DshCliResult<()> {
   match get_keyring_entry()? {
     Some(mut keyring_entry) => match keyring_entry.remove(platform.name()) {
@@ -297,6 +298,13 @@ pub(crate) fn _remove_platform_from_keyring(platform: &DshPlatform) -> DshCliRes
   }
 }
 
+/// Get entry from the keyring
+///
+/// # Returns
+/// * `Ok(Some(entry))` - Successfully read keyring entry.
+/// * `Ok(None)` - Keyring entry not found.
+/// * `Err(DshCliError::Canceled)` - User canceled keyring authentication.
+/// * `Err(DshCliError)` - Something went wrong.
 fn get_keyring_entry() -> DshCliResult<Option<KeyringEntry>> {
   let user = whoami::username()?;
   let entry = keyring::Entry::new(APPLICATION_NAME, &user)?;
@@ -305,8 +313,20 @@ fn get_keyring_entry() -> DshCliResult<Option<KeyringEntry>> {
       Ok(secrets) => Ok(Some(secrets)),
       Err(_) => err!("keyring entry corrupted"),
     },
-    Err(keyring_error) => match keyring_error {
-      keyring::Error::NoEntry => Ok(None),
+    Err(keyring_error) => match &keyring_error {
+      keyring::Error::NoEntry => {
+        debug!("entry for dsh tool not found in keyring");
+        Ok(None)
+      }
+      keyring::Error::PlatformFailure(error) => {
+        if error.to_string() == "User canceled the operation." {
+          debug!("user cancelled keyring authentication");
+          Err(DshCliError::Canceled)
+        } else {
+          error!("keyring returned an error while reading entry ({})", keyring_error);
+          Err(DshCliError::from(keyring_error))
+        }
+      }
       _ => {
         error!("keyring returned an error while reading entry ({})", keyring_error);
         Err(DshCliError::from(keyring_error))

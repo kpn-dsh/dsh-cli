@@ -6,6 +6,7 @@ use std::fmt::{Debug, Display, Formatter};
 #[derive(Clone)]
 pub(crate) enum DshCliError {
   AesGcm(String),
+  Canceled,
   Configuration(String),
   Conversion(String),
   Decode(String),
@@ -140,6 +141,7 @@ impl Debug for DshCliError {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::AesGcm(message) => write!(f, "DshCliError(aes gcm, {})", message),
+      Self::Canceled => write!(f, "DshCliError(canceled)"),
       Self::Configuration(message) => write!(f, "DshCliError(configuration, {})", message),
       Self::Conversion(message) => write!(f, "DshCliError(conversion, {})", message),
       Self::Decode(message) => write!(f, "DshCliError(decode, {})", message),
@@ -166,6 +168,7 @@ impl Display for DshCliError {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::AesGcm(message) => write!(f, "{}", message),
+      Self::Canceled => f.write_str("canceled"),
       Self::Configuration(message) => write!(f, "{}", message),
       Self::Conversion(message) => write!(f, "{}", message),
       Self::Decode(message) => write!(f, "{}", message),
