@@ -1,7 +1,7 @@
 use crate::context::Context;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_LOG_COLOR, ENV_VAR_DSH_CLI_LOG_LEVEL, ENV_VAR_DSH_CLI_LOG_LEVEL_API, ENV_VAR_DSH_CLI_LOG_STYLE};
 use crate::error::DshCliError;
-use crate::log_arguments::{LOG_LEVEL_API_OPTION, LOG_LEVEL_OPTION};
+use crate::global_options::{LOG_LEVEL_API_OPTION, LOG_LEVEL_OPTION};
 use crate::settings::Settings;
 use crate::style::{style_from, DshColor, DshStyle};
 use crate::{err, DshCliResult};

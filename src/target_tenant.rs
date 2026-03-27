@@ -1,12 +1,10 @@
-use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_TARGET_TENANT};
+use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_TENANT};
+use crate::global_options::TENANT_OPTION;
 use crate::settings::Settings;
 use crate::{err, read_single_line, DshCliResult};
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use log::debug;
 use std::io::{stdin, IsTerminal};
-
-pub(crate) const TARGET_TENANTS_ALL_FLAG: &str = "target-tenants-all-flag";
-pub(crate) const TARGET_TENANTS_OPTION: &str = "target-tenants-option";
 
 /// # Get the target tenant
 ///
@@ -120,56 +118,6 @@ pub(crate) fn get_target_tenant_from_command_line_argument(matches: &ArgMatches)
   }
 }
 
-const TARGET_TENANT_OPTION: &str = "target-tenant-option";
-
-pub(crate) fn target_tenant_option() -> Arg {
-  Arg::new(TARGET_TENANT_OPTION)
-    .long("tenant")
-    .short('t')
-    .action(ArgAction::Append)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("TENANT")
-    .help("Provide target tenant")
-    .long_help(
-      "This option specifies the name of the target tenant, which specifies for which \
-          tenant a command will be executed. If this argument is not provided, \
-          the tenant should be specified via the environment variable DSH_CLI_TENANT, \
-          as a default setting in the settings file, or else the user will be prompted.",
-    )
-    .global(true)
-    .conflicts_with_all([TARGET_TENANTS_OPTION, TARGET_TENANTS_ALL_FLAG])
-}
-
-pub(crate) fn target_tenants_option() -> Arg {
-  Arg::new(TARGET_TENANTS_OPTION)
-    .long("tenants")
-    .action(ArgAction::Append)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("TENANTS")
-    .help("Provide list of target tenants")
-    .long_help(
-      "This option specifies a comma separated list of names of target tenants, without spaces. \
-      If this argument is provided, the selected command will be executed for all tenants in the list.",
-    )
-    .hide_short_help(true)
-    .global(true)
-    .conflicts_with_all([TARGET_TENANT_OPTION, TARGET_TENANTS_ALL_FLAG])
-}
-
-pub(crate) fn target_tenants_all_flag() -> Arg {
-  Arg::new(TARGET_TENANTS_ALL_FLAG)
-    .long("all-tenants")
-    .action(ArgAction::SetTrue)
-    .help("Use list of target tenants")
-    .long_help(
-      "If this option is specified, the selected command will be executed for all \
-      tenants that the user is authenticated for.",
-    )
-    .hide_short_help(true)
-    .global(true)
-    .conflicts_with_all([TARGET_TENANT_OPTION, TARGET_TENANTS_OPTION])
-}
-
 /// Create target tenant command line argument
 ///
 /// Creates a command line argument that allows commands to get the target tenant as an argument.
@@ -195,7 +143,7 @@ pub(crate) fn tenant_name_argument() -> Arg {
 /// * `Some(String)` - The tenant name when it is available as a command line option.
 /// * `None` - When no tenant name is available on the command line.
 fn get_target_tenant_from_command_line_option(matches: &ArgMatches) -> Option<String> {
-  match matches.get_one::<String>(TARGET_TENANT_OPTION) {
+  match matches.get_one::<String>(TENANT_OPTION) {
     Some(target_tenant) => {
       debug!("target tenant '{}' (from command line option '--tenant')", target_tenant);
       Some(target_tenant.clone())
@@ -216,9 +164,9 @@ fn get_target_tenant_from_command_line_option(matches: &ArgMatches) -> Option<St
 /// * `Ok(None)` - When the environment variable is not set.
 /// * `Err<DshCliError>` - When the environment variable could not be read.
 fn get_target_tenant_from_environment_variable(matches: &ArgMatches) -> DshCliResult<Option<String>> {
-  match environment_variable(ENV_VAR_DSH_CLI_TARGET_TENANT, Some(matches))? {
+  match environment_variable(ENV_VAR_DSH_CLI_TENANT, Some(matches))? {
     Some(target_tenant) => {
-      debug!("target tenant '{}' (from environment variable '{}')", target_tenant, ENV_VAR_DSH_CLI_TARGET_TENANT);
+      debug!("target tenant '{}' (from environment variable '{}')", target_tenant, ENV_VAR_DSH_CLI_TENANT);
       Ok(Some(target_tenant))
     }
     None => Ok(None),

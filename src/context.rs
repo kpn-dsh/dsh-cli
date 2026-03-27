@@ -9,7 +9,7 @@ use crate::environment_variables::{
 };
 use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
-use crate::global_arguments::{
+use crate::global_options::{
   AUTHENTICATION_OPTION, BROWSER_OPTION, DRY_RUN_FLAG, FORCE_FLAG, NO_CSV_HEADERS_FLAG, NO_ESCAPE_FLAG, OUTPUT_FORMAT_OPTION, QUIET_FLAG, SHOW_EXECUTION_TIME_FLAG,
   SUPPRESS_EXIT_STATUS_FLAG, TERMINAL_WIDTH_OPTION, VERBOSITY_OPTION,
 };

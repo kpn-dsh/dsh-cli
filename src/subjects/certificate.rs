@@ -613,11 +613,9 @@ pub(crate) fn format_distinguished_name(distinguished_name: &str) -> String {
     &distinguished_name
       .split(",")
       .map(|relative_distinguished_name| {
-        let attribute_value = relative_distinguished_name.split("=").map(|s| s.trim().to_string()).collect_vec();
-        (
-          attribute_value.first().cloned().unwrap_or_default().to_string(),
-          vec![attribute_value.get(1).cloned().unwrap_or_default().to_string()],
-        )
+        let attribute_values = relative_distinguished_name.split("=").map(|s| s.trim().to_string()).collect_vec();
+        let first_attribute = attribute_values.first().cloned().unwrap_or_default().to_string();
+        (first_attribute, vec![attribute_values.get(1).cloned().unwrap_or_default().to_string()])
       })
       .collect_vec(),
   )

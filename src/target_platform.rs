@@ -1,5 +1,6 @@
-use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_TARGET_PLATFORM};
+use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_PLATFORM};
 use crate::error::DshCliError;
+use crate::global_options::PLATFORM_OPTION;
 use crate::settings::Settings;
 use crate::{err, read_single_line, DshCliResult};
 use clap::builder::PossibleValue;
@@ -97,38 +98,6 @@ pub(crate) fn get_target_platform_explicit(matches: &ArgMatches) -> DshCliResult
   }
 }
 
-const TARGET_PLATFORM_OPTION: &str = "target-platform-option";
-
-/// Create target platform command line option
-///
-/// Creates a global option that provides the target platform option to all commands that need it.
-/// If a target platform is required, use the function [`get_target_platform`] to get the value.
-pub(crate) fn target_platform_option() -> Arg {
-  let possible_values = DshPlatform::all()
-    .iter()
-    .map(|platform| {
-      PossibleValue::new(platform.name())
-        .alias(platform.alias())
-        .help(format!("{} ({})", platform.description(), platform.alias()))
-    })
-    .collect_vec();
-  Arg::new(TARGET_PLATFORM_OPTION)
-    .long("platform")
-    .short('p')
-    .action(ArgAction::Append)
-    .value_parser(possible_values)
-    .value_name("PLATFORM")
-    .help("Provide target platform")
-    .long_help(
-      "This option specifies the name of the target platform, which specifies on which \
-          platform a command will be executed. If this argument is not provided, \
-          the platform can also be specified via the environment variable DSH_CLI_PLATFORM, \
-          as a default setting in the settings file, or else the user will be prompted. \
-          The value between parentheses can be used as an alias for the platform name.",
-    )
-    .global(true)
-}
-
 const PLATFORM_NAME_ARGUMENT: &str = "platform-name-argument";
 
 /// Create target platform command line argument
@@ -193,7 +162,7 @@ pub(crate) fn get_target_platform_from_command_line_argument(matches: &ArgMatche
 /// * `Ok(None)` - When no target platform is available on the command line.
 /// * `Err<DshCliError>` - When an invalid platform name was found.
 fn get_target_platform_from_command_line_option(matches: &ArgMatches) -> DshCliResult<Option<DshPlatform>> {
-  match matches.get_one::<String>(TARGET_PLATFORM_OPTION) {
+  match matches.get_one::<String>(PLATFORM_OPTION) {
     Some(target_platform_name) => match DshPlatform::from_str(target_platform_name) {
       Ok(target_platform) => {
         debug!("target platform '{}' (from command line option '--platform')", target_platform);
@@ -218,13 +187,10 @@ fn get_target_platform_from_command_line_option(matches: &ArgMatches) -> DshCliR
 /// * `Ok(None)` - When the environment variable is not set.
 /// * `Err<DshCliError>` - When an invalid platform name was specified.
 fn get_target_platform_from_environment_variable(matches: &ArgMatches) -> DshCliResult<Option<DshPlatform>> {
-  match environment_variable(ENV_VAR_DSH_CLI_TARGET_PLATFORM, Some(matches))? {
+  match environment_variable(ENV_VAR_DSH_CLI_PLATFORM, Some(matches))? {
     Some(target_platform_name) => match DshPlatform::from_str(&target_platform_name) {
       Ok(target_platform) => {
-        debug!(
-          "target platform '{}' (from environment variable '{}')",
-          target_platform, ENV_VAR_DSH_CLI_TARGET_PLATFORM
-        );
+        debug!("target platform '{}' (from environment variable '{}')", target_platform, ENV_VAR_DSH_CLI_PLATFORM);
         Ok(Some(target_platform))
       }
       Err(error) => Err(DshCliError::from(error)),
