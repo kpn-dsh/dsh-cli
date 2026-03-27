@@ -6,7 +6,7 @@ set -e
 # This script will run a large number of commands and print the output to the console.
 #
 # To run this test the following is expected:
-# * User is logged in via the single sign on authentication pattern at platform $DSH_CLI_PLATFORM
+# * User is logged in via the single-sign-on authentication method at platform $DSH_CLI_PLATFORM
 # * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM and has manage rights
 # * User is authenticated for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
 # *  Managed internal stream $INTERNAL_STREAM exists at platform $DSH_CLI_PLATFORM and is managed by $DSH_CLI_TENANT

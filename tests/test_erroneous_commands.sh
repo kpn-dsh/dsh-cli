@@ -5,7 +5,7 @@
 # This script will run a large number of erroneous commands and print the output to the console.
 #
 # To run this test the following is expected:
-# * User is logged in via the single sign on authentication pattern at platform $DSH_CLI_PLATFORM
+# * User is logged in via the single-sign-on authentication method at platform $DSH_CLI_PLATFORM
 # * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM
 # * User is authenticated for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
 
