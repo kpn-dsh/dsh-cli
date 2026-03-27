@@ -14,14 +14,14 @@ use crate::environment_variables::{
   ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
 };
 use crate::error::DshCliError;
-use crate::global_arguments::{
-  authentication_option, browser_option, environment_variable_option, no_csv_headers_flag, robot_password_file_option, robot_platform_option, robot_tenant_option,
+use crate::global_options::{
+  authentication_option, browser_option, environment_variable_option, log_level_api_option, log_level_option, no_csv_headers_flag, password_file_option, platform_option,
+  tenant_option, tenants_all_flag, tenants_option, TENANTS_ALL_FLAG,
 };
 use crate::releases::{newer_release, newer_release_notification};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
-use crate::target_platform::{get_target_platform, get_target_platform_from_all_sources, platform_name_argument, target_platform_option};
-use crate::target_tenant::{target_tenant_option, target_tenants_all_flag, target_tenants_option, TARGET_TENANTS_ALL_FLAG};
+use crate::target_platform::{get_target_platform, get_target_platform_from_all_sources, platform_name_argument};
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
@@ -31,14 +31,12 @@ use context::Context;
 use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
-use global_arguments::{
+use global_options::{
   dry_run_flag, force_flag, no_escape_flag, output_format_option, quiet_flag, set_verbosity_option, show_execution_time_flag, suppress_exit_status_flag, terminal_width_option,
   version_flag, VERSION_FLAG,
 };
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use log::{debug, error, trace};
-use log_arguments::{log_level_api_option, log_level_option};
 use log_level::initialize_logger;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
@@ -52,6 +50,7 @@ use std::io::{stdin, stdout, Write};
 use std::path::Path;
 use std::process::{ExitCode, Termination};
 use std::str::FromStr;
+use std::sync::LazyLock;
 use std::{fs, process};
 use subject::Subject;
 use subjects::api::API_SUBJECT;
@@ -64,7 +63,6 @@ use subjects::manifest::MANIFEST_SUBJECT;
 use subjects::metric::METRIC_SUBJECT;
 use subjects::platform::PLATFORM_SUBJECT;
 use subjects::proxy::PROXY_SUBJECT;
-#[cfg(feature = "robot")]
 use subjects::robot::ROBOT_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
 use subjects::service::SERVICE_SUBJECT;
@@ -84,7 +82,7 @@ mod authentication;
 mod autocomplete;
 mod capability;
 mod capability_builder;
-mod certificates;
+// TODO mod certificates;
 mod cipher;
 mod clients;
 mod context;
@@ -94,12 +92,11 @@ mod error;
 mod filter_flags;
 mod flags;
 mod formatters;
-mod global_arguments;
+mod global_options;
 mod issues;
 mod keyring;
 #[cfg(feature = "manage")]
 mod limits_options;
-mod log_arguments;
 mod log_level;
 mod modifier_flags;
 mod releases;
@@ -113,13 +110,13 @@ mod target_platform;
 mod target_tenant;
 mod verbosity;
 
-lazy_static! {
-  static ref STYLES: Styles = Styles::styled()
+static STYLES: LazyLock<Styles> = LazyLock::new(|| {
+  Styles::styled()
     .header(AnsiColor::Green.on_default() | styling::Effects::BOLD)
     .usage(AnsiColor::Green.on_default() | styling::Effects::BOLD)
     .literal(AnsiColor::Blue.on_default() | styling::Effects::BOLD)
-    .placeholder(AnsiColor::Cyan.on_default());
-}
+    .placeholder(AnsiColor::Cyan.on_default())
+});
 
 const APPLICATION_NAME: &str = "dsh";
 
@@ -138,9 +135,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-lazy_static! {
-  static ref VERSION: Version = Version::from_str("0.10.0").unwrap();
-}
+static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.0").unwrap());
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
 const OUTPUT_OPTIONS_HEADING: &str = "Output options";
@@ -255,7 +250,6 @@ async fn inner_main() -> DshCliExit {
     NODE_POOL_SUBJECT.as_ref(),
     PLATFORM_SUBJECT.as_ref(),
     PROXY_SUBJECT.as_ref(),
-    #[cfg(feature = "robot")]
     ROBOT_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     SERVICE_SUBJECT.as_ref(),
@@ -402,7 +396,7 @@ async fn inner_main() -> DshCliExit {
             Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
           };
           for client in &clients {
-            if matches.get_flag(TARGET_TENANTS_ALL_FLAG) {
+            if matches.get_flag(TENANTS_ALL_FLAG) {
               context.print(format!("# {}", client.tenant()))
             }
             match subject.execute_subject_command_with_client(sub_matches, client, &context).await {
@@ -432,7 +426,7 @@ async fn inner_main() -> DshCliExit {
               Err(error) => return DshCliExit::CliErrContext(error, Box::new(context)),
             };
             for client in &clients {
-              if matches.get_flag(TARGET_TENANTS_ALL_FLAG) {
+              if matches.get_flag(TENANTS_ALL_FLAG) {
                 context.print(format!("# {}", client.tenant()))
               }
               match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
@@ -461,9 +455,9 @@ async fn inner_main() -> DshCliExit {
 
 fn login_command() -> Command {
   Command::new("login")
-    .about("Login via single sign on")
+    .about("Login via single-sign-on")
     .long_about(
-      "Login via single sign on. You will be directed to the login page for the currently \
+      "Login via single-sign-on. You will be directed to the login page for the currently \
         selected platform where you must sign in using your credentials (using two-factor \
         authentication). The platform is either the configured platform, or can be specified \
         via the '--platform' argument.",
@@ -473,9 +467,9 @@ fn login_command() -> Command {
 
 fn logout_command() -> Command {
   Command::new("logout")
-    .about("Logout from single sign on")
+    .about("Logout from single-sign-on")
     .long_about(
-      "Logout from single sign on. You will be directed to the logout page for the currently \
+      "Logout from single-sign-on. You will be directed to the logout page for the currently \
         selected platform where you must confirm.",
     )
     .arg(platform_name_argument())
@@ -499,10 +493,10 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       dry_run_flag(),
       environment_variable_option(),
       force_flag(),
-      target_platform_option(),
-      target_tenant_option(),
-      target_tenants_all_flag(),
-      target_tenants_option(),
+      platform_option(),
+      tenant_option(),
+      tenants_all_flag(),
+      tenants_option(),
       // Output options
       no_csv_headers_flag(),
       no_escape_flag(),
@@ -518,9 +512,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       generate_autocomplete_file_argument(),
       log_level_option(),
       log_level_api_option(),
-      robot_password_file_option(),
-      robot_platform_option(),
-      robot_tenant_option(),
+      password_file_option(),
       suppress_exit_status_flag(),
       version_flag(),
     ])
@@ -567,8 +559,8 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
           })
         })
         .collect_vec();
-      let authentications = to_help_items("Authentications:", access_tokens);
-      after_help.push(authentications);
+      let authorizations = to_help_items("Authorizations:", access_tokens);
+      after_help.push(authorizations);
     }
   }
   command = command.after_help(after_help.join("\n\n"));

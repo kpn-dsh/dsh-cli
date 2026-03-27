@@ -1,3 +1,4 @@
+use crate::authentication::AuthenticationMethod;
 #[cfg(feature = "robot")]
 use crate::capability::UPDATE_COMMAND;
 use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
@@ -11,11 +12,12 @@ use crate::keyring::{get_secret_from_keyring, get_secrets_from_keyring, remove_s
 use crate::subject::{Requirements, Subject};
 use crate::target_platform::{get_target_platform_from_command_line_argument, platform_name_argument};
 use crate::target_tenant::{get_target_tenant_from_command_line_argument, tenant_name_argument};
-use crate::DshCliResult;
+use crate::{err, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::ArgMatches;
-use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::secret::ROBOT_SECRET;
 use itertools::Itertools;
@@ -63,9 +65,21 @@ impl Subject for RobotSubject {
 
 static ROBOT_COPY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(COPY_COMMAND, None, &RobotCopy {}, "Copy robot secret to clipboard")
+    CapabilityBuilder::new(COPY_COMMAND, None, &RobotCopy {}, "Copy robot secret from local keyring to clipboard")
       .add_target_argument(platform_name_argument().required(true))
       .add_target_argument(tenant_name_argument().required(true)),
+  )
+});
+
+static ROBOT_IMPORT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
+    CapabilityBuilder::new(IMPORT_COMMAND, None, &RobotImport {}, "Import the robot secret from the platform secret store")
+      .add_target_argument(platform_name_argument().required(true))
+      .add_target_argument(tenant_name_argument().required(true))
+      .set_long_about(
+        "Import the robot secret from the DSH platform secret store into your local keyring. This \
+       command is only available with the single-sign-on authentication method.",
+      ),
   )
 });
 
@@ -74,21 +88,13 @@ static ROBOT_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = La
     LIST_COMMAND,
     Some(LIST_COMMAND_ALIAS),
     &RobotList {},
-    "List stored robot secrets",
+    "List robot secrets in your local keyring",
   ))
-});
-
-static ROBOT_IMPORT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(IMPORT_COMMAND, None, &RobotImport {}, "Import the robot secret from the platform secret store")
-      .add_target_argument(platform_name_argument().required(true))
-      .add_target_argument(tenant_name_argument().required(true)),
-  )
 });
 
 static ROBOT_SET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(SET_COMMAND, None, &RobotSet {}, "Store robot secret to keyring")
+    CapabilityBuilder::new(SET_COMMAND, None, &RobotSet {}, "Store a robot secret into local keyring")
       .add_target_argument(platform_name_argument().required(true))
       .add_target_argument(tenant_name_argument().required(true)),
   )
@@ -96,7 +102,7 @@ static ROBOT_SET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = Laz
 
 static ROBOT_UNSET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(UNSET_COMMAND, None, &RobotUnset {}, "Remove robot secret from keyring")
+    CapabilityBuilder::new(UNSET_COMMAND, None, &RobotUnset {}, "Remove robot secret from local keyring")
       .add_target_argument(platform_name_argument().required(true))
       .add_target_argument(tenant_name_argument().required(true)),
   )
@@ -108,7 +114,12 @@ static ROBOT_UPDATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = 
     CapabilityBuilder::new(UPDATE_COMMAND, None, &RobotUpdate {}, "Request a new robot secret")
       .add_target_argument(platform_name_argument().required(true))
       .add_target_argument(tenant_name_argument().required(true))
-      .set_long_about("Triggers the generation of a new robot secret for the tenant’s robot account. This automatically invalidates the existing client secret. The new secret will be stored in DSH secret store and in your local keyring.")
+      .set_long_about(
+        "Triggers the generation of a new robot secret for the tenant’s robot account. \
+         This automatically invalidates the existing client secret. The new secret will be stored \
+         in DSH secret store and in your local keyring. This command is only available with the \
+         robot authentication method and thus requires the original robot password.",
+      ),
   )
 });
 
@@ -159,35 +170,40 @@ struct RobotImport {}
 
 #[async_trait]
 impl CommandExecutor for RobotImport {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
-    let start_instant = context.now();
-    let robot_secret = client.get_secret(ROBOT_SECRET).await?;
-    context.print_execution_time(start_instant);
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     if context.stdin_is_terminal() {
-      context.print_explanation(format!("copy robot secret for '{}@{}' from platform secret store to keyring", platform, tenant));
-      if get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)?.is_some()
-        && !context.confirmed(format!("overwrite existing robot secret for '{}@{}' in keyring?", platform, tenant))?
-      {
-        context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored to keyring", platform, tenant));
-        return Ok(());
-      }
-      if context.dry_run() {
-        context.print_warning("dry-run mode, secret not stored in keyring");
-      } else {
-        match upsert_secret_to_keyring(&platform, &tenant, ROBOT_SECRET, &robot_secret) {
-          Ok(_) => context.print_outcome("robot secret stored in keyring"),
-          Err(_) => context.print_error("robot secret could not be stored in keyring"),
+      let (platform, tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
+      match create_client_access_token_from_platform_tenant(&platform, &tenant, context).await? {
+        Some(client) => {
+          let start_instant = context.now();
+          let robot_secret = client.get_secret(ROBOT_SECRET).await?;
+          context.print_execution_time(start_instant);
+          context.print_explanation(format!("copy robot secret for '{}@{}' from platform secret store to keyring", platform, tenant));
+          if get_secret_from_keyring(&platform, &tenant, ROBOT_SECRET)?.is_some()
+            && !context.confirmed(format!("overwrite existing robot secret for '{}@{}' in keyring?", platform, tenant))?
+          {
+            context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored to keyring", platform, tenant));
+            return Ok(());
+          }
+          if context.dry_run() {
+            context.print_warning("dry-run mode, secret not stored in keyring");
+          } else {
+            match upsert_secret_to_keyring(&platform, &tenant, ROBOT_SECRET, &robot_secret) {
+              Ok(_) => context.print_outcome("robot secret stored in keyring"),
+              Err(_) => context.print_error("robot secret could not be stored in keyring"),
+            }
+          }
+          Ok(())
         }
+        None => Ok(()),
       }
     } else {
-      context.print_warning("command is only available in interactive mode");
+      err!("command is only available in interactive mode")
     }
-    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
+    Requirements::new(false, Some(AuthenticationMethod::SingleSignOn), false)
   }
 }
 
@@ -219,9 +235,9 @@ struct RobotSet {}
 #[async_trait]
 impl CommandExecutor for RobotSet {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
-    context.print_explanation(format!("store robot secret for '{}@{}' in keyring", platform, tenant));
     if context.stdin_is_terminal() {
+      let (platform, tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
+      context.print_explanation(format!("store robot secret for '{}@{}' in keyring", platform, tenant));
       let robot_secret = context.read_single_line_password("enter robot secret")?;
       if context.dry_run() {
         context.print_warning("dry-run mode, secret not stored to keyring");
@@ -247,9 +263,9 @@ struct RobotUnset {}
 #[async_trait]
 impl CommandExecutor for RobotUnset {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (platform, tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
-    context.print_explanation(format!("remove robot secret for '{}@{}' from keyring", platform, tenant));
     if context.stdin_is_terminal() {
+      let (platform, tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
+      context.print_explanation(format!("remove robot secret for '{}@{}' from keyring", platform, tenant));
       if context.confirmed(format!("remove robot secret for '{}@{}'?", platform, tenant))? {
         if context.dry_run() {
           context.print_warning("dry-run mode, secret not removed from keyring");
@@ -280,37 +296,38 @@ struct RobotUpdate {}
 #[async_trait]
 impl CommandExecutor for RobotUpdate {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let (robot_platform, robot_tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
-    context.print_explanation(format!("renew the robot secret for '{}@{}'", robot_platform, robot_tenant));
-    context.print_warning("this will automatically invalidate the existing robot secret");
-    if context.confirmed(format!("renew robot secret for '{}@{}'?", robot_platform, robot_tenant))? {
-      if context.dry_run() {
-        context.print_warning("dry-run mode, robot secret not renewed");
-      } else {
-        match create_client_access_token_from_platform_tenant(&robot_platform, &robot_tenant, context).await? {
-          Some(client) => {
-            let new_robot_secret = client.post_robot_generate_secret().await?;
-            context.print_outcome(format!("robot secret for '{}@{}' renewed", robot_platform, robot_tenant));
-            if context.confirmed(format!("store new robot secret for '{}@{}' in keyring?", robot_platform, robot_tenant))? {
-              upsert_secret_to_keyring(&robot_platform, &robot_tenant, ROBOT_SECRET, &new_robot_secret.value)?;
-              context.print_outcome(format!("robot secret for '{}@{}' stored in keyring", robot_platform, robot_tenant));
-            } else {
-              context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored in keyring", robot_platform, robot_tenant));
-            }
-          }
-          None => {
-            context.print_warning(format!("please log in to platform '{}' using the 'dsh login' command", robot_platform));
+    if context.stdin_is_terminal() {
+      let (robot_platform, robot_tenant) = get_target_platform_and_tenant_from_command_line_arguments(matches)?;
+      context.print_explanation(format!("renew the robot secret for '{}@{}'", robot_platform, robot_tenant));
+      context.print_warning("this will automatically invalidate the existing robot secret");
+      if context.confirmed(format!("renew robot secret for '{}@{}'?", robot_platform, robot_tenant))? {
+        let robot_secret = context.read_single_line_password("enter the current robot secret")?;
+        if context.dry_run() {
+          context.print_warning("dry-run mode, robot secret not renewed");
+        } else {
+          let dsh_api_tenant = DshApiTenant::new(robot_tenant.clone(), robot_platform.clone());
+          let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_secret);
+          let client = dsh_api_client_factory.client().await?;
+          let new_robot_secret = client.post_robot_generate_secret().await?;
+          context.print_outcome(format!("robot secret for '{}@{}' renewed", robot_platform, robot_tenant));
+          if context.confirmed(format!("store new robot secret for '{}@{}' in keyring?", robot_platform, robot_tenant))? {
+            upsert_secret_to_keyring(&robot_platform, &robot_tenant, ROBOT_SECRET, &new_robot_secret.value)?;
+            context.print_outcome(format!("robot secret for '{}@{}' stored in keyring", robot_platform, robot_tenant));
+          } else {
+            context.print_outcome(format!("cancelled, robot secret for '{}@{}' not stored in keyring", robot_platform, robot_tenant));
           }
         }
+      } else {
+        context.print_outcome(format!("cancelled, robot secret for '{}@{}' not renewed", robot_platform, robot_tenant));
       }
+      Ok(())
     } else {
-      context.print_outcome(format!("cancelled, robot secret for '{}@{}' not renewed", robot_platform, robot_tenant));
+      err!("command is only available in interactive mode")
     }
-    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api()
+    Requirements::new(false, Some(AuthenticationMethod::Robot), false)
   }
 }
 

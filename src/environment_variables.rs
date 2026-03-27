@@ -4,7 +4,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
-use crate::global_arguments::ENVIRONMENT_VARIABLE_OPTION;
+use crate::global_options::ENVIRONMENT_VARIABLE_OPTION;
 use crate::{err, DshCliResult, TOOL_OPTIONS_HEADING};
 use clap::builder::ValueParser;
 use clap::{builder, Arg, ArgAction, ArgMatches};
@@ -456,11 +456,10 @@ pub(crate) const ENV_VAR_DSH_CLI_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE"
 pub(crate) const ENV_VAR_DSH_CLI_NO_CSV_HEADERS: &str = "DSH_CLI_NO_CSV_HEADERS";
 pub(crate) const ENV_VAR_DSH_CLI_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
 pub(crate) const ENV_VAR_DSH_CLI_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
+pub(crate) const ENV_VAR_DSH_CLI_PASSWORD: &str = "DSH_CLI_PASSWORD";
+pub(crate) const ENV_VAR_DSH_CLI_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
+pub(crate) const ENV_VAR_DSH_CLI_PLATFORM: &str = "DSH_CLI_PLATFORM";
 pub(crate) const ENV_VAR_DSH_CLI_QUIET: &str = "DSH_CLI_QUIET";
-pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PASSWORD: &str = "DSH_CLI_ROBOT_PASSWORD";
-pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PASSWORD_FILE: &str = "DSH_CLI_ROBOT_PASSWORD_FILE";
-pub(crate) const ENV_VAR_DSH_CLI_ROBOT_PLATFORM: &str = "DSH_CLI_ROBOT_PLATFORM";
-pub(crate) const ENV_VAR_DSH_CLI_ROBOT_TENANT: &str = "DSH_CLI_ROBOT_TENANT";
 pub(crate) const ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME: &str = "DSH_CLI_SHOW_EXECUTION_TIME";
 pub(crate) const ENV_VAR_DSH_CLI_STDERR_COLOR: &str = "DSH_CLI_STDERR_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_STDERR_STYLE: &str = "DSH_CLI_STDERR_STYLE";
@@ -468,9 +467,8 @@ pub(crate) const ENV_VAR_DSH_CLI_STDOUT_COLOR: &str = "DSH_CLI_STDOUT_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_STDOUT_STYLE: &str = "DSH_CLI_STDOUT_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS: &str = "DSH_CLI_SUPPRESS_EXIT_STATUS";
 pub(crate) const ENV_VAR_DSH_CLI_TARGET_COLOR: &str = "DSH_CLI_TARGET_COLOR";
-pub(crate) const ENV_VAR_DSH_CLI_TARGET_PLATFORM: &str = "DSH_CLI_PLATFORM";
 pub(crate) const ENV_VAR_DSH_CLI_TARGET_STYLE: &str = "DSH_CLI_TARGET_STYLE";
-pub(crate) const ENV_VAR_DSH_CLI_TARGET_TENANT: &str = "DSH_CLI_TENANT";
+pub(crate) const ENV_VAR_DSH_CLI_TENANT: &str = "DSH_CLI_TENANT";
 pub(crate) const ENV_VAR_DSH_CLI_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
 pub(crate) const ENV_VAR_DSH_CLI_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
 pub(crate) const ENV_VAR_DSH_CLI_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
@@ -479,7 +477,7 @@ pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
 
 lazy_static! {
-  static ref EnvironmentVariables: [EnvironmentVariable; 42] = [
+  static ref EnvironmentVariables: [EnvironmentVariable; 40] = [
     EnvironmentVariable::new(
       ENV_VAR_DSH_API_PLATFORMS_FILE,
       "Overrides the default list of available platforms.",
@@ -724,6 +722,41 @@ lazy_static! {
       overridden via the --output-format command line argument.",
     ),
     EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_PASSWORD,
+      "Specifies the robot password for the robot authentication method.",
+      true,
+      false,
+      None,
+      "This environment variable specifies the robot password for the robot authentication \n\
+      method. Note that when the environment variable 'DSH_CLI_PASSWORD_FILE' or the argument \n\
+      --password-file command line argument is provided, this environment variable will \n\
+      not be used. For better security, consider using one of these two options instead of \n\
+      defining 'DSH_CLI_PASSWORD'. This environment variable cannot be overridden via the \n\
+      --environment-variable command line argument.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_PASSWORD_FILE,
+      "Specifies the location of a file containing the robot password for the robot authentication method.",
+      false,
+      true,
+      None,
+      "This environment variable specifies a file containing the robot password for the robot \n\
+      authentication method. Note that when the --robot-password-file command line argument is \n\
+      provided, this environment variable will not be used.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_PLATFORM,
+      "Specifies the platform on which the target tenant environments live.",
+      false,
+      true,
+      None,
+      "Target platform for which commands/capabilities will be executed. The supported \n\
+       platforms are: 'np-aws-lz-dsh' / 'nplz', 'poc-aws-dsh' / 'poc', 'prod-aws-dsh' / 'prod', \n\
+      'prod-aws-lz-dsh' / 'prodlz', 'prod-aws-lz-laas' / 'prodls' or 'prod-azure-dsh' / \n\
+      'prodaz'. This environment variable can be overridden via the --platform command line \n\
+      argument.",
+    ),
+    EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_QUIET,
       "Enables quiet mode, which means that no output will be produced to the terminal.",
       false,
@@ -732,50 +765,6 @@ lazy_static! {
       "When this environment variable is set (to any value) the dsh tool will run in quiet mode, \n\
       meaning that no output will be produced to the terminal (stdout and stderr). This \n\
       environment variable can be overridden via the --quiet command line argument.",
-    ),
-    EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_ROBOT_PASSWORD,
-      "Specifies the robot password for the robot access pattern.",
-      true,
-      false,
-      None,
-      "This environment variable specifies the robot password for the robot access pattern. \n\
-      Note that when the environment variable 'DSH_CLI_ROBOT_PASSWORD_FILE' or the argument \n\
-      --robot-password-file command line argument is provided, this environment variable will \n\
-      not be used. For better security, consider using one of these two options instead of \n\
-      defining 'DSH_CLI_ROBOT_PASSWORD'. This environment variable cannot be overridden via the \n\
-      --environment-variable command line argument.",
-    ),
-    EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_ROBOT_PASSWORD_FILE,
-      "Specifies the location of a file containing the robot password for the robot access pattern.",
-      false,
-      true,
-      None,
-      "This environment variable specifies a file containing the robot password for the robot \n\
-      access pattern. Note that when the --robot-password-file command line argument is \n\
-      provided, this environment variable will not be used.",
-    ),
-    EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_ROBOT_PLATFORM,
-      "Specifies the robot platform on which the target tenant environments live.",
-      false,
-      true,
-      None,
-      "Robot platform used when authenticating via the robot access pattern. The supported \n\
-       platforms are: 'np-aws-lz-dsh' / 'nplz', 'poc-aws-dsh' / 'poc', 'prod-aws-dsh' / 'prod', \n\
-      'prod-aws-lz-dsh' / 'prodlz', 'prod-aws-lz-laas' / 'prodls' or 'prod-azure-dsh' / 'prodaz'. \n\
-      This environment variable can be overridden via the --robot-platform command line argument.",
-    ),
-    EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_ROBOT_TENANT,
-      "Specifies the robot tenant name.",
-      false,
-      true,
-      None,
-      "Tenant name for the robot tenant. The robot tenant is used to authenticate via the \n\
-       robot access pattern. This environment variable can be overridden via the --robot-tenant \n\
-      command line argument.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME,
@@ -866,25 +855,13 @@ lazy_static! {
       'DSH_CLI_ERROR_STYLE' for the supported styles.",
     ),
     EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_TARGET_PLATFORM,
-      "Specifies the target platform on which the target tenant environments live.",
+      ENV_VAR_DSH_CLI_TENANT,
+      "Specifies the robot tenant name.",
       false,
       true,
       None,
-      "Target platform on which the tenants environment lives. The supported platforms are: \n\
-      'np-aws-lz-dsh' / 'nplz', 'poc-aws-dsh' / 'poc', 'prod-aws-dsh' / 'prod', \n\
-      'prod-aws-lz-dsh' / 'prodlz', 'prod-aws-lz-laas' / 'prodls' or 'prod-azure-dsh' / 'prodaz'. \n\
-      This environment variable can be overridden via the --platform command line argument.",
-    ),
-    EnvironmentVariable::new(
-      ENV_VAR_DSH_CLI_TARGET_TENANT,
-      "Specifies the target tenant name.",
-      false,
-      true,
-      None,
-      "Tenant name for the target tenant. The target tenant is the tenant whose resources will \n\
-      be managed via the api. This environment variable can be overridden via the --tenant \n\
-      command line argument.",
+      "Target tenant for which commands/capabilities will be executed. This environment variable \n\
+      can be overridden via the --tenant command line argument.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_TERMINAL_WIDTH,

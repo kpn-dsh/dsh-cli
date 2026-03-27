@@ -1,6 +1,7 @@
 use crate::authentication::AuthenticationMethod;
 use crate::context::BrowserMethod;
 use crate::formatters::OutputFormat;
+use crate::log_level::LogLevel;
 use crate::verbosity::Verbosity;
 use crate::{OUTPUT_OPTIONS_HEADING, TOOL_OPTIONS_HEADING};
 use builder::EnumValueParser;
@@ -15,15 +16,19 @@ pub(crate) const DRY_RUN_FLAG: &str = "dry-run-flag";
 pub(crate) const ENVIRONMENT_VARIABLE_OPTION: &str = "environment-variable-option";
 pub(crate) const FORCE_FLAG: &str = "force-flag";
 // pub(crate) const FROM_CLIPBOARD_FLAG: &str = "from-clipboard-flag";
+pub(crate) const LOG_LEVEL_API_OPTION: &str = "log-level-api-argument";
+pub(crate) const LOG_LEVEL_OPTION: &str = "log-level-argument";
 pub(crate) const NO_CSV_HEADERS_FLAG: &str = "no-csv-headers-flag";
 pub(crate) const NO_ESCAPE_FLAG: &str = "no-escape-flag";
 pub(crate) const OUTPUT_FORMAT_OPTION: &str = "output-format-option";
+pub(crate) const PASSWORD_FILE_OPTION: &str = "password-file-option";
+pub(crate) const PLATFORM_OPTION: &str = "platform-option";
 pub(crate) const QUIET_FLAG: &str = "quiet-flag";
-pub(crate) const ROBOT_PASSWORD_FILE_OPTION: &str = "robot-password-file-option";
-pub(crate) const ROBOT_PLATFORM_OPTION: &str = "robot-platform-option";
-pub(crate) const ROBOT_TENANT_OPTION: &str = "robot-tenant-option";
 pub(crate) const SHOW_EXECUTION_TIME_FLAG: &str = "show-execution-time-flag";
 pub(crate) const SUPPRESS_EXIT_STATUS_FLAG: &str = "suppress-exit-status-flag";
+pub(crate) const TENANT_OPTION: &str = "tenant-option";
+pub(crate) const TENANTS_ALL_FLAG: &str = "tenants-all-flag";
+pub(crate) const TENANTS_OPTION: &str = "tenants-option";
 pub(crate) const TERMINAL_WIDTH_OPTION: &str = "terminal-width-option";
 // pub(crate) const TO_CLIPBOARD_FLAG: &str = "to-clipboard-flag";
 pub(crate) const VERBOSITY_OPTION: &str = "set-verbosity-option";
@@ -41,7 +46,7 @@ pub(crate) fn authentication_option() -> Arg {
           to access the resource management api. If this argument is not provided, the value \
           from the environment variable 'DSH_CLI_AUTHENTICATION' or the value from the \
           settings file will be used. By default, when stdout is a terminal 'single-sign-on' \
-          (single sign on) will be used, while if stdout is not a terminal 'robot' will be used.",
+          will be used, while if stdout is not a terminal 'robot' will be used.",
     )
     .hide_short_help(true)
     .global(true)
@@ -127,21 +132,35 @@ pub(crate) fn force_flag() -> Arg {
 //     .help_heading(MAIN_OPTIONS_HEADING)
 // }
 
-pub(crate) fn no_escape_flag() -> Arg {
-  Arg::new(NO_ESCAPE_FLAG)
-    .long("no-color")
-    .alias("no-ansi")
-    .action(ArgAction::SetTrue)
+pub(crate) fn log_level_api_option() -> Arg {
+  Arg::new(LOG_LEVEL_API_OPTION)
+    .long("log-level-api")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<LogLevel>::new())
+    .value_name("LEVEL")
     .long_help(
-      "When this flag is provided the output will not contain \
-          any color or other ansi escape sequences. \
-          If this argument is not provided, the environment variable \
-          DSH_CLI_NO_ESCAPE or the value from the settings file will be used. \
-          The default behavior is to use ansi escape styling where applicable.",
+      "If this option is provided, it will set the log level for the 'dsh_api' crate. \
+      The default log level is 'error'. See option --log-level for the possible values.",
+    )
+    .hide_short_help(true)
+    .hide_possible_values(true)
+    .global(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
+}
+
+pub(crate) fn log_level_option() -> Arg {
+  Arg::new(LOG_LEVEL_OPTION)
+    .long("log-level")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<LogLevel>::new())
+    .value_name("LEVEL")
+    .long_help(
+      "If this option is provided, it will set the dsh tool's log level. \
+      The default log level is 'error'.",
     )
     .hide_short_help(true)
     .global(true)
-    .help_heading(OUTPUT_OPTIONS_HEADING)
+    .help_heading(TOOL_OPTIONS_HEADING)
 }
 
 pub(crate) fn no_csv_headers_flag() -> Arg {
@@ -153,6 +172,23 @@ pub(crate) fn no_csv_headers_flag() -> Arg {
           If this argument is not provided, the environment variable \
           DSH_CLI_NO_CSV_HEADERS or the value from the settings file will be used. \
           The default behavior is to use headers where applicable.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
+}
+
+pub(crate) fn no_escape_flag() -> Arg {
+  Arg::new(NO_ESCAPE_FLAG)
+    .long("no-color")
+    .alias("no-ansi")
+    .action(ArgAction::SetTrue)
+    .long_help(
+      "When this flag is provided the output will not contain \
+          any color or other ansi escape sequences. \
+          If this argument is not provided, the environment variable \
+          DSH_CLI_NO_ESCAPE or the value from the settings file will be used. \
+          The default behavior is to use ansi escape styling where applicable.",
     )
     .hide_short_help(true)
     .global(true)
@@ -178,17 +214,17 @@ pub(crate) fn output_format_option() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-pub(crate) fn robot_password_file_option() -> Arg {
-  Arg::new(ROBOT_PASSWORD_FILE_OPTION)
-    .long("robot-password-file")
+pub(crate) fn password_file_option() -> Arg {
+  Arg::new(PASSWORD_FILE_OPTION)
+    .long("password-file")
     .action(ArgAction::Set)
     .value_parser(ValueParser::path_buf())
     .value_name("FILE")
     .help("Provide robot password file name")
     .long_help(
       "This option specifies the name of a file that contains the robot password, which can \
-          be used when authenticating via the robot access pattern. \
-          If this flag is not provided, the environment variable DSH_CLI_ROBOT_PASSWORD_FILE \
+          be used when authenticating via the robot authentication method. \
+          If this flag is not provided, the environment variable DSH_CLI_PASSWORD_FILE \
           will be tried. Else, the user will be prompted for the password.",
     )
     .hide_short_help(true)
@@ -196,7 +232,11 @@ pub(crate) fn robot_password_file_option() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
-pub(crate) fn robot_platform_option() -> Arg {
+/// Create target platform command line option
+///
+/// Creates a global option that provides the target platform option to all commands that need it.
+/// If a target platform is required, use the function [`get_target_platform`] to get the value.
+pub(crate) fn platform_option() -> Arg {
   let possible_values = DshPlatform::all()
     .iter()
     .map(|platform| {
@@ -205,35 +245,19 @@ pub(crate) fn robot_platform_option() -> Arg {
         .help(format!("{} ({})", platform.description(), platform.alias()))
     })
     .collect_vec();
-  Arg::new(ROBOT_PLATFORM_OPTION)
-    .long("robot-platform")
+  Arg::new(PLATFORM_OPTION)
+    .long("platform")
+    .short('p')
     .action(ArgAction::Set)
     .value_parser(possible_values)
     .value_name("PLATFORM")
-    .help("Provide robot platform")
+    .help("Provide target/robot platform")
     .long_help(
-      "This option specifies the name of the robot platform which is required when \
-          authenticating via the robot access pattern. If this argument is not provided, \
-          the robot platform can also be specified via the environment variable \
-          DSH_CLI_ROBOT_PLATFORM, or else the user will be prompted.",
-    )
-    .hide_short_help(true)
-    .global(true)
-    .help_heading(TOOL_OPTIONS_HEADING)
-}
-
-pub(crate) fn robot_tenant_option() -> Arg {
-  Arg::new(ROBOT_TENANT_OPTION)
-    .long("robot-tenant")
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("TENANT")
-    .help("Provide robot tenant")
-    .long_help(
-      "This option specifies the name of the robot tenant which is required when \
-          authenticating via the robot access pattern. If this argument is not provided, \
-          the tenant should be specified via the environment variable DSH_CLI_ROBOT_TENANT, \
-          or else the user will be prompted.",
+      "This option specifies the name of the target/robot platform, which specifies on \
+                which platform a command will be executed. If this argument is not provided, \
+                the platform can also be specified via the environment variable DSH_CLI_PLATFORM, \
+                as a default setting in the settings file, or else the user will be prompted. \
+                The value between parentheses can be used as an alias for the platform name.",
     )
     .hide_short_help(true)
     .global(true)
@@ -249,23 +273,6 @@ pub(crate) fn quiet_flag() -> Arg {
     .long_help(
       "When this flag is provided the dsh tool will run in quiet mode, \
           meaning that no output will be produced to the terminal (stdout and stderr).",
-    )
-    .global(true)
-    .help_heading(OUTPUT_OPTIONS_HEADING)
-}
-
-pub(crate) fn set_verbosity_option() -> Arg {
-  Arg::new(VERBOSITY_OPTION)
-    .long("verbosity")
-    .short('v')
-    .action(ArgAction::Set)
-    .value_parser(EnumValueParser::<Verbosity>::new())
-    .value_name("VERBOSITY")
-    .help("Set verbosity level")
-    .long_help(
-      "If this option is provided, \
-    it will set the verbosity level. \
-    The default verbosity setting is 'low'.",
     )
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
@@ -297,6 +304,55 @@ pub(crate) fn suppress_exit_status_flag() -> Arg {
     .help_heading(TOOL_OPTIONS_HEADING)
 }
 
+pub(crate) fn tenant_option() -> Arg {
+  Arg::new(TENANT_OPTION)
+    .long("tenant")
+    .short('t')
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("TENANT")
+    .help("Provide target/robot tenant")
+    .long_help(
+      "This option specifies the name of the target/robot tenant, which specifies for \
+                which tenant a command will be executed. If this argument is not provided, \
+                the tenant should be specified via the environment variable DSH_CLI_TENANT, \
+                as a default setting in the settings file, or else the user will be prompted.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
+}
+
+pub(crate) fn tenants_option() -> Arg {
+  Arg::new(TENANTS_OPTION)
+    .long("tenants")
+    .action(ArgAction::Append)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("TENANTS")
+    .help("Provide list of target tenants")
+    .long_help(
+      "This option specifies a comma separated list of names of target tenants, without spaces. \
+      If this argument is provided, the selected command will be executed for all tenants in the list.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .conflicts_with_all([TENANT_OPTION, TENANTS_ALL_FLAG])
+}
+
+pub(crate) fn tenants_all_flag() -> Arg {
+  Arg::new(TENANTS_ALL_FLAG)
+    .long("all-tenants")
+    .action(ArgAction::SetTrue)
+    .help("Use list of target tenants")
+    .long_help(
+      "If this option is specified, the selected command will be executed for all \
+      tenants that the user is authenticated for.",
+    )
+    .hide_short_help(true)
+    .global(true)
+    .conflicts_with_all([TENANT_OPTION, TENANTS_OPTION])
+}
+
 pub(crate) fn terminal_width_option() -> Arg {
   Arg::new(TERMINAL_WIDTH_OPTION)
     .long("terminal-width")
@@ -309,6 +365,23 @@ pub(crate) fn terminal_width_option() -> Arg {
           or else no terminal width value will be used.",
     )
     .hide_short_help(true)
+    .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
+}
+
+pub(crate) fn set_verbosity_option() -> Arg {
+  Arg::new(VERBOSITY_OPTION)
+    .long("verbosity")
+    .short('v')
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<Verbosity>::new())
+    .value_name("VERBOSITY")
+    .help("Set verbosity level")
+    .long_help(
+      "If this option is provided, \
+    it will set the verbosity level. \
+    The default verbosity setting is 'low'.",
+    )
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
