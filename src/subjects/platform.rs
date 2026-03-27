@@ -200,7 +200,7 @@ impl CommandExecutor for PlatformOpen {
   }
 
   fn requirements(&self, sub_matches: &ArgMatches) -> Requirements {
-    Requirements::new(true, matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER))
+    Requirements::new(true, None, matches!(sub_matches.subcommand().unwrap_or_else(|| unreachable!()).0, OPEN_SWAGGER))
   }
 }
 

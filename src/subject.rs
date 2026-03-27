@@ -1,3 +1,4 @@
+use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, LIST_COMMAND};
 use crate::context::Context;
 use crate::DshCliResult;
@@ -6,31 +7,66 @@ use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 use std::fmt::{Display, Formatter};
 
+/// Defines the requirements for a command/capability
 #[derive(PartialEq)]
 pub(crate) struct Requirements {
+  /// If `true` the command allows the `--all-tenants` flag to be used.
   all_tenants_allowed: bool,
+  /// If provided specifies the mandatory authentication method.
+  mandatory_authentication_method: Option<AuthenticationMethod>,
+  /// If `true` the command requires an api client.
   needs_dsh_api_client: bool,
 }
 
 impl Requirements {
-  pub(crate) fn new(all_tenants_allowed: bool, needs_dsh_api_client: bool) -> Self {
-    Self { all_tenants_allowed, needs_dsh_api_client }
+  /// Create `Requirements` struct
+  ///
+  /// ## Parameters
+  /// * `all_tenants_allowed` - If `true` the command allows the `--all-tenants` flag to be used.
+  /// * `mandatory_authentication_method` - If provided this parameter specifies the mandatory
+  ///   authentication method.
+  /// * `needs_dsh_api_client` - If `true` the command requires an api client.
+  pub(crate) fn new(all_tenants_allowed: bool, mandatory_authentication_method: Option<AuthenticationMethod>, needs_dsh_api_client: bool) -> Self {
+    Self { all_tenants_allowed, mandatory_authentication_method, needs_dsh_api_client }
   }
 
+  /// Standard `Requirements` with api client
+  ///
+  /// * The command allows the `--all-tenants` flag to be used.
+  /// * All authentication methods allowed.
+  /// * Command requires an api client.
   pub(crate) fn standard_with_api() -> Self {
-    Self::new(true, true)
+    Self::new(true, None, true)
   }
 
+  /// Standard `Requirements` without api client
+  ///
+  /// * The command allows the `--all-tenants` flag to be used.
+  /// * Although not really relevant, all authentication methods are allowed.
+  /// * Command does not require an api client.
   pub(crate) fn standard_without_api() -> Self {
-    Self::new(true, false)
+    Self::new(true, None, false)
   }
 
+  /// Checks whether the `--all-tenants` flag is allowed.
   pub(crate) fn all_tenants_allowed(&self) -> bool {
     self.all_tenants_allowed
   }
 
+  /// Checks whether the command requires an api client.
   pub(crate) fn needs_dsh_api_client(&self) -> bool {
     self.needs_dsh_api_client
+  }
+
+  /// Checks whether an authentication method is allowed
+  ///
+  /// ## Parameters
+  /// * `authentication_method` - The authentication method to check.
+  pub(crate) fn authentication_method_allowed(&self, authentication_method: &AuthenticationMethod) -> bool {
+    self
+      .mandatory_authentication_method
+      .as_ref()
+      .is_none_or(|mandatory_authentication_method| mandatory_authentication_method == authentication_method)
   }
 }
 
