@@ -63,8 +63,8 @@ const TARGETS_SUBDIRECTORY: &str = "targets";
 /// determined.
 ///
 /// ## Returns
-/// * `Ok<()>` - Initialisation was successful.
-/// * `Err<DshCliError>` - Initialisation failed and the application must report the error and
+/// * `Ok<()>` - Initialization was successful.
+/// * `Err<DshCliError>` - Initialization failed and the application must report the error and
 ///   terminate.
 #[allow(clippy::single_element_loop)]
 pub(crate) fn init_dsh_directory() -> DshCliResult<()> {

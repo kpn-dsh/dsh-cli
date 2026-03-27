@@ -229,7 +229,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
         Ok(parameter.clone())
       } else {
         err!(
-          "property {} has illegal value \"{}\", should be one of {}",
+          "property '{}' has illegal value \"{}\", should be one of {}",
           property_name,
           parameter,
           enumeration
@@ -245,7 +245,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
           Ok(parameter.clone())
         } else {
           err!(
-            "dns-zone property {} has illegal value \"{}\", should be \"private\" or \"public\"",
+            "dns-zone property '{}' has illegal value \"{}\", should be \"private\" or \"public\"",
             property_name,
             parameter
           )
@@ -257,7 +257,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
         }
         match NUMBER_REGEX.captures(parameter) {
           Some(_) => Ok(parameter.clone()),
-          None => err!("property {} has illegal value \"{}\", should be a number", property_name, parameter),
+          None => err!("property '{}' has illegal value \"{}\", should be a number", property_name, parameter),
         }
       }
       PropertyKind::String => Ok(parameter.clone()),
