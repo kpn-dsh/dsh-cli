@@ -47,7 +47,7 @@ should specify the dependency:
 
 ```toml
 [dependencies]
-dsh_api = { version = "0.9.0", features = ["generic"] }
+dsh_api = { version = "0.10.0", features = ["generic"] }
 ```
 
 The `generic` feature must be enabled. The `dsh` tool has some optional features specified,

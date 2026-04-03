@@ -28,7 +28,7 @@ your local copy of `dsh_api`. Check the dependency in `Cargo.toml`:
 
 ```toml
 # When publishing, alway use the crates.io dependency.
-dsh_api = { version = "0.9.0", features = ["generic"] }
+dsh_api = { version = "0.10.0", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api and enable the manage feature.
 #dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
 ```
