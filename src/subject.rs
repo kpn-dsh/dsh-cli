@@ -99,6 +99,10 @@ pub(crate) trait Subject {
   // Returns list of capabilities that are supported for this Subject
   fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)>;
 
+  fn support_list_shortcut(&self) -> bool {
+    true
+  }
+
   // Called once by main when building the clap command
   fn subject_command(&self) -> (String, Command) {
     let mut capability_subcommands: Vec<Command> = vec![];
@@ -120,19 +124,23 @@ pub(crate) trait Subject {
   // Called once by main when building the clap command
   fn subject_list_shortcut_command(&self) -> Option<(String, Command)> {
     if let Some(list_capability) = self.capability(LIST_COMMAND) {
-      let list_shortcut_name = format!("{}s", self.subject());
-      let list_flags = list_capability.clap_flags(self.subject());
-      let mut list_shortcut_command = Command::new(list_shortcut_name.to_string())
-        .about(self.subject_command_about())
-        .args(list_flags)
-        .hide(true);
-      if let Some(alias) = self.subject_command_alias() {
-        list_shortcut_command = list_shortcut_command.alias(format!("{}s", alias))
+      if self.support_list_shortcut() {
+        let list_shortcut_name = format!("{}s", self.subject());
+        let list_flags = list_capability.clap_flags(self.subject());
+        let mut list_shortcut_command = Command::new(list_shortcut_name.to_string())
+          .about(self.subject_command_about())
+          .args(list_flags)
+          .hide(true);
+        if let Some(alias) = self.subject_command_alias() {
+          list_shortcut_command = list_shortcut_command.alias(format!("{}s", alias))
+        }
+        if let Some(long_about) = list_capability.long_about() {
+          list_shortcut_command = list_shortcut_command.long_about(long_about)
+        }
+        Some((list_shortcut_name, list_shortcut_command))
+      } else {
+        None
       }
-      if let Some(long_about) = list_capability.long_about() {
-        list_shortcut_command = list_shortcut_command.long_about(long_about)
-      }
-      Some((list_shortcut_name, list_shortcut_command))
     } else {
       None
     }

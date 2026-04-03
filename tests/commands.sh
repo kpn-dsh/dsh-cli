@@ -19,6 +19,7 @@ export SECRET_NAME_UNDER_TEST=broker-ca-cert
 export SYSTEM_SECRET_ID_UNDER_TEST="\!rest-api-client"
 export SYSTEM_SECRET_NAME_UNDER_TEST=system/rest-api-client
 export SERVICE_UNDER_TEST=keyring-dev
+export SERVICE_TASK_UNDER_TEST=58b9fc6c48-45qlv-00000000
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
 export TOPIC_UNDER_TEST=reference-implementation-avro
@@ -51,10 +52,12 @@ export SAFE_COMMANDS=(
   "app show $APP_UNDER_TEST"
   "app show $APP_UNDER_TEST --output-format table-no-border"
   "app undeploy $APP_UNDER_TEST --force --dry-run"
+  "apps"
 
   "bucket list"
   "bucket list --ids"
   "bucket show $BUCKET_UNDER_TEST"
+  "buckets"
 
   "certificate list"
   "certificate list --configuration"
@@ -66,6 +69,7 @@ export SAFE_COMMANDS=(
   "certificate show $CERTIFICATE_UNDER_TEST --status"
   "certificate show $CERTIFICATE_UNDER_TEST --usage"
   "certificate show $CERTIFICATE_UNDER_TEST"
+  "certificates"
 
   "env find $ENV_VALUE_UNDER_TEST"
   "env find $ENV_VALUE_UNDER_TEST --started"
@@ -86,6 +90,7 @@ export SAFE_COMMANDS=(
   "image list --started"
   "image list --stopped"
   "image list"
+  "images"
 
   "manifest explain $MANIFEST_UNDER_TEST"
   "manifest explain $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
@@ -98,10 +103,12 @@ export SAFE_COMMANDS=(
   "manifest show $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "manifest show $MANIFEST_UNDER_TEST --complete"
   "manifest show $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION --complete"
+  "manifests"
 
   "metric list --started"
   "metric list --stopped"
   "metric list"
+  "metrics"
 
   "platform export"
   "platform list"
@@ -111,6 +118,7 @@ export SAFE_COMMANDS=(
   "platform open console --dry-run"
   "platform open monitoring --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open monitoring --dry-run"
+  "platform open service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open service $SERVICE_UNDER_TEST --dry-run"
   "platform open swagger --platform $PLATFORM_UNDER_TEST --dry-run"
@@ -129,20 +137,18 @@ export SAFE_COMMANDS=(
   "platform show --vhost $VHOST_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST"
   "platform show"
+  "platforms"
 
   "proxy list --ids"
   "proxy list"
   "proxy show $PROXY_UNDER_TEST"
+  "proxys"
 
-  "robot copy -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST"
-  "robot copy"
-  "robot list -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST"
+  "robot copy $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST"
+  "robot import $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST --force"
   "robot list"
-  "robot set --dry-run --authentication sso < /dev/null"
-  "robot set -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST --dry-run --authentication sso < /dev/null"
-  "robot unset --force --dry-run"
-  "robot unset -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST --force --dry-run"
-  "robots -p $PLATFORM_UNDER_TEST -t $TENANT_UNDER_TEST"
+  "robot set $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST --dry-run --authentication sso < /dev/null"
+  "robot unset $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST --force --dry-run"
   "robots"
 
   "secret copy $SECRET_NAME_UNDER_TEST"
@@ -173,6 +179,7 @@ export SAFE_COMMANDS=(
   "secret show broker-ca-key"
   "secret show kda-test"
   "secret update $SECRET_NAME_UNDER_TEST --dry-run --authentication sso < /dev/null"
+  "secrets"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
   "service export $SERVICE_UNDER_TEST -o json"
@@ -180,20 +187,22 @@ export SAFE_COMMANDS=(
   "service list --started"
   "service list --status"
   "service list --stopped"
-  "service list --tasks"
   "service list"
   "service restart $SERVICE_UNDER_TEST --force --dry-run"
   "service show $SERVICE_UNDER_TEST --status"
-  "service show $SERVICE_UNDER_TEST --tasks"
   "service show $SERVICE_UNDER_TEST"
   "service start $SERVICE_UNDER_TEST --force --dry-run"
   "service start $SERVICE_UNDER_TEST --force --instances 2 --dry-run"
   "service stop $SERVICE_UNDER_TEST --force --dry-run"
   "service update $SERVICE_UNDER_TEST --cpus 1 --instances 1 --mem 32 --force --dry-run"
+  "services"
 
   "setting list"
+  "settings"
 
-  "target list"
+  "task list $SERVICE_UNDER_TEST"
+  "task show $SERVICE_UNDER_TEST"
+  "task show $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
 
   "token copy --dry-run"
   "token fetch"
@@ -222,12 +231,14 @@ export SAFE_COMMANDS=(
   "topic show $TOPIC_UNDER_TEST --status"
   "topic show $TOPIC_UNDER_TEST --usage"
   "topic show $TOPIC_UNDER_TEST"
+  "topics"
 
   "vhost list"
   "vhost list --started"
   "vhost list --stopped"
   "vhost list --started --stopped"
   "vhost list --usage"
+  "vhosts"
 
   "volume create $VOLUME_NON_EXISTING --size 2 --dry-run"
   "volume delete $VOLUME_UNDER_TEST --force --dry-run"
@@ -239,4 +250,5 @@ export SAFE_COMMANDS=(
   "volume show $VOLUME_UNDER_TEST --status"
   "volume show $VOLUME_UNDER_TEST --usage"
   "volume show $VOLUME_UNDER_TEST"
+  "volumes"
 )

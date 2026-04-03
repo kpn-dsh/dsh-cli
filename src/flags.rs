@@ -16,7 +16,6 @@ pub(crate) enum FlagType {
   #[cfg(feature = "manage")]
   Stream,
   System,
-  Tasks,
   Usage,
   Value,
 }
@@ -38,7 +37,6 @@ impl FlagType {
       #[cfg(feature = "manage")]
       Self::Stream => "stream-flag",
       Self::System => "system-flag",
-      Self::Tasks => "tasks-flag",
       Self::Usage => "usage-flag",
       Self::Value => "value-flag",
     }
@@ -60,7 +58,6 @@ impl FlagType {
       #[cfg(feature = "manage")]
       Self::Stream => "stream",
       Self::System => "system",
-      Self::Tasks => "tasks",
       Self::Usage => "usage",
       Self::Value => "value",
     }
@@ -83,7 +80,6 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     #[cfg(feature = "manage")]
     FlagType::Stream => create_clap_flag(FlagType::Stream, format!("Include the {}'s stream", subject), long_help),
     FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s", subject), long_help),
-    FlagType::Tasks => create_clap_flag(FlagType::Tasks, format!("Include the {}'s tasks", subject), long_help),
     FlagType::Usage => create_clap_flag(FlagType::Usage, format!("Include the {}'s usages", subject), long_help),
     FlagType::Value => create_clap_flag(FlagType::Value, format!("Include the {}'s value", subject), long_help),
   }

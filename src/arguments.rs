@@ -13,6 +13,7 @@ pub(crate) const PROXY_ID_ARGUMENT: &str = "proxy-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 pub(crate) const SECRET_ID_ARGUMENT: &str = "secret-id-argument";
 pub(crate) const SERVICE_ID_ARGUMENT: &str = "service-id-argument";
+pub(crate) const TASK_ID_ARGUMENT: &str = "task-id-argument";
 pub(crate) const TOPIC_ID_ARGUMENT: &str = "topic-id-argument";
 pub(crate) const VENDOR_NAME_ARGUMENT: &str = "vendor-name-argument";
 pub(crate) const MANIFEST_VERSION_ARGUMENT: &str = "version-argument";
@@ -112,6 +113,15 @@ pub(crate) fn service_id_argument() -> Arg {
     .value_name("SERVICE")
     .help("Service identifier")
     .long_help("Identifies a service deployed on the DSH.")
+}
+
+pub(crate) fn task_id_argument() -> Arg {
+  Arg::new(TASK_ID_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("TASK")
+    .help("Task identifier")
+    .long_help("Identifies a task within a service deployed on the DSH.")
 }
 
 pub(crate) fn topic_id_argument() -> Arg {
