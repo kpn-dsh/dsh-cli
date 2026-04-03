@@ -113,7 +113,7 @@ where
     }
   }
 
-  pub(crate) fn print_non_serializable(&self, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
+  pub(crate) fn _print_non_serializable(&self, default_output_format: Option<OutputFormat>) -> DshCliResult<()> {
     if self.is_empty() {
       self.context.print_outcome("no results");
       Ok(())
