@@ -11,7 +11,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::settings::Settings;
 use crate::subject::{Requirements, Subject};
-use crate::target_platform::{get_target_platform_from_all_sources, platform_name_argument};
+use crate::target_platform::get_target_platform_from_all_sources;
 use crate::target_tenant::{get_target_tenant, get_target_tenant_non_interactive};
 use crate::{err, read_single_line, DshCliResult};
 use arboard::Clipboard;
@@ -86,37 +86,23 @@ lazy_static! {
         Command::new(OPEN_APP)
           .about("Open the console for the target platform/tenant and the provided app")
           .alias("a")
-          .arg(app_id_argument().required(true))
-          .arg(platform_name_argument()),
-        Command::new(OPEN_CONSOLE)
-          .about("Open the console for the target platform")
-          .alias("c")
-          .arg(platform_name_argument()),
+          .arg(app_id_argument().required(true)),
+        Command::new(OPEN_CONSOLE).about("Open the console for the target platform").alias("c"),
         Command::new(OPEN_MONITORING)
           .about("Open the monitoring web application for the target platform/tenant")
-          .alias("m")
-          .arg(platform_name_argument()),
+          .alias("m"),
         Command::new(OPEN_SERVICE)
           .about("Open the console for the target platform/tenant and the provided service")
           .alias("s")
-          .arg(platform_name_argument())
           .arg(service_id_argument().required(true)),
-        Command::new(OPEN_SWAGGER)
-          .about("Open the swagger web application for the target platform and copy a fresh token to the clipboard")
-          .arg(platform_name_argument()),
-        Command::new(OPEN_TENANT)
-          .about("Open the console for the target platform/tenant")
-          .alias("t")
-          .arg(platform_name_argument()),
-        Command::new(OPEN_TRACING)
-          .about("Open the tracing application for the target platform")
-          .arg(platform_name_argument()),
+        Command::new(OPEN_SWAGGER).about("Open the swagger web application for the target platform and copy a fresh token to the clipboard"),
+        Command::new(OPEN_TENANT).about("Open the console for the target platform/tenant").alias("t"),
+        Command::new(OPEN_TRACING).about("Open the tracing application for the target platform")
       ])
   );
   static ref PLATFORM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &PlatformShow {}, "Show platform data")
       .set_long_about("Show platform data.")
-      .add_target_argument(platform_name_argument())
       .add_extra_arguments(vec![
         app_id_argument().long("app"),
         bucket_id_argument().long("bucket"),
