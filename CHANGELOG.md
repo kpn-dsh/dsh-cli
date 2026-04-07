@@ -9,14 +9,21 @@ All notable changes to the `dsh` tool project will be documented in this file.
 ### Added
 
 * Capability to store robot secrets in keyring.
+* Capability to copy robot secret from secret store to keyring
 * Capability to renew the robot secret.
 * Descriptions for publish and release steps.
+* Task capabilities.
+* Dependency check when deleting or updating buckets, secrets, topics and volumes.
 
 ### Changed
 
-* Changed configuration for robot authentication.
+* Updated `dsh-api` dependency to version `0.10.0`.
 * Removed the `target` capabilities.
+* Improved `GitHub` documentation
 * Directory structure for docs.
+* Changed configuration for robot authentication.
+* Resolved some technical debt.
+* Moved task capabilities to separate subject.
 
 ## [0.9.0] - 2026-03-05
 

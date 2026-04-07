@@ -29,7 +29,7 @@ use log::debug;
 /// * `Ok(None)` - User needs to log in.
 pub(crate) async fn create_clients(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Option<Vec<DshApiClient>>> {
   match context.authentication_method() {
-    AuthenticationMethod::Robot => create_client_robot_password(matches, requirements).await.map(Some),
+    AuthenticationMethod::Robot => create_client_robot_password(matches, requirements, context).await.map(Some),
     AuthenticationMethod::SingleSignOn => create_clients_single_sign_on(matches, requirements, context).await,
   }
 }
@@ -85,7 +85,7 @@ pub(crate) async fn create_client_access_token_from_platform_tenant(api_platform
 /// Returns
 /// * `Ok(Vec<Client>)` - Client was successfully created. Note that there always be only one
 ///   client created.
-async fn create_client_robot_password(matches: &ArgMatches, requirements: &Requirements) -> DshCliResult<Vec<DshApiClient>> {
+async fn create_client_robot_password(matches: &ArgMatches, requirements: &Requirements, context: &Context) -> DshCliResult<Vec<DshApiClient>> {
   if !requirements.authentication_method_allowed(&AuthenticationMethod::Robot) {
     return err!("robot authentication method not allowed");
   }
@@ -93,7 +93,7 @@ async fn create_client_robot_password(matches: &ArgMatches, requirements: &Requi
   let robot_tenant_name = get_robot_tenant(matches)?;
   debug!("create client with token fetcher for '{}@{}'", robot_tenant_name, robot_platform);
   let dsh_api_tenant = DshApiTenant::new(robot_tenant_name, robot_platform);
-  let robot_password = get_robot_password(matches, &dsh_api_tenant)?;
+  let robot_password = get_robot_password(matches, &dsh_api_tenant, context)?;
   let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_password);
   let dsh_api_client = dsh_api_client_factory.client().await?;
   debug!("api client created");

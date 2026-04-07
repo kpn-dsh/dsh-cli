@@ -39,7 +39,6 @@ use global_options::{
 use itertools::Itertools;
 use log::{debug, error, trace};
 use log_level::initialize_logger;
-use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use settings::Settings;
 use std::collections::HashMap;
@@ -579,13 +578,6 @@ fn read_single_line(prompt: impl AsRef<str>) -> DshCliResult<String> {
   let mut line = String::new();
   stdin().read_line(&mut line).expect("could not read line");
   Ok(line.trim().to_string())
-}
-
-fn read_single_line_password(prompt: impl AsRef<str>) -> DshCliResult<String> {
-  match prompt_password(prompt.as_ref()) {
-    Ok(line) => Ok(line.trim().to_string()),
-    Err(_) => err!("empty input"),
-  }
 }
 
 fn include_started_stopped(matches: &ArgMatches) -> (bool, bool) {

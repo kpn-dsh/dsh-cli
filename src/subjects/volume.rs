@@ -147,6 +147,11 @@ impl CommandExecutor for VolumeDelete {
     if client.get_volume(&volume_id).await.is_err() {
       return err!("volume '{}' does not exists", volume_id);
     }
+    let (_, volume_dependants) = client.volume_with_dependants(&volume_id).await?;
+    if context.dependencies_warning("volume", volume_dependants, &volume_id) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, volume '{}' not deleted", volume_id));
+      return Ok(());
+    }
     if context.confirmed(format!("delete volume '{}'?", volume_id))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, volume not deleted");

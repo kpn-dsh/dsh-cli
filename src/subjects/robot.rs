@@ -302,12 +302,17 @@ impl CommandExecutor for RobotUpdate {
       context.print_warning("this will automatically invalidate the existing robot secret");
       if context.confirmed(format!("renew robot secret for '{}@{}'?", robot_platform, robot_tenant))? {
         let robot_secret = context.read_single_line_password("enter the current robot secret")?;
+        let dsh_api_tenant = DshApiTenant::new(robot_tenant.clone(), robot_platform.clone());
+        let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_secret);
+        let client = dsh_api_client_factory.client().await?;
+        let secret_dependants = client.secret_dependants(ROBOT_SECRET).await?;
+        if context.dependencies_warning("robot secret", secret_dependants, ROBOT_SECRET) && !context.confirmed("do you want to continue?")? {
+          context.print_outcome(format!("cancelled, robot secret '{}' not updated", ROBOT_SECRET));
+          return Ok(());
+        }
         if context.dry_run() {
           context.print_warning("dry-run mode, robot secret not renewed");
         } else {
-          let dsh_api_tenant = DshApiTenant::new(robot_tenant.clone(), robot_platform.clone());
-          let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_secret);
-          let client = dsh_api_client_factory.client().await?;
           let new_robot_secret = client.post_robot_generate_secret().await?;
           context.print_outcome(format!("robot secret for '{}@{}' renewed", robot_platform, robot_tenant));
           if context.confirmed(format!("store new robot secret for '{}@{}' in keyring?", robot_platform, robot_tenant))? {

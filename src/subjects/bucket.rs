@@ -136,6 +136,11 @@ impl CommandExecutor for BucketDelete {
     if client.get_bucket_configuration(&bucket_id).await.is_err() {
       return err!("bucket '{}' does not exists", bucket_id);
     }
+    let (_, bucket_dependants) = client.bucket_with_dependants(&bucket_id).await?;
+    if context.dependencies_warning("bucket", bucket_dependants, &bucket_id) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, bucket '{}' not deleted", bucket_id));
+      return Ok(());
+    }
     if context.confirmed(format!("delete bucket '{}'?", bucket_id))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, bucket not deleted");

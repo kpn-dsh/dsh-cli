@@ -332,6 +332,11 @@ impl CommandExecutor for TopicDelete {
     if client.get_topic(&topic_id).await.is_err() {
       return err!("scratch topic '{}' does not exists", topic_id);
     }
+    let topic_dependants = client.topic_dependants(&topic_id).await?;
+    if context.dependencies_warning("topic", topic_dependants, &topic_id) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, topic '{}' not deleted", topic_id));
+      return Ok(());
+    }
     if context.confirmed(format!("delete scratch topic '{}'?", topic_id))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, scratch topic not deleted");
@@ -357,7 +362,6 @@ impl CommandExecutor for TopicList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all scratch topics with their configurations");
     let start_instant = context.now();
-
     let topic_ids = client.get_topic_ids().await?;
     let configurations = try_join_all(topic_ids.iter().map(|topic_id| client.get_topic(topic_id))).await?;
     context.print_execution_time(start_instant);

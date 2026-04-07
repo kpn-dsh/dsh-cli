@@ -221,6 +221,10 @@ impl CommandExecutor for SecretDelete {
     if client.get_secret_configuration(&secret_name).await.is_err() {
       return err!("secret '{}' does not exist", secret_name);
     }
+    if context.dependencies_warning("secret", client.secret_dependants(&secret_name).await?, &secret_name) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, secret '{}' not deleted", secret_name));
+      return Ok(());
+    }
     if context.confirmed(format!("delete secret '{}'?", secret_name))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, secret not deleted");
@@ -549,6 +553,10 @@ impl CommandExecutor for SecretUpdate {
     }
     if client.get_secret(&secret_name).await.is_err() {
       return err!("secret '{}' does not exist", secret_name);
+    }
+    if context.dependencies_warning("secret", client.secret_dependants(&secret_name).await?, &secret_name) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, secret '{}' not updated", secret_name));
+      return Ok(());
     }
     if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {

@@ -24,6 +24,7 @@ use dsh_api::error::DshApiResult;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
 use dsh_api::types::AllocationStatus;
+use dsh_api::Dependant;
 use getch_rs::{Getch, Key};
 use itertools::Itertools;
 use log::debug;
@@ -1177,6 +1178,67 @@ impl Context {
       println!("{}", text)
     } else {
       println!("{}{}{:#}", self.stdout_style, text, self.stdout_style)
+    }
+  }
+
+  pub(crate) fn dependencies_warning<T>(&self, subject: &str, dependants: Vec<Dependant<T>>, subject_id: &str) -> bool {
+    if let Some((apps, services, certificates, proxies, trifoniuses)) = Self::dependant_ids::<_>(dependants) {
+      self.print_warning(format!("{} '{}' has dependants", subject, subject_id));
+      if !apps.is_empty() {
+        self.print_warning(format!("dependant apps:"));
+        for app in apps {
+          self.print_warning(format!("  {}", app));
+        }
+      }
+      if !services.is_empty() {
+        self.print_warning(format!("dependant services:"));
+        for service in services {
+          self.print_warning(format!("  {}", service));
+        }
+      }
+      if !certificates.is_empty() {
+        self.print_warning(format!("dependant certificates:"));
+        for certificate in certificates {
+          self.print_warning(format!("  {}", certificate));
+        }
+      }
+      if !proxies.is_empty() {
+        self.print_warning(format!("dependant proxies:"));
+        for proxy in proxies {
+          self.print_warning(format!("  {}", proxy));
+        }
+      }
+      if !trifoniuses.is_empty() {
+        self.print_warning(format!("dependant trifonius:"));
+        for trifonius in trifoniuses {
+          self.print_warning(format!("  {}", trifonius));
+        }
+      }
+      true
+    } else {
+      false
+    }
+  }
+
+  fn dependant_ids<T>(dependants: Vec<Dependant<T>>) -> Option<(Vec<String>, Vec<String>, Vec<String>, Vec<String>, Vec<String>)> {
+    if dependants.is_empty() {
+      None
+    } else {
+      let mut apps = vec![];
+      let mut applications = vec![];
+      let mut certificates = vec![];
+      let mut proxies = vec![];
+      let mut trifoniuses = vec![];
+      for dependant in dependants {
+        match dependant {
+          Dependant::App { app } => apps.push(app.app_id),
+          Dependant::Application { application } => applications.push(application.application_id),
+          Dependant::Certificate { certificate } => certificates.push(certificate.certificate_id),
+          Dependant::Proxy { proxy } => proxies.push(proxy.proxy_id),
+          Dependant::Trifonius { trifonius } => trifoniuses.push(trifonius.trifonius_id),
+        }
+      }
+      Some((apps, applications, certificates, proxies, trifoniuses))
     }
   }
 }

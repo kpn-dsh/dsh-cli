@@ -1,8 +1,9 @@
+use crate::context::Context;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_PASSWORD, ENV_VAR_DSH_CLI_PASSWORD_FILE, ENV_VAR_DSH_CLI_PLATFORM, ENV_VAR_DSH_CLI_TENANT};
 use crate::error::DshCliError;
 use crate::global_options::{PASSWORD_FILE_OPTION, PLATFORM_OPTION, TENANTS_ALL_FLAG, TENANTS_OPTION, TENANT_OPTION};
 use crate::keyring::get_secret_from_keyring;
-use crate::{err, error_map, read_single_line, read_single_line_password, DshCliResult};
+use crate::{err, error_map, read_single_line, DshCliResult};
 use clap::ArgMatches;
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
@@ -99,7 +100,7 @@ pub(crate) fn get_robot_tenant(matches: &ArgMatches) -> DshCliResult<String> {
 ///
 /// ## Returns
 /// * `Ok<String>` - Password.
-pub(crate) fn get_robot_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant) -> DshCliResult<String> {
+pub(crate) fn get_robot_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTenant, context: &Context) -> DshCliResult<String> {
   match matches.get_one::<PathBuf>(PASSWORD_FILE_OPTION) {
     Some(password_file_from_arg) => read_robot_password_file(password_file_from_arg),
     None => match environment_variable(ENV_VAR_DSH_CLI_PASSWORD_FILE, Some(matches))? {
@@ -116,7 +117,7 @@ pub(crate) fn get_robot_password(matches: &ArgMatches, dsh_api_tenant: &DshApiTe
           }
           Ok(None) | Err(DshCliError::Canceled) => {
             if stdin().is_terminal() {
-              let password = read_single_line_password(format!("robot password for tenant {}: ", dsh_api_tenant).as_str())?;
+              let password = context.read_single_line_password(format!("robot password for tenant {}: ", dsh_api_tenant))?;
               if password.is_empty() {
                 err!("password cannot be empty")
               } else {
