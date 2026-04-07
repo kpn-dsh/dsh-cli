@@ -26,7 +26,7 @@ fn random_pane_id() -> String {
   (0..3)
     .map(|_| {
       let idx = random & 0x001f;
-      random = random >> 5;
+      random >>= 5;
       char::from(CHARSET[idx])
     })
     .collect()
