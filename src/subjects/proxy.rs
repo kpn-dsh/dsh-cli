@@ -2,13 +2,17 @@ use crate::arguments::proxy_id_argument;
 use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
+use crate::secret_metadata::secret_metadata;
 use crate::subject::{Requirements, Subject};
+use crate::subjects::certificate::{CERTIFICATE_LABELS_SHOW, EXPIRATION_CHECK_DAYS};
+use crate::subjects::secret::SECRET_LABELS_LIST;
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -149,11 +153,35 @@ impl CommandExecutor for ProxyShow {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
-    let start_instant = context.now();
     let (proxy, allocation_status) = join!(client.get_kafkaproxy_configuration(&proxy_id), client.get_kafkaproxy_status(&proxy_id));
-    context.print_execution_time(start_instant);
-    context.print_allocation_status(&allocation_status, PROXY_SUBJECT_TARGET);
-    UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, context).print(&proxy?, None)
+    match proxy {
+      Ok(proxy) => {
+        let certificate_status = client.get_certificate(&proxy.certificate).await?;
+        context.print_allocation_status(&allocation_status, PROXY_SUBJECT_TARGET);
+        UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, context).print(&proxy, None)?;
+        let mut secret_ids: Vec<String> = vec![proxy.secret_name_ca_chain];
+        if let Some(actual_certificate) = &certificate_status.actual {
+          UnitFormatter::new(proxy.certificate, &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, EXPIRATION_CHECK_DAYS), None)?;
+          secret_ids.push(actual_certificate.key_secret.clone());
+          secret_ids.push(actual_certificate.cert_chain_secret.clone());
+          if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
+            secret_ids.push(passphrase_secret.clone());
+          }
+        }
+        secret_ids.sort();
+        let secrets = try_join_all(secret_ids.iter().map(|secret_id| client.get_secret(secret_id))).await?;
+        let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
+        for (secret_id, secret) in secret_ids.iter().zip(secrets) {
+          formatter.push_target_id_value_owned(secret_id.clone(), secret_metadata(&secret));
+        }
+        formatter.print(None)?;
+        Ok(())
+      }
+      Err(error) => {
+        context.print_allocation_status(&allocation_status, PROXY_SUBJECT_TARGET);
+        Err(DshCliError::from(error))
+      }
+    }
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -185,7 +213,7 @@ impl Label for ProxyLabel {
       ProxyLabel::Cpus => "cpus",
       ProxyLabel::Instances => "instances",
       ProxyLabel::Mem => "memory",
-      ProxyLabel::Name => "certificate",
+      ProxyLabel::Name => "name",
       ProxyLabel::SchemaStore => "schema store",
       ProxyLabel::Target => "proxy id",
       ProxyLabel::Validations => "validations",
@@ -201,7 +229,7 @@ impl Label for ProxyLabel {
       ProxyLabel::Cpus => "cpus",
       ProxyLabel::Instances => "instances",
       ProxyLabel::Mem => "memory",
-      ProxyLabel::Name => "certificate name",
+      ProxyLabel::Name => "proxy name",
       ProxyLabel::SchemaStore => "schema store",
       ProxyLabel::Target => "proxy id",
       ProxyLabel::Validations => "validations",
@@ -218,8 +246,8 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
   fn value(&self, label: &ProxyLabel, target_id: &str) -> Value {
     match label {
       ProxyLabel::AclGroupsEnabled => Value::option(self.enable_kafka_acl_groups),
-      ProxyLabel::CaChainSecretName => Value::plain(&self.secret_name_ca_chain),
-      ProxyLabel::Certificate => Value::plain(&self.certificate),
+      ProxyLabel::CaChainSecretName => Value::target(&self.secret_name_ca_chain),
+      ProxyLabel::Certificate => Value::target(&self.certificate),
       ProxyLabel::Cpus => Value::plain(self.cpus),
       ProxyLabel::Instances => Value::plain(self.instances),
       ProxyLabel::Mem => Value::plain(self.mem),
