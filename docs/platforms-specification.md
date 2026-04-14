@@ -26,7 +26,7 @@ Then set the environment variable to point to the file and see the new platform 
 > dsh platform list
 ```
 
-See the GitHub for the [`dsh_api`](https://github.com/kpn-dsh/dsh-api) for more information
+See [`dsh_api`](https://github.com/kpn-dsh/dsh-api) for more information
 about the platforms specifications.
 
 [Set up autocompletion &#x2192;](autocompletion.md)

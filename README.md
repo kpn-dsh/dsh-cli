@@ -47,7 +47,7 @@ This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/
 
 ### Pre-built binaries
 
-For some platforms a pre-built binary is available at the GitHub release page:
+For some platforms a pre-built binary is available at the `GitHub` release page:
 [`https://github.com/kpn-dsh/dsh-cli/releases`](https://github.com/kpn-dsh/dsh-cli/releases).
 You can download this file to your workstation. Make sure that the directory where you store
 the executable is included in your `PATH` variable and that you set the execute flag:

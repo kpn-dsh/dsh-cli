@@ -549,7 +549,7 @@ The following table describes all environment variables.
             <code>RUST_LOG</code> environment variable.
             Although the use of this variable is not recommended, 
             there might be situations when this can be useful.
-            See the crate's <code>github</code> repository for more information.
+            See the crate's <code>GitHub</code> repository for more information.
         </td>
     </tr>
 

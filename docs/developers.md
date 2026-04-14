@@ -73,7 +73,7 @@ back to the `crates.io` version of the library,
 
 ### Coding guidelines
 
-Before pushing code to github, make sure that you adhere to the code formatting defined in
+Before pushing code to `GitHub`, make sure that you adhere to the code formatting defined in
 `rustfmt.toml` and that you have run the `clippy` linter. The following commands should
 return without any remarks:
 
