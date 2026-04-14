@@ -24,6 +24,7 @@ pub(crate) const OUTPUT_FORMAT_OPTION: &str = "output-format-option";
 pub(crate) const PASSWORD_FILE_OPTION: &str = "password-file-option";
 pub(crate) const PLATFORM_OPTION: &str = "platform-option";
 pub(crate) const QUIET_FLAG: &str = "quiet-flag";
+pub(crate) const RELEASES_FLAG: &str = "releases-flag";
 pub(crate) const SHOW_EXECUTION_TIME_FLAG: &str = "show-execution-time-flag";
 pub(crate) const SUPPRESS_EXIT_STATUS_FLAG: &str = "suppress-exit-status-flag";
 pub(crate) const TENANT_OPTION: &str = "tenant-option";
@@ -278,6 +279,16 @@ pub(crate) fn quiet_flag() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
+pub(crate) fn releases_flag() -> Arg {
+  Arg::new(RELEASES_FLAG)
+    .long("releases")
+    .action(ArgAction::SetTrue)
+    .long_help("If this flag is provided, the dsh tool will show all available github releases.")
+    .exclusive(true)
+    .hide_short_help(true)
+    .help_heading(TOOL_OPTIONS_HEADING)
+}
+
 pub(crate) fn show_execution_time_flag() -> Arg {
   Arg::new(SHOW_EXECUTION_TIME_FLAG)
     .long("show-execution-time")
@@ -378,9 +389,8 @@ pub(crate) fn set_verbosity_option() -> Arg {
     .value_name("VERBOSITY")
     .help("Set verbosity level")
     .long_help(
-      "If this option is provided, \
-    it will set the verbosity level. \
-    The default verbosity setting is 'low'.",
+      "If this option is provided, it will set the verbosity level. \
+      The default verbosity setting is 'low'.",
     )
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)

@@ -14,11 +14,13 @@ use crate::environment_variables::{
   ENV_VARS_ARGUMENT, ENV_VAR_ARGUMENT,
 };
 use crate::error::DshCliError;
+use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::global_options::{
   authentication_option, browser_option, environment_variable_option, log_level_api_option, log_level_option, no_csv_headers_flag, password_file_option, platform_option,
-  tenant_option, tenants_all_flag, tenants_option, TENANTS_ALL_FLAG,
+  releases_flag, tenant_option, tenants_all_flag, tenants_option, RELEASES_FLAG, TENANTS_ALL_FLAG,
 };
-use crate::releases::{newer_release, newer_release_notification};
+use crate::releases::{newer_release, newer_release_notification, releases_from_github, ReleaseAsset};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
 use crate::subjects::task::TASK_SUBJECT;
@@ -82,7 +84,7 @@ mod authentication;
 mod autocomplete;
 mod capability;
 mod capability_builder;
-// TODO mod certificates;
+mod certificates;
 mod cipher;
 mod clients;
 mod context;
@@ -350,6 +352,24 @@ async fn inner_main() -> DshCliExit {
     return DshCliExit::Ok;
   }
 
+  if matches.get_flag(RELEASES_FLAG) {
+    match releases_from_github().await {
+      Ok(mut releases) => {
+        releases.reverse();
+        context.print_explanation("list all releases");
+        let mut formatter = ListFormatter::new(&RELEASE_LABELS, &context);
+        for release in releases {
+          for asset in release.assets {
+            formatter.push_target_id_value_owned(release.name.clone(), asset.clone());
+          }
+        }
+        _ = formatter.print(None);
+        return DshCliExit::Ok;
+      }
+      Err(error) => return DshCliExit::CliErr(error),
+    }
+  }
+
   if let Some(newer_release) = newer_release_notification(&VERSION).await {
     context.print_warning(format!(
       "newer release {} available at {}",
@@ -515,6 +535,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       log_level_option(),
       log_level_api_option(),
       password_file_option(),
+      releases_flag(),
       suppress_exit_status_flag(),
       version_flag(),
     ])
@@ -711,6 +732,45 @@ fn enabled_features() -> Option<Vec<&'static str>> {
     Some(enabled_features)
   }
 }
+
+#[derive(Eq, Hash, PartialEq, Serialize)]
+enum ReleaseLabel {
+  Release,
+  Asset,
+  NumberOfDownloads,
+  CreatedAt,
+  Size,
+}
+
+impl Label for ReleaseLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::Release => "release",
+      Self::Asset => "asset",
+      Self::NumberOfDownloads => "downloads",
+      Self::CreatedAt => "created at",
+      Self::Size => "size",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, Self::Release)
+  }
+}
+
+impl SubjectFormatter<ReleaseLabel> for ReleaseAsset {
+  fn value(&self, label: &ReleaseLabel, target_id: &str) -> Value {
+    match label {
+      ReleaseLabel::Release => Value::target(target_id),
+      ReleaseLabel::Asset => Value::plain(&self.name),
+      ReleaseLabel::NumberOfDownloads => Value::plain(self.download_count),
+      ReleaseLabel::CreatedAt => Value::plain(&self.created_at),
+      ReleaseLabel::Size => Value::plain(self.size),
+    }
+  }
+}
+
+pub(crate) static RELEASE_LABELS: [ReleaseLabel; 5] = [ReleaseLabel::Release, ReleaseLabel::Asset, ReleaseLabel::CreatedAt, ReleaseLabel::Size, ReleaseLabel::NumberOfDownloads];
 
 #[test]
 fn test_open_api_version() {
