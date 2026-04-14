@@ -9,10 +9,14 @@
 //!  ├── targets/
 //!  │    ├── platform1/
 //!  │    │    ├── tenant1/
-//!  │    │    │    └── certificates/
-//!  │    │    │         ├── broker-ca.pem
-//!  │    │    │         ├── broker-client.key
-//!  │    │    │         └── broker-client.pem
+//!  │    │    │    └── bundles/
+//!  │    │    │         └── proxy1/
+//!  │    │    │              ├── ca.key
+//!  │    │    │              ├── ca.pem
+//!  │    │    │              ├── client.key
+//!  │    │    │              ├── client.pem
+//!  │    │    │              ├── server.key
+//!  │    │    │              └── server.key
 //!  │    │    ├── tenant2/
 //!  │    │    │     ...
 //!  │    │    └── refresh-token.encrypted
@@ -34,6 +38,7 @@
 //! Note that the environment variables `DSH_CLI_HOME` and `HOME` must be regular environment
 //! variables and cannot be specified via the command line `--environment-variable` argument.
 
+use crate::certificates::ProxyCertificateBundle;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
 use crate::settings::Settings;
 use crate::{err, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
@@ -41,15 +46,21 @@ use dsh_api::platform::DshPlatform;
 use homedir::my_home;
 use lazy_static::lazy_static;
 use log::{debug, info, warn};
+use rcgen::KeyPair;
 use std::fs;
-use std::io::ErrorKind;
+use std::fs::{File, Permissions};
+use std::io::{ErrorKind, Write};
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-const _CERTIFICATES_SUBDIRECTORY: &str = "certificates";
+const PROXY_CERTIFICATE_BUNDLES_SUBDIRECTORY: &str = "bundles";
 const DEFAULT_SETTINGS_FILENAME: &str = "settings.toml";
 const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const REFRESH_TOKEN_FILENAME: &str = "refresh-token.encrypted";
 const TARGETS_SUBDIRECTORY: &str = "targets";
+
+const MODE_U_RW: u32 = 0o600;
 
 /// # Initialise the dsh directory
 ///
@@ -81,7 +92,7 @@ pub(crate) fn init_dsh_directory() -> DshCliResult<()> {
           )
         }
       } else {
-        _ = &fs::create_dir_all(&dsh_directory)?;
+        fs::create_dir_all(&dsh_directory)?;
         info!("dsh directory {} created", dsh_directory.display());
         for dsh_subdirectory_name in [TARGETS_SUBDIRECTORY] {
           let dsh_subdirectory = dsh_directory.join(dsh_subdirectory_name);
@@ -185,11 +196,106 @@ pub(crate) fn write_refresh_token(platform: &DshPlatform, refresh_token: &str) -
     Some(refresh_token_pathbuf) => {
       create_parent_directories(&refresh_token_pathbuf)?;
       debug!("write refresh token for platform '{}' to '{}'", platform, refresh_token_pathbuf.display());
-      fs::write(refresh_token_pathbuf, refresh_token)?;
+      write_with_mode(refresh_token_pathbuf, refresh_token, Some(MODE_U_RW))?;
       Ok(())
     }
     None => err!("dsh directory disabled, refresh token cannot be stored"),
   }
+}
+
+const CA_KEY_FILENAME: &str = "CA_KEY";
+const CA_CERTIFICATE_FILENAME: &str = "CA_PEM";
+const CLIENT_KEY_FILENAME: &str = "CLIENT_KEY";
+const CLIENT_CERTIFICATE_FILENAME: &str = "CLIENT_PEM";
+const SERVER_KEY_FILENAME: &str = "SERVER_KEY";
+const SERVER_CERTIFICATE_FILENAME: &str = "SERVER_PEM";
+
+/// Read stored certificate bundle
+///
+/// ## Parameters
+/// * `platform` - Platform for which the certificate bundle is requested.
+/// * `tenant` - Tenant for which the certificate bundle is requested.
+/// * `proxy_prefix` - Proxy prefix for the requested certificate bundle.
+///
+/// ## Returns
+/// * `Ok<Some<CertBundle>>` - Certificate bundle.
+/// * `Ok<None>` - Certificate bundle does not exist.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn read_certificate_bundle(platform: &DshPlatform, tenant: &str, proxy_prefix: &str) -> DshCliResult<Option<ProxyCertificateBundle>> {
+  match certificate_bundle_pathbuf(platform, tenant, proxy_prefix)? {
+    Some(certificate_bundle_directory_pathbuf) => {
+      let mut ca_key_file_path = certificate_bundle_directory_pathbuf.clone();
+      ca_key_file_path.push(CA_KEY_FILENAME);
+      let _ca_key = KeyPair::from_pem(&fs::read_to_string(ca_key_file_path)?)?;
+
+      let mut ca_certificate_file_path = certificate_bundle_directory_pathbuf.clone();
+      ca_certificate_file_path.push(CA_CERTIFICATE_FILENAME);
+      // let ca_certificate = Certificate::fr(&fs::read_to_string(ca_certificate_file_path)?)?;
+
+      Ok(None)
+    } // TODO
+    None => err!("dsh directory disabled, certificate bundle cannot be read"),
+  }
+}
+
+/// Store certificate bundle
+///
+/// ## Parameters
+/// * `platform` - Platform for which the certificate bundle must be stored.
+/// * `tenant` - Tenant for which the certificate bundle must be stored.
+/// * `proxy_prefix` - Proxy prefix for the certificate bundle.
+/// * `certificate_bundle` - Certificate bundle that must be stored.
+///
+/// ## Returns
+/// * `Ok<String>` - If storing was successful, the directory name where the bundle was stored
+///   will be returned.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn store_certificate_bundle(platform: &DshPlatform, tenant: &str, proxy_prefix: &str, certificate_bundle: &ProxyCertificateBundle) -> DshCliResult<String> {
+  match certificate_bundle_pathbuf(platform, tenant, proxy_prefix)? {
+    Some(certificate_bundle_directory_pathbuf) => {
+      let pems = vec![
+        (CA_CERTIFICATE_FILENAME, certificate_bundle.ca_certificate.certificate.pem(), Some(MODE_U_RW)),
+        (CA_KEY_FILENAME, certificate_bundle.ca_certificate.key_pair.serialize_pem(), Some(MODE_U_RW)),
+        (
+          CLIENT_CERTIFICATE_FILENAME,
+          certificate_bundle.client_certificate.certificate.pem(),
+          Some(MODE_U_RW),
+        ),
+        (CLIENT_KEY_FILENAME, certificate_bundle.client_certificate.key_pair.serialize_pem(), Some(MODE_U_RW)),
+        (
+          SERVER_CERTIFICATE_FILENAME,
+          certificate_bundle.server_certificate.certificate.pem(),
+          Some(MODE_U_RW),
+        ),
+        (SERVER_KEY_FILENAME, certificate_bundle.server_certificate.key_pair.serialize_pem(), Some(MODE_U_RW)),
+      ];
+      for (filename, pem, mode) in pems {
+        let mut file_path = certificate_bundle_directory_pathbuf.clone();
+        file_path.push(filename);
+        debug!("write certificate bundle file '{}'", file_path.display());
+        write_with_mode(file_path, &pem, mode)?;
+      }
+      Ok(certificate_bundle_directory_pathbuf.display().to_string())
+    }
+    None => err!("dsh directory disabled, certificate bundle cannot be stored"),
+  }
+}
+
+fn write_with_mode<T>(file_path: T, data: &str, mode: Option<u32>) -> DshCliResult<()>
+where
+  T: AsRef<Path>,
+{
+  create_parent_directories(file_path.as_ref())?;
+  debug!("write certificate bundle file '{}'", file_path.as_ref().display());
+  let mut file = File::create(file_path)?;
+  file.write_all(data.as_bytes())?;
+  if let Some(mode) = mode {
+    #[cfg(target_family = "unix")]
+    file.set_permissions(Permissions::from_mode(mode))?;
+    #[cfg(not(target_family = "unix"))]
+    debug!("permissions on file '{}' can only be set on unix", file_path.display());
+  }
+  Ok(())
 }
 
 /// # Returns the settings file
@@ -276,6 +382,33 @@ fn refresh_token_pathbuf(platform: &DshPlatform) -> DshCliResult<Option<PathBuf>
   dsh_directory_pathbuf(&format!("{}/{}/{}", TARGETS_SUBDIRECTORY, platform.name(), REFRESH_TOKEN_FILENAME))
 }
 
+/// Returns `PathBuf` for certificate bundle
+///
+/// Return the [PathBuf] for a certificate bundle directory for the provided `platform`, `tenant`
+/// and `proxy_prefix`. The directory name will be
+///
+/// $HOME/.dsh_cli/targets/\[platform.name\]/\[tenant\]/bundles/\[proxy_prefix\]
+///
+/// ## Parameters
+/// * `platform` - Platform for which the [PathBuf] will be created.
+/// * `tenant` - Tenant for which the [PathBuf] will be created.
+/// * `proxy_prefix` - Proxy prefix for which the [PathBuf] will be created.
+///
+/// ## Returns
+/// * `Ok<Some<PathBuf>>` - Pathbuf of the certificate bundle directory.
+/// * `Ok<None>` - Dsh tool does not support storing state and settings.
+/// * `Err<DshCliError>` -  Ssh directory could not be determined.
+fn certificate_bundle_pathbuf(platform: &DshPlatform, tenant: &str, proxy_prefix: &str) -> DshCliResult<Option<PathBuf>> {
+  dsh_directory_pathbuf(&format!(
+    "{}/{}/{}/{}/{}",
+    TARGETS_SUBDIRECTORY,
+    platform.name(),
+    tenant,
+    PROXY_CERTIFICATE_BUNDLES_SUBDIRECTORY,
+    proxy_prefix
+  ))
+}
+
 /// Create parent directory
 ///
 /// Create the parent directory or directories for the provided `path`. If the parent directory
@@ -287,8 +420,11 @@ fn refresh_token_pathbuf(platform: &DshPlatform) -> DshCliResult<Option<PathBuf>
 /// ## Returns
 /// * `Ok<()>` - Parent directory already exists or was successfully created.
 /// * `Err<DshCliError>` - Pasrent directory or directories could not be created.
-fn create_parent_directories(path: &Path) -> DshCliResult<()> {
-  match path.parent() {
+fn create_parent_directories<T>(path: T) -> DshCliResult<()>
+where
+  T: AsRef<Path>,
+{
+  match path.as_ref().parent() {
     Some(parent) => {
       if parent.exists() {
         if parent.is_dir() {
@@ -302,7 +438,7 @@ fn create_parent_directories(path: &Path) -> DshCliResult<()> {
         Ok(())
       }
     }
-    None => err!("'{}' has no parent", path.display()),
+    None => err!("'{}' has no parent", path.as_ref().display()),
   }
 }
 
