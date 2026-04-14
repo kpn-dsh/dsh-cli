@@ -3,7 +3,6 @@ use crate::authentication::AuthenticationMethod;
 use crate::capability::UPDATE_COMMAND;
 use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
-#[cfg(feature = "robot")]
 use crate::clients::create_client_access_token_from_platform_tenant;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
@@ -16,7 +15,9 @@ use crate::{err, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::ArgMatches;
+#[cfg(feature = "robot")]
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
+#[cfg(feature = "robot")]
 use dsh_api::dsh_api_tenant::DshApiTenant;
 use dsh_api::platform::DshPlatform;
 use dsh_api::secret::ROBOT_SECRET;

@@ -44,7 +44,6 @@ pub(crate) async fn create_clients(matches: &ArgMatches, requirements: &Requirem
 /// Returns
 /// * `Ok(Some(Vec<Client>))` - Client successfully created.
 /// * `Ok(None)` - User needs to log in.
-#[cfg(feature = "robot")]
 pub(crate) async fn create_client_access_token_from_platform_tenant(api_platform: &DshPlatform, api_tenant: &str, context: &Context) -> DshCliResult<Option<DshApiClient>> {
   if *context.authentication_method() == AuthenticationMethod::SingleSignOn {
     if supports_dsh_directory() {
