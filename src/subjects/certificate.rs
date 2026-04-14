@@ -1,21 +1,20 @@
 use crate::arguments::certificate_id_argument;
-use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
+use crate::certificates::{hashmap_from_distinguished_name, san_to_string, DshCertificate};
 use crate::context::Context;
 use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{vec_to_table, OutputFormat, Value};
+use crate::formatters::{hashmap_to_table, vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::issues::{Issue, IssueDescription, IssueLabel, Severity};
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::secret::{secrets_with_metadata, SECRET_LABELS_LIST};
 use crate::subjects::{secret, DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
-use crate::target_platform::{get_target_platform_explicit, platform_name_argument};
-use crate::target_tenant::{get_target_tenant_explicit, tenant_name_argument};
 use crate::DshCliResult;
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -31,6 +30,7 @@ use itertools::{multizip, Itertools};
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 struct CertificateSubject {}
 
@@ -60,7 +60,6 @@ impl Subject for CertificateSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      CREATE_COMMAND => Some(CERTIFICATE_CREATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(CERTIFICATE_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(CERTIFICATE_SHOW_CAPABILITY.as_ref()),
       _ => None,
@@ -72,14 +71,8 @@ impl Subject for CertificateSubject {
   }
 }
 
-lazy_static! {
-  static ref CERTIFICATE_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, None, &CertificateCreate {}, "Create self signed certificate")
-      .add_target_argument(certificate_id_argument().required(true))
-      .add_target_argument(platform_name_argument())
-      .add_target_argument(tenant_name_argument())
-  );
-  static ref CERTIFICATE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &CertificateList {}, "List certificates")
       .set_long_about("Lists all available certificates.")
       .add_command_executors(vec![
@@ -89,45 +82,23 @@ lazy_static! {
         (FlagType::Ids, &CertificateListIds {}, None),
         (FlagType::Issues, &CertificateListIssues {}, None),
         (FlagType::Usage, &CertificateListUsage {}, None),
-      ])
-  );
-  static ref CERTIFICATE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+      ]),
+  )
+});
+static CERTIFICATE_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &CertificateShow {}, "Show certificate configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
-        // (FlagType::Issues, &CertificateShowIssues {}, None),
-        (FlagType::Usage, &CertificateShowUsage {}, None)
+        (FlagType::Usage, &CertificateShowUsage {}, None),
       ])
-      .add_target_argument(certificate_id_argument().required(true))
-  );
-  static ref CERTIFICATE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![CERTIFICATE_CREATE_CAPABILITY.as_ref(), CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()];
-}
+      .add_target_argument(certificate_id_argument().required(true)),
+  )
+});
+static CERTIFICATE_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> =
+  LazyLock::new(|| vec![CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()]);
 
-const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
-
-struct CertificateCreate {}
-
-#[async_trait]
-impl CommandExecutor for CertificateCreate {
-  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let platform = get_target_platform_explicit(matches)?;
-    let tenant = get_target_tenant_explicit(matches)?;
-    let certificate_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("create self signed certificate '{}' for {}@{}", certificate_id, tenant, platform));
-
-    if context.dry_run() {
-      context.print_warning("dry-run mode, certificate not created");
-    } else {
-      context.print_outcome(format!("certificate '{}' created", certificate_id));
-    }
-
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api()
-  }
-}
+pub(crate) const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
 
 struct CertificateList {}
 
@@ -447,13 +418,16 @@ impl SubjectFormatter<CertificateLabel> for (&ActualCertificate, Option<u64>) {
   fn value(&self, label: &CertificateLabel, target_id: &str) -> Value {
     let (actual_certificate, days) = self;
     match label {
-      CertificateLabel::CertChainSecret => Value::plain(&actual_certificate.cert_chain_secret),
+      CertificateLabel::CertChainSecret => Value::target(&actual_certificate.cert_chain_secret),
       CertificateLabel::DistinguishedName => Value::plain(format_distinguished_name(&actual_certificate.distinguished_name)),
       CertificateLabel::DnsNames => Value::plain(actual_certificate.dns_names.join("\n")),
-      CertificateLabel::KeySecret => Value::plain(&actual_certificate.key_secret),
+      CertificateLabel::KeySecret => Value::target(&actual_certificate.key_secret),
       CertificateLabel::NotAfter => Value::datetime_expired(&actual_certificate.not_after, *days),
       CertificateLabel::NotBefore => Value::datetime_not_before(&actual_certificate.not_before),
-      CertificateLabel::PassphraseSecret => Value::option(actual_certificate.passphrase_secret.clone()),
+      CertificateLabel::PassphraseSecret => match &actual_certificate.passphrase_secret {
+        Some(passphrase_secret) => Value::target(passphrase_secret.clone()),
+        None => Value::empty(),
+      },
       CertificateLabel::SerialNumber => Value::plain(&actual_certificate.serial_number),
       CertificateLabel::Target => Value::target(target_id),
     }
@@ -475,6 +449,22 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
       CertificateLabel::PassphraseSecret => Value::option(self.passphrase_secret.clone()),
       CertificateLabel::Target => Value::target(target_id),
       _ => unreachable!(),
+    }
+  }
+}
+
+impl SubjectFormatter<CertificateLabel> for DshCertificate {
+  fn value(&self, label: &CertificateLabel, target_id: &str) -> Value {
+    match label {
+      CertificateLabel::CertChainSecret => Value::unreachable(),
+      CertificateLabel::DistinguishedName => Value::plain(hashmap_to_table(&hashmap_from_distinguished_name(&self.certificate.params().distinguished_name))),
+      CertificateLabel::DnsNames => Value::plain(self.certificate.params().subject_alt_names.iter().map(san_to_string).collect_vec().join("\n")),
+      CertificateLabel::KeySecret => Value::unreachable(),
+      CertificateLabel::NotAfter => Value::plain(self.certificate.params().not_after),
+      CertificateLabel::NotBefore => Value::plain(self.certificate.params().not_before),
+      CertificateLabel::PassphraseSecret => Value::unreachable(),
+      CertificateLabel::SerialNumber => Value::option(self.certificate.params().serial_number.as_ref().map(|serial_number| serial_number.to_string())),
+      CertificateLabel::Target => Value::target(target_id),
     }
   }
 }
@@ -605,6 +595,15 @@ pub(crate) static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 9] = [
   CertificateLabel::NotAfter,
   CertificateLabel::NotBefore,
   CertificateLabel::PassphraseSecret,
+  CertificateLabel::SerialNumber,
+];
+
+pub(crate) static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
+  CertificateLabel::Target,
+  CertificateLabel::DistinguishedName,
+  CertificateLabel::DnsNames,
+  CertificateLabel::NotAfter,
+  CertificateLabel::NotBefore,
   CertificateLabel::SerialNumber,
 ];
 

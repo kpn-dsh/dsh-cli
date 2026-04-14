@@ -1,7 +1,9 @@
-use crate::arguments::proxy_id_argument;
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::arguments::{certificate_id_argument, proxy_id_argument};
+use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
+use crate::certificates::{ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::context::Context;
+use crate::directory::store_certificate_bundle;
 use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
@@ -11,18 +13,24 @@ use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::secret_metadata::secret_metadata;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::certificate::{CERTIFICATE_LABELS_SHOW, EXPIRATION_CHECK_DAYS};
+use crate::subjects::certificate::{CERTIFICATE_LABELS_SHOW, EXPIRATION_CHECK_DAYS, GENERATED_CERTIFICATE_LABELS};
 use crate::subjects::secret::SECRET_LABELS_LIST;
-use crate::{err, DshCliResult};
+use crate::target_platform::{get_target_platform, platform_name_argument};
+use crate::target_tenant::{get_target_tenant, tenant_name_argument};
+use crate::verbosity::Verbosity;
+use crate::{cli_error, err, DshCliResult};
 use async_trait::async_trait;
-use clap::ArgMatches;
+use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::types::KafkaProxy;
 use futures::future::try_join_all;
 use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::trace;
 use serde::Serialize;
+use std::convert::AsRef;
+use std::sync::LazyLock;
 
 struct ProxySubject {}
 
@@ -48,6 +56,7 @@ impl Subject for ProxySubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      CREATE_COMMAND => Some(PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(PROXY_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(PROXY_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(PROXY_SHOW_CAPABILITY.as_ref()),
@@ -60,22 +69,169 @@ impl Subject for ProxySubject {
   }
 }
 
-lazy_static! {
-  static ref PROXY_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+static PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
+    CapabilityBuilder::new(CREATE_COMMAND, None, &ProxyCertificateBundleCreate {}, "Create proxy certificates bundle")
+      .add_target_argument(certificate_id_argument().required(true))
+      .add_target_argument(platform_name_argument())
+      .add_target_argument(tenant_name_argument())
+      .add_extra_argument(broker_prefix_option())
+      .add_extra_argument(number_of_brokers_option())
+      .add_extra_argument(public_vhost_option())
+      .add_extra_argument(include_schema_store_dns_option()),
+  )
+});
+static PROXY_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, None, &ProxyDelete {}, "Delete proxy")
       .set_long_about("Delete a Kafka proxy.")
-      .add_target_argument(proxy_id_argument().required(true))
-  );
-  static ref PROXY_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+      .add_target_argument(proxy_id_argument().required(true)),
+  )
+});
+static PROXY_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyList {}, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
-      .add_command_executor(FlagType::Ids, &ProxyListIds {}, None)
-  );
-  static ref PROXY_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShow {}, "Show Kafka proxy configuration").add_target_argument(proxy_id_argument().required(true))
-  );
-  static ref PROXY_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref()];
+      .add_command_executor(FlagType::Ids, &ProxyListIds {}, None),
+  )
+});
+static PROXY_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShow {}, "Show Kafka proxy configuration").add_target_argument(proxy_id_argument().required(true)))
+});
+
+static PROXY_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> =
+  LazyLock::new(|| vec![PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY.as_ref(), PROXY_DELETE_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref()]);
+
+const BROKER_PREFIX_OPTION: &str = "broker-prefix-option";
+
+fn broker_prefix_option() -> Arg {
+  Arg::new(BROKER_PREFIX_OPTION)
+    .long("broker-prefix")
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("BROKER_PREFIX")
+    .help("Broker prefix")
+    .long_help("Prefix used to generate the dsn and schema store name.")
+}
+
+const NUMBER_OF_BROKERS_OPTION: &str = "number-of-brokers-option";
+
+fn number_of_brokers_option() -> Arg {
+  Arg::new(NUMBER_OF_BROKERS_OPTION)
+    .long("number-of-brokers")
+    .action(ArgAction::Set)
+    .value_parser(builder::RangedU64ValueParser::<u32>::new().range(1..11))
+    .value_name("NUMBER_OF_BROKERS")
+    .help("Number of brokers")
+    .long_help("Number of brokers or dns records that will be generated.")
+}
+
+const PUBLIC_VHOST_OPTION: &str = "public-vhost-option";
+
+fn public_vhost_option() -> Arg {
+  Arg::new(PUBLIC_VHOST_OPTION)
+    .long("public-vhost")
+    .action(ArgAction::SetTrue)
+    .help("Public vhost")
+    .long_help(
+      "If this option is provided the certificates will be created for a public vhost. \
+      If this option is not provided certificates for a private vhost will be created.",
+    )
+}
+
+const INCLUDE_SCHEMA_STORE_DNS_OPTION: &str = "include-schema-store-dns-option";
+
+fn include_schema_store_dns_option() -> Arg {
+  Arg::new(INCLUDE_SCHEMA_STORE_DNS_OPTION)
+    .long("include-schema-store-dns")
+    .action(ArgAction::SetTrue)
+    .help("Include schema store dns")
+    .long_help(
+      "If this option is provided the created certificates will include a dns entry \
+    for a schema store.",
+    )
+}
+
+struct ProxyCertificateBundleCreate {}
+
+#[async_trait]
+impl CommandExecutor for ProxyCertificateBundleCreate {
+  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant = get_target_tenant(matches, context.settings())?;
+    let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("create proxy certificates bundle '{}' for {}@{}", proxy_bundle_id, tenant, platform));
+    let broker_prefix: String = match matches.get_one::<String>(BROKER_PREFIX_OPTION) {
+      Some(prefix) => prefix.clone(),
+      None => {
+        let prefix = context.read_single_line("broker prefix")?;
+        if prefix.is_empty() {
+          return err!("proxy prefix cannot be empty");
+        }
+        prefix
+      }
+    };
+    let number_of_brokers: u32 = match matches.get_one::<u32>(NUMBER_OF_BROKERS_OPTION) {
+      Some(prefix) => *prefix,
+      None => {
+        let line = context.read_single_line("enter number of brokers (default is 10)")?;
+        if line.is_empty() {
+          10
+        } else {
+          line.parse::<u32>().map_err(|_| cli_error!("could not parse '{}' as a valid integer", line))?
+        }
+      }
+    };
+    let public_vhost = matches.get_flag(PUBLIC_VHOST_OPTION);
+    let include_schema_store_dns_record = matches.get_flag(INCLUDE_SCHEMA_STORE_DNS_OPTION);
+
+    context.print_explanation(format!("create proxy certificates bundle '{}' for '{}@{}'", proxy_bundle_id, platform, tenant));
+
+    let config = ProxyCertificateBundleConfig {
+      platform: platform.clone(),
+      tenant: tenant.clone(),
+      broker_prefix: broker_prefix.clone(),
+      number_of_brokers,
+      public_vhost,
+      include_schema_store_dns_record,
+    };
+    trace!("{:#?}", config);
+
+    let cert_bundle = ProxyCertificateBundle::try_from(&config)?;
+
+    if !context.quiet() {
+      match context.verbosity() {
+        Verbosity::Off | Verbosity::Low => (),
+        Verbosity::Medium | Verbosity::High => {
+          UnitFormatter::new("ca certificate", &GENERATED_CERTIFICATE_LABELS, context).print_non_serializable(&cert_bundle.ca_certificate, None)?;
+          UnitFormatter::new("client certificate", &GENERATED_CERTIFICATE_LABELS, context).print_non_serializable(&cert_bundle.client_certificate, None)?;
+          UnitFormatter::new("server certificate", &GENERATED_CERTIFICATE_LABELS, context).print_non_serializable(&cert_bundle.server_certificate, None)?;
+        }
+      }
+    }
+    context.print(format!(
+      "broker prefix: '{}', number of brokers: {}, {} vhost, schema dns entry {}included",
+      broker_prefix,
+      number_of_brokers,
+      if public_vhost { "public" } else { "private" },
+      if include_schema_store_dns_record { "" } else { "not " }
+    ));
+
+    if context.dry_run() {
+      context.print_warning("dry-run mode, proxy certificates bundle not stored");
+    } else {
+      let bundle_directory = store_certificate_bundle(&platform, &tenant, &proxy_bundle_id, &cert_bundle)?;
+      context.print(format!(
+        "proxy certificates bundle '{}' stored in directory '{}'",
+        proxy_bundle_id, bundle_directory
+      ));
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
+  }
 }
 
 struct ProxyDelete {}
