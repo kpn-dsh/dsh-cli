@@ -894,7 +894,7 @@ pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 9] = [
   SecretLabel::Notifications,
 ];
 
-pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 10] = [
+pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 12] = [
   SecretLabel::SecretName,
   SecretLabel::SecretId,
   SecretLabel::System,
@@ -905,4 +905,6 @@ pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 10] = [
   SecretLabel::Expires,
   SecretLabel::Status,
   SecretLabel::Notifications,
+  SecretLabel::Subject,
+  SecretLabel::Issuer,
 ];
