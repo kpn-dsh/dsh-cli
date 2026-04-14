@@ -226,7 +226,11 @@ impl Context {
     let no_csv_headers = Self::get_no_csv_headers(matches, &settings);
     let terminal_width = Self::get_terminal_width(matches, &settings)?;
     if dry_run && verbosity >= Verbosity::Medium {
-      eprintln!("dry-run mode enabled");
+      if stderr_no_escape {
+        eprintln!("dry-run mode enabled")
+      } else {
+        eprintln!("{}dry-run mode enabled{:#}", warning_style, warning_style)
+      }
     }
     Ok(Context {
       authentication_method,
@@ -283,6 +287,10 @@ impl Context {
     self.dry_run
   }
 
+  pub(crate) fn quiet(&self) -> bool {
+    self.quiet
+  }
+
   pub(crate) fn settings(&self) -> &Settings {
     &self.settings
   }
@@ -297,6 +305,10 @@ impl Context {
 
   pub(crate) fn terminal_width(&self) -> Option<usize> {
     self.terminal_width
+  }
+
+  pub(crate) fn verbosity(&self) -> &Verbosity {
+    &self.verbosity
   }
 
   /// Gets authentication method
@@ -659,7 +671,7 @@ impl Context {
         Some(verbosity_env_var) => Verbosity::try_from(verbosity_env_var.as_str()).map_err(error_append!("error in environment variable {}: ", ENV_VAR_DSH_CLI_VERBOSITY)),
         None => match settings.verbosity.clone() {
           Some(verbosity_from_settings) => Ok(verbosity_from_settings),
-          None => Ok(Verbosity::Low),
+          None => Ok(Verbosity::Medium),
         },
       },
     }
@@ -1185,31 +1197,31 @@ impl Context {
     if let Some((apps, services, certificates, proxies, trifoniuses)) = Self::dependant_ids::<_>(dependants) {
       self.print_warning(format!("{} '{}' has dependants", subject, subject_id));
       if !apps.is_empty() {
-        self.print_warning(format!("dependant apps:"));
+        self.print_warning("dependant apps:");
         for app in apps {
           self.print_warning(format!("  {}", app));
         }
       }
       if !services.is_empty() {
-        self.print_warning(format!("dependant services:"));
+        self.print_warning("dependant services:");
         for service in services {
           self.print_warning(format!("  {}", service));
         }
       }
       if !certificates.is_empty() {
-        self.print_warning(format!("dependant certificates:"));
+        self.print_warning("dependant certificates:");
         for certificate in certificates {
           self.print_warning(format!("  {}", certificate));
         }
       }
       if !proxies.is_empty() {
-        self.print_warning(format!("dependant proxies:"));
+        self.print_warning("dependant proxies:");
         for proxy in proxies {
           self.print_warning(format!("  {}", proxy));
         }
       }
       if !trifoniuses.is_empty() {
-        self.print_warning(format!("dependant trifonius:"));
+        self.print_warning("dependant trifonius:");
         for trifonius in trifoniuses {
           self.print_warning(format!("  {}", trifonius));
         }
