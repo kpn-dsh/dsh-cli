@@ -164,7 +164,7 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
       .arg(
         Arg::new(SETTING_EXPIRATION)
           .action(ArgAction::Set)
-          .value_parser(RangedValueParser::<u64>::new(0, 3000))
+          .value_parser(RangedValueParser::<u64>::new(0, 10000))
           .required(required),
       )
       .about("Number of days used to check if some resource is about to expire"),

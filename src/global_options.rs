@@ -96,7 +96,7 @@ pub(crate) fn expiration_option() -> Arg {
   Arg::new(EXPIRATION_OPTION)
     .long("expiration")
     .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<u64>::new(0, 3000))
+    .value_parser(RangedValueParser::<u64>::new(0, 10000))
     .value_name("DAYS")
     .help("Expiration period in days")
     .long_help("Number of days used to check if some resource is about to expire.")
@@ -450,9 +450,9 @@ pub(crate) fn get_expiration_days(matches: &ArgMatches, settings: &Settings) -> 
     None => match environment_variable(ENV_VAR_DSH_CLI_EXPIRATION, Some(matches))? {
       Some(expiration_env_var) => match expiration_env_var.parse::<u64>() {
         Ok(expiration) => {
-          if expiration > 30000 {
+          if expiration > 100000 {
             err!(
-              "expiration days value in environment variable '{}' must be lower than or equal to 3000",
+              "expiration days value in environment variable '{}' must be lower than or equal to 10000",
               ENV_VAR_DSH_CLI_EXPIRATION
             )
           } else {
