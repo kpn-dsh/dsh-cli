@@ -214,8 +214,8 @@ impl Context {
       &Self::get_color(ENV_VAR_DSH_CLI_TARGET_COLOR, matches, &settings.target_color, DshColor::Blue)?,
     );
     let warning_style = style_from(
-      &Self::get_style(ENV_VAR_DSH_CLI_WARNING_STYLE, matches, &settings.warning_style, DshStyle::Bold)?,
-      &Self::get_color(ENV_VAR_DSH_CLI_WARNING_COLOR, matches, &settings.warning_color, DshColor::Blue)?,
+      &Self::get_style(ENV_VAR_DSH_CLI_WARNING_STYLE, matches, &settings.warning_style, DshStyle::Normal)?,
+      &Self::get_color(ENV_VAR_DSH_CLI_WARNING_COLOR, matches, &settings.warning_color, DshColor::Magenta)?,
     );
     let quiet = Self::get_quiet(matches, &settings);
     let force = Self::get_force(matches);
