@@ -32,6 +32,8 @@ pub(crate) struct Settings {
   pub(crate) error_color: Option<DshColor>,
   #[serde(rename = "error-style", skip_serializing_if = "Option::is_none")]
   pub(crate) error_style: Option<DshStyle>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) expiration: Option<u64>,
   #[serde(rename = "label-color", skip_serializing_if = "Option::is_none")]
   pub(crate) label_color: Option<DshColor>,
   #[serde(rename = "label-style", skip_serializing_if = "Option::is_none")]
@@ -152,6 +154,9 @@ impl Debug for Settings {
     }
     if let Some(error_style) = &self.error_style {
       builder.field("error_style", error_style);
+    }
+    if let Some(expiration) = &self.expiration {
+      builder.field("expiration", expiration);
     }
     if let Some(label_color) = &self.label_color {
       builder.field("label_color", label_color);

@@ -10,6 +10,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{hashmap_to_table, vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
+use crate::global_options::{expiration_option, get_expiration_days};
 use crate::issues::{Issue, IssueDescription, IssueLabel, Severity};
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
@@ -75,6 +76,7 @@ static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>
   Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &CertificateList {}, "List certificates")
       .set_long_about("Lists all available certificates.")
+      .add_extra_argument(expiration_option())
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
         (FlagType::Configuration, &CertificateListConfiguration {}, None),
@@ -92,20 +94,20 @@ static CERTIFICATE_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>
         (FlagType::AllocationStatus, &CertificateShowAllocationStatus {}, None),
         (FlagType::Usage, &CertificateShowUsage {}, None),
       ])
-      .add_target_argument(certificate_id_argument().required(true)),
+      .add_target_argument(certificate_id_argument().required(true))
+      .add_extra_argument(expiration_option()),
   )
 });
 static CERTIFICATE_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> =
   LazyLock::new(|| vec![CERTIFICATE_LIST_CAPABILITY.as_ref(), CERTIFICATE_SHOW_CAPABILITY.as_ref()]);
 
-pub(crate) const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
-
 struct CertificateList {}
 
 #[async_trait]
 impl CommandExecutor for CertificateList {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificates with their parameters");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let certificate_ids = client.get_certificate_ids().await?;
     let certificate_statuses = join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate(certificate_id))).await;
@@ -114,7 +116,7 @@ impl CommandExecutor for CertificateList {
       .into_iter()
       .map(|certificate_status| match certificate_status {
         Ok(status) => match status.actual {
-          Some(actual_status) => Ok((actual_status, EXPIRATION_CHECK_DAYS)),
+          Some(actual_status) => Ok((actual_status, Some(expiration_days))),
           None => Err(DshApiError::from("")),
         },
         Err(error) => Err(error),
@@ -177,9 +179,9 @@ struct CertificateListErrors {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListErrors {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificates that have errors");
-    list_certificates(client, context, true).await?
+    list_certificates(client, matches, context, true).await?
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -207,9 +209,10 @@ impl CommandExecutor for CertificateListIds {
   }
 }
 
-async fn list_certificates(client: &DshApiClient, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
+async fn list_certificates(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
   const CERTIFICATE_ISSUE_LABELS_LIST: [IssueLabel; 6] =
     [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::DependencyName, IssueLabel::DependencySubject, IssueLabel::DependencyValue, IssueLabel::IssueDetails];
+  let expiration_days = get_expiration_days(matches, context.settings())?;
   let start_instant = context.now();
   let certificate_ids = client.get_certificate_ids().await?;
   let (certificates_statuses, secrets): (Vec<DshApiResult<CertificateStatus>>, DshCliResult<Vec<SecretTuple>>) = join!(
@@ -222,7 +225,7 @@ async fn list_certificates(client: &DshApiClient, context: &Context, only_errors
     .collect_vec()
     .into_iter()
     .flat_map(|(certificate_id, certificate_status)| {
-      let issues: Option<Vec<IssueDescription>> = has_issues(certificate_status, &secrets, EXPIRATION_CHECK_DAYS, only_errors);
+      let issues: Option<Vec<IssueDescription>> = has_issues(certificate_status, &secrets, Some(expiration_days), only_errors);
       issues.map(|issues| (certificate_id, issues))
     })
     .collect_vec();
@@ -240,9 +243,9 @@ struct CertificateListIssues {}
 
 #[async_trait]
 impl CommandExecutor for CertificateListIssues {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all certificates that have potential issues");
-    list_certificates(client, context, false).await?
+    list_certificates(client, matches, context, false).await?
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -282,15 +285,16 @@ struct CertificateShow {}
 
 #[async_trait]
 impl CommandExecutor for CertificateShow {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let (certificate_status, allocation_status) = join!(client.get_certificate(&certificate_id), client.get_certificate_status(&certificate_id));
     context.print_allocation_status(&allocation_status, CERTIFICATE_SUBJECT_TARGET);
     let certificate_status = certificate_status?;
     if let Some(actual_certificate) = &certificate_status.actual {
-      UnitFormatter::new(certificate_id.clone(), &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, EXPIRATION_CHECK_DAYS), None)?;
+      UnitFormatter::new(certificate_id.clone(), &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days)), None)?;
       let certificate_secret_ids = if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
         vec![actual_certificate.cert_chain_secret.clone(), actual_certificate.key_secret.clone(), passphrase_secret.clone()]
       } else {
@@ -300,7 +304,7 @@ impl CommandExecutor for CertificateShow {
       context.print_execution_time(start_instant);
       let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
       for (secret_id, secret) in certificate_secret_ids.iter().zip(certificate_secrets) {
-        formatter.push_target_id_value_owned(secret_id.clone(), secret_metadata(&secret));
+        formatter.push_target_id_value_owned(secret_id.clone(), (secret_metadata(&secret), Some(expiration_days)));
       }
       formatter.print(None)?;
       if let Some(certificate) = &certificate_status.configuration {

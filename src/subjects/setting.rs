@@ -1,3 +1,4 @@
+use crate::argument_parsers::RangedValueParser;
 use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
@@ -66,6 +67,7 @@ const SETTING_DEFAULT_TENANT: &str = "default-tenant";
 const SETTING_DRY_RUN: &str = "dry-run";
 const SETTING_ERROR_COLOR: &str = "error-color";
 const SETTING_ERROR_STYLE: &str = "error-style";
+const SETTING_EXPIRATION: &str = "expiration";
 const SETTING_LABEL_COLOR: &str = "label-color";
 const SETTING_LABEL_STYLE: &str = "label-style";
 const SETTING_LOG_COLOR: &str = "log-color";
@@ -158,6 +160,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Styling to be used when printing error messages"),
+    Command::new(SETTING_EXPIRATION)
+      .arg(
+        Arg::new(SETTING_EXPIRATION)
+          .action(ArgAction::Set)
+          .value_parser(RangedValueParser::<u64>::new(0, 3000))
+          .required(required),
+      )
+      .about("Number of days used to check if some resource is about to expire"),
     Command::new(SETTING_LABEL_COLOR)
       .arg(
         Arg::new(SETTING_LABEL_COLOR)
@@ -467,6 +477,9 @@ impl CommandExecutor for SettingSet {
       SETTING_ERROR_STYLE => {
         upsert_settings(move |settings| Ok(Settings { error_style: get_some(SETTING_ERROR_STYLE, matches, context)?, ..settings }))?;
       }
+      SETTING_EXPIRATION => {
+        upsert_settings(move |settings| Ok(Settings { expiration: get_some(SETTING_EXPIRATION, matches, context)?, ..settings }))?;
+      }
       SETTING_LABEL_COLOR => {
         upsert_settings(move |settings| Ok(Settings { label_color: get_some(SETTING_LABEL_COLOR, matches, context)?, ..settings }))?;
       }
@@ -603,6 +616,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(|settings| Ok(Settings { error_style: None, ..settings }))?;
         context.print_outcome("error style unset");
       }
+      SETTING_EXPIRATION => {
+        upsert_settings(|settings| Ok(Settings { expiration: None, ..settings }))?;
+        context.print_outcome("expiration days unset");
+      }
       SETTING_LABEL_COLOR => {
         upsert_settings(|settings| Ok(Settings { label_color: None, ..settings }))?;
         context.print_outcome("label color unset");
@@ -720,6 +737,7 @@ enum SettingLabel {
   DryRun,
   ErrorColor,
   ErrorStyle,
+  Expiration,
   FileName,
   LabelColor,
   LabelStyle,
@@ -760,6 +778,7 @@ impl Label for SettingLabel {
       Self::DryRun => SETTING_DRY_RUN,
       Self::ErrorColor => SETTING_ERROR_COLOR,
       Self::ErrorStyle => SETTING_ERROR_STYLE,
+      Self::Expiration => SETTING_EXPIRATION,
       Self::FileName => "settings file name",
       Self::LabelColor => SETTING_LABEL_COLOR,
       Self::LabelStyle => SETTING_LABEL_STYLE,
@@ -809,6 +828,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::DryRun => Value::option(self.dry_run),
       SettingLabel::ErrorColor => Value::option(self.error_color.as_ref()),
       SettingLabel::ErrorStyle => Value::option(self.error_style.as_ref()),
+      SettingLabel::Expiration => Value::option(self.expiration.as_ref()),
       SettingLabel::FileName => Value::option(self.file_name.clone()),
       SettingLabel::LabelColor => Value::option(self.label_color.as_ref()),
       SettingLabel::LabelStyle => Value::option(self.label_style.as_ref()),
@@ -839,7 +859,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
   }
 }
 
-static SETTING_LABELS: [SettingLabel; 35] = [
+static SETTING_LABELS: [SettingLabel; 36] = [
   SettingLabel::Authentication,
   SettingLabel::Browser,
   SettingLabel::CsvQuote,
@@ -849,6 +869,7 @@ static SETTING_LABELS: [SettingLabel; 35] = [
   SettingLabel::DryRun,
   SettingLabel::ErrorColor,
   SettingLabel::ErrorStyle,
+  SettingLabel::Expiration,
   SettingLabel::FileName,
   SettingLabel::LabelColor,
   SettingLabel::LabelStyle,

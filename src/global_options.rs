@@ -1,12 +1,15 @@
+use crate::argument_parsers::RangedValueParser;
 use crate::authentication::AuthenticationMethod;
 use crate::context::BrowserMethod;
+use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_EXPIRATION};
 use crate::formatters::OutputFormat;
 use crate::log_level::LogLevel;
+use crate::settings::Settings;
 use crate::verbosity::Verbosity;
-use crate::{OUTPUT_OPTIONS_HEADING, TOOL_OPTIONS_HEADING};
+use crate::{err, DshCliResult, OUTPUT_OPTIONS_HEADING, TOOL_OPTIONS_HEADING};
 use builder::EnumValueParser;
 use clap::builder::{PossibleValue, ValueParser};
-use clap::{builder, Arg, ArgAction};
+use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::platform::DshPlatform;
 use itertools::Itertools;
 
@@ -14,6 +17,7 @@ pub(crate) const AUTHENTICATION_OPTION: &str = "authentication-option";
 pub(crate) const BROWSER_OPTION: &str = "browser-option";
 pub(crate) const DRY_RUN_FLAG: &str = "dry-run-flag";
 pub(crate) const ENVIRONMENT_VARIABLE_OPTION: &str = "environment-variable-option";
+pub(crate) const EXPIRATION_OPTION: &str = "expiration-option";
 pub(crate) const FORCE_FLAG: &str = "force-flag";
 // pub(crate) const FROM_CLIPBOARD_FLAG: &str = "from-clipboard-flag";
 pub(crate) const LOG_LEVEL_API_OPTION: &str = "log-level-api-argument";
@@ -85,6 +89,18 @@ pub(crate) fn dry_run_flag() -> Arg {
           resources and services on the DSH. Dry-run mode can also be set by the \
           environment variable DSH_CLI_DRY_RUN or in the settings file.",
     )
+    .global(true)
+}
+
+pub(crate) fn expiration_option() -> Arg {
+  Arg::new(EXPIRATION_OPTION)
+    .long("expiration")
+    .action(ArgAction::Set)
+    .value_parser(RangedValueParser::<u64>::new(0, 3000))
+    .value_name("DAYS")
+    .help("Expiration period in days")
+    .long_help("Number of days used to check if some resource is about to expire.")
+    .hide_short_help(false)
     .global(true)
 }
 
@@ -420,4 +436,39 @@ pub(crate) fn version_flag() -> Arg {
     .exclusive(true)
     .hide_short_help(true)
     .help_heading(TOOL_OPTIONS_HEADING)
+}
+
+/// Gets expiration days
+///
+/// 1. Try flag `--expiration`
+/// 1. Try if environment variable `DSH_CLI_EXPIRATION` exists
+/// 1. Try settings file
+/// 1. Default to `30`
+pub(crate) fn get_expiration_days(matches: &ArgMatches, settings: &Settings) -> DshCliResult<u64> {
+  match matches.get_one::<u64>(EXPIRATION_OPTION) {
+    Some(expiration_argument) => Ok(expiration_argument.to_owned()),
+    None => match environment_variable(ENV_VAR_DSH_CLI_EXPIRATION, Some(matches))? {
+      Some(expiration_env_var) => match expiration_env_var.parse::<u64>() {
+        Ok(expiration) => {
+          if expiration > 30000 {
+            err!(
+              "expiration days value in environment variable '{}' must be lower than or equal to 3000",
+              ENV_VAR_DSH_CLI_EXPIRATION
+            )
+          } else {
+            Ok(expiration)
+          }
+        }
+        Err(_) => err!(
+          "non-numerical value '{}' in environment variable '{}'",
+          expiration_env_var,
+          ENV_VAR_DSH_CLI_EXPIRATION
+        ),
+      },
+      None => match settings.expiration {
+        Some(expiration_from_settings) => Ok(expiration_from_settings),
+        None => Ok(30),
+      },
+    },
+  }
 }

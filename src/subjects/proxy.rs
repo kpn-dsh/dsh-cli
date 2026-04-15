@@ -11,9 +11,10 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
+use crate::global_options::get_expiration_days;
 use crate::secret_metadata::secret_metadata;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::certificate::{CERTIFICATE_LABELS_SHOW, EXPIRATION_CHECK_DAYS, GENERATED_CERTIFICATE_LABELS};
+use crate::subjects::certificate::{CERTIFICATE_LABELS_SHOW, GENERATED_CERTIFICATE_LABELS};
 use crate::subjects::secret::SECRET_LABELS_LIST;
 use crate::target_platform::{get_target_platform, platform_name_argument};
 use crate::target_tenant::{get_target_tenant, tenant_name_argument};
@@ -306,9 +307,10 @@ struct ProxyShow {}
 
 #[async_trait]
 impl CommandExecutor for ProxyShow {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show configuration of proxy '{}'", proxy_id));
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let (proxy, allocation_status) = join!(client.get_kafkaproxy_configuration(&proxy_id), client.get_kafkaproxy_status(&proxy_id));
     match proxy {
       Ok(proxy) => {
@@ -317,7 +319,7 @@ impl CommandExecutor for ProxyShow {
         UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, context).print(&proxy, None)?;
         let mut secret_ids: Vec<String> = vec![proxy.secret_name_ca_chain];
         if let Some(actual_certificate) = &certificate_status.actual {
-          UnitFormatter::new(proxy.certificate, &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, EXPIRATION_CHECK_DAYS), None)?;
+          UnitFormatter::new(proxy.certificate, &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days)), None)?;
           secret_ids.push(actual_certificate.key_secret.clone());
           secret_ids.push(actual_certificate.cert_chain_secret.clone());
           if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
@@ -328,7 +330,7 @@ impl CommandExecutor for ProxyShow {
         let secrets = try_join_all(secret_ids.iter().map(|secret_id| client.get_secret(secret_id))).await?;
         let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
         for (secret_id, secret) in secret_ids.iter().zip(secrets) {
-          formatter.push_target_id_value_owned(secret_id.clone(), secret_metadata(&secret));
+          formatter.push_target_id_value_owned(secret_id.clone(), (secret_metadata(&secret), Some(expiration_days)));
         }
         formatter.print(None)?;
         Ok(())

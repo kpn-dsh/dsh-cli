@@ -12,6 +12,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::Value;
 use crate::formatters::{Label, OutputFormat, SubjectFormatter};
+use crate::global_options::{expiration_option, get_expiration_days};
 use crate::issues::{Issue, IssueLabel, Severity};
 use crate::modifier_flags::ModifierFlagType;
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
@@ -100,6 +101,7 @@ lazy_static! {
         (FlagType::System, &SecretListSystem {}, None),
         (FlagType::Usage, &SecretListUsage {}, None)
       ])
+      .add_extra_argument(expiration_option())
   );
   static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &SecretShow {}, "Show secret details")
@@ -127,8 +129,6 @@ lazy_static! {
     SECRET_UPDATE_CAPABILITY.as_ref()
   ];
 }
-
-const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
 
 struct SecretCopy {}
 
@@ -290,15 +290,16 @@ struct SecretListCertificates {}
 
 #[async_trait]
 impl CommandExecutor for SecretListCertificates {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that contain certificates");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, context);
     for (secret_name, _, secret_metadata, _, _) in secrets_with_metadata {
       if matches!(secret_metadata, SecretMetadata::Certificate { .. }) {
-        formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
+        formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata, Some(expiration_days)));
       }
     }
     formatter.print(None)?;
@@ -314,9 +315,9 @@ struct SecretListErrors {}
 
 #[async_trait]
 impl CommandExecutor for SecretListErrors {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that have errors");
-    list_issues(client, context, true).await?
+    list_issues(client, matches, context, true).await?
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -349,9 +350,9 @@ struct SecretListIssues {}
 
 #[async_trait]
 impl CommandExecutor for SecretListIssues {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that have potential issues");
-    list_issues(client, context, false).await?
+    list_issues(client, matches, context, false).await?
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -359,15 +360,16 @@ impl CommandExecutor for SecretListIssues {
   }
 }
 
-async fn list_issues(client: &DshApiClient, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
+async fn list_issues(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
   pub(crate) static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
     [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::SubjectDescription, IssueLabel::IssueDetails];
+  let expiration_days = get_expiration_days(matches, context.settings())?;
   let start_instant = context.now();
   let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
   context.print_execution_time(start_instant);
   let secrets_issues: Vec<(String, SecretMetadata, Vec<Issue>)> = secrets
     .iter()
-    .flat_map(|secret_tuple| has_issues(secret_tuple, EXPIRATION_CHECK_DAYS, only_errors).map(|issues| (secret_tuple.0.clone(), secret_tuple.2.clone(), issues)))
+    .flat_map(|secret_tuple| has_issues(secret_tuple, Some(expiration_days), only_errors).map(|issues| (secret_tuple.0.clone(), secret_tuple.2.clone(), issues)))
     .collect_vec();
   let mut formatter = ListFormatter::new_override_target_id_label(&SECRET_LIST_ISSUES_LABELS_LIST, "secret id", context);
   for (secret_name, secret_metadata, issues) in secrets_issues.into_iter() {
@@ -383,15 +385,16 @@ struct SecretListKeys {}
 
 #[async_trait]
 impl CommandExecutor for SecretListKeys {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that contain private of public keys");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&KEY_LABELS_LIST, context);
     for (secret_name, _, secret_metadata, _, _) in secrets_with_metadata {
       if let SecretMetadata::Pki { .. } = &secret_metadata {
-        formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
+        formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata, Some(expiration_days)));
       }
     }
     formatter.print(None)?;
@@ -821,53 +824,54 @@ impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<A
           Value::empty()
         }
       }
-      _ => secret_metadata.value(label, target_id),
+      _ => (secret_metadata.clone(), None::<u64>).value(label, target_id),
     }
   }
 }
 
-impl SubjectFormatter<SecretLabel> for SecretMetadata {
+impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
+    let (secret_metadata, expiration_days) = self;
     match label {
-      SecretLabel::Description => match self.kind() {
-        Some("error") => Value::error(self.additional_info().map(|info| info.to_string()).unwrap_or_default()),
-        _ => Value::option(self.additional_info()),
+      SecretLabel::Description => match secret_metadata.kind() {
+        Some("error") => Value::error(secret_metadata.additional_info().map(|info| info.to_string()).unwrap_or_default()),
+        _ => Value::option(secret_metadata.additional_info()),
       },
-      SecretLabel::Expires => match self.not_after() {
-        Some(not_after) => Value::timestamp_seconds_expired(not_after as i64, EXPIRATION_CHECK_DAYS),
+      SecretLabel::Expires => match secret_metadata.not_after() {
+        Some(not_after) => Value::timestamp_seconds_expired(not_after as i64, *expiration_days),
         None => Value::empty(),
       },
-      SecretLabel::_Format => Value::plain(self.format()),
-      SecretLabel::FormatKind => Value::option(self.format_kind()),
-      SecretLabel::Issuer => match self {
+      SecretLabel::_Format => Value::plain(secret_metadata.format()),
+      SecretLabel::FormatKind => Value::option(secret_metadata.format_kind()),
+      SecretLabel::Issuer => match secret_metadata {
         SecretMetadata::Certificate { issuer, .. } => Value::plain(issuer),
         _ => Value::not_applicable(),
       },
-      SecretLabel::Kind => match self.kind() {
+      SecretLabel::Kind => match secret_metadata.kind() {
         Some("error") => Value::error("ERROR"),
-        _ => Value::option(self.kind()),
+        _ => Value::option(secret_metadata.kind()),
       },
-      SecretLabel::Label => match self {
+      SecretLabel::Label => match secret_metadata {
         SecretMetadata::Certificate { label, .. } => Value::plain(label),
         SecretMetadata::Pki { labels, .. } => Value::plain(labels.join("/")),
         _ => Value::not_applicable(),
       },
-      SecretLabel::_NotBefore => match self {
+      SecretLabel::_NotBefore => match secret_metadata {
         SecretMetadata::Certificate { not_before, .. } => Value::plain(not_before),
         _ => Value::not_applicable(),
       },
-      SecretLabel::NotAfter => match self {
-        SecretMetadata::Certificate { not_after, .. } => Value::timestamp_seconds_expired(*not_after as i64, EXPIRATION_CHECK_DAYS),
+      SecretLabel::NotAfter => match secret_metadata {
+        SecretMetadata::Certificate { not_after, .. } => Value::timestamp_seconds_expired(*not_after as i64, *expiration_days),
         _ => Value::not_applicable(),
       },
-      SecretLabel::_NumberOfEntries => Value::option(self.number_of_entries()),
-      SecretLabel::Private => match self {
+      SecretLabel::_NumberOfEntries => Value::option(secret_metadata.number_of_entries()),
+      SecretLabel::Private => match secret_metadata {
         SecretMetadata::Pki { private, .. } => Value::plain(if *private { "private" } else { "public" }),
         _ => Value::not_applicable(),
       },
       SecretLabel::SecretName => Value::target(target_id),
-      SecretLabel::Size => Value::option(self.secret_size()),
-      SecretLabel::Subject => match self {
+      SecretLabel::Size => Value::option(secret_metadata.secret_size()),
+      SecretLabel::Subject => match secret_metadata {
         SecretMetadata::Certificate { subject, .. } => Value::plain(subject),
         _ => Value::not_applicable(),
       },

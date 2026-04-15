@@ -331,6 +331,16 @@ struct EnvironmentVariable {
 }
 
 impl EnvironmentVariable {
+  /// Create an environment variable description
+  ///
+  /// ## Parameters
+  /// * `name` - Environment variable name/key.
+  /// * `short_explanation` - Short explanation.
+  /// * `contains_secret` - If `true` the value of the environment variable will never be shown.
+  /// * `override_allowed` - If `true` the value of the environment variable can be overwritten
+  ///   by a command line option.
+  /// * `default_value` - Optional default value, only used for documentation.
+  /// * `long_explanation` - Long explanation.
   fn new(
     name: &'static str,
     short_explanation: &'static str,
@@ -444,6 +454,7 @@ pub(crate) const ENV_VAR_DSH_CLI_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
 pub(crate) const ENV_VAR_DSH_CLI_ENV_FILE: &str = "DSH_CLI_ENV_FILE";
 pub(crate) const ENV_VAR_DSH_CLI_ERROR_COLOR: &str = "DSH_CLI_ERROR_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_ERROR_STYLE: &str = "DSH_CLI_ERROR_STYLE";
+pub(crate) const ENV_VAR_DSH_CLI_EXPIRATION: &str = "DSH_CLI_EXPIRATION";
 pub(crate) const ENV_VAR_DSH_CLI_HOME: &str = "DSH_CLI_HOME";
 pub(crate) const ENV_VAR_DSH_CLI_LABEL_COLOR: &str = "DSH_CLI_LABEL_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_LABEL_STYLE: &str = "DSH_CLI_LABEL_STYLE";
@@ -477,7 +488,7 @@ pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
 
 lazy_static! {
-  static ref EnvironmentVariables: [EnvironmentVariable; 40] = [
+  static ref EnvironmentVariables: [EnvironmentVariable; 41] = [
     EnvironmentVariable::new(
       ENV_VAR_DSH_API_PLATFORMS_FILE,
       "Overrides the default list of available platforms.",
@@ -586,6 +597,16 @@ lazy_static! {
       If this variable is not set, the settings file will be checked for the 'error-style' entry. \n\
       Else the default value 'bold' will be used. The supported styles are: 'normal' (no styling), \n\
       'bold', 'dim', 'italic', 'underline' or 'reverse'.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_EXPIRATION,
+      "Number of days used to check if some resource is about to expire.",
+      false,
+      true,
+      Some("30"),
+      "Number of days used to check if some resource is about to expire. \n\
+      If this variable is not set, the settings file will be checked for the 'expiration' entry. \n\
+      Else the default value '30' will be used.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_HOME,
