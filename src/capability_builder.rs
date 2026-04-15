@@ -136,7 +136,6 @@ impl Capability for CapabilityBuilder<'_> {
       .subcommands(&self.subcommands)
       .args(&self.target_arguments)
       .args(self.clap_flags(subject_command))
-      .args(&self.extra_arguments)
       .arg_required_else_help(!self.subcommands.is_empty());
     if let Some(ref alias) = self.capability_command_alias {
       capability_command = capability_command.alias(alias)
@@ -159,6 +158,7 @@ impl Capability for CapabilityBuilder<'_> {
         .iter()
         .map(|(flag_type, long_help)| create_filter_flag(flag_type, long_help.as_deref()).help_heading(COMMAND_OPTIONS_HEADING))
         .collect_vec(),
+      self.extra_arguments.iter().cloned().collect_vec(),
       self
         .modifier_flags
         .iter()
