@@ -113,6 +113,7 @@ lazy_static! {
       .add_command_executor(FlagType::Usage, &SecretShowUsage {}, Some("Show where the secret is used".to_string()))
       .add_command_executor(FlagType::Value, &SecretShowValue {}, Some("Show the secret value".to_string()))
       .add_target_argument(secret_id_argument().required(true))
+      .add_extra_argument(expiration_option())
   );
   static ref SECRET_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &SecretUpdate {}, "Update secret")
@@ -247,14 +248,18 @@ struct SecretList {}
 
 #[async_trait]
 impl CommandExecutor for SecretList {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
     for (secret_name, secret_id, secret_metadata, allocation_status, _dependants) in secrets.into_iter() {
-      formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, allocation_status.clone()));
+      formatter.push_target_id_value_owned(
+        secret_name.clone(),
+        (secret_id.clone(), secret_metadata, Some(expiration_days), allocation_status.clone()),
+      );
     }
     formatter.print(None)?;
     Ok(())
@@ -410,15 +415,16 @@ struct SecretListSystem {}
 
 #[async_trait]
 impl CommandExecutor for SecretListSystem {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all system secret ids");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SYSTEM_LABELS_LIST, context);
     for (secret_name, secret_id, secret_metadata, _, _) in secrets_with_metadata {
       if secret_id.is_some() {
-        formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, None));
+        formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, Some(expiration_days), None));
       }
     }
     formatter.print(None)?;
@@ -462,13 +468,22 @@ struct SecretShow {}
 
 #[async_trait]
 impl CommandExecutor for SecretShow {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let (secret_value, allocation_status) = join!(client.get_secret(&secret_name), client.get_secret_status(&secret_name));
     context.print_execution_time(start_instant);
     context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
-    _ = UnitFormatter::new(&secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_id.clone(), secret_metadata(&secret_value?), allocation_status.clone().ok()), None);
+    _ = UnitFormatter::new(&secret_name, &SECRET_LABELS_SHOW, context).print(
+      &(
+        secret_id.clone(),
+        secret_metadata(&secret_value?),
+        Some(expiration_days),
+        allocation_status.clone().ok(),
+      ),
+      None,
+    );
     Ok(())
   }
 
@@ -794,9 +809,9 @@ impl Label for SecretLabel {
   }
 }
 
-impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<AllocationStatus>) {
+impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<u64>, Option<AllocationStatus>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
-    let (secret_id, secret_metadata, allocation_status) = self;
+    let (secret_id, secret_metadata, expiration_days, allocation_status) = self;
     match label {
       SecretLabel::Notifications => match allocation_status {
         Some(allocation_status) => Value::warn(allocation_status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
@@ -824,7 +839,7 @@ impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<A
           Value::empty()
         }
       }
-      _ => (secret_metadata.clone(), None::<u64>).value(label, target_id),
+      _ => (secret_metadata.clone(), *expiration_days).value(label, target_id),
     }
   }
 }
