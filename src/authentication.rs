@@ -319,22 +319,17 @@ fn authenticate_and_get_access_and_refresh_tokens(
   match device_authorization_request.request(http_client) {
     Ok(device_authorization_response) => {
       open_login_page(&device_authorization_response, platform, context);
-      if context.dry_run() {
-        context.print_warning("dry-run mode, not waiting for login".to_string());
-        Err(DshCliError::String("dry-run mode".to_string()))
-      } else {
-        let device_access_token_request: DeviceAccessTokenRequest<CoreTokenResponse, EmptyExtraDeviceAuthorizationFields> =
-          openid_connect_client.exchange_device_access_token(&device_authorization_response)?;
-        match device_access_token_request.request(http_client, std::thread::sleep, None) {
-          Ok(token_response) => {
-            if let Some(refresh_token) = token_response.refresh_token() {
-              Ok((token_response.access_token().clone(), refresh_token.clone()))
-            } else {
-              err!("device access token does not contain refresh token")
-            }
+      let device_access_token_request: DeviceAccessTokenRequest<CoreTokenResponse, EmptyExtraDeviceAuthorizationFields> =
+        openid_connect_client.exchange_device_access_token(&device_authorization_response)?;
+      match device_access_token_request.request(http_client, std::thread::sleep, None) {
+        Ok(token_response) => {
+          if let Some(refresh_token) = token_response.refresh_token() {
+            Ok((token_response.access_token().clone(), refresh_token.clone()))
+          } else {
+            err!("device access token does not contain refresh token")
           }
-          Err(error) => err!("authentication request failed: {}", error),
         }
+        Err(error) => err!("authentication request failed: {}", error),
       }
     }
     Err(error) => err!("authentication request failed: {}", error),
