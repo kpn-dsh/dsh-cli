@@ -31,7 +31,7 @@ pub(crate) enum Issue {
   ///
   /// ## Fields
   /// * `not_after` - Not after timestamp value of the configuration item in seconds since epoch.
-  ExpirationOncoming { not_after: i64 },
+  ExpirationUpcoming { not_after: i64 },
 
   /// Configuration item has an incorrect/illegal value
   ///
@@ -86,7 +86,7 @@ impl Issue {
       | Self::NotProvisioned
       | Self::Unexpected { .. } => Severity::Error,
       Self::Empty | Self::NotUsed => Severity::Ignore,
-      Self::CreationUpdateNotification { .. } | Self::ExpirationOncoming { .. } | Self::RemovalNotification { .. } => Severity::Warning,
+      Self::CreationUpdateNotification { .. } | Self::ExpirationUpcoming { .. } | Self::RemovalNotification { .. } => Severity::Warning,
     }
   }
 
@@ -96,7 +96,7 @@ impl Issue {
       Self::Before { .. } => "before",
       Self::CreationUpdateNotification { .. } => "creation/update notification",
       Self::Empty { .. } => "empty",
-      Self::ExpirationOncoming { .. } => "expiration oncoming",
+      Self::ExpirationUpcoming { .. } => "expiration upcoming",
       Self::Expired { .. } => "expired",
       Self::IncorrectValue { .. } => "incorrect value",
       Self::Misconfiguration { .. } => "misconfiguration",
@@ -113,7 +113,7 @@ impl Issue {
       Self::Before { not_before, .. } => Some(format!("not before {}", timestamp_to_string(*not_before))),
       Self::CreationUpdateNotification { notification } => Some(notification.render_message()),
       Self::Empty => None,
-      Self::ExpirationOncoming { not_after } => Some(format!("will expire at {}", timestamp_to_string(*not_after))),
+      Self::ExpirationUpcoming { not_after } => Some(format!("will expire at {}", timestamp_to_string(*not_after))),
       Self::Expired { not_after } => Some(format!("not after {}", timestamp_to_string(*not_after))),
       Self::IncorrectValue { explanation } => Some(explanation.clone()),
       Self::Misconfiguration { explanation } => Some(explanation.clone()),
@@ -141,12 +141,12 @@ impl Issue {
         Some(warning_days) => match Utc::now().checked_add_days(Days::new(warning_days)) {
           Some(expiration_warning_date) => {
             if not_after < &expiration_warning_date {
-              Some(Self::ExpirationOncoming { not_after: not_after.timestamp() })
+              Some(Self::ExpirationUpcoming { not_after: not_after.timestamp() })
             } else {
               None
             }
           }
-          None => Some(Self::IncorrectValue { explanation: format!("could not determine oncoming expiration ({}/{})", not_after, warning_days) }),
+          None => Some(Self::IncorrectValue { explanation: format!("could not determine upcoming expiration ({}/{})", not_after, warning_days) }),
         },
         None => None,
       }
