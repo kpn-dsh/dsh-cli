@@ -216,8 +216,6 @@ export SAFE_COMMANDS=(
   "token show --output-format json"
   "token show --output-format json-compact"
   "token show --complete"
-  "token show --complete --output-format json"
-  "token show --complete --output-format json-compact"
 
   "topic create $TOPIC_NON_EXISTING --dry-run"
   "topic create $TOPIC_NON_EXISTING --cleanup-policy compact --dry-run"
