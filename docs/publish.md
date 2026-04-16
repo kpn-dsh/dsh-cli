@@ -35,7 +35,7 @@ dsh_api = { version = "0.10.0", features = ["generic"] }
 
 Now from the root directory of the `dsh` project publish the crate using:
 
-```bash
+```shell
 > cargo publish --all-features --dry-run
 > ...
 > cargo publish --all-features

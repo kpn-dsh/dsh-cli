@@ -38,7 +38,7 @@ The DSH Api Command Line Tool (`dsh`) can be installed on your local machine
 (assuming you have the Rust tool-chain installed),
 by executing the following command.
 
-```bash
+```shell
 > cargo install dsh
 ...
 ```
@@ -48,7 +48,7 @@ by executing the following command.
 When installation completed without any errors,
 you should be able to start the `dsh` tool from the command line.
 
-```bash
+```shell
 > dsh
 DSH resource management api command line interface.
 

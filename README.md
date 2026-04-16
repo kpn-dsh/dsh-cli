@@ -39,7 +39,7 @@ The following features are defined:
 If you have the Rust tool-chain installed, the `dsh` tool can be installed on your local machine
 directly from `crates.io`, by executing the following command:
 
-```bash
+```shell
 > cargo install dsh --all-features
 ```
 
@@ -52,7 +52,7 @@ For some platforms a pre-built binary is available at the `GitHub` release page:
 You can download this file to your workstation. Make sure that the directory where you store
 the executable is included in your `PATH` variable and that you set the execute flag:
 
-```bash
+```shell
 > chmod $DIR/dsh u+x
 ```
 

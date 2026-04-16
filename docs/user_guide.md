@@ -5,7 +5,7 @@
 To see an overview of the most important commands that the `dsh` tool provides, just type
 the tool name without any command, subcommand, options or arguments:
 
-```bash
+```shell
 > dsh
 DSH resource management api command line interface.
 
@@ -55,7 +55,7 @@ Settings:
 You can have a complete list of all command and a more comprehensive explanation by using the
 `--help` command line option. Subcommands also have their own help text.
 
-```bash
+```shell
 > dsh --help
 > dsh secret
 > dsh secret --help
@@ -132,14 +132,14 @@ configuration item.
 For a complete list and detailed information about all environment variables,
 see [Environment variables](environment_variables.md), or use the following command:
 
-```bash
+```shell
 > dsh --env-vars
 ```
 
 For an explanation of a single environment variable (and the value if it is set), use the
 `--env-var` option followed by a (part of) the name of the environment variable:
 
-```bash
+```shell
 > dsh --env-var tenant
 ┌──────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────┐
 │ environment variable │ DSH_CLI_TENANT                                                                             │
@@ -158,7 +158,7 @@ For an explanation of a single environment variable (and the value if it is set)
 Many settings with regard to the configuration of the `dsh` tool can also be made in the tool
 itself, using the `setting` command:
 
-```bash
+```shell
 > dsh setting set default-platform nplz
 > dsh setting set default-tenant my-tenant
 > dsh setting set dry-run true
@@ -170,7 +170,7 @@ itself, using the `setting` command:
 
 To see all settings (with their current values), use:
 
-```bash
+```shell
 > dsh settings
 ┌────────────────────┬──────────────────────────────────┐
 │ setting            │ value                            │
@@ -186,7 +186,7 @@ Settings are stored in the tool directory (`$HOME/.dsh_cli/settings.toml`).
 
 To reset a setting to its default value, use:
 
-```bash
+```shell
 > dsh setting unset log-level
 ```
 
@@ -201,7 +201,7 @@ If you did not specify the target platform and/or target tenant (or any other ma
 on the command line, the environment variables or in the settings, the user will be prompted
 to provide the required values.
 
-```bash
+```shell
 > dsh secret list
 target platform: nplz
 target tenant: my-tenant

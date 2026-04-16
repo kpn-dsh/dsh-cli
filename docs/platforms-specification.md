@@ -14,14 +14,14 @@ include the default platforms in your platforms file.
 The default platforms file is defined in the `dsh_api` library crate.
 When you want to create your own platforms file you can use the default file as a starting point.
 
-```bash
+```shell
 > dsh platform export > my-platforms.json
 ```
 
 Open the file in your favorite editor and make the required changes,
 Then set the environment variable to point to the file and see the new platform configuration:
 
-```bash
+```shell
 > export DSH_API_PLATFORMS_FILE=my-platforms.json
 > dsh platform list
 ```

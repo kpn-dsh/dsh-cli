@@ -9,13 +9,13 @@ it is much more convenient to make some settings persistent via environment vari
 
 The `dsh` tool can print a list of all used environment variables via the command:
 
-```bash
+```shell
 > dsh --env-vars
 ```
 
 A detailed explanation of an environment variable can be printed via the commands:
 
-```bash
+```shell
 > dsh --env-var DSH_CLI_DRY_RUN  # Explains environment variable "DSH_CLI_DRY_RUN"
 > dsh --env-var dry              # Explaines all variables that contain "dry" (case insensitive)
 ```

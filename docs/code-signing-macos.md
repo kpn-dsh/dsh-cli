@@ -62,13 +62,13 @@ install it from [DeveloperIDG2CA](https://www.apple.com/certificateauthority/Dev
 
 You can check whether the KPN Developer Certificate is properly installed using the command:
 
-```bash
+```shell
 > security find-identity -v -p codesigning
 ```
 
 If everything is ok this command should return something like:
 
-```bash
+```shell
 1) FA675DE5B91B034C50FF28367713EE347A5A5C0C "Developer ID Application: KPN B.V. (B86ZND72C8)"
    1 valid identities found
 ```
@@ -91,7 +91,7 @@ rest of this text once for each binary.
 
 Build the tool with the following command:
 
-```bash
+```shell
 > cargo build --release --all-features
 ```
 
@@ -102,13 +102,13 @@ The build step will result in a binary file (`target/release/dsh`).
 Next step is signing the binary with the KPN developers certificate.
 Code signing is executed by the `codesign` command:
 
-```bash
+```shell
 > codesign -o runtime -s "Developer ID Application: KPN B.V. (B86ZND72C8)" target/release/dsh
 ```
 
 This command will most likely ask four your Keychain password. You can check the result by:
 
-```bash
+```shell
 > codesign -vvv --deep --strict target/release/dsh
 target/release/dsh: valid on disk
 target/release/dsh: satisfies its Designated Requirement
@@ -133,14 +133,14 @@ For the rest of this explanation `abcd-efgh-ijkl-mnop` will be used for the pass
 
 In order to notarise the `dsh` tool it must first be packed in a zip file:
 
-```bash
+```shell
 > zip dsh.zip target/release/dsh
 ```
 
 This creates the file `dsh.zip` containing only the `dsh` binary.
 This zip file can then be submitted to be notarised by the following command:
 
-```bash
+```shell
 > xcrun notarytool submit dsh.zip --apple-id your.name@kpn.com \
         --team-id B86ZND72C8 --password abcd-efgh-ijkl-mnop
 Conducting pre-submission checks for dsh.zip and initiating connection to the Apple notary service...
@@ -158,7 +158,7 @@ might need it to check the status of the process.
 Notarization usually takes less than 5 minutes, but in some cases it can take quite a bit longer.
 In order to poll the status of the process you can use the following command:
 
-```bash
+```shell
 > xcrun notarytool log abcdef01-2345-6789-abcd-ef0123456789 --apple-id your.name@kpn.com \
         --team-id B86ZND72C8  --password abcd-efgh-ijkl-mnop
 {
@@ -185,7 +185,7 @@ In order to poll the status of the process you can use the following command:
 When the notarise process is finished, you can check whether it was successful using the
 `codesign` command:
 
-```bash
+```shell
 > codesign -vvvv -R="notarized" --check-notarization target/release/dsh
 target/release/dsh: valid on disk
 target/release/dsh: satisfies its Designated Requirement

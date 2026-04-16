@@ -8,7 +8,7 @@ This page is targeted a developers who wish to work on the `dsh` tool.
 
 First clone the repository to your local machine:
 
-```bash
+```shell
 > git clone git@github.com:kpn-dsh/dsh-cli.git
 ...
 > cd dsh-cli
@@ -16,7 +16,7 @@ First clone the repository to your local machine:
 
 Then you can for example install the `dsh` tool on your local machine using:
 
-```bash
+```shell
 > cargo install --path .
 ...
 > dsh platform list
@@ -25,13 +25,13 @@ Then you can for example install the `dsh` tool on your local machine using:
 
 When developing, it is convenient to set an alias:
 
-```bash
+```shell
 > alias dshd="cargo run --all-features --package dsh --bin dsh --"
 ````
 
 You can then easily run the `dsh` tool without installing it:
 
-```bash
+```shell
 > dshd platform list
 ...
 ```
@@ -77,7 +77,7 @@ Before pushing code to `GitHub`, make sure that you adhere to the code formattin
 `rustfmt.toml` and that you have run the `clippy` linter. The following commands should
 return without any remarks:
 
-```bash
+```shell
 > cargo +nightly fmt --check
 > cargo clippy
 > cargo clippy --all-features
@@ -89,7 +89,7 @@ Consider configuring your IDE to automatically apply the formatting rules when s
 
 Be sure to include the `--all-features` flag when you run the unit tests:
 
-```bash
+```shell
 > cargo test --all-features
 ```
 

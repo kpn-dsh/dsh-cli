@@ -8,7 +8,7 @@ command requires parameters you will be prompted for them. However, there are
 also commands that do not require being logged in or any parameters. For example, to see a
 list of the available platforms, type:
 
-```bash
+```shell
 > dsh platforms
 ┌────────────────────┬────────┬────────────────────┬────────────┬──────────────────────────────────────────────┬───────────────────────────────────────────────┐
 │ platform id        │ alias  │ realm              │ production │ description                                  │ console url                                   │
@@ -25,7 +25,7 @@ list of the available platforms, type:
 Most commands however do require you to be logged in, and do require parameters. For example,
 to get a list of the configured secrets for `my-tenant` on platform `np-aws-lz-dsh`, just type:
 
-```bash
+```shell
 > dsh secret list
 target platform: np-aws-lz-dsh
 target tenant: my-tenant
@@ -40,7 +40,7 @@ so that will be the next step.
 Assuming that you are member of the tenant `my-tenant` on the platform `np-aws-lz-dsh`, you can
 log in by typing the following command in your shell:
 
-```bash
+```shell
 > dsh login np-aws-lz-dsh
 opening login page for platform 'np-aws-lz-dsh'
 ```
@@ -55,14 +55,14 @@ When logging in was successful you will see the following page where you have to
 After confirmation by clicking the `Yes` button, move back to your shell where you will see the
 tenants that you are authorized for.
 
-```bash
+```shell
 you are logged in
 authorized tenants: my-tenant, my-tenant1, my-tenant2, my-tenant3, my-tenant4
 ```
 
 Now we can try again:
 
-```bash
+```shell
 > dsh secrets --platform nplz --tenant my-tenant
 ┌─────────────┬────────┬─────────┬────────┬──────────┬─────────────┬─────────┬────────┬───────────────┐
 │ secret name │ system │ kind    │ format │ size     │ description │ expires │ status │ notifications │
@@ -81,7 +81,7 @@ subcommand.
 Typically, you will be submitting commands for the same platform and tenant quit often.
 In this case you can set the default platform and default tenant via a command:
 
-```bash
+```shell
 > dsh setting set default-platform np-aws-lz-dsh
 default platform set to np-aws-lz-dsh
 > dsh setting set default-tenant my-tenant
@@ -90,14 +90,14 @@ default tenant set to my-tenant
 
 Now you can get the same list of secrets by just typing:
 
-```bash
+```shell
 > dsh secrets
 ...
 ```
 
 Alternatively you can also provide the default parameters via environment variables:
 
-```bash
+```shell
 > export DSH_CLI_PLATFORM=np-aws-lz-dsh
 > export DSH_CLI_TENANT=my-tenant
 ```

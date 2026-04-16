@@ -23,7 +23,7 @@ but can also be specified explicitly:
 
 You can start a session with the command:
 
-```bash
+```shell
 > dsh login nplz
 opening login page for platform np-aws-lz-dsh
 ```
@@ -32,7 +32,7 @@ This will direct you to a web page where you can authenticate with your username
 other means available. When logging in was successful you will see the tenants that
 you are authorized for.
 
-```bash
+```shell
 you are logged in
 authorized tenants: my-tenant1, my-tenant2, my-tenant3, my-tenant4
 ```
@@ -43,7 +43,7 @@ after which you will have to log in again. You can check for which tenants you a
 by running the `dhs` tool without any arguments. This will give you the concise help information,
 followed by your current authorizations.
 
-```bash
+```shell
 > dsh
 ...
 Authentications:
@@ -53,7 +53,7 @@ Authentications:
 
 Once you're logged in, you can run commands without providing any further credentials:
 
-```bash
+```shell
 > dsh buckets -t my-tenant
 ┌───────────┬───────────┬─────────────┬────────────────────────────────┬────────────┐
 │ bucket id │ versioned │ provisioned │ name                           │ dependants │
@@ -66,7 +66,7 @@ Once you're logged in, you can run commands without providing any further creden
 With the single-sign-on authentication method it is also possible to run a command for more
 than one tenant, or even for all authorized tenants:
 
-```bash
+```shell
 > dsh env find debug --ignore-case --all-tenants
 # my-tenant1@np-aws-lz-dsh
 ┌─────────────┬───┬──────────────────────┬───────┐
@@ -85,7 +85,7 @@ than one tenant, or even for all authorized tenants:
 
 If needed, you can log out using the command:
 
-```bash
+```shell
 > dsh logout nplz
 ```
 
@@ -105,7 +105,7 @@ password. This robot password is located in the DSH platform secret store and is
 `Resources > Secrets`. You can also obtain the robot password using the `dsh` tool itself,
 by logging in using single-sign-on and running one of the following commands:
 
-```bash
+```shell
 > dsh secret copy system/rest-api-client
 > dsh secret show system/rest-api-client --value
 ```
@@ -135,14 +135,14 @@ When your computer supports it, robot passwords can safely be stored in your com
 See `dsh robot -h` for more information. The easiest and safest way to copy a robot password
 from the DSH secret store to your local keyring is by using the following command:
 
-```bash
+```shell
 > dsh robot import nplz my-tenant3
 ```
 
 This will get the robot password from the secret store and copy it to your local keyring
 without showing it. To list the available robot passwords in your local keyring, use:
 
-```bash
+```shell
 > dsh robots
 ┌───────────────┬────────────┐
 │ platform      │ tenant     │
