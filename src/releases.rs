@@ -211,14 +211,3 @@ fn parse_version(version_string: &str) -> Option<Version> {
     Version::from_str(version_string).ok()
   }
 }
-
-#[tokio::test]
-async fn test_releases_from_github() {
-  let releases = releases_from_github().await.unwrap();
-  for release in releases {
-    println!("{}", release.name);
-    for asset in release.assets {
-      println!("  {} -> {}", asset.name, asset.download_count);
-    }
-  }
-}
