@@ -110,8 +110,8 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
         debug!("get access token from stored refresh token: {}", access_token_jwt);
         trace!("{:#}", access_token_jwt);
         match &access_token_jwt.payload.preferred_username {
-          Some(preferred_username) => context.print(format!("you are already logged in as '{}'", preferred_username)),
-          None => context.print("you are already logged in"),
+          Some(preferred_username) => context.println(format!("you are already logged in as '{}'", preferred_username)),
+          None => context.println("you are already logged in"),
         }
         print_authorizations(&context, &access_token_jwt);
         Ok(())
@@ -122,8 +122,8 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
           let _ = write_refresh_token(&platform, &encrypted_refresh_token);
           let access_token_jwt = DshJwt::from_str(access_token.secret())?;
           match &access_token_jwt.payload.preferred_username {
-            Some(preferred_username) => context.print(format!("you are logged in as '{}'", preferred_username)),
-            None => context.print("you are logged in"),
+            Some(preferred_username) => context.println(format!("you are logged in as '{}'", preferred_username)),
+            None => context.println("you are logged in"),
           }
           print_authorizations(&context, &access_token_jwt);
           Ok(())
@@ -139,9 +139,9 @@ fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
   match &access_token_jwt.authorized_tenants() {
     Some(authorized_tenants) => {
       if !authorized_tenants.is_empty() {
-        context.print(format!("authorized tenants: {}", authorized_tenants.join(", ")));
+        context.println(format!("authorized tenants: {}", authorized_tenants.join(", ")));
       } else {
-        context.print("you are not authorized for tenants");
+        context.println("you are not authorized for tenants");
       }
     }
     None => context.print_warning("json web token does not provide authorized tenants"),
@@ -351,13 +351,13 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
         "open login page for platform '{}' in your browser and enter the provided user code",
         platform
       ));
-      context.print(format!("login page: {}", response.verification_uri()));
-      context.print(format!("user code: {}", response.user_code().secret()));
+      context.println(format!("login page: {}", response.verification_uri()));
+      context.println(format!("user code: {}", response.user_code().secret()));
     }
     BrowserMethod::Open => match response.verification_uri_complete() {
       Some(verification_uri) => match open::that(verification_uri.secret()) {
         Ok(()) => {
-          context.print(format!("opening login page for platform '{}'", platform));
+          context.println(format!("opening login page for platform '{}'", platform));
         }
         Err(_) => {
           context.print_error("could not open your browser");
@@ -365,8 +365,8 @@ fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthor
             "open login page for platform '{}' in your browser and enter the provided user code",
             platform
           ));
-          context.print(format!("login page: {}", response.verification_uri()));
-          context.print(format!("user code: {}", response.user_code().secret()));
+          context.println(format!("login page: {}", response.verification_uri()));
+          context.println(format!("user code: {}", response.user_code().secret()));
         }
       },
       None => unreachable!(),

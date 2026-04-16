@@ -119,7 +119,7 @@ impl CommandExecutor for TokenFetch {
     let start_instant = context.now();
     let raw_token = client.raw_token().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
-    context.print(raw_token);
+    context.println(raw_token);
     Ok(())
   }
 

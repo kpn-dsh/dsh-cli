@@ -370,11 +370,11 @@ impl Context {
   /// 1. When not run from a terminal confirmation is always false.
   pub(crate) fn confirmed(&self, prompt: impl Display) -> DshCliResult<bool> {
     if self.force {
-      self.wprintln(format!("{}", prompt));
-      self.wprintln("confirmed by --force option");
+      self.stdout_println(format!("{}", prompt));
+      self.warning_println("confirmed by --force option");
       Ok(true)
     } else if self.stdin_is_terminal {
-      self.wprint(format!("{} [y/N]", prompt));
+      self.print(format!("{} [y/N]", prompt));
       let _ = stdout().lock().flush();
       match Getch::new().getch() {
         Ok(key) => match key {
@@ -628,7 +628,7 @@ impl Context {
           Ok(terminal_width) => {
             if terminal_width < 40 {
               err!(
-                "terminal width in environment variable {} must be greater than or equal to 40",
+                "terminal width in environment variable '{}' must be greater than or equal to 40",
                 ENV_VAR_DSH_CLI_TERMINAL_WIDTH
               )
             } else {
@@ -680,24 +680,24 @@ impl Context {
   /// Open the provided url in the system browser
   pub(crate) fn open_url(&self, url: impl AsRef<OsStr> + Display, opening_target: impl Display) {
     if self.dry_run() {
-      self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
+      self.print_warning(format!("dry-run mode, opening '{}' canceled", opening_target));
       self.print_warning(format!("{}", url));
     } else {
       match self.browser_method() {
         BrowserMethod::Instruct => {
           self.print_explanation(format!("opening {}", opening_target));
           self.print_explanation("open url in your browser:");
-          self.print(format!("{}", url));
+          self.println(format!("{}", url));
         }
         BrowserMethod::Open => match open::that(&url) {
           Ok(()) => {
             self.print_explanation(format!("opening {}", opening_target));
           }
           Err(error) => {
-            self.print_error(format!("could not open {} in your browser", opening_target));
+            self.print_error(format!("could not open '{}' in your browser", opening_target));
             debug!("{}", error);
             self.print_explanation("open url in your browser:");
-            self.print(format!("{}", url));
+            self.println(format!("{}", url));
           }
         },
       }
@@ -709,7 +709,7 @@ impl Context {
     Instant::now()
   }
 
-  /// # Prints plain text output to stdout
+  /// # Prints plain text output to stdout without newline
   ///
   /// This method is used to print the output of the `dsh` tool to the standard output device.
   /// If `quiet` is `true`, nothing will be printed.
@@ -717,7 +717,19 @@ impl Context {
   /// depending on how the `dsh` tool was run from a shell or script.
   pub(crate) fn print<T: Display>(&self, output: T) {
     if !self.quiet {
-      self.println(output)
+      self.stdout_print(output)
+    }
+  }
+
+  /// # Prints plain text output to stdout
+  ///
+  /// This method is used to print the output of the `dsh` tool to the standard output device.
+  /// If `quiet` is `true`, nothing will be printed.
+  /// This standard output device can either be a tty, a pipe or an output file,
+  /// depending on how the `dsh` tool was run from a shell or script.
+  pub(crate) fn println<T: Display>(&self, output: T) {
+    if !self.quiet {
+      self.stdout_println(output)
     }
   }
 
@@ -733,26 +745,26 @@ impl Context {
       match self.output_format(default_output_format) {
         Csv => self.print_warning("csv output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Json => match serde_json::to_string_pretty(&output) {
-          Ok(json) => self.println(json),
+          Ok(json) => self.stdout_println(json),
           Err(_) => self.print_error("serializing to json failed"),
         },
         OutputFormat::JsonCompact => match serde_json::to_string(&output) {
-          Ok(json) => self.println(json),
+          Ok(json) => self.stdout_println(json),
           Err(_) => self.print_error("serializing to json failed"),
         },
         OutputFormat::Plain => self.print_warning("plain output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Quiet => (),
         OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Toml => match toml::ser::to_string_pretty(&output) {
-          Ok(toml) => self.println(toml),
+          Ok(toml) => self.stdout_println(toml),
           Err(_) => self.print_error("serializing to toml failed"),
         },
         OutputFormat::TomlCompact => match toml::ser::to_string(&output) {
-          Ok(toml) => self.println(toml),
+          Ok(toml) => self.stdout_println(toml),
           Err(_) => self.print_error("serializing to toml failed"),
         },
         OutputFormat::Yaml => match serde_yaml::to_string(&output) {
-          Ok(yaml) => self.println(yaml),
+          Ok(yaml) => self.stdout_println(yaml),
           Err(_) => self.print_error("serializing to yaml failed"),
         },
       }
@@ -765,7 +777,7 @@ impl Context {
   /// The prompt is only printed when stderr is a terminal.
   pub(crate) fn print_progress_step(&self) {
     if !self.quiet && self.stderr_is_terminal {
-      self.eprint(".");
+      self.stderr_print(".");
     }
   }
 
@@ -778,7 +790,7 @@ impl Context {
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: Display>(&self, prompt: T) {
     if !self.quiet && self.stderr_is_terminal {
-      self.eprint(prompt);
+      self.stderr_print(prompt);
     }
   }
 
@@ -796,7 +808,7 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => self.eprintln(outcome),
+        Verbosity::Medium | Verbosity::High => self.stderr_println(outcome),
       }
     }
   }
@@ -843,7 +855,7 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => self.eprintln(explanation),
+        Verbosity::Medium | Verbosity::High => self.stderr_println(explanation),
       }
     }
   }
@@ -866,7 +878,7 @@ impl Context {
         Ok(allocation_status) => {
           if allocation_status.provisioned {
             if self.verbosity == Verbosity::High {
-              self.eprintln(format!("{} is provisioned", subject));
+              self.stderr_println(format!("{} is provisioned", subject));
             }
           } else {
             match self.verbosity {
@@ -883,7 +895,7 @@ impl Context {
           }
           if let Some(derived_from) = &allocation_status.derived_from {
             match self.verbosity {
-              Verbosity::Medium | Verbosity::High => self.eprintln(format!("derived from '{}'", derived_from)),
+              Verbosity::Medium | Verbosity::High => self.stderr_println(format!("derived from '{}'", derived_from)),
               _ => {}
             }
           }
@@ -924,7 +936,7 @@ impl Context {
         if !self.quiet {
           match self.verbosity {
             Verbosity::Off | Verbosity::Low | Verbosity::Medium => (),
-            Verbosity::High => self.eprintln(format!("target {}", dsh_api_client.tenant())),
+            Verbosity::High => self.stderr_println(format!("target {}", dsh_api_client.tenant())),
           }
         }
       }
@@ -941,7 +953,7 @@ impl Context {
   /// a pipe or an output file.
   pub(crate) fn print_execution_time(&self, start_instant: Instant) {
     if !self.quiet && self.show_execution_time {
-      self.eprintln(format!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis()));
+      self.stderr_println(format!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis()));
     }
   }
 
@@ -1137,7 +1149,7 @@ impl Context {
   ///
   /// If `stderr_no_escape` is not set, the `stderr_style` will be applied to the provided string,
   /// and it will be post-fixed with an escape sequence to reset the `stderr_style`.
-  fn eprint<T: Display>(&self, text: T) {
+  fn stderr_print<T: Display>(&self, text: T) {
     if self.stderr_no_escape {
       eprint!("{}", text)
     } else {
@@ -1149,7 +1161,7 @@ impl Context {
   ///
   /// If `stderr_no_escape` is not set, the `error_style` will be applied to the provided string,
   /// and it will be post-fixed with an escape sequence to reset the `stderr_style`.
-  fn eprintln<T: Display>(&self, text: T) {
+  fn stderr_println<T: Display>(&self, text: T) {
     if self.stderr_no_escape {
       eprintln!("{}", text)
     } else {
@@ -1161,7 +1173,7 @@ impl Context {
   ///
   /// If `stderr_no_escape` is not set, the `warning_style` will be applied to the provided
   /// string, and it will be post-fixed with an escape sequence to reset the `warning_style`.
-  fn wprint<T: Display>(&self, text: T) {
+  fn _warning_print<T: Display>(&self, text: T) {
     if self.stderr_no_escape {
       eprint!("{}", text)
     } else {
@@ -1173,7 +1185,7 @@ impl Context {
   ///
   /// If `stderr_no_escape` is not set, the `warning_style` will be applied to the provided
   /// string, and it will be post-fixed with an escape sequence to reset the `warning_style`.
-  fn wprintln<T: Display>(&self, text: T) {
+  fn warning_println<T: Display>(&self, text: T) {
     if self.stderr_no_escape {
       eprintln!("{}", text)
     } else {
@@ -1181,11 +1193,23 @@ impl Context {
     }
   }
 
+  /// Print a text to stdout without newline
+  ///
+  /// If `stdout_no_escape` is not set, the `stdout_style` will be applied to the provided string,
+  /// and it will be post-fixed with an escape sequence to reset the `stdout_style`.
+  fn stdout_print<T: Display>(&self, text: T) {
+    if self.stdout_no_escape {
+      print!("{}", text)
+    } else {
+      print!("{}{}{:#}", self.stdout_style, text, self.stdout_style)
+    }
+  }
+
   /// Print a text to stdout
   ///
   /// If `stdout_no_escape` is not set, the `stdout_style` will be applied to the provided string,
   /// and it will be post-fixed with an escape sequence to reset the `stdout_style`.
-  fn println<T: Display>(&self, text: T) {
+  fn stdout_println<T: Display>(&self, text: T) {
     if self.stdout_no_escape {
       println!("{}", text)
     } else {

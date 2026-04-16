@@ -148,18 +148,18 @@ impl CommandExecutor for ManifestExplain {
         .map_err(|_| cli_error!("app catalog manifest '{}' does not exist", manifest_id))?,
     };
     context.print_execution_time(start_instant);
-    context.print(manifest.name);
+    context.println(manifest.name);
     if let Some(description) = manifest.description {
-      context.print(description);
+      context.println(description);
     }
     if manifest.draft {
-      context.print(format!("{}:{} is a draft manifest", manifest.id, manifest.version));
+      context.println(format!("{}:{} is a draft manifest", manifest.id, manifest.version));
     } else {
-      context.print(format!("{}:{}", manifest.id, manifest.version));
+      context.println(format!("{}:{}", manifest.id, manifest.version));
     }
     if let Some(more_info) = manifest.more_info {
-      context.print("");
-      context.print(termimad::text(more_info.as_str()));
+      context.println("");
+      context.println(termimad::text(more_info.as_str()));
     }
     if let Some(configuration) = &manifest.configuration {
       let mut property_ids = configuration.properties.keys().map(|id| id.to_string()).collect_vec();
@@ -213,7 +213,7 @@ impl CommandExecutor for ManifestExport {
     if draft {
       context.print_warning(format!("{}:{} is a draft manifest", manifest_id, version));
     }
-    context.print(raw_manifest);
+    context.println(raw_manifest);
     Ok(())
   }
 

@@ -135,7 +135,7 @@ where
 
   fn print_csv(&self) -> DshCliResult<()> {
     if !self.context.no_csv_headers() {
-      self.context.print(
+      self.context.println(
         self
           .labels
           .iter()
@@ -144,7 +144,7 @@ where
       );
     }
     for (target_id, value) in &self.values {
-      self.context.print(
+      self.context.println(
         self
           .labels
           .iter()
@@ -159,14 +159,14 @@ where
     match self.simplified_values() {
       Some(simplified_values) => match serde_json::to_string_pretty(&simplified_values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert simplified values to json ({})", error),
       },
       None => match serde_json::to_string_pretty(&self.values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert values to json ({})", error),
@@ -178,14 +178,14 @@ where
     match self.simplified_values() {
       Some(simplified_values) => match serde_json::to_string(&simplified_values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert simplified values to json compact ({})", error),
       },
       None => match serde_json::to_string(&self.values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert values to json compact ({})", error),
@@ -194,11 +194,11 @@ where
   }
 
   fn print_plain(&self) -> Result<(), DshCliError> {
-    self.context.print(self.labels.iter().map(|label| label.as_str()).join(","));
+    self.context.println(self.labels.iter().map(|label| label.as_str()).join(","));
     for (target_id, value) in &self.values {
       self
         .context
-        .print(self.labels.iter().map(|label| value.value(label, target_id).to_undecorated_string()).join(","));
+        .println(self.labels.iter().map(|label| value.value(label, target_id).to_undecorated_string()).join(","));
     }
     Ok(())
   }
@@ -243,7 +243,7 @@ where
     } else {
       table.with(Style::sharp());
     }
-    self.context.print(table.to_string());
+    self.context.println(table.to_string());
     Ok(())
   }
 
@@ -265,7 +265,7 @@ where
     }
     table.with(Padding::new(0, 2, 0, 0));
     table.with(Style::empty());
-    self.context.print(table.to_string());
+    self.context.println(table.to_string());
     Ok(())
   }
 
@@ -273,14 +273,14 @@ where
     match self.simplified_values() {
       Some(simplified_values) => match toml::to_string_pretty(&simplified_values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert simplified values to toml ({})", error),
       },
       None => match toml::to_string_pretty(&self.values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert values to toml ({})", error),
@@ -292,14 +292,14 @@ where
     match self.simplified_values() {
       Some(simplified_values) => match toml::to_string(&simplified_values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert simplified values to toml compact ({})", error),
       },
       None => match toml::to_string(&self.values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert values to toml compact ({})", error),
@@ -311,14 +311,14 @@ where
     match self.simplified_values() {
       Some(simplified_values) => match serde_yaml::to_string(&simplified_values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert simplified values to yaml ({})", error),
       },
       None => match serde_yaml::to_string(&self.values) {
         Ok(json) => {
-          self.context.print(json);
+          self.context.println(json);
           Ok(())
         }
         Err(error) => err!("could not convert values to yaml ({})", error),

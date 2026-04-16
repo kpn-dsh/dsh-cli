@@ -551,7 +551,7 @@ impl CommandExecutor for SecretShowValue {
     let secret = client.get_secret(&secret_name).await?;
     context.print_execution_time(start_instant);
     context.print_explanation(format!("show the value of secret '{}'", secret_name));
-    context.print(secret);
+    context.println(secret);
     Ok(())
   }
 

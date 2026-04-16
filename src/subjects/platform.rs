@@ -123,7 +123,7 @@ struct PlatformExport {}
 impl CommandExecutor for PlatformExport {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("export the default platforms specification");
-    context.print(DEFAULT_PLATFORMS);
+    context.println(DEFAULT_PLATFORMS);
     Ok(())
   }
 

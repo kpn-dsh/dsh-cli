@@ -327,7 +327,7 @@ async fn inner_main() -> DshCliExit {
   if matches.get_flag(VERSION_FLAG) {
     match newer_release(&VERSION).await {
       Ok(Some(newer_release)) => {
-        context.print(format!(
+        context.println(format!(
           "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
           *VERSION,
           crate_version(),
@@ -340,7 +340,7 @@ async fn inner_main() -> DshCliExit {
         ));
       }
       Ok(None) => {
-        context.print(format!(
+        context.println(format!(
           "version: {} (latest)\ndsh-api library version: {}\ndsh openapi version: {}",
           *VERSION,
           crate_version(),
@@ -419,7 +419,7 @@ async fn inner_main() -> DshCliExit {
           };
           for client in &clients {
             if matches.get_flag(TENANTS_ALL_FLAG) {
-              context.print(format!("# {}", client.tenant()))
+              context.println(format!("# {}", client.tenant()))
             }
             match subject.execute_subject_command_with_client(sub_matches, client, &context).await {
               Ok(_) => {}
@@ -449,7 +449,7 @@ async fn inner_main() -> DshCliExit {
             };
             for client in &clients {
               if matches.get_flag(TENANTS_ALL_FLAG) {
-                context.print(format!("# {}", client.tenant()))
+                context.println(format!("# {}", client.tenant()))
               }
               match subject_list_shortcut.execute_subject_list_shortcut_with_client(sub_matches, client, &context).await {
                 Ok(_) => {}

@@ -425,7 +425,7 @@ struct ApiShow {}
 impl CommandExecutor for ApiShow {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("print the open api specification");
-    context.print(DshApiClient::openapi_spec());
+    context.println(DshApiClient::openapi_spec());
     Ok(())
   }
 
