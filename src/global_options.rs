@@ -296,13 +296,7 @@ pub(crate) fn quiet_flag() -> Arg {
 }
 
 pub(crate) fn releases_flag() -> Arg {
-  Arg::new(RELEASES_FLAG)
-    .long("releases")
-    .action(ArgAction::SetTrue)
-    .long_help("If this flag is provided, the dsh tool will show all available github releases.")
-    .exclusive(true)
-    .hide_short_help(true)
-    .help_heading(TOOL_OPTIONS_HEADING)
+  Arg::new(RELEASES_FLAG).long("releases").action(ArgAction::SetTrue).exclusive(true).hide(true)
 }
 
 pub(crate) fn show_execution_time_flag() -> Arg {
