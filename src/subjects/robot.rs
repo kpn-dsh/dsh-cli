@@ -5,6 +5,7 @@ use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAN
 use crate::capability_builder::CapabilityBuilder;
 use crate::clients::create_client_access_token_from_platform_tenant;
 use crate::context::Context;
+use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::keyring::{get_secret_from_keyring, get_secrets_from_keyring, remove_secret_from_keyring, upsert_secret_to_keyring};
@@ -19,6 +20,7 @@ use clap::ArgMatches;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 #[cfg(feature = "robot")]
 use dsh_api::dsh_api_tenant::DshApiTenant;
+use dsh_api::error::DshApiError;
 use dsh_api::platform::DshPlatform;
 use dsh_api::secret::ROBOT_SECRET;
 use itertools::Itertools;
@@ -303,10 +305,19 @@ impl CommandExecutor for RobotUpdate {
       context.print_warning("this will automatically invalidate the existing robot secret");
       if context.confirmed(format!("renew robot secret for '{}@{}'?", robot_platform, robot_tenant))? {
         let robot_secret = context.read_single_line_password("enter the current robot secret")?;
+        if robot_secret.is_empty() {
+          return err!("robot secret cannot be empty, update cancelled");
+        }
         let dsh_api_tenant = DshApiTenant::new(robot_tenant.clone(), robot_platform.clone());
         let dsh_api_client_factory = DshApiClientFactory::create_with_token_fetcher(dsh_api_tenant, robot_secret);
         let client = dsh_api_client_factory.client().await?;
-        let secret_dependants = client.secret_dependants(ROBOT_SECRET).await?;
+        let secret_dependants = match client.secret_dependants(ROBOT_SECRET).await {
+          Ok(dependants) => dependants,
+          Err(error) => match error {
+            DshApiError::Unexpected { message, .. } if message == "statuscode 401 Unauthorized" => return err!("authorization error"),
+            _ => return Err(DshCliError::from(error)),
+          },
+        };
         if context.dependencies_warning("robot secret", secret_dependants, ROBOT_SECRET) && !context.confirmed("do you want to continue?")? {
           context.print_outcome(format!("cancelled, robot secret '{}' not updated", ROBOT_SECRET));
           return Ok(());
