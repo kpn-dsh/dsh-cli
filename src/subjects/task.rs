@@ -71,7 +71,7 @@ static TASK_OPEN_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = Laz
       OPEN_COMMAND,
       Some(OPEN_COMMAND_ALIAS),
       &TaskOpen {},
-      "Copy robot secret from local keyring to clipboard",
+      "Open the monitoring web application for the task",
     )
     .add_target_argument(service_id_argument().required(true))
     .add_target_argument(task_id_argument()),
@@ -80,14 +80,9 @@ static TASK_OPEN_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = Laz
 
 static TASK_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(
-      SHOW_COMMAND,
-      Some(SHOW_COMMAND_ALIAS),
-      &TaskShow {},
-      "Copy robot secret from local keyring to clipboard",
-    )
-    .add_target_argument(service_id_argument().required(true))
-    .add_target_argument(task_id_argument()),
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TaskShow {}, "Show the task details")
+      .add_target_argument(service_id_argument().required(true))
+      .add_target_argument(task_id_argument()),
   )
 });
 
