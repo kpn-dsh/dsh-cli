@@ -156,14 +156,14 @@ impl Issue {
   pub(crate) fn timestamp_before(not_before: i64) -> Option<Self> {
     match DateTime::from_timestamp_secs(not_before) {
       Some(not_before_datetime) => Self::datetime_before(&not_before_datetime),
-      None => Some(Self::IncorrectValue { explanation: format!("could not convert {} to valid datetime", not_before) }),
+      None => Some(Self::IncorrectValue { explanation: format!("could not convert '{}' to valid datetime", not_before) }),
     }
   }
 
   pub(crate) fn timestamp_expired(not_after: i64, days: Option<u64>) -> Option<Self> {
     match DateTime::from_timestamp_secs(not_after) {
       Some(not_after_datetime) => Self::datetime_expired(&not_after_datetime, days),
-      None => Some(Self::IncorrectValue { explanation: format!("could not convert {} to valid datetime", not_after) }),
+      None => Some(Self::IncorrectValue { explanation: format!("could not convert '{}' to valid datetime", not_after) }),
     }
   }
 }
