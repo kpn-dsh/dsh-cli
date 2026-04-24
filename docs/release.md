@@ -4,7 +4,7 @@
 
 Once the `dsh` tool is published to `crates.io` it can easily be installed by typing:
 
-```bash
+```shell
 > cargo install dsh
 ```
 
@@ -23,26 +23,26 @@ The `dsh` tool needs to be build separately for each required feature set and fo
 supported platform. The build steps are described assuming a macOS platform. For Linux or
 Windows the steps are similar, but the details may vary.
 
-### macOS
-
 It is assumed that a recent Rust toolchain is installed.
+
+### macOS
 
 Since we're building for the native platform (macOS, `aarch64-apple-darwin`), the build
 commands are simple:
 
-```bash
+```shell
 > cargo build --release
 ...
 > mv target/release/dsh dsh-v0.10.0-aarch64-apple-darwin
 > cargo build --release --all-features
 ...
-> mv target/release/dsh-manage dsh-manage-v0.10.0-aarch64-apple-darwin
+> mv target/release/dsh dsh-manage-v0.10.0-aarch64-apple-darwin
 ```
 
 This will result in two executables in your project directory, one with `robot`, `stream` and
 `tenant` features enabled, and one without:
 
-```bash
+```shell
 > ls -al
 total 87072
 ...
@@ -57,7 +57,37 @@ the binaries need to be codesigned and notarized. See
 
 ### Linux
 
-To be done...
+Since we're building for the native platform (macOS, `aarch64-apple-darwin`), the build
+commands are simple:
+
+```shell
+> rustup target add x86_64-unknown-linux-gnu
+```
+
+```shell
+> cargo build --target x86_64-unknown-linux-gnu --release
+...
+> mv target/release/dsh dsh-v0.10.0-x86_64-unknown-linux-gnu
+> cargo build --target x86_64-unknown-linux-gnu --release --all-features
+...
+> mv target/release/dsh dsh-manage-v0.10.0-x86_64-unknown-linux-gnu
+```
+
+This will result in two executables in your project directory, one with `robot`, `stream` and
+`tenant` features enabled, and one without:
+
+```shell
+> ls -al
+total 87072
+...
+-rwxr-xr-x   1 wilbert  staff  23506384  6 mrt. 09:51 dsh-manage-v0.10.0-x86_64-unknown-linux-gnu
+-rwxr-xr-x   1 wilbert  staff  21444176  6 mrt. 09:51 dsh-v0.10.0-x86_64-unknown-linux-gnu
+...
+```
+
+For the binaries to be able to run on other machines than the machine it was build on,
+the binaries need to be codesigned and notarized. See
+[Codesign and notarize for macOS](code-signing-macos.md) for the required steps.
 
 ### Windows
 
