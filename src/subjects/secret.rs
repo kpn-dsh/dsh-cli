@@ -244,6 +244,18 @@ impl CommandExecutor for SecretDelete {
   }
 }
 
+static SECRET_LABELS_LIST: [SecretLabel; 9] = [
+  SecretLabel::SecretName,
+  SecretLabel::System,
+  SecretLabel::Kind,
+  SecretLabel::FormatKind,
+  SecretLabel::Size,
+  SecretLabel::Description,
+  SecretLabel::Expires,
+  SecretLabel::Provisioned,
+  SecretLabel::Notifications,
+];
+
 struct SecretList {}
 
 #[async_trait]
@@ -290,6 +302,8 @@ impl CommandExecutor for SecretListAllocationStatus {
     Requirements::standard_with_api()
   }
 }
+
+static CERTIFICATE_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Subject, SecretLabel::NotAfter, SecretLabel::Issuer, SecretLabel::Label];
 
 struct SecretListCertificates {}
 
@@ -365,9 +379,10 @@ impl CommandExecutor for SecretListIssues {
   }
 }
 
+static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
+  [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::SubjectDescription, IssueLabel::IssueDetails];
+
 async fn list_issues(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
-  pub(crate) static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
-    [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::SubjectDescription, IssueLabel::IssueDetails];
   let expiration_days = get_expiration_days(matches, context.settings())?;
   let start_instant = context.now();
   let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
@@ -385,6 +400,8 @@ async fn list_issues(client: &DshApiClient, matches: &ArgMatches, context: &Cont
   formatter.print(None)?;
   Ok(Ok(()))
 }
+
+static KEY_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Private, SecretLabel::Size, SecretLabel::Kind, SecretLabel::Label];
 
 struct SecretListKeys {}
 
@@ -410,6 +427,8 @@ impl CommandExecutor for SecretListKeys {
     Requirements::standard_with_api()
   }
 }
+
+static SYSTEM_LABELS_LIST: [SecretLabel; 4] = [SecretLabel::SecretName, SecretLabel::SecretId, SecretLabel::FormatKind, SecretLabel::Size];
 
 struct SecretListSystem {}
 
@@ -463,6 +482,22 @@ impl CommandExecutor for SecretListUsage {
     Requirements::standard_with_api()
   }
 }
+
+pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 13] = [
+  SecretLabel::SecretName,
+  SecretLabel::SecretId,
+  SecretLabel::System,
+  SecretLabel::Kind,
+  SecretLabel::FormatKind,
+  SecretLabel::Size,
+  SecretLabel::Description,
+  SecretLabel::Expires,
+  SecretLabel::Provisioned,
+  SecretLabel::Notifications,
+  SecretLabel::DerivedFrom,
+  SecretLabel::Subject,
+  SecretLabel::Issuer,
+];
 
 struct SecretShow {}
 
@@ -748,8 +783,8 @@ impl SubjectFormatter<IssueLabel> for (SecretMetadata, Issue) {
     match label {
       IssueLabel::IssueDetails => issue.value(label, target_id),
       IssueLabel::IssueKind => issue.value(label, target_id),
-      IssueLabel::SubjectDescription => Value::option(secret_metadata.value_description()),
-      IssueLabel::SubjectKind => Value::option(secret_metadata.kind()),
+      IssueLabel::SubjectDescription => Value::some_or_hide(secret_metadata.value_description()),
+      IssueLabel::SubjectKind => Value::some_or_hide(secret_metadata.kind()),
       IssueLabel::Target => Value::target(target_id),
       IssueLabel::DependencyName => Value::not_applicable(),
       IssueLabel::DependencySubject => Value::not_applicable(),
@@ -760,6 +795,7 @@ impl SubjectFormatter<IssueLabel> for (SecretMetadata, Issue) {
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum SecretLabel {
+  DerivedFrom,
   Description,
   Expires,
   _Format,
@@ -772,10 +808,10 @@ pub(crate) enum SecretLabel {
   Notifications,
   _NumberOfEntries,
   Private,
+  Provisioned,
   SecretId,
   SecretName,
   Size,
-  Status,
   Subject,
   System,
 }
@@ -783,6 +819,7 @@ pub(crate) enum SecretLabel {
 impl Label for SecretLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::DerivedFrom => "derived from",
       Self::Description => "description",
       Self::Expires => "expires",
       Self::_Format => "format",
@@ -795,10 +832,10 @@ impl Label for SecretLabel {
       Self::NotAfter => "not after",
       Self::_NumberOfEntries => "entries",
       Self::Private => "private",
+      Self::Provisioned => "provisioned",
       Self::SecretId => "secret id",
       Self::SecretName => "secret name",
       Self::Size => "size",
-      Self::Status => "status",
       Self::Subject => "subject",
       Self::System => "system",
     }
@@ -813,30 +850,36 @@ impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<u
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
     let (secret_id, secret_metadata, expiration_days, allocation_status) = self;
     match label {
+      SecretLabel::DerivedFrom => match allocation_status.clone().and_then(|allocation_status| allocation_status.derived_from) {
+        Some(derived_from) => Value::plain(derived_from),
+        None => Value::hide(),
+      },
       SecretLabel::Notifications => match allocation_status {
-        Some(allocation_status) => Value::warn(allocation_status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
-        None => Value::empty(),
+        Some(allocation_status) if !allocation_status.notifications.is_empty() => {
+          Value::warn(allocation_status.notifications.iter().map(|notification| notification.to_string()).join("\n"))
+        }
+        _ => Value::hide(),
+      },
+      SecretLabel::Provisioned => match allocation_status {
+        Some(allocation_status) => {
+          if allocation_status.provisioned {
+            Value::plain("yes")
+          } else {
+            Value::plain("no")
+          }
+        }
+        None => Value::hide(),
       },
       SecretLabel::SecretId => match secret_id {
         Some(secret_id) => Value::target(secret_id),
-        None => Value::empty(),
+        None => Value::hide(),
       },
       SecretLabel::SecretName => Value::target(target_id),
-      SecretLabel::Status => match allocation_status {
-        Some(allocation_status) => {
-          if allocation_status.provisioned {
-            Value::empty()
-          } else {
-            Value::error("not provisioned")
-          }
-        }
-        None => Value::empty(),
-      },
       SecretLabel::System => {
         if secret_id.is_some() {
           Value::plain("yes")
         } else {
-          Value::empty()
+          Value::plain("no")
         }
       }
       _ => (secret_metadata.clone(), *expiration_days).value(label, target_id),
@@ -850,80 +893,47 @@ impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
     match label {
       SecretLabel::Description => match secret_metadata.kind() {
         Some("error") => Value::error(secret_metadata.additional_info().map(|info| info.to_string()).unwrap_or_default()),
-        _ => Value::option(secret_metadata.additional_info()),
+        _ => Value::some_or_hide(secret_metadata.additional_info()),
       },
       SecretLabel::Expires => match secret_metadata.not_after() {
         Some(not_after) => Value::timestamp_seconds_expired(not_after as i64, *expiration_days),
-        None => Value::empty(),
+        None => Value::hide(),
       },
       SecretLabel::_Format => Value::plain(secret_metadata.format()),
-      SecretLabel::FormatKind => Value::option(secret_metadata.format_kind()),
+      SecretLabel::FormatKind => Value::some_or_hide(secret_metadata.format_kind()),
       SecretLabel::Issuer => match secret_metadata {
-        SecretMetadata::Certificate { issuer, .. } => Value::plain(issuer),
-        _ => Value::not_applicable(),
+        SecretMetadata::Certificate { issuer, .. } => Value::distinguished_name(issuer),
+        _ => Value::hide(),
       },
       SecretLabel::Kind => match secret_metadata.kind() {
         Some("error") => Value::error("ERROR"),
-        _ => Value::option(secret_metadata.kind()),
+        _ => Value::some_or_hide(secret_metadata.kind()),
       },
       SecretLabel::Label => match secret_metadata {
         SecretMetadata::Certificate { label, .. } => Value::plain(label),
         SecretMetadata::Pki { labels, .. } => Value::plain(labels.join("/")),
-        _ => Value::not_applicable(),
+        _ => Value::hide(),
       },
       SecretLabel::_NotBefore => match secret_metadata {
         SecretMetadata::Certificate { not_before, .. } => Value::plain(not_before),
-        _ => Value::not_applicable(),
+        _ => Value::hide(),
       },
       SecretLabel::NotAfter => match secret_metadata {
         SecretMetadata::Certificate { not_after, .. } => Value::timestamp_seconds_expired(*not_after as i64, *expiration_days),
-        _ => Value::not_applicable(),
+        _ => Value::hide(),
       },
-      SecretLabel::_NumberOfEntries => Value::option(secret_metadata.number_of_entries()),
+      SecretLabel::_NumberOfEntries => Value::some_or_hide(secret_metadata.number_of_entries()),
       SecretLabel::Private => match secret_metadata {
         SecretMetadata::Pki { private, .. } => Value::plain(if *private { "private" } else { "public" }),
-        _ => Value::not_applicable(),
+        _ => Value::hide(),
       },
       SecretLabel::SecretName => Value::target(target_id),
-      SecretLabel::Size => Value::option(secret_metadata.secret_size()),
+      SecretLabel::Size => Value::some_or_hide(secret_metadata.secret_size()),
       SecretLabel::Subject => match secret_metadata {
-        SecretMetadata::Certificate { subject, .. } => Value::plain(subject),
-        _ => Value::not_applicable(),
+        SecretMetadata::Certificate { subject, .. } => Value::distinguished_name(subject),
+        _ => Value::hide(),
       },
-      _ => Value::not_applicable(),
+      _ => Value::unreachable(),
     }
   }
 }
-
-static CERTIFICATE_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Subject, SecretLabel::NotAfter, SecretLabel::Issuer, SecretLabel::Label];
-
-static KEY_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Private, SecretLabel::Size, SecretLabel::Kind, SecretLabel::Label];
-
-static SYSTEM_LABELS_LIST: [SecretLabel; 4] = [SecretLabel::SecretName, SecretLabel::SecretId, SecretLabel::FormatKind, SecretLabel::Size];
-
-pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 9] = [
-  SecretLabel::SecretName,
-  SecretLabel::System,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::Expires,
-  SecretLabel::Status,
-  SecretLabel::Notifications,
-];
-
-pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 12] = [
-  SecretLabel::SecretName,
-  SecretLabel::SecretId,
-  SecretLabel::System,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::Expires,
-  SecretLabel::Status,
-  SecretLabel::Notifications,
-  SecretLabel::Subject,
-  SecretLabel::Issuer,
-];

@@ -355,6 +355,18 @@ impl CommandExecutor for TopicDelete {
   }
 }
 
+pub(crate) static TOPIC_LABELS: [TopicLabel; 9] = [
+  TopicLabel::Target,
+  TopicLabel::NumberOfPartitions,
+  TopicLabel::ReplicationFactor,
+  TopicLabel::CleanupPolicy,
+  TopicLabel::TimestampType,
+  TopicLabel::MaxMessageBytes,
+  TopicLabel::SegmentBytes,
+  TopicLabel::Notifications,
+  TopicLabel::Provisioned,
+];
+
 struct TopicList {}
 
 #[async_trait]
@@ -445,6 +457,23 @@ impl CommandExecutor for TopicListUsage {
   }
 }
 
+static TOPIC_STATUS_LABELS: [TopicLabel; 14] = [
+  TopicLabel::Target,
+  TopicLabel::NumberOfPartitions,
+  TopicLabel::ReplicationFactor,
+  TopicLabel::CleanupPolicy,
+  TopicLabel::CompressionType,
+  TopicLabel::DeleteRetentionMs,
+  TopicLabel::TimestampType,
+  TopicLabel::MaxMessageBytes,
+  TopicLabel::SegmentBytes,
+  TopicLabel::RetentionBytes,
+  TopicLabel::RetentionMs,
+  TopicLabel::Notifications,
+  TopicLabel::Provisioned,
+  TopicLabel::KafkaProperties,
+];
+
 struct TopicShow {}
 
 #[async_trait]
@@ -481,6 +510,8 @@ impl CommandExecutor for TopicShowAllocationStatus {
     Requirements::standard_with_api()
   }
 }
+
+static PROPERTY_LABELS: [PropertyLabel; 2] = [PropertyLabel::Property, PropertyLabel::Value];
 
 struct TopicShowProperties {}
 
@@ -605,21 +636,21 @@ impl Label for TopicLabel {
 impl SubjectFormatter<TopicLabel> for Topic {
   fn value(&self, label: &TopicLabel, target_id: &str) -> Value {
     match label {
-      TopicLabel::CleanupPolicy => Value::option(self.kafka_properties.get(CLEANUP_POLICY_PROPERTY)),
+      TopicLabel::CleanupPolicy => Value::some_or_hide(self.kafka_properties.get(CLEANUP_POLICY_PROPERTY)),
       TopicLabel::DerivedFrom => Value::unreachable(),
       TopicLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.kafka_properties))),
-      TopicLabel::MaxMessageBytes => Value::option(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY)),
+      TopicLabel::MaxMessageBytes => Value::some_or_hide(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY)),
       TopicLabel::Notifications => Value::unreachable(),
       TopicLabel::NumberOfPartitions => Value::plain(self.partitions),
       TopicLabel::Provisioned => Value::unreachable(),
       TopicLabel::ReplicationFactor => Value::plain(self.replication_factor),
-      TopicLabel::SegmentBytes => Value::option(self.kafka_properties.get(SEGMENT_BYTES_PROPERTY)),
+      TopicLabel::SegmentBytes => Value::some_or_hide(self.kafka_properties.get(SEGMENT_BYTES_PROPERTY)),
       TopicLabel::Target => Value::target(target_id),
-      TopicLabel::TimestampType => Value::option(self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY)),
-      TopicLabel::CompressionType => Value::option(self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY)),
-      TopicLabel::DeleteRetentionMs => Value::option(self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY)),
-      TopicLabel::RetentionBytes => Value::option(self.kafka_properties.get(RETENTION_BYTES_PROPERTY)),
-      TopicLabel::RetentionMs => Value::option(self.kafka_properties.get(RETENTION_MS_PROPERTY)),
+      TopicLabel::TimestampType => Value::some_or_hide(self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY)),
+      TopicLabel::CompressionType => Value::some_or_hide(self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY)),
+      TopicLabel::DeleteRetentionMs => Value::some_or_hide(self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY)),
+      TopicLabel::RetentionBytes => Value::some_or_hide(self.kafka_properties.get(RETENTION_BYTES_PROPERTY)),
+      TopicLabel::RetentionMs => Value::some_or_hide(self.kafka_properties.get(RETENTION_MS_PROPERTY)),
     }
   }
 }
@@ -644,58 +675,29 @@ pub(crate) fn get_implicit_properties(kafka_properties: &HashMap<String, String>
 impl SubjectFormatter<TopicLabel> for TopicStatus {
   fn value(&self, label: &TopicLabel, target_id: &str) -> Value {
     match label {
-      TopicLabel::CleanupPolicy => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(CLEANUP_POLICY_PROPERTY))),
-      TopicLabel::CompressionType => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(COMPRESSION_TYPE_PROPERTY))),
-      TopicLabel::DeleteRetentionMs => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY))),
-      TopicLabel::DerivedFrom => Value::option(self.status.derived_from.as_ref()),
-      TopicLabel::KafkaProperties => Value::option(
+      TopicLabel::CleanupPolicy => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(CLEANUP_POLICY_PROPERTY))),
+      TopicLabel::CompressionType => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(COMPRESSION_TYPE_PROPERTY))),
+      TopicLabel::DeleteRetentionMs => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY))),
+      TopicLabel::DerivedFrom => Value::some_or_hide(self.status.derived_from.as_ref()),
+      TopicLabel::KafkaProperties => Value::some_or_hide(
         self
           .actual
           .as_ref()
           .map(|topic| hashmap_to_table(&get_implicit_properties(&topic.kafka_properties))),
       ),
-      TopicLabel::MaxMessageBytes => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY))),
+      TopicLabel::MaxMessageBytes => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY))),
       TopicLabel::Notifications => Value::warn(self.status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
-      TopicLabel::NumberOfPartitions => Value::option(self.actual.as_ref().map(|topic| topic.partitions)),
+      TopicLabel::NumberOfPartitions => Value::some_or_hide(self.actual.as_ref().map(|topic| topic.partitions)),
       TopicLabel::Provisioned => Value::plain(self.status.provisioned),
-      TopicLabel::ReplicationFactor => Value::option(self.actual.as_ref().map(|topic| topic.replication_factor)),
-      TopicLabel::RetentionBytes => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(RETENTION_BYTES_PROPERTY))),
-      TopicLabel::RetentionMs => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(RETENTION_MS_PROPERTY))),
-      TopicLabel::SegmentBytes => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(SEGMENT_BYTES_PROPERTY))),
+      TopicLabel::ReplicationFactor => Value::some_or_hide(self.actual.as_ref().map(|topic| topic.replication_factor)),
+      TopicLabel::RetentionBytes => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(RETENTION_BYTES_PROPERTY))),
+      TopicLabel::RetentionMs => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(RETENTION_MS_PROPERTY))),
+      TopicLabel::SegmentBytes => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(SEGMENT_BYTES_PROPERTY))),
       TopicLabel::Target => Value::target(target_id),
-      TopicLabel::TimestampType => Value::option(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY))),
+      TopicLabel::TimestampType => Value::some_or_hide(self.actual.as_ref().and_then(|topic| topic.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY))),
     }
   }
 }
-
-static TOPIC_STATUS_LABELS: [TopicLabel; 14] = [
-  TopicLabel::Target,
-  TopicLabel::NumberOfPartitions,
-  TopicLabel::ReplicationFactor,
-  TopicLabel::CleanupPolicy,
-  TopicLabel::CompressionType,
-  TopicLabel::DeleteRetentionMs,
-  TopicLabel::TimestampType,
-  TopicLabel::MaxMessageBytes,
-  TopicLabel::SegmentBytes,
-  TopicLabel::RetentionBytes,
-  TopicLabel::RetentionMs,
-  TopicLabel::Notifications,
-  TopicLabel::Provisioned,
-  TopicLabel::KafkaProperties,
-];
-
-pub(crate) static TOPIC_LABELS: [TopicLabel; 9] = [
-  TopicLabel::Target,
-  TopicLabel::NumberOfPartitions,
-  TopicLabel::ReplicationFactor,
-  TopicLabel::CleanupPolicy,
-  TopicLabel::TimestampType,
-  TopicLabel::MaxMessageBytes,
-  TopicLabel::SegmentBytes,
-  TopicLabel::Notifications,
-  TopicLabel::Provisioned,
-];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 enum PropertyLabel {
@@ -715,5 +717,3 @@ impl Label for PropertyLabel {
     matches!(self, Self::Property)
   }
 }
-
-static PROPERTY_LABELS: [PropertyLabel; 2] = [PropertyLabel::Property, PropertyLabel::Value];

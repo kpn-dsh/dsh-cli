@@ -222,6 +222,10 @@ impl CommandExecutor for ManifestExport {
   }
 }
 
+static MANIFEST_LABELS_LIST: [ManifestLabel; 5] = [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Vendor, ManifestLabel::LastModified];
+static MANIFEST_LABELS_LIST_INCLUDE_DRAFT: [ManifestLabel; 6] =
+  [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Draft, ManifestLabel::Vendor, ManifestLabel::LastModified];
+
 struct ManifestListLatest {}
 
 #[async_trait]
@@ -299,6 +303,33 @@ impl CommandExecutor for ManifestListIds {
     Requirements::standard_with_api()
   }
 }
+
+static MANIFEST_LABELS_SHOW: [ManifestLabel; 9] = [
+  ManifestLabel::Id,
+  ManifestLabel::Name,
+  ManifestLabel::Draft,
+  ManifestLabel::Description,
+  ManifestLabel::LastModified,
+  ManifestLabel::Vendor,
+  ManifestLabel::ManifestVersion,
+  ManifestLabel::Configuration,
+  ManifestLabel::Resources,
+];
+static MANIFEST_LABELS_SHOW_FULL: [ManifestLabel; 13] = [
+  ManifestLabel::Id,
+  ManifestLabel::Name,
+  ManifestLabel::Kind,
+  ManifestLabel::Draft,
+  ManifestLabel::ApiVersion,
+  ManifestLabel::Description,
+  ManifestLabel::Contact,
+  ManifestLabel::LastModified,
+  ManifestLabel::Vendor,
+  ManifestLabel::ManifestVersion,
+  ManifestLabel::Configuration,
+  ManifestLabel::Resources,
+  ManifestLabel::MoreInfo,
+];
 
 struct ManifestShow {}
 
@@ -571,7 +602,7 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
 impl SubjectFormatter<ManifestLabel> for Manifest {
   fn value(&self, label: &ManifestLabel, target_id: &str) -> Value {
     match label {
-      ManifestLabel::ApiVersion => Value::option(self.api_version.clone()),
+      ManifestLabel::ApiVersion => Value::some_or_hide(self.api_version.clone()),
       ManifestLabel::Configuration => match self.configuration {
         Some(ref configuration) => Value::plain(hashmap_to_table(
           &configuration
@@ -583,13 +614,13 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
         None => Value::empty(),
       },
       ManifestLabel::Contact => Value::plain(&self.contact),
-      ManifestLabel::Description => Value::option(self.description.clone()),
+      ManifestLabel::Description => Value::some_or_empty(self.description.clone()),
       ManifestLabel::Draft => Value::plain(self.draft),
       ManifestLabel::Id => Value::target(target_id),
-      ManifestLabel::Kind => Value::option(self.kind.clone()),
+      ManifestLabel::Kind => Value::some_or_hide(self.kind.clone()),
       ManifestLabel::LastModified => Value::plain(&self.last_modified),
       ManifestLabel::ManifestVersion => Value::plain(&self.version),
-      ManifestLabel::MoreInfo => Value::option(self.more_info.clone().map(|more_info| termimad::text(more_info.as_str()).to_string())),
+      ManifestLabel::MoreInfo => Value::some_or_hide(self.more_info.clone().map(|more_info| termimad::text(more_info.as_str()).to_string())),
       ManifestLabel::Name => Value::plain(&self.name),
       ManifestLabel::Resources => Value::plain(vec_to_table(
         &self
@@ -602,36 +633,3 @@ impl SubjectFormatter<ManifestLabel> for Manifest {
     }
   }
 }
-
-static MANIFEST_LABELS_LIST: [ManifestLabel; 5] = [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Vendor, ManifestLabel::LastModified];
-
-static MANIFEST_LABELS_LIST_INCLUDE_DRAFT: [ManifestLabel; 6] =
-  [ManifestLabel::Id, ManifestLabel::ManifestVersion, ManifestLabel::Name, ManifestLabel::Draft, ManifestLabel::Vendor, ManifestLabel::LastModified];
-
-static MANIFEST_LABELS_SHOW: [ManifestLabel; 9] = [
-  ManifestLabel::Id,
-  ManifestLabel::Name,
-  ManifestLabel::Draft,
-  ManifestLabel::Description,
-  ManifestLabel::LastModified,
-  ManifestLabel::Vendor,
-  ManifestLabel::ManifestVersion,
-  ManifestLabel::Configuration,
-  ManifestLabel::Resources,
-];
-
-static MANIFEST_LABELS_SHOW_FULL: [ManifestLabel; 13] = [
-  ManifestLabel::Id,
-  ManifestLabel::Name,
-  ManifestLabel::Kind,
-  ManifestLabel::Draft,
-  ManifestLabel::ApiVersion,
-  ManifestLabel::Description,
-  ManifestLabel::Contact,
-  ManifestLabel::LastModified,
-  ManifestLabel::Vendor,
-  ManifestLabel::ManifestVersion,
-  ManifestLabel::Configuration,
-  ManifestLabel::Resources,
-  ManifestLabel::MoreInfo,
-];

@@ -267,6 +267,29 @@ impl CommandExecutor for StreamDelete {
   }
 }
 
+static LIST_PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 10] = [
+  ManagedStreamLabel::Target,
+  ManagedStreamLabel::Type,
+  ManagedStreamLabel::Partitions,
+  ManagedStreamLabel::ReplicationFactor,
+  ManagedStreamLabel::CleanupPolicy,
+  ManagedStreamLabel::MaxMessageBytes,
+  ManagedStreamLabel::SegmentBytes,
+  ManagedStreamLabel::TimestampType,
+  ManagedStreamLabel::Partitioner,
+  ManagedStreamLabel::CanBeRetained,
+];
+static LIST_INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 8] = [
+  ManagedStreamLabel::Target,
+  ManagedStreamLabel::Type,
+  ManagedStreamLabel::Partitions,
+  ManagedStreamLabel::ReplicationFactor,
+  ManagedStreamLabel::CleanupPolicy,
+  ManagedStreamLabel::MaxMessageBytes,
+  ManagedStreamLabel::SegmentBytes,
+  ManagedStreamLabel::TimestampType,
+];
+
 struct StreamListAll {}
 
 #[async_trait]
@@ -353,6 +376,43 @@ impl CommandExecutor for StreamListIds {
     Requirements::standard_with_api()
   }
 }
+
+static INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 15] = [
+  ManagedStreamLabel::Target,
+  ManagedStreamLabel::Type,
+  ManagedStreamLabel::Partitions,
+  ManagedStreamLabel::ReplicationFactor,
+  ManagedStreamLabel::CleanupPolicy,
+  ManagedStreamLabel::CompressionType,
+  ManagedStreamLabel::DeleteRetentionMs,
+  ManagedStreamLabel::MaxMessageBytes,
+  ManagedStreamLabel::SegmentBytes,
+  ManagedStreamLabel::TimestampType,
+  ManagedStreamLabel::RetentionBytes,
+  ManagedStreamLabel::RetentionMs,
+  ManagedStreamLabel::KafkaProperties,
+  ManagedStreamLabel::TenantsGrantedReadAccess,
+  ManagedStreamLabel::TenantsGrantedWriteAccess,
+];
+static PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 17] = [
+  ManagedStreamLabel::Target,
+  ManagedStreamLabel::Type,
+  ManagedStreamLabel::Partitions,
+  ManagedStreamLabel::ReplicationFactor,
+  ManagedStreamLabel::CleanupPolicy,
+  ManagedStreamLabel::CompressionType,
+  ManagedStreamLabel::DeleteRetentionMs,
+  ManagedStreamLabel::MaxMessageBytes,
+  ManagedStreamLabel::SegmentBytes,
+  ManagedStreamLabel::TimestampType,
+  ManagedStreamLabel::RetentionBytes,
+  ManagedStreamLabel::RetentionMs,
+  ManagedStreamLabel::KafkaProperties,
+  ManagedStreamLabel::Partitioner,
+  ManagedStreamLabel::CanBeRetained,
+  ManagedStreamLabel::TenantsGrantedReadAccess,
+  ManagedStreamLabel::TenantsGrantedWriteAccess,
+];
 
 struct StreamShow {}
 
@@ -481,19 +541,19 @@ impl SubjectFormatter<ManagedStreamLabel> for ManagedStream {
   fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> Value {
     match label {
       ManagedStreamLabel::CanBeRetained => Value::plain("NA"),
-      ManagedStreamLabel::CleanupPolicy => Value::option(self.0.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned()),
-      ManagedStreamLabel::CompressionType => Value::option(self.0.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned()),
-      ManagedStreamLabel::DeleteRetentionMs => Value::option(self.0.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::CleanupPolicy => Value::some_or_hide(self.0.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned()),
+      ManagedStreamLabel::CompressionType => Value::some_or_hide(self.0.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned()),
+      ManagedStreamLabel::DeleteRetentionMs => Value::some_or_hide(self.0.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned()),
       ManagedStreamLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.0.kafka_properties))),
-      ManagedStreamLabel::MaxMessageBytes => Value::option(self.0.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::MaxMessageBytes => Value::some_or_hide(self.0.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned()),
       ManagedStreamLabel::Partitioner => Value::plain("NA"),
       ManagedStreamLabel::Partitions => Value::plain(self.0.partitions),
       ManagedStreamLabel::ReplicationFactor => Value::plain(self.0.replication_factor),
-      ManagedStreamLabel::RetentionBytes => Value::option(self.0.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned()),
-      ManagedStreamLabel::RetentionMs => Value::option(self.0.kafka_properties.get(RETENTION_MS_PROPERTY).cloned()),
-      ManagedStreamLabel::SegmentBytes => Value::option(self.0.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::RetentionBytes => Value::some_or_hide(self.0.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::RetentionMs => Value::some_or_hide(self.0.kafka_properties.get(RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::SegmentBytes => Value::some_or_hide(self.0.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned()),
       ManagedStreamLabel::Target => Value::target(target_id),
-      ManagedStreamLabel::TimestampType => Value::option(self.0.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned()),
+      ManagedStreamLabel::TimestampType => Value::some_or_hide(self.0.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned()),
       ManagedStreamLabel::Type => Value::plain("internal"),
       _ => unreachable!("label '{}' was not expected", label.as_str()),
     }
@@ -504,22 +564,22 @@ impl SubjectFormatter<ManagedStreamLabel> for PublicManagedStream {
   fn value(&self, label: &ManagedStreamLabel, target_id: &str) -> Value {
     match label {
       ManagedStreamLabel::CanBeRetained => Value::plain(self.contract.can_be_retained),
-      ManagedStreamLabel::CleanupPolicy => Value::option(self.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned()),
-      ManagedStreamLabel::CompressionType => Value::option(self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned()),
-      ManagedStreamLabel::DeleteRetentionMs => Value::option(self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::CleanupPolicy => Value::some_or_hide(self.kafka_properties.get(CLEANUP_POLICY_PROPERTY).cloned()),
+      ManagedStreamLabel::CompressionType => Value::some_or_hide(self.kafka_properties.get(COMPRESSION_TYPE_PROPERTY).cloned()),
+      ManagedStreamLabel::DeleteRetentionMs => Value::some_or_hide(self.kafka_properties.get(DELETE_RETENTION_MS_PROPERTY).cloned()),
       ManagedStreamLabel::KafkaProperties => Value::plain(hashmap_to_table(&get_implicit_properties(&self.kafka_properties))),
-      ManagedStreamLabel::MaxMessageBytes => Value::option(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::MaxMessageBytes => Value::some_or_hide(self.kafka_properties.get(MAX_MESSAGE_BYTES_PROPERTY).cloned()),
       ManagedStreamLabel::Partitioner => match self.contract.partitioner {
         PublicManagedStreamContractPartitioner::TopicLevelPartitioner(ref topic_level_partitioner) => plain!("topic level {}", topic_level_partitioner.topic_level),
         PublicManagedStreamContractPartitioner::KafkaDefaultPartitioner(_) => Value::plain("kafka default"),
       },
       ManagedStreamLabel::Partitions => Value::plain(self.partitions),
       ManagedStreamLabel::ReplicationFactor => Value::plain(self.replication_factor),
-      ManagedStreamLabel::RetentionBytes => Value::option(self.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned()),
-      ManagedStreamLabel::RetentionMs => Value::option(self.kafka_properties.get(RETENTION_MS_PROPERTY).cloned()),
-      ManagedStreamLabel::SegmentBytes => Value::option(self.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::RetentionBytes => Value::some_or_hide(self.kafka_properties.get(RETENTION_BYTES_PROPERTY).cloned()),
+      ManagedStreamLabel::RetentionMs => Value::some_or_hide(self.kafka_properties.get(RETENTION_MS_PROPERTY).cloned()),
+      ManagedStreamLabel::SegmentBytes => Value::some_or_hide(self.kafka_properties.get(SEGMENT_BYTES_PROPERTY).cloned()),
       ManagedStreamLabel::Target => Value::target(target_id),
-      ManagedStreamLabel::TimestampType => Value::option(self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned()),
+      ManagedStreamLabel::TimestampType => Value::some_or_hide(self.kafka_properties.get(MESSAGE_TIMESTAMP_PROPERTY).cloned()),
       ManagedStreamLabel::Type => Value::plain("public"),
       _ => unreachable!("label '{}' was not expected", label.as_str()),
     }
@@ -549,68 +609,6 @@ impl SubjectFormatter<ManagedStreamLabel> for (Stream, &Vec<(String, AccessRight
     }
   }
 }
-
-static INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 15] = [
-  ManagedStreamLabel::Target,
-  ManagedStreamLabel::Type,
-  ManagedStreamLabel::Partitions,
-  ManagedStreamLabel::ReplicationFactor,
-  ManagedStreamLabel::CleanupPolicy,
-  ManagedStreamLabel::CompressionType,
-  ManagedStreamLabel::DeleteRetentionMs,
-  ManagedStreamLabel::MaxMessageBytes,
-  ManagedStreamLabel::SegmentBytes,
-  ManagedStreamLabel::TimestampType,
-  ManagedStreamLabel::RetentionBytes,
-  ManagedStreamLabel::RetentionMs,
-  ManagedStreamLabel::KafkaProperties,
-  ManagedStreamLabel::TenantsGrantedReadAccess,
-  ManagedStreamLabel::TenantsGrantedWriteAccess,
-];
-
-static PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 17] = [
-  ManagedStreamLabel::Target,
-  ManagedStreamLabel::Type,
-  ManagedStreamLabel::Partitions,
-  ManagedStreamLabel::ReplicationFactor,
-  ManagedStreamLabel::CleanupPolicy,
-  ManagedStreamLabel::CompressionType,
-  ManagedStreamLabel::DeleteRetentionMs,
-  ManagedStreamLabel::MaxMessageBytes,
-  ManagedStreamLabel::SegmentBytes,
-  ManagedStreamLabel::TimestampType,
-  ManagedStreamLabel::RetentionBytes,
-  ManagedStreamLabel::RetentionMs,
-  ManagedStreamLabel::KafkaProperties,
-  ManagedStreamLabel::Partitioner,
-  ManagedStreamLabel::CanBeRetained,
-  ManagedStreamLabel::TenantsGrantedReadAccess,
-  ManagedStreamLabel::TenantsGrantedWriteAccess,
-];
-
-static LIST_INTERNAL_STREAM_LABELS: [ManagedStreamLabel; 8] = [
-  ManagedStreamLabel::Target,
-  ManagedStreamLabel::Type,
-  ManagedStreamLabel::Partitions,
-  ManagedStreamLabel::ReplicationFactor,
-  ManagedStreamLabel::CleanupPolicy,
-  ManagedStreamLabel::MaxMessageBytes,
-  ManagedStreamLabel::SegmentBytes,
-  ManagedStreamLabel::TimestampType,
-];
-
-static LIST_PUBLIC_STREAM_LABELS: [ManagedStreamLabel; 10] = [
-  ManagedStreamLabel::Target,
-  ManagedStreamLabel::Type,
-  ManagedStreamLabel::Partitions,
-  ManagedStreamLabel::ReplicationFactor,
-  ManagedStreamLabel::CleanupPolicy,
-  ManagedStreamLabel::MaxMessageBytes,
-  ManagedStreamLabel::SegmentBytes,
-  ManagedStreamLabel::TimestampType,
-  ManagedStreamLabel::Partitioner,
-  ManagedStreamLabel::CanBeRetained,
-];
 
 fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> DshCliResult<ManagedStreamId> {
   match matches.get_one::<String>(MANAGED_STREAM_ARGUMENT) {

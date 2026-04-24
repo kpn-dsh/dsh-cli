@@ -1,6 +1,6 @@
 use crate::context::Context;
-use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::{err, error_map, DshCliResult};
 use itertools::Itertools;
 use serde::Serialize;
@@ -131,14 +131,17 @@ where
     tabled_builder.push_record([self.context.apply_target_label_style(target_label), self.context.apply_target_style(self.target_id.as_str())]);
     for label in self.labels {
       if !label.is_target_label() && label.as_str_for_unit() != target_label {
-        let value = value.value(label, self.target_id.as_str()).to_decorated_string(self.context);
-        let split_value = value.split("\n").collect_vec();
-        let mut value_iterator = split_value.iter();
-        if let Some(first_line) = value_iterator.next() {
-          tabled_builder.push_record([self.context.apply_label_style(label.as_str_for_unit()), first_line.to_string()]);
-        }
-        for next_line in value_iterator {
-          tabled_builder.push_record(["", next_line]);
+        let value = value.value(label, self.target_id.as_str());
+        if !matches!(value, Value::Hide) {
+          let decorated_string = value.to_decorated_string(self.context);
+          let split_value = decorated_string.split("\n").collect_vec();
+          let mut value_iterator = split_value.iter();
+          if let Some(first_line) = value_iterator.next() {
+            tabled_builder.push_record([self.context.apply_label_style(label.as_str_for_unit()), first_line.to_string()]);
+          }
+          for next_line in value_iterator {
+            tabled_builder.push_record(["", next_line]);
+          }
         }
       }
     }

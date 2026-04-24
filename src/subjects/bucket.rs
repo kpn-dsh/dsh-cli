@@ -159,6 +159,18 @@ impl CommandExecutor for BucketDelete {
   }
 }
 
+static BUCKET_LABELS_LIST: [BucketLabel; 5] = [BucketLabel::Target, BucketLabel::Versioned, BucketLabel::Provisioned, BucketLabel::Name, BucketLabel::Dependants];
+static BUCKET_LABELS_LIST_ALL: [BucketLabel; 8] = [
+  BucketLabel::Target,
+  BucketLabel::Encrypted,
+  BucketLabel::Versioned,
+  BucketLabel::Provisioned,
+  BucketLabel::Notifications,
+  BucketLabel::Name,
+  BucketLabel::Dependants,
+  BucketLabel::DerivedFrom,
+];
+
 struct BucketList {}
 
 #[async_trait]
@@ -209,6 +221,17 @@ impl CommandExecutor for BucketListIds {
     Requirements::standard_with_api()
   }
 }
+
+static BUCKET_LABELS_SHOW: [BucketLabel; 8] = [
+  BucketLabel::Target,
+  BucketLabel::Encrypted,
+  BucketLabel::Versioned,
+  BucketLabel::Provisioned,
+  BucketLabel::Notifications,
+  BucketLabel::Name,
+  BucketLabel::Dependants,
+  BucketLabel::DerivedFrom,
+];
 
 struct BucketShow {}
 
@@ -302,14 +325,20 @@ impl SubjectFormatter<BucketLabel> for (BucketStatus, String) {
   fn value(&self, label: &BucketLabel, target_id: &str) -> Value {
     let (bucket_status, bucket_name) = self;
     match label {
-      BucketLabel::Dependants => Value::empty(),
-      BucketLabel::DerivedFrom => Value::option(bucket_status.status.derived_from.clone()),
+      BucketLabel::Dependants => Value::hide(),
+      BucketLabel::DerivedFrom => Value::some_or_hide(bucket_status.status.derived_from.clone()),
       BucketLabel::Encrypted => Value::plain(bucket_status.configuration.as_ref().map(|bs| bs.encrypted).unwrap_or_default()),
       BucketLabel::Name => Value::plain(bucket_name),
-      BucketLabel::Notifications => Value::warn(bucket_status.status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
+      BucketLabel::Notifications => {
+        if bucket_status.status.notifications.is_empty() {
+          Value::hide()
+        } else {
+          Value::warn(bucket_status.status.notifications.iter().map(|notification| notification.to_string()).join("\n"))
+        }
+      }
       BucketLabel::Provisioned => Value::plain(bucket_status.status.provisioned),
       BucketLabel::Target => Value::target(target_id),
-      BucketLabel::Versioned => Value::option(bucket_status.configuration.clone().map(|ref a| a.versioned)),
+      BucketLabel::Versioned => Value::some_or_empty(bucket_status.configuration.clone().map(|ref bucket| bucket.versioned)),
     }
   }
 }
@@ -347,33 +376,7 @@ impl SubjectFormatter<BucketLabel> for Bucket {
       BucketLabel::Encrypted => Value::plain(self.encrypted),
       BucketLabel::Target => Value::target(target_id),
       BucketLabel::Versioned => Value::plain(self.versioned),
-      _ => Value::empty(),
+      _ => Value::not_applicable(),
     }
   }
 }
-
-static BUCKET_LABELS_LIST: [BucketLabel; 5] = [BucketLabel::Target, BucketLabel::Versioned, BucketLabel::Provisioned, BucketLabel::Name, BucketLabel::Dependants];
-
-static BUCKET_LABELS_LIST_ALL: [BucketLabel; 8] = [
-  BucketLabel::Target,
-  BucketLabel::Encrypted,
-  BucketLabel::Versioned,
-  BucketLabel::Provisioned,
-  BucketLabel::Notifications,
-  BucketLabel::Name,
-  BucketLabel::Dependants,
-  BucketLabel::DerivedFrom,
-];
-
-static BUCKET_LABELS_SHOW: [BucketLabel; 8] = [
-  BucketLabel::Target,
-  BucketLabel::Encrypted,
-  BucketLabel::Versioned,
-  BucketLabel::Provisioned,
-  BucketLabel::Notifications,
-  BucketLabel::Name,
-  BucketLabel::Dependants,
-  BucketLabel::DerivedFrom,
-];
-
-pub(crate) static BUCKET_LABELS: [BucketLabel; 3] = [BucketLabel::Target, BucketLabel::Encrypted, BucketLabel::Versioned];

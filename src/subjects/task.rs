@@ -89,6 +89,18 @@ static TASK_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = Laz
 static TASK_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> =
   LazyLock::new(|| vec![TASK_LIST_CAPABILITY.as_ref(), TASK_OPEN_CAPABILITY.as_ref(), TASK_SHOW_CAPABILITY.as_ref()]);
 
+static TASK_LABELS_LIST: [TaskLabel; 9] = [
+  TaskLabel::Target,
+  TaskLabel::StartedAt,
+  TaskLabel::State,
+  TaskLabel::Healthy,
+  TaskLabel::HostIpAddress,
+  TaskLabel::LastUpdateAt,
+  TaskLabel::StagedAt,
+  TaskLabel::StoppedAt,
+  TaskLabel::LastestLog,
+];
+
 struct TaskList {}
 
 #[async_trait]
@@ -272,29 +284,17 @@ impl SubjectFormatter<TaskLabel> for TaskStatus {
     };
     match task {
       Some(task) => match label {
-        TaskLabel::Healthy => Value::option(task.healthy),
+        TaskLabel::Healthy => Value::some_or_hide(task.healthy),
         TaskLabel::HostIpAddress => Value::plain(task.host),
-        TaskLabel::LastestLog => Value::option(task.logs),
-        TaskLabel::LastUpdateAt => Value::option(task.last_update.and_then(|update| DateTime::from_timestamp_millis(update).map(|ts| ts.to_string()))),
+        TaskLabel::LastestLog => Value::some_or_hide(task.logs),
+        TaskLabel::LastUpdateAt => Value::some_or_hide(task.last_update.and_then(|update| DateTime::from_timestamp_millis(update).map(|ts| ts.to_string()))),
         TaskLabel::StagedAt => Value::plain(task.staged_at),
         TaskLabel::StartedAt => Value::plain(task.started_at),
         TaskLabel::State => Value::plain(task.state),
-        TaskLabel::StoppedAt => Value::option(task.stopped_at),
+        TaskLabel::StoppedAt => Value::some_or_hide(task.stopped_at),
         TaskLabel::Target => Value::plain(target_id),
       },
       None => Value::empty(),
     }
   }
 }
-
-static TASK_LABELS_LIST: [TaskLabel; 9] = [
-  TaskLabel::Target,
-  TaskLabel::StartedAt,
-  TaskLabel::State,
-  TaskLabel::Healthy,
-  TaskLabel::HostIpAddress,
-  TaskLabel::LastUpdateAt,
-  TaskLabel::StagedAt,
-  TaskLabel::StoppedAt,
-  TaskLabel::LastestLog,
-];

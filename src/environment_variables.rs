@@ -364,7 +364,7 @@ impl SubjectFormatter<EnvVarLabel> for (String, Option<String>, &EnvironmentVari
           Value::plain("no")
         }
       }
-      EnvVarLabel::DefaultValue => Value::option(environment_variable.default_value),
+      EnvVarLabel::DefaultValue => Value::some_or_empty(environment_variable.default_value),
       EnvVarLabel::EnvVar => Value::plain(env_var_endorsed),
       EnvVarLabel::LongExplanation => Value::plain(environment_variable.long_explanation),
       EnvVarLabel::OverrideAllowed => {

@@ -129,7 +129,7 @@ where
     if label.is_target_label() {
       Value::target(target_id)
     } else {
-      Value::option(self.get(label))
+      Value::some_or_empty(self.get(label))
     }
   }
 }

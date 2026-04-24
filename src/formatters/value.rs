@@ -1,10 +1,13 @@
 use crate::context::Context;
+use crate::subjects::certificate::format_distinguished_name;
 use chrono::{DateTime, Days, Utc};
 
 #[derive(Clone, Debug)]
 pub(crate) enum Value {
+  DistinguishedName(String),
   Empty,
   Error(String),
+  Hide,
   Ignore(String),
   NotApplicable,
   Plain(String),
@@ -109,6 +112,20 @@ impl Value {
     }
   }
 
+  /// Create `Value` representing a distinguished name
+  ///
+  /// ## Parameters
+  /// * `distinguished_name` - Can be converted into a `String` representing the distinguished name.
+  ///
+  /// ## Returns
+  /// * `Value::DistinguishedName`
+  pub(crate) fn distinguished_name<T>(distinguished_name: T) -> Self
+  where
+    T: Into<String>,
+  {
+    Self::DistinguishedName(distinguished_name.into())
+  }
+
   /// Create `Value` representing an empty value
   ///
   /// ## Returns
@@ -126,6 +143,14 @@ impl Value {
     T: ToString,
   {
     Self::Error(value.to_string())
+  }
+
+  /// Create `Value` representing a hidden value
+  ///
+  /// ## Returns
+  /// * `Value::Hide`
+  pub(crate) fn hide() -> Self {
+    Self::Hide
   }
 
   /// Create `Value` representing a value that should be ignored
@@ -167,21 +192,39 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing an optional value
+  /// Create `Value` representing a value that might be correct or not
   ///
   /// ## Parameters
-  /// * `value` - `Option<T>` that represents the optional value.
+  /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
   ///
   /// ## Returns
-  /// * `Value::Plain(value)` - When `value` is present.
-  /// * `Value::Empty` - When `value` is `None`.
-  pub(crate) fn option<T>(value: Option<T>) -> Self
+  /// * `Value::Plain(value)` - When `value` is `Ok`.
+  /// * `Value::Empty` - When `value` is an `Err`.
+  pub(crate) fn ok_or_empty<T, E>(value: Result<T, E>) -> Self
   where
     T: ToString,
   {
     match value {
-      Some(v) => Self::plain(v.to_string()),
-      None => Self::empty(),
+      Ok(v) => Self::plain(v.to_string()),
+      Err(_) => Self::empty(),
+    }
+  }
+
+  /// Create `Value` representing a value that might be correct or not
+  ///
+  /// ## Parameters
+  /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
+  ///
+  /// ## Returns
+  /// * `Value::Plain(value)` - When `value` is `Ok`.
+  /// * `Value::Hide` - When `value` is an `Err`.
+  pub(crate) fn ok_or_hide<T, E>(value: Result<T, E>) -> Self
+  where
+    T: ToString,
+  {
+    match value {
+      Ok(v) => Self::plain(v.to_string()),
+      Err(_) => Self::hide(),
     }
   }
 
@@ -224,6 +267,42 @@ impl Value {
     match value {
       Some(v) => Self::plain(v.to_string()),
       None => Self::plain(default.to_string()),
+    }
+  }
+
+  /// Create `Value` representing an optional value
+  ///
+  /// ## Parameters
+  /// * `value` - `Option<T>` that represents the optional value.
+  ///
+  /// ## Returns
+  /// * `Value::Plain(value)` - When `value` is present.
+  /// * `Value::Empty` - When `value` is `None`.
+  pub(crate) fn some_or_empty<T>(value: Option<T>) -> Self
+  where
+    T: ToString,
+  {
+    match value {
+      Some(v) => Self::plain(v.to_string()),
+      None => Self::empty(),
+    }
+  }
+
+  /// Create `Value` representing a value or hide
+  ///
+  /// ## Parameters
+  /// * `value` - `Option<T>` that represents the optional value.
+  ///
+  /// ## Returns
+  /// * `Value::Plain(value)` - When `value` is `Some`.
+  /// * `Value::Hide` - When `value` is `None`.
+  pub(crate) fn some_or_hide<T>(value: Option<T>) -> Self
+  where
+    T: ToString,
+  {
+    match value {
+      Some(v) => Self::plain(v.to_string()),
+      None => Self::hide(),
     }
   }
 
@@ -311,8 +390,10 @@ impl Value {
 
   pub(crate) fn to_decorated_string(&self, context: &Context) -> String {
     match self {
+      Self::DistinguishedName(value) => context.apply_stdout_style(format_distinguished_name(value)),
       Self::Empty => "".to_string(),
       Self::Error(value) => context.apply_error_style(value),
+      Self::Hide => "".to_string(),
       Self::Ignore(value) => context.apply_ignore_style(value),
       Self::NotApplicable => context.apply_ignore_style("n.a."),
       Self::Plain(value) => context.apply_stdout_style(value),
@@ -325,8 +406,10 @@ impl Value {
 
   pub(crate) fn to_undecorated_string(&self) -> String {
     match self {
+      Self::DistinguishedName(value) => format_distinguished_name(value),
       Self::Empty => "".to_string(),
       Self::Error(value) => value.to_string(),
+      Self::Hide => "".to_string(),
       Self::Ignore(value) => value.to_string(),
       Self::NotApplicable => "".to_string(),
       Self::Plain(value) => value.to_string(),

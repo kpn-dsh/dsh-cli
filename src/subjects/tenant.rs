@@ -233,6 +233,24 @@ impl CommandExecutor for TenantGrant {
   }
 }
 
+static TENANT_LABELS: [TenantLabel; 15] = [
+  TenantLabel::Tenant,
+  TenantLabel::Manager,
+  TenantLabel::Monitoring,
+  TenantLabel::Tracing,
+  TenantLabel::Vpn,
+  TenantLabel::CertificateCount,
+  TenantLabel::ConsumerRate,
+  TenantLabel::Cpu,
+  TenantLabel::KafkaAclGroupCount,
+  TenantLabel::Mem,
+  TenantLabel::PartitionCount,
+  TenantLabel::ProducerRate,
+  TenantLabel::RequestRate,
+  TenantLabel::SecretCount,
+  TenantLabel::TopicCount,
+];
+
 struct TenantListAll {}
 
 #[async_trait]
@@ -287,6 +305,16 @@ impl CommandExecutor for TenantListIds {
     Requirements::standard_with_api()
   }
 }
+
+static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
+  StreamAccessLabel::Tenant,
+  StreamAccessLabel::StreamId,
+  StreamAccessLabel::StreamKind,
+  StreamAccessLabel::ReadAccess,
+  StreamAccessLabel::WriteAccess,
+  StreamAccessLabel::Partitions,
+  StreamAccessLabel::ReplicationFactor,
+];
 
 struct TenantListStreams {}
 
@@ -368,6 +396,15 @@ impl CommandExecutor for TenantShow {
     Requirements::standard_with_api()
   }
 }
+
+static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
+  StreamAccessLabel::StreamId,
+  StreamAccessLabel::StreamKind,
+  StreamAccessLabel::ReadAccess,
+  StreamAccessLabel::WriteAccess,
+  StreamAccessLabel::Partitions,
+  StreamAccessLabel::ReplicationFactor,
+];
 
 struct TenantShowStreams {}
 
@@ -607,39 +644,21 @@ impl Label for TenantLabel {
 impl SubjectFormatter<TenantLabel> for TenantLimits {
   fn value(&self, label: &TenantLabel, target_id: &str) -> Value {
     match label {
-      TenantLabel::CertificateCount => Value::option(self.certificate_count),
-      TenantLabel::ConsumerRate => Value::option(self.consumer_rate),
-      TenantLabel::Cpu => Value::option(self.cpu),
-      TenantLabel::KafkaAclGroupCount => Value::option(self.kafka_acl_group_count),
-      TenantLabel::Mem => Value::option(self.mem),
-      TenantLabel::PartitionCount => Value::option(self.partition_count),
-      TenantLabel::ProducerRate => Value::option(self.producer_rate),
-      TenantLabel::RequestRate => Value::option(self.request_rate),
-      TenantLabel::SecretCount => Value::option(self.secret_count),
+      TenantLabel::CertificateCount => Value::some_or_hide(self.certificate_count),
+      TenantLabel::ConsumerRate => Value::some_or_hide(self.consumer_rate),
+      TenantLabel::Cpu => Value::some_or_hide(self.cpu),
+      TenantLabel::KafkaAclGroupCount => Value::some_or_hide(self.kafka_acl_group_count),
+      TenantLabel::Mem => Value::some_or_hide(self.mem),
+      TenantLabel::PartitionCount => Value::some_or_hide(self.partition_count),
+      TenantLabel::ProducerRate => Value::some_or_hide(self.producer_rate),
+      TenantLabel::RequestRate => Value::some_or_hide(self.request_rate),
+      TenantLabel::SecretCount => Value::some_or_hide(self.secret_count),
       TenantLabel::Tenant => Value::target(target_id),
-      TenantLabel::TopicCount => Value::option(self.topic_count),
+      TenantLabel::TopicCount => Value::some_or_hide(self.topic_count),
       _ => unreachable!(),
     }
   }
 }
-
-static TENANT_LABELS: [TenantLabel; 15] = [
-  TenantLabel::Tenant,
-  TenantLabel::Manager,
-  TenantLabel::Monitoring,
-  TenantLabel::Tracing,
-  TenantLabel::Vpn,
-  TenantLabel::CertificateCount,
-  TenantLabel::ConsumerRate,
-  TenantLabel::Cpu,
-  TenantLabel::KafkaAclGroupCount,
-  TenantLabel::Mem,
-  TenantLabel::PartitionCount,
-  TenantLabel::ProducerRate,
-  TenantLabel::RequestRate,
-  TenantLabel::SecretCount,
-  TenantLabel::TopicCount,
-];
 
 impl SubjectFormatter<TenantLabel> for ManagedTenant {
   fn value(&self, label: &TenantLabel, _target_id: &str) -> Value {
@@ -710,7 +729,7 @@ impl SubjectFormatter<StreamAccessLabel> for (&ManagedStreamId, &str, bool, bool
           Value::plain("denied")
         }
       }
-      _ => Value::empty(),
+      _ => Value::not_applicable(),
     }
   }
 }
@@ -749,25 +768,6 @@ impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRig
     }
   }
 }
-
-static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
-  StreamAccessLabel::StreamId,
-  StreamAccessLabel::StreamKind,
-  StreamAccessLabel::ReadAccess,
-  StreamAccessLabel::WriteAccess,
-  StreamAccessLabel::Partitions,
-  StreamAccessLabel::ReplicationFactor,
-];
-
-static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
-  StreamAccessLabel::Tenant,
-  StreamAccessLabel::StreamId,
-  StreamAccessLabel::StreamKind,
-  StreamAccessLabel::ReadAccess,
-  StreamAccessLabel::WriteAccess,
-  StreamAccessLabel::Partitions,
-  StreamAccessLabel::ReplicationFactor,
-];
 
 fn service_enabled(managed_tenant: &ManagedTenant, name: ManagedTenantServicesName) -> String {
   managed_tenant

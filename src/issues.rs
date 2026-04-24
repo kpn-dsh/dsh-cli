@@ -217,16 +217,12 @@ impl SubjectFormatter<IssueLabel> for IssueDescription<'_> {
         IssueLabel::DependencyName => Value::plain(dependency_name),
         IssueLabel::DependencySubject => Value::plain(dependency_subject),
         IssueLabel::DependencyValue => Value::plain(dependency_value),
-        IssueLabel::SubjectDescription => Value::empty(),
-        IssueLabel::SubjectKind => Value::empty(),
+        IssueLabel::SubjectDescription => Value::hide(),
+        IssueLabel::SubjectKind => Value::hide(),
         _ => issue.value(label, target_id),
       },
       None => match label {
-        IssueLabel::DependencyName => Value::empty(),
-        IssueLabel::DependencySubject => Value::empty(),
-        IssueLabel::DependencyValue => Value::empty(),
-        IssueLabel::SubjectDescription => Value::empty(),
-        IssueLabel::SubjectKind => Value::empty(),
+        IssueLabel::DependencyName | IssueLabel::DependencySubject | IssueLabel::DependencyValue | IssueLabel::SubjectDescription | IssueLabel::SubjectKind => Value::hide(),
         _ => issue.value(label, target_id),
       },
     }
@@ -239,7 +235,7 @@ impl SubjectFormatter<IssueLabel> for Issue {
       IssueLabel::DependencyName => Value::unreachable(),
       IssueLabel::DependencySubject => Value::unreachable(),
       IssueLabel::DependencyValue => Value::unreachable(),
-      IssueLabel::IssueDetails => Value::option(self.details()),
+      IssueLabel::IssueDetails => Value::some_or_hide(self.details()),
       IssueLabel::IssueKind => match self.severity() {
         Severity::Error => Value::error(self.issue_kind()),
         Severity::Ignore => Value::ignore(self.issue_kind()),
