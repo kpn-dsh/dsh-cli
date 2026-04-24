@@ -222,7 +222,7 @@ impl From<dsh_api::types::error::ConversionError> for DshCliError {
 }
 
 impl From<DshApiError> for DshCliError {
-  fn from(dsh_api_error: dsh_api::error::DshApiError) -> Self {
+  fn from(dsh_api_error: DshApiError) -> Self {
     Self::DshApi(dsh_api_error.to_string())
   }
 }
