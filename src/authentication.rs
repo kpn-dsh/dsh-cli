@@ -135,19 +135,6 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
   .await?
 }
 
-fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
-  match &access_token_jwt.authorized_tenants() {
-    Some(authorized_tenants) => {
-      if !authorized_tenants.is_empty() {
-        context.println(format!("authorized tenants: {}", authorized_tenants.join(", ")));
-      } else {
-        context.println("you are not authorized for tenants");
-      }
-    }
-    None => context.print_warning("json web token does not provide authorized tenants"),
-  }
-}
-
 /// Let the user log out
 ///
 /// ## Parameters
@@ -179,6 +166,19 @@ pub(crate) async fn logout(platform: DshPlatform, context: Context) -> DshCliRes
     }
   })
   .await?
+}
+
+fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
+  match &access_token_jwt.authorized_tenants() {
+    Some(authorized_tenants) => {
+      if !authorized_tenants.is_empty() {
+        context.println(format!("authorized tenants: {}", authorized_tenants.join(", ")));
+      } else {
+        context.println("you are not authorized for tenants");
+      }
+    }
+    None => context.print_warning("json web token does not provide authorized tenants"),
+  }
 }
 
 /// Get access tokens for all current authentications

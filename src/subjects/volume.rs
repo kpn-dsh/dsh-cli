@@ -170,6 +170,8 @@ impl CommandExecutor for VolumeDelete {
   }
 }
 
+pub(crate) static VOLUME_LABELS: [VolumeLabel; 2] = [VolumeLabel::Target, VolumeLabel::Size];
+
 struct VolumeList {}
 
 #[async_trait]
@@ -280,6 +282,8 @@ impl CommandExecutor for VolumeListUsage {
     Requirements::standard_with_api()
   }
 }
+
+static VOLUME_STATUS_LABELS: [VolumeLabel; 4] = [VolumeLabel::Target, VolumeLabel::Size, VolumeLabel::ConfigurationSize, VolumeLabel::ActualSize];
 
 struct VolumeShow {}
 
@@ -394,7 +398,7 @@ impl SubjectFormatter<VolumeLabel> for Volume {
     match label {
       VolumeLabel::Target => Value::target(target_id),
       VolumeLabel::Size => Value::plain(self.size_gi_b),
-      _ => Value::empty(),
+      _ => Value::not_applicable(),
     }
   }
 }
@@ -409,7 +413,3 @@ impl SubjectFormatter<VolumeLabel> for VolumeStatus {
     }
   }
 }
-
-pub(crate) static VOLUME_LABELS: [VolumeLabel; 2] = [VolumeLabel::Target, VolumeLabel::Size];
-
-static VOLUME_STATUS_LABELS: [VolumeLabel; 4] = [VolumeLabel::Target, VolumeLabel::Size, VolumeLabel::ConfigurationSize, VolumeLabel::ActualSize];

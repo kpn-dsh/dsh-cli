@@ -13,12 +13,12 @@ use crate::formatters::{hashmap_to_table, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::bucket::BUCKET_LABELS;
+use crate::subjects::bucket::BucketLabel;
 use crate::subjects::certificate::CERTIFICATE_LABELS_SHOW;
 use crate::subjects::manifest::ManifestExplain;
 use crate::subjects::service::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
-use crate::subjects::vhost::VHOST_LABELS;
+use crate::subjects::vhost::VhostLabel;
 use crate::subjects::volume::VOLUME_LABELS;
 use crate::target_tenant::get_target_tenant;
 use crate::{cli_error, err, get_target_platform, DshCliResult};
@@ -128,6 +128,9 @@ lazy_static! {
     APP_UNDEPLOY_CAPABILITY.as_ref()
   ];
 }
+
+static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
+  [AppCatalogAppConfigurationLabel::Name, AppCatalogAppConfigurationLabel::ManifestUrn, AppCatalogAppConfigurationLabel::Stopped, AppCatalogAppConfigurationLabel::Configuration];
 
 struct AppDeploy {}
 
@@ -278,6 +281,8 @@ fn parse_app_parameter(app_parameter: &str) -> DshCliResult<(String, String)> {
   }
 }
 
+static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
+
 struct AppList {}
 
 #[async_trait]
@@ -374,6 +379,9 @@ impl CommandExecutor for AppOpen {
     Requirements::standard_with_api()
   }
 }
+
+static BUCKET_LABELS: [BucketLabel; 3] = [BucketLabel::Target, BucketLabel::Encrypted, BucketLabel::Versioned];
+static VHOST_LABELS: [VhostLabel; 2] = [VhostLabel::Target, VhostLabel::Value];
 
 struct AppShow {}
 
@@ -504,8 +512,6 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
   }
 }
 
-static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
-
 #[derive(Eq, Hash, PartialEq, Serialize)]
 enum AppCatalogAppConfigurationLabel {
   Configuration,
@@ -539,9 +545,6 @@ impl SubjectFormatter<AppCatalogAppConfigurationLabel> for AppCatalogAppConfigur
     }
   }
 }
-
-static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
-  [AppCatalogAppConfigurationLabel::Name, AppCatalogAppConfigurationLabel::ManifestUrn, AppCatalogAppConfigurationLabel::Stopped, AppCatalogAppConfigurationLabel::Configuration];
 
 const DEPLOY_LONG_ABOUT: &str = "Deploy an app from the app catalog. \
   The app to deploy must be identified by the app manifest identifier and version. \

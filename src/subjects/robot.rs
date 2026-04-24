@@ -210,12 +210,13 @@ impl CommandExecutor for RobotImport {
   }
 }
 
+static ROBOT_LABELS_LIST: [RobotLabel; 2] = [RobotLabel::PlatformName, RobotLabel::TenantName];
+
 struct RobotList {}
 
 #[async_trait]
 impl CommandExecutor for RobotList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    const ROBOT_LABELS_LIST: [RobotLabel; 2] = [RobotLabel::PlatformName, RobotLabel::TenantName];
     context.print_explanation("list all robot secret targets from keyring");
     let secret_targets = get_secrets_from_keyring()?;
     let targets: Vec<(&String, &String)> = secret_targets

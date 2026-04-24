@@ -69,6 +69,8 @@ lazy_static! {
   static ref NODE_POOL_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![NODE_POOL_LIST_CAPABILITY.as_ref(), NODE_POOL_SHOW_CAPABILITY.as_ref()];
 }
 
+static NODEPOOL_LABELS: [NodepoolLabel; 3] = [NodepoolLabel::Target, NodepoolLabel::GpuDriver, NodepoolLabel::MaxInstances];
+
 struct NodepoolList {}
 
 #[async_trait]
@@ -108,6 +110,8 @@ impl CommandExecutor for NodepoolListIds {
     Requirements::standard_with_api()
   }
 }
+
+static NODEPOOL_USAGE_LABELS: [NodepoolLabel; 4] = [NodepoolLabel::Target, NodepoolLabel::ServiceId, NodepoolLabel::ServiceInstances, NodepoolLabel::NodeFeatures];
 
 struct NodepoolListUsage {}
 
@@ -258,6 +262,3 @@ impl SubjectFormatter<NodepoolLabel> for (&NodepoolActual, &String, &u64, &Vec<N
     }
   }
 }
-
-static NODEPOOL_USAGE_LABELS: [NodepoolLabel; 4] = [NodepoolLabel::Target, NodepoolLabel::ServiceId, NodepoolLabel::ServiceInstances, NodepoolLabel::NodeFeatures];
-static NODEPOOL_LABELS: [NodepoolLabel; 3] = [NodepoolLabel::Target, NodepoolLabel::GpuDriver, NodepoolLabel::MaxInstances];
