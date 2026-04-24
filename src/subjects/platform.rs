@@ -18,7 +18,7 @@ use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::{ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
-use dsh_api::platform::DshPlatform;
+use dsh_api::platform::{DshPlatform, VhostZone};
 use dsh_api::DEFAULT_PLATFORMS;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -131,6 +131,16 @@ impl CommandExecutor for PlatformExport {
     Requirements::standard_without_api()
   }
 }
+
+static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 7] = [
+  DshPlatformLabel::Parameter,
+  DshPlatformLabel::Alias,
+  DshPlatformLabel::Realm,
+  DshPlatformLabel::IsProduction,
+  DshPlatformLabel::Description,
+  DshPlatformLabel::PublicDomain,
+  DshPlatformLabel::PrivateDomain,
+];
 
 struct PLatformList {}
 
@@ -268,6 +278,66 @@ impl PlatformOpen {
   }
 }
 
+static DSH_PLATFORM_LABELS_CONFIGURATION: [DshPlatformLabel; 10] = [
+  DshPlatformLabel::Parameter,
+  DshPlatformLabel::Alias,
+  DshPlatformLabel::Description,
+  DshPlatformLabel::IsProduction,
+  DshPlatformLabel::CloudProvider,
+  DshPlatformLabel::Region,
+  DshPlatformLabel::Realm,
+  DshPlatformLabel::IssuerEndpoint,
+  DshPlatformLabel::PrivateDomain,
+  DshPlatformLabel::PublicDomain,
+];
+
+static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 13] = [
+  DshPlatformLabel::Parameter,
+  DshPlatformLabel::RestApiDomain,
+  DshPlatformLabel::RestTokenEndpoint,
+  DshPlatformLabel::RestApiEndpoint,
+  DshPlatformLabel::MqttTokenEndpoint,
+  DshPlatformLabel::MqttMessagingApiEndpoint,
+  DshPlatformLabel::MqttMessagingApiPort,
+  DshPlatformLabel::ConsoleDomain,
+  DshPlatformLabel::ConsoleUrl,
+  DshPlatformLabel::SwaggerUrl,
+  DshPlatformLabel::TracingUrl,
+  DshPlatformLabel::AccessTokenEndpoint,
+  DshPlatformLabel::ClientId,
+];
+
+static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 28] = [
+  DshPlatformLabel::Parameter,
+  DshPlatformLabel::BucketName,
+  DshPlatformLabel::InternalDomain,
+  DshPlatformLabel::InternalServiceDomain,
+  DshPlatformLabel::TenantClientId,
+  DshPlatformLabel::HttpMessagingApiUrlMulti,
+  DshPlatformLabel::HttpMessagingApiUrlSingle,
+  DshPlatformLabel::TenantPrivateVhostDomain,
+  DshPlatformLabel::ProxyBrokerVhost,
+  DshPlatformLabel::ProxyCommonName,
+  DshPlatformLabel::ProxyConsumerGroup,
+  DshPlatformLabel::ProxyConsumerGroupAcl,
+  DshPlatformLabel::ProxySchemaStoreVhost,
+  DshPlatformLabel::ProxyVhostDomain,
+  DshPlatformLabel::TenantProxyPrivateBootstrapServers,
+  DshPlatformLabel::TenantProxyPrivateSchemaStoreHost,
+  DshPlatformLabel::TenantProxyPublicBootstrapServers,
+  DshPlatformLabel::TenantProxyPublicSchemaStoreHost,
+  DshPlatformLabel::PublicVhostDomain,
+  DshPlatformLabel::TenantPublicAppDomain,
+  DshPlatformLabel::TenantPublicAppsDomain,
+  DshPlatformLabel::TenantConsoleUrl,
+  DshPlatformLabel::TenantAppCatalogUrl,
+  DshPlatformLabel::TenantDataCatalogUrl,
+  DshPlatformLabel::TenantServiceConsoleUrl,
+  DshPlatformLabel::TenantAppConsoleUrl,
+  DshPlatformLabel::TenantAppCatalogAppUrl,
+  DshPlatformLabel::TenantMonitoringUrl,
+];
+
 struct PlatformShow {}
 
 #[async_trait]
@@ -397,8 +467,8 @@ enum DshPlatformLabel {
   InternalServiceDomain,
   ProxyBrokerVhost,
   ProxyCommonName,
-  ProxyConsumerName,
-  ProxyConsumerNameAclGroup,
+  ProxyConsumerGroup,
+  ProxyConsumerGroupAcl,
   ProxySchemaStoreVhost,
   ProxyVhostDomain,
   PublicVhostDomain,
@@ -454,8 +524,8 @@ impl Label for DshPlatformLabel {
       Self::InternalServiceDomain => "internal domain (service)",
       Self::ProxyBrokerVhost => "proxy broker vhost",
       Self::ProxyCommonName => "proxy common name",
-      Self::ProxyConsumerName => "proxy consumer name",
-      Self::ProxyConsumerNameAclGroup => "proxy consumer name acl group",
+      Self::ProxyConsumerGroup => "proxy consumer group",
+      Self::ProxyConsumerGroupAcl => "proxy consumer group acl",
       Self::ProxySchemaStoreVhost => "proxy schema store vhost",
       Self::ProxyVhostDomain => "proxy vhost domain",
       Self::PublicVhostDomain => "public vhost domain",
@@ -493,10 +563,10 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
       DshPlatformLabel::IsProduction => Value::plain(self.is_production()),
       DshPlatformLabel::IssuerEndpoint => Value::plain(self.issuer_endpoint()),
       DshPlatformLabel::Parameter => Value::target(self.name()),
-      DshPlatformLabel::PrivateDomain => Value::some_or(self.private_domain(), "not configured"),
+      DshPlatformLabel::PrivateDomain => Value::some_or_empty(self.private_domain()),
       DshPlatformLabel::PublicDomain => Value::plain(self.public_domain()),
       DshPlatformLabel::Realm => Value::plain(self.realm()),
-      DshPlatformLabel::Region => Value::option(self.region()),
+      DshPlatformLabel::Region => Value::some_or_hide(self.region()),
       // Derived from configuration
       DshPlatformLabel::AccessTokenEndpoint => Value::plain(self.access_token_endpoint()),
       DshPlatformLabel::ClientId => Value::plain(self.client_id()),
@@ -534,12 +604,12 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
       DshPlatformLabel::HttpMessagingApiUrlSingle => Value::plain(platform.http_messaging_api_url_single(topic)),
       DshPlatformLabel::InternalDomain => Value::plain(platform.internal_domain(tenant)),
       DshPlatformLabel::InternalServiceDomain => Value::plain(platform.internal_service_domain(tenant, service_id)),
-      DshPlatformLabel::ProxyBrokerVhost => Value::plain(platform.proxy_broker_vhost(tenant, proxy_name, 0)),
-      DshPlatformLabel::ProxyCommonName => Value::plain(platform.proxy_common_name(tenant)),
-      DshPlatformLabel::ProxyConsumerName => Value::plain(platform.proxy_consumer_name(tenant, proxy_name, 0)),
-      DshPlatformLabel::ProxyConsumerNameAclGroup => Value::plain(platform.proxy_consumer_name_acl_group(tenant, "acl-group-name", proxy_name, 0)),
-      DshPlatformLabel::ProxySchemaStoreVhost => Value::plain(platform.proxy_schema_store_vhost(tenant, proxy_name)),
-      DshPlatformLabel::ProxyVhostDomain => Value::plain(platform.proxy_vhost_domain(tenant)),
+      DshPlatformLabel::ProxyBrokerVhost => Value::ok_or_empty(platform.proxy_broker_vhost(tenant, proxy_name, VhostZone::Public, 0)),
+      DshPlatformLabel::ProxyCommonName => Value::ok_or_hide(platform.proxy_common_name(tenant, VhostZone::Public)),
+      DshPlatformLabel::ProxyConsumerGroup => Value::plain(platform.proxy_consumer_group(tenant, proxy_name, 0)),
+      DshPlatformLabel::ProxyConsumerGroupAcl => Value::plain(platform.proxy_consumer_name_acl_group(tenant, "acl-group-name", proxy_name, 0)),
+      DshPlatformLabel::ProxySchemaStoreVhost => Value::ok_or_empty(platform.proxy_schema_store_vhost(tenant, proxy_name, VhostZone::Public)),
+      DshPlatformLabel::ProxyVhostDomain => Value::ok_or_empty(platform.proxy_vhost_domain(tenant, VhostZone::Public)),
       DshPlatformLabel::PublicVhostDomain => Value::plain(platform.public_vhost_domain(vhost)),
       DshPlatformLabel::TenantAppCatalogAppUrl => Value::plain(platform.tenant_app_catalog_app_url(tenant, vendor_id, app_id)),
       DshPlatformLabel::TenantAppCatalogUrl => Value::plain(platform.tenant_app_catalog_url(tenant)),
@@ -548,13 +618,13 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
       DshPlatformLabel::TenantConsoleUrl => Value::plain(platform.tenant_console_url(tenant)),
       DshPlatformLabel::TenantDataCatalogUrl => Value::plain(platform.tenant_data_catalog_url(tenant)),
       DshPlatformLabel::TenantMonitoringUrl => Value::plain(platform.tenant_monitoring_url(tenant)),
-      DshPlatformLabel::TenantProxyPrivateBootstrapServers => Value::option(
+      DshPlatformLabel::TenantProxyPrivateBootstrapServers => Value::some_or_empty(
         platform
           .tenant_proxy_private_bootstrap_servers(tenant, proxy_name, 2)
           .ok()
           .map(|server| server.join("\n")),
       ),
-      DshPlatformLabel::TenantProxyPrivateSchemaStoreHost => Value::option(platform.tenant_proxy_private_schema_store_host(tenant, proxy_name).ok()),
+      DshPlatformLabel::TenantProxyPrivateSchemaStoreHost => Value::some_or_empty(platform.tenant_proxy_private_schema_store_host(tenant, proxy_name).ok()),
       DshPlatformLabel::TenantProxyPublicBootstrapServers => Value::plain(platform.tenant_proxy_public_bootstrap_servers(tenant, proxy_name, 2).join("\n")),
       DshPlatformLabel::TenantProxyPublicSchemaStoreHost => Value::plain(platform.tenant_proxy_public_schema_store_host(tenant, proxy_name)),
       DshPlatformLabel::TenantPrivateVhostDomain => Value::ok_or(platform.tenant_private_vhost_domain(tenant, vhost), "private domain not configured"),
@@ -565,69 +635,6 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
     }
   }
 }
-
-static DSH_PLATFORM_LABELS_CONFIGURATION: [DshPlatformLabel; 10] = [
-  DshPlatformLabel::Parameter,
-  DshPlatformLabel::Alias,
-  DshPlatformLabel::Description,
-  DshPlatformLabel::IsProduction,
-  DshPlatformLabel::CloudProvider,
-  DshPlatformLabel::Region,
-  DshPlatformLabel::Realm,
-  DshPlatformLabel::IssuerEndpoint,
-  DshPlatformLabel::PrivateDomain,
-  DshPlatformLabel::PublicDomain,
-];
-
-static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 13] = [
-  DshPlatformLabel::Parameter,
-  DshPlatformLabel::RestApiDomain,
-  DshPlatformLabel::RestTokenEndpoint,
-  DshPlatformLabel::RestApiEndpoint,
-  DshPlatformLabel::MqttTokenEndpoint,
-  DshPlatformLabel::MqttMessagingApiEndpoint,
-  DshPlatformLabel::MqttMessagingApiPort,
-  DshPlatformLabel::ConsoleDomain,
-  DshPlatformLabel::ConsoleUrl,
-  DshPlatformLabel::SwaggerUrl,
-  DshPlatformLabel::TracingUrl,
-  DshPlatformLabel::AccessTokenEndpoint,
-  DshPlatformLabel::ClientId,
-];
-
-static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 28] = [
-  DshPlatformLabel::Parameter,
-  DshPlatformLabel::BucketName,
-  DshPlatformLabel::InternalDomain,
-  DshPlatformLabel::InternalServiceDomain,
-  DshPlatformLabel::TenantClientId,
-  DshPlatformLabel::HttpMessagingApiUrlMulti,
-  DshPlatformLabel::HttpMessagingApiUrlSingle,
-  DshPlatformLabel::TenantPrivateVhostDomain,
-  DshPlatformLabel::ProxyBrokerVhost,
-  DshPlatformLabel::ProxyCommonName,
-  DshPlatformLabel::ProxyConsumerName,
-  DshPlatformLabel::ProxyConsumerNameAclGroup,
-  DshPlatformLabel::ProxySchemaStoreVhost,
-  DshPlatformLabel::ProxyVhostDomain,
-  DshPlatformLabel::TenantProxyPrivateBootstrapServers,
-  DshPlatformLabel::TenantProxyPrivateSchemaStoreHost,
-  DshPlatformLabel::TenantProxyPublicBootstrapServers,
-  DshPlatformLabel::TenantProxyPublicSchemaStoreHost,
-  DshPlatformLabel::PublicVhostDomain,
-  DshPlatformLabel::TenantPublicAppDomain,
-  DshPlatformLabel::TenantPublicAppsDomain,
-  DshPlatformLabel::TenantConsoleUrl,
-  DshPlatformLabel::TenantAppCatalogUrl,
-  DshPlatformLabel::TenantDataCatalogUrl,
-  DshPlatformLabel::TenantServiceConsoleUrl,
-  DshPlatformLabel::TenantAppConsoleUrl,
-  DshPlatformLabel::TenantAppCatalogAppUrl,
-  DshPlatformLabel::TenantMonitoringUrl,
-];
-
-static DSH_PLATFORM_LABELS_LIST: [DshPlatformLabel; 6] =
-  [DshPlatformLabel::Parameter, DshPlatformLabel::Alias, DshPlatformLabel::Realm, DshPlatformLabel::IsProduction, DshPlatformLabel::Description, DshPlatformLabel::ConsoleUrl];
 
 /// Defines the parameters that are required for a `Label` variant.
 /// * `app_id_required`
@@ -668,8 +675,8 @@ impl DshPlatformLabel {
       DshPlatformLabel::HttpMessagingApiUrlMulti | DshPlatformLabel::HttpMessagingApiUrlSingle => REQUIRED_ARGUMENTS_TOPIC,
       DshPlatformLabel::TenantPrivateVhostDomain => REQUIRED_ARGUMENTS_TENANT_VHOST,
       DshPlatformLabel::ProxyBrokerVhost
-      | DshPlatformLabel::ProxyConsumerName
-      | DshPlatformLabel::ProxyConsumerNameAclGroup
+      | DshPlatformLabel::ProxyConsumerGroup
+      | DshPlatformLabel::ProxyConsumerGroupAcl
       | DshPlatformLabel::ProxySchemaStoreVhost
       | DshPlatformLabel::TenantProxyPrivateBootstrapServers
       | DshPlatformLabel::TenantProxyPrivateSchemaStoreHost
