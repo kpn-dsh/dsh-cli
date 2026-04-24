@@ -20,6 +20,7 @@ pub(crate) enum DshCliError {
   SerdeJson(String),
   String(String),
   Time(String),
+  Toml(String),
   TokioJoin(String),
   UrlParse(String),
   Utf8(String),
@@ -155,6 +156,7 @@ impl Debug for DshCliError {
       Self::SerdeJson(message) => write!(f, "DshCliError(json, {})", message),
       Self::String(message) => write!(f, "DshCliError({})", message),
       Self::Time(message) => write!(f, "DshCliError(time, {})", message),
+      Self::Toml(message) => write!(f, "DshCliError(toml, {})", message),
       Self::TokioJoin(message) => write!(f, "DshCliError(tokio join, {})", message),
       Self::UrlParse(message) => write!(f, "DshCliError(url parse, {})", message),
       Self::Utf8(message) => write!(f, "DshCliError(utf8, {})", message),
@@ -182,6 +184,7 @@ impl Display for DshCliError {
       Self::SerdeJson(message) => write!(f, "{}", message),
       Self::String(message) => write!(f, "{}", message),
       Self::Time(message) => write!(f, "{}", message),
+      Self::Toml(message) => write!(f, "{}", message),
       Self::TokioJoin(message) => write!(f, "{}", message),
       Self::UrlParse(message) => write!(f, "{}", message),
       Self::Utf8(message) => write!(f, "{}", message),
@@ -278,6 +281,18 @@ impl From<std::time::SystemTimeError> for DshCliError {
 impl From<tokio::task::JoinError> for DshCliError {
   fn from(join_error: tokio::task::JoinError) -> Self {
     Self::TokioJoin(join_error.to_string())
+  }
+}
+
+impl From<toml::de::Error> for DshCliError {
+  fn from(toml_error: toml::de::Error) -> Self {
+    Self::Toml(toml_error.to_string())
+  }
+}
+
+impl From<toml::ser::Error> for DshCliError {
+  fn from(toml_error: toml::ser::Error) -> Self {
+    Self::Toml(toml_error.to_string())
   }
 }
 
