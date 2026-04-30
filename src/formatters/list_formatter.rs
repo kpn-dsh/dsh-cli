@@ -1,14 +1,15 @@
 use crate::context::Context;
 use crate::error::DshCliError;
-use crate::formatters::OutputFormat;
+use crate::formatters::{ColumnAlignment, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::{err, DshCliResult};
 use itertools::Itertools;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::marker::PhantomData;
+use tabled::settings::object::Columns;
 use tabled::settings::peaker::PriorityMax;
-use tabled::settings::{Padding, Width};
+use tabled::settings::{Alignment, Padding, Width};
 use tabled::{builder::Builder as TabledBuilder, settings::Style};
 
 pub(crate) struct ListFormatter<'a, L: Label, V: Clone + SubjectFormatter<L>> {
@@ -234,6 +235,20 @@ where
       tabled_builder.push_record(record);
     }
     let mut table = tabled_builder.build();
+    for (index, label) in self.labels.iter().enumerate() {
+      match label.column_alignment() {
+        ColumnAlignment::_Center => {
+          table.modify(Columns::one(index), Alignment::center());
+        }
+        ColumnAlignment::Default => {}
+        ColumnAlignment::_Left => {
+          table.modify(Columns::one(index), Alignment::left());
+        }
+        ColumnAlignment::Right => {
+          table.modify(Columns::one(index), Alignment::right());
+        }
+      }
+    }
     if let Some(terminal_width) = self.context.terminal_width() {
       table.with(Width::wrap(terminal_width).keep_words(true).priority(PriorityMax::new(true)));
     }

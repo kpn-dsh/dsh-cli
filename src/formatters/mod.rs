@@ -15,6 +15,15 @@ pub(crate) mod value;
 
 pub(crate) use value::Value;
 
+#[derive(Default)]
+pub(crate) enum ColumnAlignment {
+  _Center,
+  #[default]
+  Default,
+  _Left,
+  Right,
+}
+
 /// # Defines behavior of labels
 ///
 /// Adds capabilities to a type that defines its behavior as a label.
@@ -61,6 +70,17 @@ pub(crate) trait Label: Eq + Hash + PartialEq + Serialize {
   /// * `true` - if `self` is the target label for this label type.
   ///   Only one value can return `true`.
   fn is_target_label(&self) -> bool;
+
+  /// # Indicates how a column for this label should be aligned
+  ///
+  /// The default implementation returns `ColumnAlignment::Default`, which results in columns
+  /// to be left aligned by default. This function is only relevant for a `ListFormatter`.
+  ///
+  /// ## Returns
+  /// * `ColumnAlignment` - Column alignment.
+  fn column_alignment(&self) -> ColumnAlignment {
+    ColumnAlignment::default()
+  }
 }
 
 /// # Defines how a data type will be formatted

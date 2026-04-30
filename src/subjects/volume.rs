@@ -6,7 +6,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{ColumnAlignment, Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_APPS, DEPENDANT_LABELS_LIST, DEPENDANT_LABELS_SERVICES};
@@ -390,6 +390,13 @@ impl Label for VolumeLabel {
 
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
+  }
+
+  fn column_alignment(&self) -> ColumnAlignment {
+    match self {
+      Self::ActualSize | Self::ConfigurationSize | Self::Size => ColumnAlignment::Right,
+      _ => ColumnAlignment::default(),
+    }
   }
 }
 

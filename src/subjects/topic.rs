@@ -7,8 +7,8 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::OutputFormat;
 use crate::formatters::{hashmap_to_table, Value};
+use crate::formatters::{ColumnAlignment, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
@@ -630,6 +630,19 @@ impl Label for TopicLabel {
 
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
+  }
+
+  fn column_alignment(&self) -> ColumnAlignment {
+    match self {
+      TopicLabel::DeleteRetentionMs
+      | TopicLabel::MaxMessageBytes
+      | TopicLabel::NumberOfPartitions
+      | TopicLabel::ReplicationFactor
+      | TopicLabel::RetentionBytes
+      | TopicLabel::RetentionMs
+      | TopicLabel::SegmentBytes => ColumnAlignment::Right,
+      _ => ColumnAlignment::default(),
+    }
   }
 }
 

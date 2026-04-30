@@ -12,7 +12,7 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
+use crate::formatters::{hashmap_to_table, ColumnAlignment, Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
@@ -862,6 +862,13 @@ impl Label for ServiceLabel {
 
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
+  }
+
+  fn column_alignment(&self) -> ColumnAlignment {
+    match self {
+      Self::Mem => ColumnAlignment::Right,
+      _ => ColumnAlignment::default(),
+    }
   }
 }
 
