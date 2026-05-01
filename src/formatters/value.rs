@@ -21,7 +21,7 @@ pub(crate) enum Value {
 ///
 /// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
 ///
-/// ## Examples
+/// # Examples
 /// ```
 /// let id = "my-id";
 /// let plain_value = plain!("id:{}", id);
@@ -39,7 +39,7 @@ macro_rules! plain {
 ///
 /// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
 ///
-/// ## Examples
+/// # Examples
 /// ```
 /// let id = "my-id";
 /// let warn_value = warn!("{} not found", id);
@@ -54,25 +54,25 @@ macro_rules! warn {
 }
 
 impl Value {
-  /// Create `Value` representing date/time
+  /// Create `Value` representing date/time.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain`
   #[allow(dead_code)]
   pub(crate) fn datetime(datetime: &DateTime<Utc>) -> Self {
     Self::plain(datetime)
   }
 
-  /// Create `Value` representing date/time with expiration check
+  /// Create `Value` representing date/time with expiration check.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
   /// * `days` - Optional number of days in the future for the warning check.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Error` - When `datetime` is in the past.
   /// * `Value::Warn` - When `date` is present and `datetime` will expire within `days` days.
   /// * `Value::Plain` - Otherwise.
@@ -96,12 +96,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing date/time with not-before check
+  /// Create `Value` representing date/time with not-before check.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain` - When `datetime` is in the past.
   /// * `Value::Warn` - When `datetime` is now or in the future.
   pub(crate) fn datetime_not_before(datetime: &DateTime<Utc>) -> Self {
@@ -112,12 +112,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a distinguished name
+  /// Create `Value` representing a distinguished name.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `distinguished_name` - Can be converted into a `String` representing the distinguished name.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::DistinguishedName`
   pub(crate) fn distinguished_name<T>(distinguished_name: T) -> Self
   where
@@ -126,17 +126,17 @@ impl Value {
     Self::DistinguishedName(distinguished_name.into())
   }
 
-  /// Create `Value` representing an empty value
+  /// Create `Value` representing an empty value.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Empty`
   pub(crate) fn empty() -> Self {
     Self::Empty
   }
 
-  /// Create `Value` representing an error
+  /// Create `Value` representing an error.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Error` - Represents an error message.
   pub(crate) fn error<T>(value: T) -> Self
   where
@@ -145,17 +145,17 @@ impl Value {
     Self::Error(value.to_string())
   }
 
-  /// Create `Value` representing a hidden value
+  /// Create `Value` representing a hidden value.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Hide`
   pub(crate) fn hide() -> Self {
     Self::Hide
   }
 
-  /// Create `Value` representing a value that should be ignored
+  /// Create `Value` representing a value that should be ignored.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Ignore` - Represents an ignore message.
   pub(crate) fn ignore<T>(value: T) -> Self
   where
@@ -164,21 +164,21 @@ impl Value {
     Self::Ignore(value.to_string())
   }
 
-  /// Create `Value` representing a value that is not applicable
+  /// Create `Value` representing a value that is not applicable.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::NotApplicable`
   pub(crate) fn not_applicable() -> Self {
     Self::NotApplicable
   }
 
-  /// Create `Value` representing a value that might be correct or not
+  /// Create `Value` representing a value that might be correct or not.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
   /// * `default` - Value that will be shown when `value` is an `Err`.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain(value)` - When `value` is `Ok`.
   /// * `Value::Plain(default)` - When `value` is an `Err`.
   pub(crate) fn ok_or<T, U, E>(value: Result<T, E>, default: U) -> Self
@@ -192,12 +192,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a value that might be correct or not
+  /// Create `Value` representing a value that might be correct or not.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain(value)` - When `value` is `Ok`.
   /// * `Value::Empty` - When `value` is an `Err`.
   pub(crate) fn ok_or_empty<T, E>(value: Result<T, E>) -> Self
@@ -210,12 +210,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a value that might be correct or not
+  /// Create `Value` representing a value that might be correct or not.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain(value)` - When `value` is `Ok`.
   /// * `Value::Hide` - When `value` is an `Err`.
   pub(crate) fn ok_or_hide<T, E>(value: Result<T, E>) -> Self
@@ -228,12 +228,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a plain value
+  /// Create `Value` representing a plain value.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - Value.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain` - Represents the value.
   pub(crate) fn plain<T>(value: T) -> Self
   where
@@ -242,21 +242,21 @@ impl Value {
     Self::Plain(value.to_string())
   }
 
-  /// Create `Value` representing a secret
+  /// Create `Value` representing a secret.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Secret` - Represents the secret.
   pub(crate) fn secret() -> Self {
     Self::Secret
   }
 
-  /// Create `Value` representing an optional value with default
+  /// Create `Value` representing an optional value with default.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - `Option<T>` that represents the optional value.
   /// * `default` - Value that will be shown when `value` is `None`.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain(value)` - When `value` is `Some`.
   /// * `Value::Plain(default)` - When `value` is `None`.
   pub(crate) fn some_or<T, U>(value: Option<T>, default: U) -> Self
@@ -270,12 +270,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing an optional value
+  /// Create `Value` representing an optional value.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - `Option<T>` that represents the optional value.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain(value)` - When `value` is present.
   /// * `Value::Empty` - When `value` is `None`.
   pub(crate) fn some_or_empty<T>(value: Option<T>) -> Self
@@ -288,12 +288,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a value or hide
+  /// Create `Value` representing a value or hide.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - `Option<T>` that represents the optional value.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain(value)` - When `value` is `Some`.
   /// * `Value::Hide` - When `value` is `None`.
   pub(crate) fn some_or_hide<T>(value: Option<T>) -> Self
@@ -306,12 +306,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a target
+  /// Create `Value` representing a target.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `value` - Target value which identifies something.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Target` - Represents the target value.
   pub(crate) fn target<T>(value: T) -> Self
   where
@@ -320,12 +320,12 @@ impl Value {
     Self::Target(value.to_string())
   }
 
-  /// Create `Value` representing a timestamp
+  /// Create `Value` representing a timestamp.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `timestamp` - Timestamp in seconds since epoch.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain` - Formatted timestamp.
   pub(crate) fn timestamp_seconds(timestamp: i64) -> Self {
     match DateTime::from_timestamp_secs(timestamp) {
@@ -334,13 +334,13 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing timestamp with expiration check
+  /// Create `Value` representing timestamp with expiration check.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `timestamp` - Timestamp in seconds since epoch.
   /// * `days` - Optional number of days in the future for the warning check.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Error` - When `timestamp` is in the past.
   /// * `Value::Warn` - When `date` is present and `timestamp` will expire within `days` days.
   /// * `Value::Plain` - Otherwise.
@@ -352,12 +352,12 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing timestamp with not-before check
+  /// Create `Value` representing timestamp with not-before check.
   ///
-  /// ## Parameters
+  /// # Parameters
   /// * `timestamp` - Timestamp in seconds since epoch.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Plain` - When `timestamp` is in the past.
   /// * `Value::Warn` - When `timestamp` is now or in the future.
   pub(crate) fn timestamp_seconds_not_before(timestamp: i64) -> Self {
@@ -367,17 +367,17 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a program flow error
+  /// Create `Value` representing a program flow error.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Unreachable`
   pub(crate) fn unreachable() -> Self {
     Self::Unreachable
   }
 
-  /// Create `Value` representing a warning
+  /// Create `Value` representing a warning.
   ///
-  /// ## Returns
+  /// # Returns
   /// * `Value::Warn` - Represents a warning message.
   pub(crate) fn warn<T>(value: T) -> Self
   where
