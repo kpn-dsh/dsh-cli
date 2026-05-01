@@ -244,14 +244,15 @@ impl CommandExecutor for SecretDelete {
   }
 }
 
-static SECRET_LABELS_LIST: [SecretLabel; 9] = [
+static SECRET_LABELS_LIST: [SecretLabel; 10] = [
   SecretLabel::SecretName,
   SecretLabel::System,
   SecretLabel::Kind,
   SecretLabel::FormatKind,
   SecretLabel::Size,
   SecretLabel::Description,
-  SecretLabel::Expires,
+  SecretLabel::NotBefore,
+  SecretLabel::NotAfter,
   SecretLabel::Provisioned,
   SecretLabel::Notifications,
 ];
@@ -483,7 +484,7 @@ impl CommandExecutor for SecretListUsage {
   }
 }
 
-pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 13] = [
+static SECRET_LABELS_SHOW: [SecretLabel; 14] = [
   SecretLabel::SecretName,
   SecretLabel::SecretId,
   SecretLabel::System,
@@ -491,7 +492,8 @@ pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 13] = [
   SecretLabel::FormatKind,
   SecretLabel::Size,
   SecretLabel::Description,
-  SecretLabel::Expires,
+  SecretLabel::NotBefore,
+  SecretLabel::NotAfter,
   SecretLabel::Provisioned,
   SecretLabel::Notifications,
   SecretLabel::DerivedFrom,
@@ -648,16 +650,16 @@ impl CommandExecutor for SecretUpdate {
   }
 }
 
-/// Get secret with metadata
+/// Gets secret with metadata.
 ///
 /// Gets the secret value and optional allocation status. The value will be converted to a
 /// `SecretMetadata` struct. Note that system secrets do not have an allocation status.
 ///
-/// ## Parameters
+/// # Parameters
 /// * `secret_name` - Secret name.
 /// * `client` - Dsh api client.
 ///
-/// ## Returns
+/// # Returns
 /// Tuple consisting of:
 /// * `Vec<SecretMetadata>` - List containing the metadata items.
 /// * `Option<AllocationStatus>` - Secrets allocation status for non-system secrets,
@@ -683,9 +685,9 @@ pub(crate) async fn secret_with_metadata(secret_name: String, client: &DshApiCli
   }
 }
 
-/// Get all secrets with metadata and allocation status
+/// Gets all secrets with metadata and allocation status.
 ///
-/// ## Returns
+/// # Returns
 /// List of tuples, each consisting of:
 /// * `String` - Secret name.
 /// * `Option<String>` - Secret id when secret is a system secret, empty otherwise.
@@ -704,9 +706,9 @@ pub(crate) async fn secrets_with_metadata(
   )
 }
 
-/// Check if a secret has issues
+/// Check if a secret has issues.
 ///
-/// ## Parameters
+/// # Parameters
 /// * `secret_tuple` - Tuple of secret parameters, consisting of
 ///   * `String` Secret name.
 ///   * `Option<String>` - Secret id when it is a system secret.
@@ -717,7 +719,7 @@ pub(crate) async fn secrets_with_metadata(
 /// * `days` - Number of days until expiration.
 /// * `only_errors` - If `true` only issues with severity level `Severity::Error` will be returned.
 ///
-/// ## Returns
+/// # Returns
 /// * `Some(Vec<Issue>)` - List of found issues (at least one).
 /// * `None` - No issues where found.
 pub(crate) fn has_issues(
@@ -795,18 +797,19 @@ impl SubjectFormatter<IssueLabel> for (SecretMetadata, Issue) {
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum SecretLabel {
+  CaChain,
   DerivedFrom,
   Description,
-  Expires,
-  _Format,
+  // Expires,
+  Format,
   FormatKind,
   Issuer,
   Kind,
   Label,
-  _NotBefore,
+  NotBefore,
   NotAfter,
   Notifications,
-  _NumberOfEntries,
+  NumberOfEntries,
   Private,
   Provisioned,
   SecretId,
@@ -819,18 +822,18 @@ pub(crate) enum SecretLabel {
 impl Label for SecretLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::CaChain => "ca chain",
       Self::DerivedFrom => "derived from",
       Self::Description => "description",
-      Self::Expires => "expires",
-      Self::_Format => "format",
-      Self::FormatKind => "format",
+      Self::Format => "format",
+      Self::FormatKind => "format kind",
       Self::Issuer => "issuer",
       Self::Kind => "kind",
       Self::Label => "label",
       Self::Notifications => "notifications",
-      Self::_NotBefore => "not before",
+      Self::NotBefore => "not before",
       Self::NotAfter => "not after",
-      Self::_NumberOfEntries => "entries",
+      Self::NumberOfEntries => "entries",
       Self::Private => "private",
       Self::Provisioned => "provisioned",
       Self::SecretId => "secret id",
@@ -895,11 +898,7 @@ impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
         Some("error") => Value::error(secret_metadata.additional_info().map(|info| info.to_string()).unwrap_or_default()),
         _ => Value::some_or_hide(secret_metadata.additional_info()),
       },
-      SecretLabel::Expires => match secret_metadata.not_after() {
-        Some(not_after) => Value::timestamp_seconds_expired(not_after as i64, *expiration_days),
-        None => Value::hide(),
-      },
-      SecretLabel::_Format => Value::plain(secret_metadata.format()),
+      SecretLabel::Format => Value::plain(secret_metadata.format()),
       SecretLabel::FormatKind => Value::some_or_hide(secret_metadata.format_kind()),
       SecretLabel::Issuer => match secret_metadata {
         SecretMetadata::Certificate { issuer, .. } => Value::distinguished_name(issuer),
@@ -914,15 +913,15 @@ impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
         SecretMetadata::Pki { labels, .. } => Value::plain(labels.join("/")),
         _ => Value::hide(),
       },
-      SecretLabel::_NotBefore => match secret_metadata {
-        SecretMetadata::Certificate { not_before, .. } => Value::plain(not_before),
+      SecretLabel::NotBefore => match secret_metadata {
+        SecretMetadata::Certificate { not_before, .. } => Value::timestamp_seconds_not_before(*not_before as i64),
         _ => Value::hide(),
       },
       SecretLabel::NotAfter => match secret_metadata {
         SecretMetadata::Certificate { not_after, .. } => Value::timestamp_seconds_expired(*not_after as i64, *expiration_days),
         _ => Value::hide(),
       },
-      SecretLabel::_NumberOfEntries => Value::some_or_hide(secret_metadata.number_of_entries()),
+      SecretLabel::NumberOfEntries => Value::some_or_hide(secret_metadata.number_of_entries()),
       SecretLabel::Private => match secret_metadata {
         SecretMetadata::Pki { private, .. } => Value::plain(if *private { "private" } else { "public" }),
         _ => Value::hide(),

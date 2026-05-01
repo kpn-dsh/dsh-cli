@@ -620,16 +620,20 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
       DshPlatformLabel::TenantMonitoringUrl => Value::plain(platform.tenant_monitoring_url(tenant)),
       DshPlatformLabel::TenantProxyPrivateBootstrapServers => Value::some_or_empty(
         platform
-          .tenant_proxy_private_bootstrap_servers(tenant, proxy_name, 2)
+          .tenant_proxy_bootstrap_servers(tenant, proxy_name, VhostZone::Private, 2)
           .ok()
           .map(|server| server.join("\n")),
       ),
-      DshPlatformLabel::TenantProxyPrivateSchemaStoreHost => Value::some_or_empty(platform.tenant_proxy_private_schema_store_host(tenant, proxy_name).ok()),
-      DshPlatformLabel::TenantProxyPublicBootstrapServers => Value::plain(platform.tenant_proxy_public_bootstrap_servers(tenant, proxy_name, 2).join("\n")),
-      DshPlatformLabel::TenantProxyPublicSchemaStoreHost => Value::plain(platform.tenant_proxy_public_schema_store_host(tenant, proxy_name)),
+      DshPlatformLabel::TenantProxyPrivateSchemaStoreHost => Value::some_or_empty(platform.tenant_proxy_schema_store_host(tenant, proxy_name, VhostZone::Private).ok()),
+      DshPlatformLabel::TenantProxyPublicBootstrapServers => Value::ok_or_empty(
+        platform
+          .tenant_proxy_bootstrap_servers(tenant, proxy_name, VhostZone::Public, 2)
+          .map(|servers| servers.iter().join("\n")),
+      ),
+      DshPlatformLabel::TenantProxyPublicSchemaStoreHost => Value::ok_or_empty(platform.tenant_proxy_schema_store_host(tenant, proxy_name, VhostZone::Public)),
       DshPlatformLabel::TenantPrivateVhostDomain => Value::ok_or(platform.tenant_private_vhost_domain(tenant, vhost), "private domain not configured"),
       DshPlatformLabel::TenantPublicAppDomain => Value::plain(platform.tenant_public_app_domain(tenant, app_id)),
-      DshPlatformLabel::TenantPublicAppsDomain => Value::plain(platform.tenant_public_domain(tenant)),
+      DshPlatformLabel::TenantPublicAppsDomain => Value::ok_or_empty(platform.tenant_domain(tenant, VhostZone::Public)),
       DshPlatformLabel::TenantServiceConsoleUrl => Value::plain(platform.tenant_service_console_url(tenant, service_id)),
       _ => platform.value(label, target_id),
     }
@@ -637,6 +641,7 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
 }
 
 /// Defines the parameters that are required for a `Label` variant.
+///
 /// * `app_id_required`
 /// * `bucket_id_required`
 /// * `proxy_id_required`
