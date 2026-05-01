@@ -10,12 +10,10 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use time::OffsetDateTime;
 
-const KPN_ORGANIZATION_NAME: &str = "Koninklijke KPN N.V.";
-const KPN_LOCALITY_NAME: &str = "Rotterdam";
-const KPN_STATE_OR_PROVINCE_NAME: &str = "Zuid-Holland";
-const KPN_COUNTRY_NAME: &str = "NL";
+use dsh_api::platform::{deserialize_platform, serialize_platform};
 
-/// DshCertificate
+/// Contains certificate and key-pair.
+///
 /// * `certificate: Certificate`
 /// * `key_pair: KeyPair`
 pub(crate) struct DshCertificate {
@@ -32,7 +30,8 @@ impl Debug for DshCertificate {
   }
 }
 
-/// ProxyCertificateBundle
+/// Contains proxy certificate bundle and configuration.
+///
 /// * `config: ProxyCertificateBundleConfig`
 /// * `ca_certificate: DshCertificate`
 /// * `client_certificate: DshCertificate`
@@ -51,17 +50,33 @@ impl TryFrom<ProxyCertificateBundleConfig> for ProxyCertificateBundle {
   fn try_from(config: ProxyCertificateBundleConfig) -> DshCliResult<Self> {
     domain_from_platform(&config.vhost_zone, &config.platform)?;
     let ca_certificate = generate_ca_certificate(config.ca_common_name.clone())?;
-    let client_certificate = generate_client_certificate(&config.tenant, &ca_certificate)?;
+    let client_certificate = generate_client_certificate(&config.tenant, config.acl_group_id.clone(), &ca_certificate)?;
     let server_certificate = generate_server_certificate(&config, &ca_certificate)?;
     Ok(ProxyCertificateBundle { config, ca_certificate, client_certificate, server_certificate })
   }
 }
 
-/// Generate self-signed certificate authority certificate
+pub(crate) struct LocalCertificate {
+  pub(crate) value: String,
+  pub(crate) filename: String,
+}
+
+pub(crate) struct LocalCertificateBundle {
+  pub(crate) configuration: (ProxyCertificateBundleConfig, String),
+  pub(crate) _ca_key: LocalCertificate,
+  pub(crate) ca_pem: LocalCertificate,
+  pub(crate) client_key: LocalCertificate,
+  pub(crate) _client_pem: LocalCertificate,
+  pub(crate) _server_key: LocalCertificate,
+  pub(crate) server_pem: LocalCertificate,
+}
+
+/// Generates self-signed certificate authority certificate.
 ///
-/// The username is used as the common name.
+/// # Parameters
+/// * `username` - Used as the common name.
 fn generate_ca_certificate(username: String) -> DshCliResult<DshCertificate> {
-  let distinguished_name = kpn_distinguished_name(&username);
+  let distinguished_name = kpn_distinguished_name(&username, None);
   let mut params: CertificateParams = CertificateParams::new(vec![username])?;
   params.is_ca = IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
   params.distinguished_name = distinguished_name;
@@ -74,10 +89,10 @@ fn generate_ca_certificate(username: String) -> DshCliResult<DshCertificate> {
   Ok(DshCertificate { certificate, key_pair })
 }
 
-fn generate_client_certificate(client_id: &str, ca_certificate: &DshCertificate) -> DshCliResult<DshCertificate> {
+fn generate_client_certificate(client_id: &str, organizational_unit_name: Option<String>, ca_certificate: &DshCertificate) -> DshCliResult<DshCertificate> {
   let not_before_not_after = not_before_not_after(365);
   let mut params: CertificateParams = CertificateParams::new(vec![client_id.to_string()])?;
-  params.distinguished_name = kpn_distinguished_name(client_id);
+  params.distinguished_name = kpn_distinguished_name(client_id, organizational_unit_name);
   (params.not_before, params.not_after) = not_before_not_after;
   params.key_usages = vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment, KeyUsagePurpose::KeyAgreement];
   params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
@@ -92,7 +107,7 @@ fn generate_client_certificate(client_id: &str, ca_certificate: &DshCertificate)
 fn generate_server_certificate(config: &ProxyCertificateBundleConfig, ca_certificate: &DshCertificate) -> DshCliResult<DshCertificate> {
   let not_before_not_after = not_before_not_after(365);
   let mut params: CertificateParams = CertificateParams::new(config.dns_array()?)?;
-  params.distinguished_name = kpn_distinguished_name(&config.common_name()?);
+  params.distinguished_name = kpn_distinguished_name(&config.common_name()?, None);
   (params.not_before, params.not_after) = not_before_not_after;
   params.key_usages = vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment, KeyUsagePurpose::KeyAgreement];
   params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
@@ -109,10 +124,18 @@ fn not_before_not_after(days: i64) -> (OffsetDateTime, OffsetDateTime) {
   (now, now + time::Duration::days(days))
 }
 
-fn kpn_distinguished_name(common_name: &str) -> DistinguishedName {
+const KPN_ORGANIZATION_NAME: &str = "Koninklijke KPN N.V.";
+const KPN_LOCALITY_NAME: &str = "Rotterdam";
+const KPN_STATE_OR_PROVINCE_NAME: &str = "Zuid-Holland";
+const KPN_COUNTRY_NAME: &str = "NL";
+
+fn kpn_distinguished_name(common_name: &str, organizational_unit_name: Option<String>) -> DistinguishedName {
   let mut distinguished_name = DistinguishedName::new();
   distinguished_name.push(DnType::CommonName, common_name);
   distinguished_name.push(DnType::OrganizationName, KPN_ORGANIZATION_NAME);
+  if let Some(organizational_unit_name) = organizational_unit_name {
+    distinguished_name.push(DnType::OrganizationalUnitName, organizational_unit_name);
+  }
   distinguished_name.push(DnType::LocalityName, KPN_LOCALITY_NAME);
   distinguished_name.push(DnType::StateOrProvinceName, KPN_STATE_OR_PROVINCE_NAME);
   distinguished_name.push(DnType::CountryName, KPN_COUNTRY_NAME);
@@ -120,10 +143,13 @@ fn kpn_distinguished_name(common_name: &str) -> DistinguishedName {
 }
 
 #[allow(dead_code)] // TODO
-fn kpn_distinguished_name2(common_name: &str) -> DistinguishedName {
+fn kpn_distinguished_name2(common_name: &str, organizational_unit_name: Option<&str>) -> DistinguishedName {
   let mut distinguished_name = DistinguishedName::new();
   distinguished_name.push(DnType::CommonName, common_name);
   distinguished_name.push(DnType::OrganizationName, PrintableString(KPN_ORGANIZATION_NAME.try_into().unwrap()));
+  if let Some(organizational_unit_name) = organizational_unit_name {
+    distinguished_name.push(DnType::OrganizationalUnitName, organizational_unit_name);
+  }
   distinguished_name.push(DnType::LocalityName, KPN_LOCALITY_NAME);
   distinguished_name.push(DnType::StateOrProvinceName, KPN_STATE_OR_PROVINCE_NAME);
   distinguished_name.push(DnType::CountryName, KPN_COUNTRY_NAME);
@@ -134,16 +160,21 @@ fn generate_key_pair() -> DshCliResult<KeyPair> {
   KeyPair::generate_rsa_for(&rcgen::PKCS_RSA_SHA256, RsaKeySize::_4096).map_err(DshCliError::from)
 }
 
-/// Configuration for proxy certificate bundle
-/// * `platform_name: String` - Platform.
+/// Contains configuration for proxy certificate bundle.
+///
+/// * `acl_group_id` - Optional ACL group identifier.
+/// * `broker_prefix` - Prefix for dns names.
+/// * `ca_common_name` - Certificate authority common name.
+/// * `include_schema_store_dns_record` - Indicates whether a schema store dns record must be
+///   included.
+/// * `number_of_dns_records` - Number of dns records.
+/// * `platform` - Platform.
 /// * `tenant: String` - Tenant.
-/// * `broker_prefix: String` - Prefix for dns names.
-/// * `number_of_dns_records: usize` - Number of dns records.
-/// * `public_vhost: bool` - `true` if public dns names are required, `false` otherwise.
-/// * `include_schema_store_dns_record: bool` - `true` if a schema store dns record must be included,
-///   `false` otherwise.
+/// * `vhost_zone` - Public or private..
 #[derive(Clone, Deserialize, Serialize)]
 pub(crate) struct ProxyCertificateBundleConfig {
+  #[serde(rename = "acl-group-id")]
+  pub acl_group_id: Option<String>,
   #[serde(rename = "broker-prefix")]
   pub broker_prefix: String,
   #[serde(rename = "ca-common-name")]
@@ -152,7 +183,7 @@ pub(crate) struct ProxyCertificateBundleConfig {
   pub include_schema_store_dns_record: bool,
   #[serde(rename = "number_of_dns_records")]
   pub number_of_dns_records: usize,
-  #[serde(deserialize_with = "dsh_api::platform::deserialize_platform", serialize_with = "dsh_api::platform::serialize_platform")]
+  #[serde(deserialize_with = "deserialize_platform", serialize_with = "serialize_platform")]
   pub platform: DshPlatform,
   pub tenant: String,
   #[serde(rename = "vhost-zone")]
@@ -258,8 +289,8 @@ fn dn_value_string(dn_value: &DnValue) -> String {
 #[test]
 fn test() {
   let common_name = "COMMON_NAME";
-  let dn = kpn_distinguished_name(common_name);
-  let dn2 = kpn_distinguished_name2(common_name);
+  let dn = kpn_distinguished_name(common_name, None);
+  let dn2 = kpn_distinguished_name2(common_name, None);
   assert_eq!(dn, dn2);
 }
 
@@ -277,6 +308,7 @@ fn test2() {
   }
 
   let config = ProxyCertificateBundleConfig {
+    acl_group_id: None,
     broker_prefix: "broooker".to_string(),
     ca_common_name: "username".to_string(),
     include_schema_store_dns_record: false,
@@ -289,8 +321,8 @@ fn test2() {
   let key_pair = generate_key_pair().unwrap();
 
   let common_name = "COMMON_NAME";
-  let dn1 = kpn_distinguished_name2(common_name);
-  let dn2 = kpn_distinguished_name2(common_name);
+  let dn1 = kpn_distinguished_name2(common_name, None);
+  let dn2 = kpn_distinguished_name2(common_name, None);
 
   let csr1 = csr(&config, dn1, &key_pair);
   let csr2 = csr(&config, dn2, &key_pair);

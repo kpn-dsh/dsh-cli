@@ -849,6 +849,10 @@ impl Label for SecretLabel {
   }
 }
 
+/// * `Option<String>` - Secret id.
+/// * `SecretMetadata` - Secret metadata.
+/// * `Option<u64>` - Expiration days.
+/// * `AllocationStatus` - Secret allocation status.
 impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<u64>, Option<AllocationStatus>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
     let (secret_id, secret_metadata, expiration_days, allocation_status) = self;
@@ -890,6 +894,8 @@ impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<u
   }
 }
 
+/// * `SecretMetadata` - Secret metadata.
+/// * `Option<u64>` - Expiration days.
 impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
     let (secret_metadata, expiration_days) = self;

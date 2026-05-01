@@ -1,14 +1,19 @@
 use crate::arguments::proxy_id_argument;
-use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{
+  Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UNDEPLOY_COMMAND, UPDATE_COMMAND,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-use crate::directory::{list_proxy_certificate_bundles, proxy_certificate_bundle_exists, read_proxy_certificate_bundle, store_proxy_certificate_bundle};
+use crate::directory::{
+  delete_proxy_certificate_bundle, list_proxy_certificate_bundles, proxy_certificate_bundle_exists, read_local_certificate_bundle, read_proxy_certificate_bundle,
+  store_proxy_certificate_bundle,
+};
 use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{ColumnAlignment, Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::global_options::{expiration_option, get_expiration_days};
 use crate::proxy_bundles::{ProxyCertificateBundle, ProxyCertificateBundleConfig};
@@ -31,6 +36,7 @@ use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::trace;
+
 use serde::Serialize;
 use std::convert::AsRef;
 use std::num::NonZeroU64;
@@ -63,10 +69,12 @@ impl Subject for ProxySubject {
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       CREATE_COMMAND => Some(PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY.as_ref()),
-      DELETE_COMMAND => Some(PROXY_DELETE_CAPABILITY.as_ref()),
+      DELETE_COMMAND => Some(PROXY_CERTIFICATE_BUNDLE_DELETE_CAPABILITY.as_ref()),
       DEPLOY_COMMAND => Some(PROXY_DEPLOY_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(PROXY_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(PROXY_SHOW_CAPABILITY.as_ref()),
+      UNDEPLOY_COMMAND => Some(PROXY_UNDEPLOY_CAPABILITY.as_ref()),
+      UPDATE_COMMAND => Some(PROXY_UPDATE_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -82,6 +90,7 @@ static PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability 
       .add_target_argument(proxy_id_argument().required(true))
       .add_target_argument(platform_name_argument())
       .add_target_argument(tenant_name_argument())
+      .add_extra_argument(acl_group_id_option())
       .add_extra_argument(broker_prefix_option())
       .add_extra_argument(number_of_dns_records_option())
       .add_extra_argument(ca_common_name_option())
@@ -89,11 +98,12 @@ static PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability 
       .add_extra_argument(include_schema_store_dns_option()),
   )
 });
-static PROXY_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static PROXY_CERTIFICATE_BUNDLE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &ProxyDelete {}, "Delete proxy")
-      .set_long_about("Delete a Kafka proxy.")
-      .add_target_argument(proxy_id_argument().required(true)),
+    CapabilityBuilder::new(DELETE_COMMAND, None, &ProxyCertificateBundleDelete {}, "Delete proxy certificates bundle")
+      .add_target_argument(proxy_id_argument().required(true))
+      .add_target_argument(platform_name_argument())
+      .add_target_argument(tenant_name_argument()),
   )
 });
 static PROXY_DEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
@@ -107,27 +117,56 @@ static PROXY_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = La
   Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyList {}, "List proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
-      .add_command_executor(FlagType::Bundles, &ProxyListBundles {}, None)
+      .add_command_executor(FlagType::Bundle, &ProxyListBundles {}, None)
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None),
   )
 });
 static PROXY_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShow {}, "Show Kafka proxy configuration")
+      .add_command_executor(FlagType::Bundle, &ProxyShowBundle {}, None)
       .add_target_argument(proxy_id_argument().required(true))
       .add_extra_argument(expiration_option()),
+  )
+});
+static PROXY_UNDEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
+    CapabilityBuilder::new(UNDEPLOY_COMMAND, None, &ProxyUndeploy {}, "Undeploy proxy")
+      .set_long_about("Undeploy a Kafka proxy.")
+      .add_target_argument(proxy_id_argument().required(true)),
+  )
+});
+static PROXY_UPDATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
+    CapabilityBuilder::new(UPDATE_COMMAND, None, &ProxyUpdate {}, "Update proxy")
+      .set_long_about("Update an existing Kafka proxy.")
+      .add_target_argument(proxy_id_argument().required(true)),
   )
 });
 
 static PROXY_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   vec![
     PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY.as_ref(),
-    PROXY_DELETE_CAPABILITY.as_ref(),
+    PROXY_CERTIFICATE_BUNDLE_DELETE_CAPABILITY.as_ref(),
     PROXY_DEPLOY_CAPABILITY.as_ref(),
     PROXY_LIST_CAPABILITY.as_ref(),
     PROXY_SHOW_CAPABILITY.as_ref(),
+    PROXY_UNDEPLOY_CAPABILITY.as_ref(),
+    PROXY_UPDATE_CAPABILITY.as_ref(),
   ]
 });
+
+const ACL_GROUP_ID_OPTION: &str = "acl-group-id-option";
+
+fn acl_group_id_option() -> Arg {
+  Arg::new(ACL_GROUP_ID_OPTION)
+    .long("acl-group-id")
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("ACL_GROUP_ID")
+    .help("Acl group id")
+    .long_help("Acl group id used for fine-grained access control.")
+}
 
 const BROKER_PREFIX_OPTION: &str = "broker-prefix-option";
 
@@ -200,7 +239,7 @@ static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
   CertificateLabel::NotBefore,
   CertificateLabel::SerialNumber,
 ];
-static PROXY_BUNDLE_LABELS_CREATE: [ProxyBundleLabel; 8] = [
+static PROXY_BUNDLE_LABELS_CREATE: [ProxyBundleLabel; 9] = [
   ProxyBundleLabel::Platform,
   ProxyBundleLabel::Tenant,
   ProxyBundleLabel::BundleName,
@@ -208,6 +247,7 @@ static PROXY_BUNDLE_LABELS_CREATE: [ProxyBundleLabel; 8] = [
   ProxyBundleLabel::CaCommonName,
   ProxyBundleLabel::HasSchemaStoreDnsRecord,
   ProxyBundleLabel::VhostZone,
+  ProxyBundleLabel::AclGroupId,
   ProxyBundleLabel::NumberOfDsnRecords,
 ];
 
@@ -232,6 +272,18 @@ impl CommandExecutor for ProxyCertificateBundleCreate {
     }
 
     context.print_explanation(format!("create proxy certificates bundle '{}' for '{}@{}'", proxy_bundle_id, platform, tenant));
+
+    let acl_group_id: Option<String> = match matches.get_one::<String>(ACL_GROUP_ID_OPTION) {
+      Some(group_id) => Some(group_id.clone()),
+      None => {
+        let group_id = context.read_single_line("acl group id [none]")?;
+        if group_id.is_empty() {
+          None
+        } else {
+          Some(group_id)
+        }
+      }
+    };
 
     let broker_prefix: String = match matches.get_one::<String>(BROKER_PREFIX_OPTION) {
       Some(prefix) => prefix.clone(),
@@ -283,6 +335,7 @@ impl CommandExecutor for ProxyCertificateBundleCreate {
     };
 
     let config = ProxyCertificateBundleConfig {
+      acl_group_id,
       broker_prefix: broker_prefix.clone(),
       ca_common_name: ca_common_name.clone(),
       include_schema_store_dns_record,
@@ -313,15 +366,6 @@ impl CommandExecutor for ProxyCertificateBundleCreate {
       }
     }
 
-    context.println(format!(
-      "broker prefix: '{}', number of brokers: {}, {} vhost zone, schema dns entry {}included, ca common name: {}",
-      broker_prefix,
-      number_of_dns_records,
-      vhost_zone,
-      if include_schema_store_dns_record { "" } else { "not " },
-      ca_common_name
-    ));
-
     if context.dry_run() {
       context.print_warning("dry-run mode, proxy certificates bundle not stored");
     } else {
@@ -339,32 +383,52 @@ impl CommandExecutor for ProxyCertificateBundleCreate {
   }
 }
 
-struct ProxyDelete {}
+struct ProxyCertificateBundleDelete {}
 
 #[async_trait]
-impl CommandExecutor for ProxyDelete {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    let proxy_id = target.unwrap_or_else(|| unreachable!());
-    if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
-      return err!("proxy '{}' does not exists", proxy_id);
+impl CommandExecutor for ProxyCertificateBundleDelete {
+  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant = get_target_tenant(matches, context.settings())?;
+    let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
+    if !proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
+      return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", proxy_bundle_id, platform, tenant);
     }
-    if context.confirmed(format!("delete proxy '{}'?", proxy_id))? {
+    context.print_explanation(format!("delete proxy certificates bundle '{}' for '{}@{}'", proxy_bundle_id, platform, tenant));
+    if context.confirmed(format!("delete proxy certificate bundle '{}'?", proxy_bundle_id))? {
       if context.dry_run() {
-        context.print_warning("dry-run mode, proxy not deleted");
+        context.print_warning("dry-run mode, proxy certificate bundle not deleted");
       } else {
-        client.delete_kafkaproxy_configuration(&proxy_id).await?;
-        context.print_outcome(format!("proxy '{}' deleted", proxy_id));
+        delete_proxy_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
+        context.print_outcome(format!("proxy certificate bundle '{}' deleted", proxy_bundle_id));
       }
     } else {
-      context.print_outcome(format!("cancelled, proxy '{}' not deleted", proxy_id));
+      context.print_outcome(format!("cancelled, proxy certificate bundle '{}' not deleted", proxy_bundle_id));
     }
     Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
+    Requirements::standard_without_api()
   }
 }
+
+static SECRET_LABELS_SHOW: [SecretLabel; 14] = [
+  SecretLabel::SecretName,
+  SecretLabel::SecretId,
+  SecretLabel::System,
+  SecretLabel::Kind,
+  SecretLabel::FormatKind,
+  SecretLabel::Size,
+  SecretLabel::Description,
+  SecretLabel::NotBefore,
+  SecretLabel::NotAfter,
+  SecretLabel::Provisioned,
+  SecretLabel::Notifications,
+  SecretLabel::DerivedFrom,
+  SecretLabel::Subject,
+  SecretLabel::Issuer,
+];
 
 struct ProxyDeploy {}
 
@@ -373,25 +437,24 @@ impl CommandExecutor for ProxyDeploy {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant = get_target_tenant(matches, context.settings())?;
-    let proxy_id = target.unwrap_or_else(|| unreachable!());
+    let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
 
-    if !proxy_certificate_bundle_exists(&platform, &tenant, &proxy_id)? {
-      return err!("proxy certificate bundle '{}' does not exist", proxy_id);
+    if !proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
+      return err!("proxy certificate bundle '{}' does not exist", proxy_bundle_id);
     }
-
-    let (server_certificate, private_key, ca_certificate, configuration) = read_proxy_certificate_bundle(&platform, &tenant, &proxy_id)?;
-
-    if client.get_kafkaproxy_configuration(&proxy_id).await.is_ok() {
-      context.print_warning(format!("proxy '{}' already exists", proxy_id));
-      if !context.confirmed(format!("replace proxy '{}'?", proxy_id))? {
-        return err!("cancelled, proxy '{}' not deployed", proxy_id);
+    if client.get_kafkaproxy_configuration(&proxy_bundle_id).await.is_ok() {
+      context.print_warning(format!("proxy '{}' already exists", proxy_bundle_id));
+      if !context.confirmed(format!("replace proxy '{}'?", proxy_bundle_id))? {
+        return err!("cancelled, proxy '{}' not deployed", proxy_bundle_id);
       }
     }
 
-    let server_certificate_secret_name = format!("{}-certificate-cert", proxy_id);
-    let private_key_secret_name = format!("{}-certificate-key", proxy_id);
-    let ca_certificate_secret_name = format!("{}-certificate-ca", proxy_id);
-    let certificate_name = format!("{}-certificate", proxy_id);
+    let (server_certificate, private_key, ca_certificate, configuration) = read_proxy_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
+
+    let server_certificate_secret_name = format!("{}-certificate-cert", proxy_bundle_id);
+    let private_key_secret_name = format!("{}-certificate-key", proxy_bundle_id);
+    let ca_certificate_secret_name = format!("{}-certificate-ca", proxy_bundle_id);
+    let certificate_name = format!("{}-certificate", proxy_bundle_id);
 
     let (cert_secret_result, key_secret_result, ca_secret_result, certificate_result) = join!(
       client.get_secret(&server_certificate_secret_name),
@@ -412,14 +475,14 @@ impl CommandExecutor for ProxyDeploy {
       context.print_error(format!("certificate '{}' already exists", certificate_name));
     }
     if cert_secret_result.is_ok() || key_secret_result.is_ok() || ca_secret_result.is_ok() || certificate_result.is_ok() {
-      return err!("cancelled, some resources already exists");
+      return err!("cancelled, some resources already exist");
     }
 
     let server_certificate_secret = Secret::new(&server_certificate_secret_name, server_certificate);
     let private_key_secret = Secret::new(&private_key_secret_name, private_key);
     let ca_certificate_secret = Secret::new(&ca_certificate_secret_name, ca_certificate);
 
-    let name = Some(proxy_id.clone());
+    let name = Some(proxy_bundle_id.clone());
     let secret_name_ca_chain = ca_certificate_secret_name.clone();
     let certificate = certificate_name.clone();
     let cpus = 0.1;
@@ -442,7 +505,7 @@ impl CommandExecutor for ProxyDeploy {
     UnitFormatter::new(&private_key_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&private_key_secret.value), None), None)?;
     UnitFormatter::new(&ca_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&ca_certificate_secret.value), None), None)?;
     UnitFormatter::new(&ca_certificate_secret_name, &GENERATED_CERTIFICATE_LABELS, context).print(&certificate_body, None)?;
-    UnitFormatter::new(&ca_certificate_secret_name, &PROXY_LABELS_SHOW, context).print(&kafka_proxy, None)?;
+    UnitFormatter::new(&proxy_bundle_id, &PROXY_LABELS_SHOW, context).print(&kafka_proxy, None)?;
 
     if context.dry_run() {
       context.print_warning("dry-run mode, proxy not deployed");
@@ -468,11 +531,11 @@ impl CommandExecutor for ProxyDeploy {
         .map_err(|error| cli_error!("error writing certificate configuration '{}' ({})", certificate_name, error))?;
 
       client
-        .put_kafkaproxy_configuration(&proxy_id, &kafka_proxy)
+        .put_kafkaproxy_configuration(&proxy_bundle_id, &kafka_proxy)
         .await
-        .map_err(|error| cli_error!("error writing proxy configuration '{}' ({})", proxy_id, error))?;
+        .map_err(|error| cli_error!("error writing proxy configuration '{}' ({})", proxy_bundle_id, error))?;
 
-      context.print_outcome(format!("proxy '{}' deployed", proxy_id));
+      context.print_outcome(format!("proxy '{}' deployed", proxy_bundle_id));
     }
 
     Ok(())
@@ -483,7 +546,8 @@ impl CommandExecutor for ProxyDeploy {
   }
 }
 
-static PROXY_LABELS_LIST: [ProxyLabel; 6] = [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore];
+static PROXY_LABELS_LIST: [ProxyLabel; 7] =
+  [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore, ProxyLabel::AclGroupsEnabled];
 
 struct ProxyList {}
 
@@ -506,13 +570,14 @@ impl CommandExecutor for ProxyList {
   }
 }
 
-static PROXY_BUNDLE_LABELS_LIST: [ProxyBundleLabel; 7] = [
+static PROXY_BUNDLE_LABELS_LIST: [ProxyBundleLabel; 8] = [
   ProxyBundleLabel::BundleName,
   ProxyBundleLabel::BrokerPrefix,
   ProxyBundleLabel::CaCommonName,
   ProxyBundleLabel::HasSchemaStoreDnsRecord,
   ProxyBundleLabel::VhostZone,
   ProxyBundleLabel::NumberOfDsnRecords,
+  ProxyBundleLabel::AclGroupId,
   ProxyBundleLabel::BundleDirectory,
 ];
 
@@ -558,6 +623,9 @@ impl CommandExecutor for ProxyListIds {
     Requirements::standard_with_api()
   }
 }
+
+pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 6] =
+  [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::FormatKind, SecretLabel::Size, SecretLabel::Description, SecretLabel::NotAfter];
 
 struct ProxyShow {}
 
@@ -612,24 +680,107 @@ impl CommandExecutor for ProxyShow {
   }
 }
 
-pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 6] =
-  [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::FormatKind, SecretLabel::Size, SecretLabel::Description, SecretLabel::Expires];
-
-static SECRET_LABELS_SHOW: [SecretLabel; 13] = [
+static BUNDLE_SECRET_LABELS_SHOW: [SecretLabel; 9] = [
   SecretLabel::SecretName,
-  SecretLabel::SecretId,
-  SecretLabel::System,
   SecretLabel::Kind,
   SecretLabel::FormatKind,
   SecretLabel::Size,
   SecretLabel::Description,
-  SecretLabel::Expires,
-  SecretLabel::Provisioned,
-  SecretLabel::Notifications,
-  SecretLabel::DerivedFrom,
+  SecretLabel::NotBefore,
+  SecretLabel::NotAfter,
   SecretLabel::Subject,
   SecretLabel::Issuer,
 ];
+
+static PROXY_BUNDLE_LABELS_SHOW: [ProxyBundleLabel; 7] = [
+  ProxyBundleLabel::BundleName,
+  ProxyBundleLabel::BrokerPrefix,
+  ProxyBundleLabel::CaCommonName,
+  ProxyBundleLabel::HasSchemaStoreDnsRecord,
+  ProxyBundleLabel::VhostZone,
+  ProxyBundleLabel::NumberOfDsnRecords,
+  ProxyBundleLabel::AclGroupId,
+];
+
+struct ProxyShowBundle {}
+
+#[async_trait]
+impl CommandExecutor for ProxyShowBundle {
+  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant = get_target_tenant(matches, context.settings())?;
+    let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("show local certificate bundle '{}'", proxy_bundle_id));
+    let expiration_days = get_expiration_days(matches, context.settings())?;
+    let bundle = read_local_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
+    context.print_explanation(format!("configuration file '{}'", bundle.configuration.1));
+    UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_SHOW, context).print(&bundle.configuration, None)?;
+    context.print_explanation(format!("server certificate file '{}'", bundle.server_pem.filename));
+    UnitFormatter::new(&proxy_bundle_id, &BUNDLE_SECRET_LABELS_SHOW, context).print(&(secret_metadata(&bundle.server_pem.value), Some(expiration_days)), None)?;
+    context.print_explanation(format!("client key file '{}'", bundle.client_key.filename));
+    UnitFormatter::new(&proxy_bundle_id, &BUNDLE_SECRET_LABELS_SHOW, context).print(&(secret_metadata(&bundle.client_key.value), Some(expiration_days)), None)?;
+    context.print_explanation(format!("certificate authority certificate file '{}'", bundle.ca_pem.filename));
+    UnitFormatter::new(&proxy_bundle_id, &BUNDLE_SECRET_LABELS_SHOW, context).print(&(secret_metadata(&bundle.ca_pem.value), Some(expiration_days)), None)?;
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
+  }
+}
+
+struct ProxyUndeploy {}
+
+#[async_trait]
+impl CommandExecutor for ProxyUndeploy {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    let proxy_id = target.unwrap_or_else(|| unreachable!());
+    if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
+      return err!("proxy '{}' does not exists", proxy_id);
+    }
+    if context.confirmed(format!("undeploy proxy '{}'?", proxy_id))? {
+      if context.dry_run() {
+        context.print_warning("dry-run mode, proxy not undeployed");
+      } else {
+        client.delete_kafkaproxy_configuration(&proxy_id).await?;
+        context.print_outcome(format!("proxy '{}' undeployed", proxy_id));
+      }
+    } else {
+      context.print_outcome(format!("cancelled, proxy '{}' not undeployed", proxy_id));
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+struct ProxyUpdate {}
+
+#[async_trait]
+impl CommandExecutor for ProxyUpdate {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    let proxy_id = target.unwrap_or_else(|| unreachable!());
+    if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
+      err!("proxy '{}' does not exists", proxy_id)
+    } else if context.confirmed(format!("update proxy '{}'?", proxy_id))? {
+      if context.dry_run() {
+        context.print_warning("dry-run mode, proxy not updated");
+        Ok(())
+      } else {
+        err!("capability not yet implemented, proxy not updated")
+      }
+    } else {
+      context.print_outcome(format!("cancelled, proxy '{}' not updated", proxy_id));
+      Ok(())
+    }
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 enum ProxyLabel {
@@ -681,6 +832,13 @@ impl Label for ProxyLabel {
 
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
+  }
+
+  fn column_alignment(&self) -> ColumnAlignment {
+    match self {
+      Self::Mem => ColumnAlignment::Right,
+      _ => ColumnAlignment::default(),
+    }
   }
 }
 
@@ -743,6 +901,7 @@ static PROXY_LABELS_SHOW: [ProxyLabel; 11] = [
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 enum ProxyBundleLabel {
+  AclGroupId,
   CaCommonName,
   BrokerPrefix,
   BundleDirectory,
@@ -757,6 +916,7 @@ enum ProxyBundleLabel {
 impl Label for ProxyBundleLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::AclGroupId => "acl group id",
       Self::BrokerPrefix => "prefix",
       Self::BundleDirectory => "directory",
       Self::BundleName => "bundle",
@@ -774,9 +934,20 @@ impl Label for ProxyBundleLabel {
   }
 }
 
+impl SubjectFormatter<ProxyBundleLabel> for (ProxyCertificateBundleConfig, String) {
+  fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
+    let (config, directory) = self;
+    match label {
+      ProxyBundleLabel::BundleDirectory => Value::plain(directory),
+      _ => config.value(label, target_id),
+    }
+  }
+}
+
 impl SubjectFormatter<ProxyBundleLabel> for ProxyCertificateBundleConfig {
   fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
     match label {
+      ProxyBundleLabel::AclGroupId => Value::some_or_hide(self.acl_group_id.clone()),
       ProxyBundleLabel::BrokerPrefix => Value::plain(&self.broker_prefix),
       ProxyBundleLabel::BundleDirectory => Value::unreachable(),
       ProxyBundleLabel::BundleName => Value::target(target_id),
@@ -786,16 +957,6 @@ impl SubjectFormatter<ProxyBundleLabel> for ProxyCertificateBundleConfig {
       ProxyBundleLabel::Tenant => Value::target(&self.tenant),
       ProxyBundleLabel::VhostZone => Value::plain(&self.vhost_zone),
       ProxyBundleLabel::NumberOfDsnRecords => Value::plain(self.number_of_dns_records),
-    }
-  }
-}
-
-impl SubjectFormatter<ProxyBundleLabel> for (ProxyCertificateBundleConfig, String) {
-  fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
-    let (config, directory) = self;
-    match label {
-      ProxyBundleLabel::BundleDirectory => Value::plain(directory),
-      _ => config.value(label, target_id),
     }
   }
 }

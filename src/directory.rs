@@ -39,7 +39,7 @@
 //! variables and cannot be specified via the command line `--environment-variable` argument.
 
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
-use crate::proxy_bundles::{ProxyCertificateBundle, ProxyCertificateBundleConfig};
+use crate::proxy_bundles::{LocalCertificate, LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::settings::Settings;
 use crate::{err, error_map, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::platform::DshPlatform;
@@ -294,6 +294,69 @@ pub(crate) fn read_proxy_certificate_bundle(platform: &DshPlatform, tenant: &str
       debug!("ca certificate read from '{}'", ca_certificate_key_file_path.display());
 
       Ok((server_certificate, private_key, ca_certificate, config))
+    }
+    None => err!("dsh directory disabled, proxy certificate bundle cannot be read"),
+  }
+}
+
+/// Reads local certificate bundle file.
+///
+/// # Parameters
+/// * `directory_pathbuf` - Pathbuf for local certificate bundle directory.
+/// * `filename` - Filename in local certificate bundle directory.
+fn read_local_certificate_bundle_file(directory_pathbuf: &Path, filename: &str) -> DshCliResult<LocalCertificate> {
+  let mut file_path = directory_pathbuf.to_path_buf();
+  file_path.push(filename);
+  let local_certificate_bundle_file = fs::read_to_string(&file_path)?;
+  debug!("local certificate bundle file read from '{}'", file_path.display());
+  Ok(LocalCertificate { value: local_certificate_bundle_file, filename: file_path.display().to_string() })
+}
+
+/// Reads local certificate bundle configuration.
+///
+/// # Parameters
+/// * `directory_pathbuf` - Pathbuf for local certificate bundle directory.
+///
+/// # Returns
+/// Tuple consisting of:
+/// * `ProxyCertificateBundleConfig` - Proxy certificate bundle configuration.
+/// * `String` - Filename.
+fn read_local_certificate_bundle_configuration(local_bundle_directory_pathbuf: &Path) -> DshCliResult<(ProxyCertificateBundleConfig, String)> {
+  let mut config_file_path = local_bundle_directory_pathbuf.to_path_buf();
+  config_file_path.push(CONFIG_FILENAME);
+  match read_and_deserialize_from_toml_file::<ProxyCertificateBundleConfig>(&config_file_path)? {
+    Some(configuration) => {
+      debug!("local certificate bundle configuration read from '{}'", config_file_path.display());
+      trace!("{:#?}'", configuration);
+      Ok((configuration, config_file_path.display().to_string()))
+    }
+    None => err!("local certificate bundle configuration '{}' not found", config_file_path.display()),
+  }
+}
+
+/// Reads locally stored certificate bundle.
+///
+/// # Parameters
+/// * `platform` - Platform for which the local certificate bundle is requested.
+/// * `tenant` - Tenant for which the local certificate bundle is requested.
+/// * `proxy_bundle_id` - Proxy certificate bundle id for the requested local certificate bundle.
+///
+/// # Returns
+/// * `Ok<LocalCertificateBundle>` - Local certificate bundle.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn read_local_certificate_bundle(platform: &DshPlatform, tenant: &str, proxy_bundle_id: &str) -> DshCliResult<LocalCertificateBundle> {
+  match proxy_certificate_bundle_pathbuf(platform, tenant, proxy_bundle_id)? {
+    Some(certificate_bundle_directory_pathbuf) => {
+      debug!("read local certificate bundle from '{}'", certificate_bundle_directory_pathbuf.display());
+      Ok(LocalCertificateBundle {
+        configuration: read_local_certificate_bundle_configuration(&certificate_bundle_directory_pathbuf)?,
+        _ca_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_KEY_FILENAME)?,
+        ca_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_CERTIFICATE_FILENAME)?,
+        client_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_KEY_FILENAME)?,
+        _client_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_CERTIFICATE_FILENAME)?,
+        _server_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_KEY_FILENAME)?,
+        server_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_CERTIFICATE_FILENAME)?,
+      })
     }
     None => err!("dsh directory disabled, proxy certificate bundle cannot be read"),
   }
