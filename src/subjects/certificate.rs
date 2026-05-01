@@ -14,8 +14,7 @@ use crate::issues::{Issue, IssueDescription, IssueLabel, Severity};
 use crate::proxy_bundles::{hashmap_from_distinguished_name, san_to_string, DshCertificate};
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
-use crate::subjects::proxy::SECRET_LABELS_LIST;
-use crate::subjects::secret::secrets_with_metadata;
+use crate::subjects::secret::{secrets_with_metadata, SecretLabel};
 use crate::subjects::{secret, DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
@@ -349,6 +348,23 @@ impl CommandExecutor for CertificateListUsage {
   }
 }
 
+pub(crate) static SECRET_CERTIFICATE_LABELS: [SecretLabel; 14] = [
+  SecretLabel::CaChain,
+  SecretLabel::Description,
+  SecretLabel::Format,
+  SecretLabel::FormatKind,
+  SecretLabel::Issuer,
+  SecretLabel::Kind,
+  SecretLabel::Label,
+  SecretLabel::NotBefore,
+  SecretLabel::NotAfter,
+  SecretLabel::NumberOfEntries,
+  SecretLabel::Private,
+  SecretLabel::SecretName,
+  SecretLabel::Size,
+  SecretLabel::Subject,
+];
+
 struct CertificateShow {}
 
 #[async_trait]
@@ -357,24 +373,19 @@ impl CommandExecutor for CertificateShow {
     let certificate_id = target.unwrap_or_else(|| unreachable!());
     context.print_explanation(format!("show all parameters for certificate '{}'", certificate_id));
     let expiration_days = get_expiration_days(matches, context.settings())?;
-    let start_instant = context.now();
     let (certificate_status, allocation_status) = join!(client.get_certificate(&certificate_id), client.get_certificate_status(&certificate_id));
     context.print_allocation_status(&allocation_status, CERTIFICATE_SUBJECT_TARGET);
     let certificate_status = certificate_status?;
     if let Some(actual_certificate) = &certificate_status.actual {
       UnitFormatter::new(certificate_id.clone(), &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days)), None)?;
-      let certificate_secret_ids = if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
-        vec![actual_certificate.cert_chain_secret.clone(), actual_certificate.key_secret.clone(), passphrase_secret.clone()]
-      } else {
-        vec![actual_certificate.cert_chain_secret.clone(), actual_certificate.key_secret.clone()]
-      };
-      let certificate_secrets = try_join_all(certificate_secret_ids.iter().map(|secret_id| client.get_secret(secret_id))).await?;
-      context.print_execution_time(start_instant);
-      let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
-      for (secret_id, secret) in certificate_secret_ids.iter().zip(certificate_secrets) {
-        formatter.push_target_id_value_owned(secret_id.clone(), (secret_metadata(&secret), Some(expiration_days)));
+      let cert_chain_secret = client.get_secret(&actual_certificate.cert_chain_secret).await?;
+      UnitFormatter::new(&actual_certificate.cert_chain_secret, &SECRET_CERTIFICATE_LABELS, context).print(&(secret_metadata(&cert_chain_secret), Some(expiration_days)), None)?;
+      let key_secret = client.get_secret(&actual_certificate.key_secret).await?;
+      UnitFormatter::new(&actual_certificate.key_secret, &SECRET_CERTIFICATE_LABELS, context).print(&(secret_metadata(&key_secret), None), None)?;
+      if let Some(passphrase_secret_name) = &actual_certificate.passphrase_secret {
+        let passphrase_secret = client.get_secret(&passphrase_secret_name).await?;
+        UnitFormatter::new(passphrase_secret_name, &SECRET_CERTIFICATE_LABELS, context).print(&(secret_metadata(&passphrase_secret), Some(expiration_days)), None)?;
       }
-      formatter.print(None)?;
       if let Some(certificate) = &certificate_status.configuration {
         if actual_certificate.cert_chain_secret != certificate.cert_chain_secret
           || actual_certificate.key_secret != certificate.key_secret
@@ -385,7 +396,6 @@ impl CommandExecutor for CertificateShow {
         }
       }
     } else {
-      context.print_execution_time(start_instant);
       context.print_warning(format!("certificate '{}' has no configuration", certificate_id));
     }
     Ok(())
@@ -541,9 +551,9 @@ impl SubjectFormatter<CertificateLabel> for DshCertificate {
   }
 }
 
-/// Check if a certificate has issues
+/// Check if a certificate has issues.
 ///
-/// ## Parameters
+/// # Parameters
 /// * `certificate_status`
 /// * `secrets` - List of [`SecretTuple`]s describing all secrets. Each tuple consists of:
 ///   * `String` - Secret name.
@@ -555,7 +565,7 @@ impl SubjectFormatter<CertificateLabel> for DshCertificate {
 /// * `days` - Number of days until expiration.
 /// * `only_errors` - If `true` only issues with severity level `Severity::Error` will be returned.
 ///
-/// ## Returns
+/// # Returns
 /// * `Some(Vec<IssueDescription>)` - List of tuples describing the issues found
 ///   (at least one).
 /// * `None` - No issues where found.
@@ -620,7 +630,8 @@ fn has_issues(certificate_status: DshApiResult<CertificateStatus>, secrets: &[Se
   }
 }
 
-/// Tuple describing a secret, consisting of:
+/// Tuple describing a secret.
+///
 /// * `String` - Secret name.
 /// * `Option<String>` - Secret id when it is a system secret.
 /// * `SecretMetadata` - Secret metadata.
