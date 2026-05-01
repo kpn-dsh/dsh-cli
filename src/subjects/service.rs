@@ -532,6 +532,8 @@ impl CommandExecutor for ServiceRestart {
         let instances = configuration.instances;
         if instances == 0 {
           context.print_warning(format!("service '{}' not started", service_id));
+        } else if !configuration.volumes.is_empty() && !context.confirmed("volume content will not be preserved, do you want to continue?")? {
+          context.print_warning("cancelled, service not restarted");
         } else if context.dry_run() {
           context.print_warning("dry-run mode, service not restarted");
         } else {
