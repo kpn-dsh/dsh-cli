@@ -69,7 +69,13 @@ impl SecretMetadata {
   /// Returns additional information.
   pub(crate) fn additional_info(&self) -> Option<String> {
     match self {
-      Self::Certificate { label, .. } => Some(label.to_string()),
+      Self::Certificate { label, .. } => {
+        if label.is_empty() {
+          None
+        } else {
+          Some(label.to_string())
+        }
+      }
       Self::Empty => None,
       Self::Error { message } => Some(message.to_string()),
       Self::Misconfiguration { message } => Some(message.to_string()),
