@@ -29,7 +29,7 @@ to get a list of the configured secrets for `my-tenant` on platform `np-aws-lz-d
 > dsh secret list
 target platform: np-aws-lz-dsh
 target tenant: my-tenant
-please log in to platform `np-aws-lz-dsh` using the 'dsh login np-aws-lz-dsh' command
+please log in to platform 'np-aws-lz-dsh' using the 'dsh login nplz' command
 user is not authenticated
 ```
 
