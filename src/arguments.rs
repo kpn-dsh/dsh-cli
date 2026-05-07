@@ -9,7 +9,7 @@ pub(crate) const MANAGED_STREAM_ARGUMENT: &str = "managed-stream-argument";
 pub(crate) const MANAGED_TENANT_NAME_ARGUMENT: &str = "managed-tenant-name-argument";
 pub(crate) const MANIFEST_ID_ARGUMENT: &str = "manifest-id-argument";
 pub(crate) const NODEPOOL_ID_ARGUMENT: &str = "node-pool-id-argument";
-pub(crate) const PROXY_ID_ARGUMENT: &str = "proxy-argument";
+pub(crate) const PROXY_ID_ARGUMENT: &str = "proxy-id-argument";
 pub(crate) const QUERY_ARGUMENT: &str = "query-argument";
 pub(crate) const SECRET_ID_ARGUMENT: &str = "secret-id-argument";
 pub(crate) const SERVICE_ID_ARGUMENT: &str = "service-id-argument";
@@ -76,6 +76,33 @@ pub(crate) fn manifest_id_argument() -> Arg {
     .long_help("Identifies an app manifest from the app catalog.")
 }
 
+pub(crate) fn manifest_version_argument() -> Arg {
+  Arg::new(MANIFEST_VERSION_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("VERSION")
+    .help("App manifest version")
+    .long_help("Identifies the version of an app manifest from the app catalog.")
+}
+
+pub(crate) fn nodepool_id_argument() -> Arg {
+  Arg::new(NODEPOOL_ID_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("NODEPOOL")
+    .help("Node pool identifier")
+    .long_help("Identifies a node pool on the DSH.")
+}
+
+pub(crate) fn proxy_id_argument() -> Arg {
+  Arg::new(PROXY_ID_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("PROXY")
+    .help("Proxy identifier")
+    .long_help("Identifies a proxy configured on the DSH.")
+}
+
 pub(crate) fn query_argument(long_help: Option<&str>) -> Arg {
   let mut query_argument = Arg::new(QUERY_ARGUMENT)
     .action(ArgAction::Set)
@@ -86,15 +113,6 @@ pub(crate) fn query_argument(long_help: Option<&str>) -> Arg {
     query_argument = query_argument.long_help(long_help.to_string())
   }
   query_argument
-}
-
-pub(crate) fn proxy_id_argument() -> Arg {
-  Arg::new(PROXY_ID_ARGUMENT)
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("PROXY")
-    .help("Proxy identifier")
-    .long_help("Identifies a proxy configured on the DSH.")
 }
 
 pub(crate) fn secret_id_argument() -> Arg {
@@ -140,24 +158,6 @@ pub(crate) fn vendor_name_argument() -> Arg {
     .value_name("VENDOR")
     .help("Provide app vendor")
     .long_help("This option specifies the name of an app vendor. Allowed values are \"kpn\".")
-}
-
-pub(crate) fn manifest_version_argument() -> Arg {
-  Arg::new(MANIFEST_VERSION_ARGUMENT)
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("VERSION")
-    .help("App manifest version")
-    .long_help("Identifies the version of an app manifest from the app catalog.")
-}
-
-pub(crate) fn nodepool_id_argument() -> Arg {
-  Arg::new(NODEPOOL_ID_ARGUMENT)
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("NODEPOOL")
-    .help("Node pool identifier")
-    .long_help("Identifies a node pool on the DSH.")
 }
 
 pub(crate) fn vhost_id_argument() -> Arg {

@@ -20,7 +20,7 @@ pub(crate) enum SecretMetadata {
   /// * `label` - Label in the pem file that contained the certificate.
   /// * `chain` - Chain of certificate authorities that issued the certificate. This will
   ///   always be a `SecretMetadata::Certificate` variant.
-  Certificate { subject: String, not_after: u64, not_before: u64, issuer: String, label: String, chain: Vec<SecretMetadata> },
+  Certificate { subject: String, not_after: u64, not_before: u64, issuer: String, label: String, chain: Vec<SecretMetadata>, serial_number: String },
 
   /// Secret is empty.
   Empty,
@@ -344,8 +344,8 @@ impl Display for SecretSize {
 pub(crate) fn secret_metadata(secret: &str) -> SecretMetadata {
   if secret.trim().is_empty() {
     SecretMetadata::Empty
-  } else if let Ok(pkcs1_private_key) = try_certificates(secret) {
-    pkcs1_private_key
+  } else if let Ok(certificate) = try_certificates(secret) {
+    certificate
   } else if let Some(encrypted_label) = get_encrypted_label(secret) {
     SecretMetadata::Pki { secret_format: SecretFormat::Encrypted { secret_size: SecretSize::from(secret) }, private: false, labels: vec![encrypted_label], algorithm: None }
   } else if let Ok(pkcs1_private_key) = try_pkcs1_private_key_metadata(secret) {
@@ -376,21 +376,27 @@ fn try_certificates(secret: &str) -> Result<SecretMetadata, ()> {
   match Certificate::load_pem_chain(secret.as_bytes()) {
     Ok(certificates) => {
       if let Some(certificate) = certificates.first() {
-        let subject = certificate.tbs_certificate.subject.to_string();
-        let not_after = certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs();
-        let not_before = certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs();
-        let issuer = certificate.tbs_certificate.issuer.to_string();
         let certificate_chain = certificates
           .iter()
-          .map(|certificate| {
-            let subject = certificate.tbs_certificate.subject.to_string();
-            let not_after = certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs();
-            let not_before = certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs();
-            let issuer = certificate.tbs_certificate.issuer.to_string();
-            SecretMetadata::Certificate { subject, not_after, not_before, issuer, label: "".to_string(), chain: vec![] }
+          .map(|certificate| SecretMetadata::Certificate {
+            subject: certificate.tbs_certificate.subject.to_string(),
+            not_after: certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs(),
+            not_before: certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs(),
+            issuer: certificate.tbs_certificate.issuer.to_string(),
+            label: "".to_string(),
+            chain: vec![],
+            serial_number: certificate.tbs_certificate.serial_number.to_string(),
           })
           .collect_vec();
-        Ok(SecretMetadata::Certificate { subject, not_after, not_before, issuer, label: "".to_string(), chain: certificate_chain })
+        Ok(SecretMetadata::Certificate {
+          subject: certificate.tbs_certificate.subject.to_string(),
+          not_after: certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs(),
+          not_before: certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs(),
+          issuer: certificate.tbs_certificate.issuer.to_string(),
+          label: "".to_string(),
+          chain: certificate_chain,
+          serial_number: certificate.tbs_certificate.serial_number.to_string(),
+        })
       } else {
         Err(())
       }

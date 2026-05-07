@@ -304,7 +304,7 @@ static DSH_PLATFORM_LABELS_DERIVED: [DshPlatformLabel; 13] = [
   DshPlatformLabel::SwaggerUrl,
   DshPlatformLabel::TracingUrl,
   DshPlatformLabel::AccessTokenEndpoint,
-  DshPlatformLabel::ClientId,
+  DshPlatformLabel::RobotClientId,
 ];
 
 static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 28] = [
@@ -312,7 +312,7 @@ static DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS: [DshPlatformLabel; 28] = [
   DshPlatformLabel::BucketName,
   DshPlatformLabel::InternalDomain,
   DshPlatformLabel::InternalServiceDomain,
-  DshPlatformLabel::TenantClientId,
+  DshPlatformLabel::RobotTenantClientId,
   DshPlatformLabel::HttpMessagingApiUrlMulti,
   DshPlatformLabel::HttpMessagingApiUrlSingle,
   DshPlatformLabel::TenantPrivateVhostDomain,
@@ -448,7 +448,6 @@ enum DshPlatformLabel {
   Region,
   // Derived from configuration
   AccessTokenEndpoint,
-  ClientId,
   ConsoleDomain,
   ConsoleUrl,
   MqttMessagingApiEndpoint,
@@ -457,6 +456,7 @@ enum DshPlatformLabel {
   RestApiDomain,
   RestApiEndpoint,
   RestTokenEndpoint,
+  RobotClientId,
   SwaggerUrl,
   TracingUrl,
   // Derived from configuration and arguments
@@ -472,10 +472,10 @@ enum DshPlatformLabel {
   ProxySchemaStoreVhost,
   ProxyVhostDomain,
   PublicVhostDomain,
+  RobotTenantClientId,
   TenantAppCatalogAppUrl,
   TenantAppCatalogUrl,
   TenantAppConsoleUrl,
-  TenantClientId,
   TenantConsoleUrl,
   TenantDataCatalogUrl,
   TenantMonitoringUrl,
@@ -505,7 +505,6 @@ impl Label for DshPlatformLabel {
       Self::Region => "region",
       // Derived from configuration
       Self::AccessTokenEndpoint => "access token endpoint",
-      Self::ClientId => "client id",
       Self::ConsoleDomain => "console domain",
       Self::ConsoleUrl => "console url",
       Self::MqttMessagingApiEndpoint => "mqtt messaging api endpoint",
@@ -514,6 +513,7 @@ impl Label for DshPlatformLabel {
       Self::RestApiDomain => "rest api domain",
       Self::RestApiEndpoint => "rest api endpoint",
       Self::RestTokenEndpoint => "rest token endpoint",
+      Self::RobotClientId => "robot client id",
       Self::SwaggerUrl => "swagger url",
       Self::TracingUrl => "tracing url",
       // Derived from configuration and arguments
@@ -529,10 +529,10 @@ impl Label for DshPlatformLabel {
       Self::ProxySchemaStoreVhost => "proxy schema store vhost",
       Self::ProxyVhostDomain => "proxy vhost domain",
       Self::PublicVhostDomain => "public vhost domain",
+      Self::RobotTenantClientId => "robot client id (tenant)",
       Self::TenantAppCatalogAppUrl => "app catalog url (app/tenant)",
       Self::TenantAppCatalogUrl => "app catalog url (tenant)",
       Self::TenantAppConsoleUrl => "console url (app/tenant)",
-      Self::TenantClientId => "client id (tenant)",
       Self::TenantConsoleUrl => "console url (tenant)",
       Self::TenantDataCatalogUrl => "data catalog url (tenant)",
       Self::TenantMonitoringUrl => "monitoring url (tenant)",
@@ -569,7 +569,6 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
       DshPlatformLabel::Region => Value::some_or_hide(self.region()),
       // Derived from configuration
       DshPlatformLabel::AccessTokenEndpoint => Value::plain(self.access_token_endpoint()),
-      DshPlatformLabel::ClientId => Value::plain(self.client_id()),
       DshPlatformLabel::ConsoleDomain => Value::plain(self.console_domain()),
       DshPlatformLabel::ConsoleUrl => Value::plain(self.console_url()),
       DshPlatformLabel::MqttMessagingApiEndpoint => Value::plain(self.mqtt_messaging_api_endpoint()),
@@ -578,6 +577,7 @@ impl SubjectFormatter<DshPlatformLabel> for DshPlatform {
       DshPlatformLabel::RestApiDomain => Value::plain(self.rest_api_domain()),
       DshPlatformLabel::RestApiEndpoint => Value::plain(self.rest_api_endpoint()),
       DshPlatformLabel::RestTokenEndpoint => Value::plain(self.rest_token_endpoint()),
+      DshPlatformLabel::RobotClientId => Value::plain(self.robot_client_id()),
       DshPlatformLabel::SwaggerUrl => Value::plain(self.swagger_url()),
       DshPlatformLabel::TracingUrl => Value::plain(self.tracing_url()),
       _ => unreachable!(),
@@ -604,17 +604,17 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
       DshPlatformLabel::HttpMessagingApiUrlSingle => Value::plain(platform.http_messaging_api_url_single(topic)),
       DshPlatformLabel::InternalDomain => Value::plain(platform.internal_domain(tenant)),
       DshPlatformLabel::InternalServiceDomain => Value::plain(platform.internal_service_domain(tenant, service_id)),
-      DshPlatformLabel::ProxyBrokerVhost => Value::ok_or_empty(platform.proxy_broker_vhost(tenant, proxy_name, VhostZone::Public, 0)),
-      DshPlatformLabel::ProxyCommonName => Value::ok_or_hide(platform.proxy_common_name(tenant, VhostZone::Public)),
+      DshPlatformLabel::ProxyBrokerVhost => Value::ok_or_empty(platform.proxy_vhost(tenant, proxy_name, VhostZone::Public, 0)),
+      DshPlatformLabel::ProxyCommonName => Value::ok_or_hide(platform.proxy_common_name(proxy_name, tenant, VhostZone::Public)),
       DshPlatformLabel::ProxyConsumerGroup => Value::plain(platform.proxy_consumer_group(tenant, proxy_name, 0)),
-      DshPlatformLabel::ProxyConsumerGroupAcl => Value::plain(platform.proxy_consumer_name_acl_group(tenant, "acl-group-name", proxy_name, 0)),
+      DshPlatformLabel::ProxyConsumerGroupAcl => Value::plain(platform.proxy_consumer_group_acl(tenant, "acl-group-name", proxy_name, 0)),
       DshPlatformLabel::ProxySchemaStoreVhost => Value::ok_or_empty(platform.proxy_schema_store_vhost(tenant, proxy_name, VhostZone::Public)),
       DshPlatformLabel::ProxyVhostDomain => Value::ok_or_empty(platform.proxy_vhost_domain(tenant, VhostZone::Public)),
       DshPlatformLabel::PublicVhostDomain => Value::plain(platform.public_vhost_domain(vhost)),
+      DshPlatformLabel::RobotTenantClientId => Value::plain(platform.robot_tenant_client_id(tenant)),
       DshPlatformLabel::TenantAppCatalogAppUrl => Value::plain(platform.tenant_app_catalog_app_url(tenant, vendor_id, app_id)),
       DshPlatformLabel::TenantAppCatalogUrl => Value::plain(platform.tenant_app_catalog_url(tenant)),
       DshPlatformLabel::TenantAppConsoleUrl => Value::plain(platform.tenant_app_console_url(tenant, app_id)),
-      DshPlatformLabel::TenantClientId => Value::plain(platform.tenant_client_id(tenant)),
       DshPlatformLabel::TenantConsoleUrl => Value::plain(platform.tenant_console_url(tenant)),
       DshPlatformLabel::TenantDataCatalogUrl => Value::plain(platform.tenant_data_catalog_url(tenant)),
       DshPlatformLabel::TenantMonitoringUrl => Value::plain(platform.tenant_monitoring_url(tenant)),
@@ -669,8 +669,8 @@ impl DshPlatformLabel {
       DshPlatformLabel::TenantAppConsoleUrl | DshPlatformLabel::TenantPublicAppDomain => REQUIRED_ARGUMENTS_APP_TENANT,
       DshPlatformLabel::TenantServiceConsoleUrl | DshPlatformLabel::InternalServiceDomain => REQUIRED_ARGUMENTS_SERVICE_TENANT,
       DshPlatformLabel::InternalDomain
+      | DshPlatformLabel::RobotTenantClientId
       | DshPlatformLabel::TenantAppCatalogUrl
-      | DshPlatformLabel::TenantClientId
       | DshPlatformLabel::TenantConsoleUrl
       | DshPlatformLabel::TenantDataCatalogUrl
       | DshPlatformLabel::TenantMonitoringUrl
