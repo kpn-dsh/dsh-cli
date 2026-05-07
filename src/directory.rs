@@ -318,17 +318,15 @@ fn read_local_certificate_bundle_file(directory_pathbuf: &Path, filename: &str) 
 /// * `directory_pathbuf` - Pathbuf for local certificate bundle directory.
 ///
 /// # Returns
-/// Tuple consisting of:
-/// * `ProxyCertificateBundleConfig` - Proxy certificate bundle configuration.
-/// * `String` - Filename.
-fn read_local_certificate_bundle_configuration(local_bundle_directory_pathbuf: &Path) -> DshCliResult<(ProxyCertificateBundleConfig, String)> {
+/// `ProxyCertificateBundleConfig` - Proxy certificate bundle configuration.
+fn read_local_certificate_bundle_configuration(local_bundle_directory_pathbuf: &Path) -> DshCliResult<ProxyCertificateBundleConfig> {
   let mut config_file_path = local_bundle_directory_pathbuf.to_path_buf();
   config_file_path.push(CONFIG_FILENAME);
   match read_and_deserialize_from_toml_file::<ProxyCertificateBundleConfig>(&config_file_path)? {
     Some(configuration) => {
       debug!("local certificate bundle configuration read from '{}'", config_file_path.display());
       trace!("{:#?}'", configuration);
-      Ok((configuration, config_file_path.display().to_string()))
+      Ok(configuration)
     }
     None => err!("local certificate bundle configuration '{}' not found", config_file_path.display()),
   }
@@ -349,7 +347,10 @@ pub(crate) fn read_local_certificate_bundle(platform: &DshPlatform, tenant: &str
     Some(certificate_bundle_directory_pathbuf) => {
       debug!("read local certificate bundle from '{}'", certificate_bundle_directory_pathbuf.display());
       Ok(LocalCertificateBundle {
-        configuration: read_local_certificate_bundle_configuration(&certificate_bundle_directory_pathbuf)?,
+        configuration: (
+          read_local_certificate_bundle_configuration(&certificate_bundle_directory_pathbuf)?,
+          certificate_bundle_directory_pathbuf.display().to_string(),
+        ),
         _ca_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_KEY_FILENAME)?,
         ca_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_CERTIFICATE_FILENAME)?,
         client_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_KEY_FILENAME)?,

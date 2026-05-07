@@ -302,6 +302,18 @@ impl From<openidconnect::url::ParseError> for DshCliError {
   }
 }
 
+impl From<std::num::ParseIntError> for DshCliError {
+  fn from(parse_error: std::num::ParseIntError) -> Self {
+    Self::Conversion(parse_error.to_string())
+  }
+}
+
+impl From<std::num::ParseFloatError> for DshCliError {
+  fn from(parse_error: std::num::ParseFloatError) -> Self {
+    Self::Conversion(parse_error.to_string())
+  }
+}
+
 impl From<rcgen::Error> for DshCliError {
   fn from(rcgen_error: rcgen::Error) -> Self {
     Self::Rcgen(rcgen_error.to_string())

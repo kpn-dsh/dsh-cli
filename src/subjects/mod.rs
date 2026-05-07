@@ -1,6 +1,7 @@
 pub(crate) mod api;
 pub(crate) mod app;
 pub(crate) mod bucket;
+pub(crate) mod bundle;
 pub(crate) mod certificate;
 pub(crate) mod env;
 pub(crate) mod image;

@@ -11,7 +11,7 @@ use crate::formatters::{hashmap_to_table, vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::global_options::{expiration_option, get_expiration_days};
 use crate::issues::{Issue, IssueDescription, IssueLabel, Severity};
-use crate::proxy_bundles::{hashmap_from_distinguished_name, san_to_string, DshCertificate};
+use crate::proxy_bundles::DshCertificate;
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::secret::{secrets_with_metadata, SecretLabel};
@@ -29,6 +29,7 @@ use futures::future::{join_all, try_join_all};
 use futures::join;
 use itertools::{multizip, Itertools};
 use lazy_static::lazy_static;
+use rcgen::{DistinguishedName, DnType, DnValue, OtherNameValue, SanType};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -141,7 +142,7 @@ impl CommandExecutor for CertificateDelete {
 
     if context.confirmed(format!("delete certificate '{}'?", certificate_id))? {
       let delete_existing_secrets =
-        !existing_certificate_secrets.is_empty() && context.confirmed(format!("delete certificate secrets: '{}'?", existing_certificate_secrets.join(", ")))?;
+        !existing_certificate_secrets.is_empty() && context.confirmed(format!("delete certificate secrets '{}'?", existing_certificate_secrets.join(", ")))?;
       if context.dry_run() {
         context.print_warning("dry-run mode, certificate not deleted");
       } else {
@@ -477,20 +478,6 @@ impl Label for CertificateLabel {
     }
   }
 
-  fn as_str_for_list(&self) -> &str {
-    match self {
-      Self::CertChainSecret => "cert secret",
-      Self::DistinguishedName => "distinguished name",
-      Self::DnsNames => "dns names",
-      Self::KeySecret => "key secret",
-      Self::NotAfter => "not after",
-      Self::NotBefore => "not before",
-      Self::PassphraseSecret => "pass phrase secret",
-      Self::SerialNumber => "serial number",
-      Self::Target => "certificate id",
-    }
-  }
-
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
   }
@@ -528,9 +515,9 @@ impl SubjectFormatter<CertificateLabel> for Certificate {
     match label {
       CertificateLabel::CertChainSecret => Value::plain(&self.cert_chain_secret),
       CertificateLabel::KeySecret => Value::plain(&self.key_secret),
-      CertificateLabel::PassphraseSecret => Value::some_or_hide(self.passphrase_secret.clone()),
+      CertificateLabel::PassphraseSecret => Value::some_or_empty(self.passphrase_secret.clone()),
       CertificateLabel::Target => Value::target(target_id),
-      _ => Value::unreachable(),
+      _ => Value::todo(),
     }
   }
 }
@@ -548,6 +535,47 @@ impl SubjectFormatter<CertificateLabel> for DshCertificate {
       CertificateLabel::SerialNumber => Value::some_or_hide(self.certificate.params().serial_number.as_ref().map(|serial_number| serial_number.to_string())),
       CertificateLabel::Target => Value::target(target_id),
     }
+  }
+}
+
+fn san_to_string(san_type: &SanType) -> String {
+  match san_type {
+    SanType::Rfc822Name(rfc822) => format!("rfc822: {}", rfc822),
+    SanType::DnsName(dns_name) => format!("dns: {}", dns_name),
+    SanType::URI(uri) => format!("uri: {}", uri),
+    SanType::IpAddress(ip_addr) => format!("ip address: {}", ip_addr),
+    SanType::OtherName((_, OtherNameValue::Utf8String(utf8_string))) => format!("utf8: {}", utf8_string),
+    _ => "".to_string(),
+  }
+}
+
+fn hashmap_from_distinguished_name(distinguished_name: &DistinguishedName) -> HashMap<String, String> {
+  distinguished_name
+    .iter()
+    .map(|(dn_type, dn_value)| (dn_type_name(dn_type).to_string(), dn_value_string(dn_value)))
+    .collect::<HashMap<_, _>>()
+}
+
+fn dn_value_string(dn_value: &DnValue) -> String {
+  match dn_value {
+    DnValue::Ia5String(ia5_string) => ia5_string.to_string(),
+    DnValue::PrintableString(printable_string) => printable_string.to_string(),
+    DnValue::TeletexString(teletex_string) => teletex_string.to_string(),
+    DnValue::Utf8String(utf8_string) => utf8_string.to_string(),
+    _ => "".to_string(),
+  }
+}
+
+fn dn_type_name(dn_type: &DnType) -> &'static str {
+  match dn_type {
+    DnType::CountryName => "C",
+    DnType::LocalityName => "L",
+    DnType::StateOrProvinceName => "ST",
+    DnType::OrganizationName => "O",
+    DnType::OrganizationalUnitName => "OU",
+    DnType::CommonName => "CN",
+    DnType::CustomDnType(_) => "",
+    _ => "",
   }
 }
 

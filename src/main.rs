@@ -22,6 +22,7 @@ use crate::global_options::{
 };
 use crate::releases::{newer_release, newer_release_notification, releases_from_github, ReleaseAsset};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
+use crate::subjects::bundle::BUNDLE_SUBJECT;
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
 use crate::subjects::task::TASK_SUBJECT;
 use crate::target_platform::{get_target_platform, get_target_platform_from_all_sources, platform_name_argument};
@@ -245,6 +246,7 @@ async fn inner_main() -> DshCliExit {
     API_SUBJECT.as_ref(),
     APP_SUBJECT.as_ref(),
     BUCKET_SUBJECT.as_ref(),
+    BUNDLE_SUBJECT.as_ref(),
     CERTIFICATE_SUBJECT.as_ref(),
     ENV_SUBJECT.as_ref(),
     IMAGE_SUBJECT.as_ref(),

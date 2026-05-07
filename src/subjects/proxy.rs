@@ -1,13 +1,8 @@
 use crate::arguments::proxy_id_argument;
-use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UNDEPLOY_COMMAND, UPDATE_COMMAND,
-};
+use crate::capability::{Capability, CommandExecutor, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UNDEPLOY_COMMAND, UPDATE_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-use crate::directory::{
-  delete_proxy_certificate_bundle, list_proxy_certificate_bundles, proxy_certificate_bundle_exists, read_local_certificate_bundle, read_proxy_certificate_bundle,
-  store_proxy_certificate_bundle,
-};
+use crate::directory::{proxy_certificate_bundle_exists, read_proxy_certificate_bundle};
 use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
@@ -16,18 +11,15 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{ColumnAlignment, Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::global_options::{expiration_option, get_expiration_days};
-use crate::proxy_bundles::{ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::certificate::{CertificateLabel, CERTIFICATE_LABELS_SHOW};
 use crate::subjects::secret::SecretLabel;
-use crate::target_platform::{get_target_platform, platform_name_argument};
-use crate::target_tenant::{get_target_tenant, tenant_name_argument};
-use crate::verbosity::Verbosity;
-use crate::{cli_error, err, DshCliResult};
+use crate::target_platform::get_target_platform;
+use crate::target_tenant::get_target_tenant;
+use crate::{cli_error, err, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
-use clap::builder::PossibleValue;
-use clap::{builder, Arg, ArgAction, ArgMatches};
+use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::VhostZone;
 use dsh_api::types::{Certificate, KafkaProxy, KafkaProxyZone, Secret};
@@ -35,14 +27,13 @@ use futures::future::try_join_all;
 use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::trace;
 
+use crate::subjects::service::{cpus_option, instances_option, mem_option, CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use serde::Serialize;
 use std::convert::AsRef;
 use std::num::NonZeroU64;
 use std::str::FromStr;
 use std::sync::LazyLock;
-use whoami::username;
 
 struct ProxySubject {}
 
@@ -68,8 +59,6 @@ impl Subject for ProxySubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
-      CREATE_COMMAND => Some(PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY.as_ref()),
-      DELETE_COMMAND => Some(PROXY_CERTIFICATE_BUNDLE_DELETE_CAPABILITY.as_ref()),
       DEPLOY_COMMAND => Some(PROXY_DEPLOY_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(PROXY_LIST_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(PROXY_SHOW_CAPABILITY.as_ref()),
@@ -84,350 +73,77 @@ impl Subject for ProxySubject {
   }
 }
 
-static PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, None, &ProxyCertificateBundleCreate {}, "Create proxy certificates bundle")
-      .add_target_argument(proxy_id_argument().required(true))
-      .add_target_argument(platform_name_argument())
-      .add_target_argument(tenant_name_argument())
-      .add_extra_argument(acl_group_id_option())
-      .add_extra_argument(broker_prefix_option())
-      .add_extra_argument(number_of_dns_records_option())
-      .add_extra_argument(ca_common_name_option())
-      .add_extra_argument(vhost_zone_option())
-      .add_extra_argument(include_schema_store_dns_option()),
-  )
-});
-static PROXY_CERTIFICATE_BUNDLE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &ProxyCertificateBundleDelete {}, "Delete proxy certificates bundle")
-      .add_target_argument(proxy_id_argument().required(true))
-      .add_target_argument(platform_name_argument())
-      .add_target_argument(tenant_name_argument()),
-  )
-});
 static PROXY_DEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(DEPLOY_COMMAND, None, &ProxyDeploy {}, "Deploy proxy")
+    CapabilityBuilder::new(DEPLOY_COMMAND, None, &ProxyDeploy {}, "Deploy local proxy on dsh")
       .set_long_about("Deploy a Kafka proxy.")
-      .add_target_argument(proxy_id_argument().required(true)),
+      .add_target_argument(proxy_id_argument().required(true))
+      .add_extra_argument(cpus_option().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(instances_option().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(mem_option().help_heading(COMMAND_OPTIONS_HEADING)),
   )
 });
 static PROXY_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyList {}, "List proxies")
+    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyList {}, "List dsh proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
-      .add_command_executor(FlagType::Bundle, &ProxyListBundles {}, None)
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None),
   )
 });
 static PROXY_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShow {}, "Show Kafka proxy configuration")
-      .add_command_executor(FlagType::Bundle, &ProxyShowBundle {}, None)
       .add_target_argument(proxy_id_argument().required(true))
       .add_extra_argument(expiration_option()),
   )
 });
 static PROXY_UNDEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(UNDEPLOY_COMMAND, None, &ProxyUndeploy {}, "Undeploy proxy")
+    CapabilityBuilder::new(UNDEPLOY_COMMAND, None, &ProxyUndeploy {}, "Undeploy proxy from dsh")
       .set_long_about("Undeploy a Kafka proxy.")
       .add_target_argument(proxy_id_argument().required(true)),
   )
 });
 static PROXY_UPDATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(UPDATE_COMMAND, None, &ProxyUpdate {}, "Update proxy")
+    CapabilityBuilder::new(UPDATE_COMMAND, None, &ProxyUpdate {}, "Update proxy on dsh")
       .set_long_about("Update an existing Kafka proxy.")
       .add_target_argument(proxy_id_argument().required(true)),
   )
 });
 
 static PROXY_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  vec![
-    PROXY_CERTIFICATE_BUNDLE_CREATE_CAPABILITY.as_ref(),
-    PROXY_CERTIFICATE_BUNDLE_DELETE_CAPABILITY.as_ref(),
-    PROXY_DEPLOY_CAPABILITY.as_ref(),
-    PROXY_LIST_CAPABILITY.as_ref(),
-    PROXY_SHOW_CAPABILITY.as_ref(),
-    PROXY_UNDEPLOY_CAPABILITY.as_ref(),
-    PROXY_UPDATE_CAPABILITY.as_ref(),
-  ]
+  vec![PROXY_DEPLOY_CAPABILITY.as_ref(), PROXY_LIST_CAPABILITY.as_ref(), PROXY_SHOW_CAPABILITY.as_ref(), PROXY_UNDEPLOY_CAPABILITY.as_ref(), PROXY_UPDATE_CAPABILITY.as_ref()]
 });
 
-const ACL_GROUP_ID_OPTION: &str = "acl-group-id-option";
+static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 4] =
+  [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
 
-fn acl_group_id_option() -> Arg {
-  Arg::new(ACL_GROUP_ID_OPTION)
-    .long("acl-group-id")
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("ACL_GROUP_ID")
-    .help("Acl group id")
-    .long_help("Acl group id used for fine-grained access control.")
-}
-
-const BROKER_PREFIX_OPTION: &str = "broker-prefix-option";
-
-fn broker_prefix_option() -> Arg {
-  Arg::new(BROKER_PREFIX_OPTION)
-    .long("broker-prefix")
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .value_name("BROKER_PREFIX")
-    .help("Broker prefix")
-    .long_help("Prefix used to generate the dsn and schema store name.")
-}
-
-const NUMBER_OF_DNS_RECORDS_OPTION: &str = "number-of-dns-records-option";
-
-fn number_of_dns_records_option() -> Arg {
-  Arg::new(NUMBER_OF_DNS_RECORDS_OPTION)
-    .long("number-of-dns-records")
-    .action(ArgAction::Set)
-    .value_parser(builder::RangedU64ValueParser::<usize>::new().range(1..11))
-    .value_name("NUMBER_OF_DNS_RECORDS")
-    .help("Number of dns records")
-    .long_help(
-      "Number of broker dns records that will be generated. Do not use this \
-         option unless you know what you are doing.",
-    )
-}
-
-const CA_COMMON_NAME_OPTION: &str = "ca-common-name-option";
-
-fn ca_common_name_option() -> Arg {
-  Arg::new(CA_COMMON_NAME_OPTION)
-    .long("ca-common-name")
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .help("Certificate authority common name")
-    .long_help("This option specifies the common name used to create certificate authority certificate.")
-}
-
-const VHOST_ZONE_OPTION: &str = "vhost-zone-option";
-
-fn vhost_zone_option() -> Arg {
-  let possible_values = [PossibleValue::new("private").help("Private vhost"), PossibleValue::new("public").help("Public vhost")];
-  Arg::new(VHOST_ZONE_OPTION)
-    .long("vhost-zone")
-    .action(ArgAction::Set)
-    .value_parser(possible_values)
-    .help("Vhost zone")
-    .long_help("This option indicates whether the certificates will be created for a public or a private vhost.")
-}
-
-const INCLUDE_SCHEMA_STORE_DNS_OPTION: &str = "include-schema-store-dns-option";
-
-fn include_schema_store_dns_option() -> Arg {
-  Arg::new(INCLUDE_SCHEMA_STORE_DNS_OPTION)
-    .long("include-schema-store-dns")
-    .action(ArgAction::SetTrue)
-    .help("Include schema store dns")
-    .long_help(
-      "If this option is provided the created certificates will include a dns entry \
-    for a schema store.",
-    )
-}
-
-static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
-  CertificateLabel::Target,
-  CertificateLabel::DistinguishedName,
-  CertificateLabel::DnsNames,
-  CertificateLabel::NotAfter,
-  CertificateLabel::NotBefore,
-  CertificateLabel::SerialNumber,
-];
-static PROXY_BUNDLE_LABELS_CREATE: [ProxyBundleLabel; 9] = [
-  ProxyBundleLabel::Platform,
-  ProxyBundleLabel::Tenant,
-  ProxyBundleLabel::BundleName,
-  ProxyBundleLabel::BrokerPrefix,
-  ProxyBundleLabel::CaCommonName,
-  ProxyBundleLabel::HasSchemaStoreDnsRecord,
-  ProxyBundleLabel::VhostZone,
-  ProxyBundleLabel::AclGroupId,
-  ProxyBundleLabel::NumberOfDsnRecords,
-];
-
-struct ProxyCertificateBundleCreate {}
-
-#[async_trait]
-impl CommandExecutor for ProxyCertificateBundleCreate {
-  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let platform = get_target_platform(matches, context.settings())?;
-    let tenant = get_target_tenant(matches, context.settings())?;
-    let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
-
-    if proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
-      context.print_warning(format!(
-        "proxy certificate bundle '{}' already exists for '{}@{}'",
-        proxy_bundle_id, platform, tenant
-      ));
-      if !context.confirmed("do you want to override the existing bundle?")? {
-        context.print_outcome("cancelled");
-        return Ok(());
-      }
-    }
-
-    context.print_explanation(format!("create proxy certificates bundle '{}' for '{}@{}'", proxy_bundle_id, platform, tenant));
-
-    let acl_group_id: Option<String> = match matches.get_one::<String>(ACL_GROUP_ID_OPTION) {
-      Some(group_id) => Some(group_id.clone()),
-      None => {
-        let group_id = context.read_single_line("acl group id [none]")?;
-        if group_id.is_empty() {
-          None
-        } else {
-          Some(group_id)
-        }
-      }
-    };
-
-    let broker_prefix: String = match matches.get_one::<String>(BROKER_PREFIX_OPTION) {
-      Some(prefix) => prefix.clone(),
-      None => {
-        let prefix = context.read_single_line(format!("broker prefix [{}]", proxy_bundle_id))?;
-        if prefix.is_empty() {
-          proxy_bundle_id.clone()
-        } else {
-          prefix
-        }
-      }
-    };
-    let vhost_zone = match matches.get_one::<VhostZone>(VHOST_ZONE_OPTION) {
-      Some(vhost_zone) => vhost_zone.clone(),
-      None => {
-        let vhost_zone_string = context.read_single_line("vhost zone [PRIVATE/public]")?;
-        if vhost_zone_string.is_empty() {
-          VhostZone::Private
-        } else {
-          VhostZone::from_str(&vhost_zone_string)?
-        }
-      }
-    };
-
-    let ca_common_name = match matches.get_one::<String>(CA_COMMON_NAME_OPTION) {
-      Some(ca_common_name) => ca_common_name.to_string(),
-      None => {
-        let default_username = username()?;
-        let ca_common_name = context.read_single_line(format!("certificate authority common name [{}]", default_username))?;
-        if ca_common_name.is_empty() {
-          default_username
-        } else {
-          ca_common_name
-        }
-      }
-    };
-
-    let include_schema_store_dns_record = matches.get_flag(INCLUDE_SCHEMA_STORE_DNS_OPTION);
-    let number_of_dns_records = match matches.get_one::<usize>(NUMBER_OF_DNS_RECORDS_OPTION) {
-      Some(number_of_dns_records) if *number_of_dns_records < 10 => {
-        context.print_warning("the number of dns records should almost always be set to the default value of 10");
-        if context.confirmed(format!("are you sure you want to set the number of dns records to {}?", number_of_dns_records))? {
-          *number_of_dns_records
-        } else {
-          return err!("cancelled");
-        }
-      }
-      _ => 10,
-    };
-
-    let config = ProxyCertificateBundleConfig {
-      acl_group_id,
-      broker_prefix: broker_prefix.clone(),
-      ca_common_name: ca_common_name.clone(),
-      include_schema_store_dns_record,
-      number_of_dns_records,
-      platform: platform.clone(),
-      tenant: tenant.clone(),
-      vhost_zone: vhost_zone.clone(),
-    };
-    trace!("{:#?}", config);
-
-    if !context.quiet() {
-      match context.verbosity() {
-        Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_CREATE, context).print(&config, None)?,
-      }
-    }
-
-    let cert_bundle = ProxyCertificateBundle::try_from(config)?;
-
-    if !context.quiet() {
-      match context.verbosity() {
-        Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => {
-          UnitFormatter::new("ca certificate", &GENERATED_CERTIFICATE_LABELS, context).print_non_serializable(&cert_bundle.ca_certificate, None)?;
-          UnitFormatter::new("client certificate", &GENERATED_CERTIFICATE_LABELS, context).print_non_serializable(&cert_bundle.client_certificate, None)?;
-          UnitFormatter::new("server certificate", &GENERATED_CERTIFICATE_LABELS, context).print_non_serializable(&cert_bundle.server_certificate, None)?;
-        }
-      }
-    }
-
-    if context.dry_run() {
-      context.print_warning("dry-run mode, proxy certificates bundle not stored");
-    } else {
-      let bundle_directory = store_proxy_certificate_bundle(&platform, &tenant, &proxy_bundle_id, &cert_bundle)?;
-      context.println(format!(
-        "proxy certificates bundle '{}' stored in directory '{}'",
-        proxy_bundle_id, bundle_directory
-      ));
-    }
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api()
-  }
-}
-
-struct ProxyCertificateBundleDelete {}
-
-#[async_trait]
-impl CommandExecutor for ProxyCertificateBundleDelete {
-  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let platform = get_target_platform(matches, context.settings())?;
-    let tenant = get_target_tenant(matches, context.settings())?;
-    let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
-    if !proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
-      return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", proxy_bundle_id, platform, tenant);
-    }
-    context.print_explanation(format!("delete proxy certificates bundle '{}' for '{}@{}'", proxy_bundle_id, platform, tenant));
-    if context.confirmed(format!("delete proxy certificate bundle '{}'?", proxy_bundle_id))? {
-      if context.dry_run() {
-        context.print_warning("dry-run mode, proxy certificate bundle not deleted");
-      } else {
-        delete_proxy_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
-        context.print_outcome(format!("proxy certificate bundle '{}' deleted", proxy_bundle_id));
-      }
-    } else {
-      context.print_outcome(format!("cancelled, proxy certificate bundle '{}' not deleted", proxy_bundle_id));
-    }
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api()
-  }
-}
-
-static SECRET_LABELS_SHOW: [SecretLabel; 14] = [
+static SECRET_LABELS_SHOW: [SecretLabel; 10] = [
   SecretLabel::SecretName,
-  SecretLabel::SecretId,
-  SecretLabel::System,
   SecretLabel::Kind,
   SecretLabel::FormatKind,
   SecretLabel::Size,
   SecretLabel::Description,
   SecretLabel::NotBefore,
   SecretLabel::NotAfter,
-  SecretLabel::Provisioned,
-  SecretLabel::Notifications,
-  SecretLabel::DerivedFrom,
   SecretLabel::Subject,
   SecretLabel::Issuer,
+  SecretLabel::SerialNumber,
+];
+
+static PROXY_LABELS_SHOW: [KafkaProxyLabel; 11] = [
+  KafkaProxyLabel::Target,
+  KafkaProxyLabel::Name,
+  KafkaProxyLabel::Zone,
+  KafkaProxyLabel::Certificate,
+  KafkaProxyLabel::CaChainSecretName,
+  KafkaProxyLabel::Cpus,
+  KafkaProxyLabel::Mem,
+  KafkaProxyLabel::Instances,
+  KafkaProxyLabel::SchemaStore,
+  KafkaProxyLabel::AclGroupsEnabled,
+  KafkaProxyLabel::Validations,
 ];
 
 struct ProxyDeploy {}
@@ -439,96 +155,116 @@ impl CommandExecutor for ProxyDeploy {
     let tenant = get_target_tenant(matches, context.settings())?;
     let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
 
+    if client.get_kafkaproxy_configuration(&proxy_bundle_id).await.is_ok() {
+      return err!("proxy '{}' already exists", proxy_bundle_id);
+    }
     if !proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
       return err!("proxy certificate bundle '{}' does not exist", proxy_bundle_id);
     }
-    if client.get_kafkaproxy_configuration(&proxy_bundle_id).await.is_ok() {
-      context.print_warning(format!("proxy '{}' already exists", proxy_bundle_id));
-      if !context.confirmed(format!("replace proxy '{}'?", proxy_bundle_id))? {
-        return err!("cancelled, proxy '{}' not deployed", proxy_bundle_id);
-      }
-    }
 
-    let (server_certificate, private_key, ca_certificate, configuration) = read_proxy_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
+    let proxy_certificate_name = format!("{}-certificate", proxy_bundle_id);
+    let proxy_ca_certificate_secret_name = format!("{}-ca-certificate", proxy_bundle_id);
+    let proxy_private_key_secret_name = format!("{}-private-key", proxy_bundle_id);
+    let proxy_server_certificate_secret_name = format!("{}-server-certificate", proxy_bundle_id);
 
-    let server_certificate_secret_name = format!("{}-certificate-cert", proxy_bundle_id);
-    let private_key_secret_name = format!("{}-certificate-key", proxy_bundle_id);
-    let ca_certificate_secret_name = format!("{}-certificate-ca", proxy_bundle_id);
-    let certificate_name = format!("{}-certificate", proxy_bundle_id);
-
-    let (cert_secret_result, key_secret_result, ca_secret_result, certificate_result) = join!(
-      client.get_secret(&server_certificate_secret_name),
-      client.get_secret(&private_key_secret_name),
-      client.get_secret(&ca_certificate_secret_name),
-      client.get_certificate(&certificate_name)
+    let (proxy_certificate_result, ca_secret_result, key_secret_result, cert_secret_result) = join!(
+      client.get_certificate(&proxy_certificate_name),
+      client.get_secret(&proxy_ca_certificate_secret_name),
+      client.get_secret(&proxy_private_key_secret_name),
+      client.get_secret(&proxy_server_certificate_secret_name),
     );
-    if cert_secret_result.is_ok() {
-      context.print_error(format!("secret '{}' already exists", server_certificate_secret_name));
-    }
-    if key_secret_result.is_ok() {
-      context.print_error(format!("secret '{}' already exists", private_key_secret_name));
+    if proxy_certificate_result.is_ok() {
+      context.print_error(format!("certificate '{}' already exists", proxy_certificate_name));
     }
     if ca_secret_result.is_ok() {
-      context.print_error(format!("secret '{}' already exists", ca_certificate_secret_name));
+      context.print_error(format!("secret '{}' already exists", proxy_ca_certificate_secret_name));
     }
-    if certificate_result.is_ok() {
-      context.print_error(format!("certificate '{}' already exists", certificate_name));
+    if key_secret_result.is_ok() {
+      context.print_error(format!("secret '{}' already exists", proxy_private_key_secret_name));
     }
-    if cert_secret_result.is_ok() || key_secret_result.is_ok() || ca_secret_result.is_ok() || certificate_result.is_ok() {
+    if cert_secret_result.is_ok() {
+      context.print_error(format!("secret '{}' already exists", proxy_server_certificate_secret_name));
+    }
+    if proxy_certificate_result.is_ok() || ca_secret_result.is_ok() || key_secret_result.is_ok() || cert_secret_result.is_ok() {
       return err!("cancelled, some resources already exist");
     }
 
-    let server_certificate_secret = Secret::new(&server_certificate_secret_name, server_certificate);
-    let private_key_secret = Secret::new(&private_key_secret_name, private_key);
-    let ca_certificate_secret = Secret::new(&ca_certificate_secret_name, ca_certificate);
+    let (proxy_server_certificate, proxy_private_key, proxy_ca_certificate, configuration) = read_proxy_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
 
-    let name = Some(proxy_bundle_id.clone());
-    let secret_name_ca_chain = ca_certificate_secret_name.clone();
-    let certificate = certificate_name.clone();
-    let cpus = 0.1;
-    let mem = 256;
-    let instances = NonZeroU64::new(1).unwrap();
-    let enable_kafka_acl_groups = Some(false);
-    let validations = vec![];
-    let (schema_store, schema_store_cpus, schema_store_mem) = if configuration.include_schema_store_dns_record { (Some(true), Some(0.1), Some(256)) } else { (None, None, None) };
-    let zone = match configuration.vhost_zone {
-      VhostZone::Private => KafkaProxyZone::Private,
-      VhostZone::Public => KafkaProxyZone::Public,
+    let (schema_store, schema_store_cpus, schema_store_mem) = if configuration.enable_schema_store { (Some(true), Some(0.1), Some(256)) } else { (None, None, None) };
+
+    let proxy_cpus = match matches.get_one::<f64>(CPUS_OPTION) {
+      Some(cpus) => *cpus,
+      None => f64::from_str(&context.read_single_line_with_default("proxy cpus", "0.1")?)?,
     };
 
-    let certificate_body = Certificate { cert_chain_secret: server_certificate_secret_name.clone(), key_secret: private_key_secret_name.clone(), passphrase_secret: None };
+    let proxy_mem = match matches.get_one::<u64>(MEM_OPTION) {
+      Some(mem) => *mem,
+      None => u64::from_str(&context.read_single_line_with_default("proxy memory", "256")?)?,
+    };
 
-    let kafka_proxy =
-      KafkaProxy { name, secret_name_ca_chain, certificate, cpus, mem, instances, enable_kafka_acl_groups, validations, schema_store, schema_store_cpus, schema_store_mem, zone };
+    let proxy_instances = NonZeroU64::new(match matches.get_one::<u64>(INSTANCES_OPTION) {
+      Some(instances) => *instances,
+      None => u64::from_str(&context.read_single_line_with_default("proxy instances", "1")?)?,
+    })
+    .ok_or(cli_error!("number of instances cannot be zero"))?;
 
-    UnitFormatter::new(&server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&server_certificate_secret.value), None), None)?;
-    UnitFormatter::new(&private_key_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&private_key_secret.value), None), None)?;
-    UnitFormatter::new(&ca_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&ca_certificate_secret.value), None), None)?;
-    UnitFormatter::new(&ca_certificate_secret_name, &GENERATED_CERTIFICATE_LABELS, context).print(&certificate_body, None)?;
+    let kafka_proxy = KafkaProxy {
+      name: Some(proxy_bundle_id.clone()),
+      secret_name_ca_chain: proxy_ca_certificate_secret_name.clone(),
+      certificate: proxy_certificate_name.clone(),
+      cpus: proxy_cpus,
+      mem: proxy_mem as i64,
+      instances: proxy_instances,
+      enable_kafka_acl_groups: Some(false),
+      validations: vec![],
+      schema_store,
+      schema_store_cpus,
+      schema_store_mem,
+      zone: match configuration.vhost_zone {
+        VhostZone::Private => KafkaProxyZone::Private,
+        VhostZone::Public => KafkaProxyZone::Public,
+      },
+    };
+
+    let certificate_body =
+      Certificate { cert_chain_secret: proxy_server_certificate_secret_name.clone(), key_secret: proxy_private_key_secret_name.clone(), passphrase_secret: None };
+
     UnitFormatter::new(&proxy_bundle_id, &PROXY_LABELS_SHOW, context).print(&kafka_proxy, None)?;
+    UnitFormatter::new(&proxy_certificate_name, &GENERATED_CERTIFICATE_LABELS, context).print(&certificate_body, None)?;
+    UnitFormatter::new(&proxy_ca_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_ca_certificate), None), None)?;
+    UnitFormatter::new(&proxy_server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_server_certificate), None), None)?;
+    UnitFormatter::new(&proxy_private_key_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_private_key), None), None)?;
+
+    if !context.confirmed(format!("deploy proxy '{}'?", proxy_bundle_id))? {
+      return err!("cancelled, proxy '{}' not deployed", proxy_bundle_id);
+    }
 
     if context.dry_run() {
       context.print_warning("dry-run mode, proxy not deployed");
     } else {
+      let ca_certificate_secret = Secret::new(&proxy_ca_certificate_secret_name, &proxy_ca_certificate);
+      let private_key_secret = Secret::new(&proxy_private_key_secret_name, &proxy_private_key);
+      let server_certificate_secret = Secret::new(&proxy_server_certificate_secret_name, &proxy_server_certificate);
       let (cert_secret_result, key_secret_result, ca_secret_result) = join!(
         client.post_secret(&server_certificate_secret),
         client.post_secret(&private_key_secret),
         client.post_secret(&ca_certificate_secret),
       );
       if let Err(error) = cert_secret_result {
-        context.print_error(format!("error writing certificate secret '{}' ({})", server_certificate_secret_name, error));
+        context.print_error(format!("error writing certificate secret '{}' ({})", proxy_server_certificate_secret_name, error));
       }
       if let Err(error) = key_secret_result {
-        context.print_error(format!("error writing key secret '{}' ({})", private_key_secret_name, error));
+        context.print_error(format!("error writing key secret '{}' ({})", proxy_private_key_secret_name, error));
       }
       if let Err(error) = ca_secret_result {
-        context.print_error(format!("error writing ca certificate secret '{}' ({})", ca_certificate_secret_name, error));
+        context.print_error(format!("error writing ca certificate secret '{}' ({})", proxy_ca_certificate_secret_name, error));
       }
 
       client
-        .put_certificate_configuration(&certificate_name, &certificate_body)
+        .put_certificate_configuration(&proxy_certificate_name, &certificate_body)
         .await
-        .map_err(|error| cli_error!("error writing certificate configuration '{}' ({})", certificate_name, error))?;
+        .map_err(|error| cli_error!("error writing certificate configuration '{}' ({})", proxy_certificate_name, error))?;
 
       client
         .put_kafkaproxy_configuration(&proxy_bundle_id, &kafka_proxy)
@@ -546,8 +282,15 @@ impl CommandExecutor for ProxyDeploy {
   }
 }
 
-static PROXY_LABELS_LIST: [ProxyLabel; 7] =
-  [ProxyLabel::Target, ProxyLabel::Certificate, ProxyLabel::Cpus, ProxyLabel::Mem, ProxyLabel::Zone, ProxyLabel::SchemaStore, ProxyLabel::AclGroupsEnabled];
+static PROXY_LABELS_LIST: [KafkaProxyLabel; 7] = [
+  KafkaProxyLabel::Target,
+  KafkaProxyLabel::Certificate,
+  KafkaProxyLabel::Cpus,
+  KafkaProxyLabel::Mem,
+  KafkaProxyLabel::Zone,
+  KafkaProxyLabel::SchemaStore,
+  KafkaProxyLabel::AclGroupsEnabled,
+];
 
 struct ProxyList {}
 
@@ -567,40 +310,6 @@ impl CommandExecutor for ProxyList {
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
     Requirements::standard_with_api()
-  }
-}
-
-static PROXY_BUNDLE_LABELS_LIST: [ProxyBundleLabel; 8] = [
-  ProxyBundleLabel::BundleName,
-  ProxyBundleLabel::BrokerPrefix,
-  ProxyBundleLabel::CaCommonName,
-  ProxyBundleLabel::HasSchemaStoreDnsRecord,
-  ProxyBundleLabel::VhostZone,
-  ProxyBundleLabel::NumberOfDsnRecords,
-  ProxyBundleLabel::AclGroupId,
-  ProxyBundleLabel::BundleDirectory,
-];
-
-struct ProxyListBundles {}
-
-#[async_trait]
-impl CommandExecutor for ProxyListBundles {
-  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let platform = get_target_platform(matches, context.settings())?;
-    let tenant = get_target_tenant(matches, context.settings())?;
-    context.print_explanation(format!("list all local proxy certificate bundles for '{}@{}'", platform.name(), tenant));
-    let list: Vec<(String, (ProxyCertificateBundleConfig, String))> = list_proxy_certificate_bundles(&platform, &tenant)?
-      .into_iter()
-      .map(|(bundle_name, bundle_config, bundle_directory)| (bundle_name, (bundle_config, bundle_directory)))
-      .collect_vec();
-    let mut formatter = ListFormatter::new(&PROXY_BUNDLE_LABELS_LIST, context);
-    formatter.push_target_id_value_pairs(&list);
-    formatter.print(None)?;
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api()
   }
 }
 
@@ -680,55 +389,6 @@ impl CommandExecutor for ProxyShow {
   }
 }
 
-static BUNDLE_SECRET_LABELS_SHOW: [SecretLabel; 9] = [
-  SecretLabel::SecretName,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::NotBefore,
-  SecretLabel::NotAfter,
-  SecretLabel::Subject,
-  SecretLabel::Issuer,
-];
-
-static PROXY_BUNDLE_LABELS_SHOW: [ProxyBundleLabel; 7] = [
-  ProxyBundleLabel::BundleName,
-  ProxyBundleLabel::BrokerPrefix,
-  ProxyBundleLabel::CaCommonName,
-  ProxyBundleLabel::HasSchemaStoreDnsRecord,
-  ProxyBundleLabel::VhostZone,
-  ProxyBundleLabel::NumberOfDsnRecords,
-  ProxyBundleLabel::AclGroupId,
-];
-
-struct ProxyShowBundle {}
-
-#[async_trait]
-impl CommandExecutor for ProxyShowBundle {
-  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let platform = get_target_platform(matches, context.settings())?;
-    let tenant = get_target_tenant(matches, context.settings())?;
-    let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show local certificate bundle '{}'", proxy_bundle_id));
-    let expiration_days = get_expiration_days(matches, context.settings())?;
-    let bundle = read_local_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
-    context.print_explanation(format!("configuration file '{}'", bundle.configuration.1));
-    UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_SHOW, context).print(&bundle.configuration, None)?;
-    context.print_explanation(format!("server certificate file '{}'", bundle.server_pem.filename));
-    UnitFormatter::new(&proxy_bundle_id, &BUNDLE_SECRET_LABELS_SHOW, context).print(&(secret_metadata(&bundle.server_pem.value), Some(expiration_days)), None)?;
-    context.print_explanation(format!("client key file '{}'", bundle.client_key.filename));
-    UnitFormatter::new(&proxy_bundle_id, &BUNDLE_SECRET_LABELS_SHOW, context).print(&(secret_metadata(&bundle.client_key.value), Some(expiration_days)), None)?;
-    context.print_explanation(format!("certificate authority certificate file '{}'", bundle.ca_pem.filename));
-    UnitFormatter::new(&proxy_bundle_id, &BUNDLE_SECRET_LABELS_SHOW, context).print(&(secret_metadata(&bundle.ca_pem.value), Some(expiration_days)), None)?;
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api()
-  }
-}
-
 struct ProxyUndeploy {}
 
 #[async_trait]
@@ -783,7 +443,7 @@ impl CommandExecutor for ProxyUpdate {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-enum ProxyLabel {
+enum KafkaProxyLabel {
   AclGroupsEnabled,
   CaChainSecretName,
   Certificate,
@@ -797,36 +457,36 @@ enum ProxyLabel {
   Zone,
 }
 
-impl Label for ProxyLabel {
+impl Label for KafkaProxyLabel {
   fn as_str(&self) -> &str {
     match self {
-      ProxyLabel::AclGroupsEnabled => "acl groups",
-      ProxyLabel::CaChainSecretName => "ca certificate",
-      ProxyLabel::Certificate => "certificate",
-      ProxyLabel::Cpus => "cpus",
-      ProxyLabel::Instances => "instances",
-      ProxyLabel::Mem => "memory",
-      ProxyLabel::Name => "name",
-      ProxyLabel::SchemaStore => "schema store",
-      ProxyLabel::Target => "proxy id",
-      ProxyLabel::Validations => "validations",
-      ProxyLabel::Zone => "zone",
+      KafkaProxyLabel::AclGroupsEnabled => "acl groups",
+      KafkaProxyLabel::CaChainSecretName => "ca certificate secret",
+      KafkaProxyLabel::Certificate => "certificate",
+      KafkaProxyLabel::Cpus => "cpus",
+      KafkaProxyLabel::Instances => "instances",
+      KafkaProxyLabel::Mem => "memory",
+      KafkaProxyLabel::Name => "name",
+      KafkaProxyLabel::SchemaStore => "schema store",
+      KafkaProxyLabel::Target => "proxy id",
+      KafkaProxyLabel::Validations => "validations",
+      KafkaProxyLabel::Zone => "zone",
     }
   }
 
   fn as_str_for_list(&self) -> &str {
     match self {
-      ProxyLabel::AclGroupsEnabled => "acl groups",
-      ProxyLabel::CaChainSecretName => "ca certificate",
-      ProxyLabel::Certificate => "certificate",
-      ProxyLabel::Cpus => "cpus",
-      ProxyLabel::Instances => "instances",
-      ProxyLabel::Mem => "memory",
-      ProxyLabel::Name => "proxy name",
-      ProxyLabel::SchemaStore => "schema store",
-      ProxyLabel::Target => "proxy id",
-      ProxyLabel::Validations => "validations",
-      ProxyLabel::Zone => "zone",
+      KafkaProxyLabel::AclGroupsEnabled => "acl groups",
+      KafkaProxyLabel::CaChainSecretName => "ca certificate",
+      KafkaProxyLabel::Certificate => "certificate",
+      KafkaProxyLabel::Cpus => "cpus",
+      KafkaProxyLabel::Instances => "instances",
+      KafkaProxyLabel::Mem => "memory",
+      KafkaProxyLabel::Name => "proxy name",
+      KafkaProxyLabel::SchemaStore => "schema store",
+      KafkaProxyLabel::Target => "proxy id",
+      KafkaProxyLabel::Validations => "validations",
+      KafkaProxyLabel::Zone => "zone",
     }
   }
 
@@ -842,34 +502,34 @@ impl Label for ProxyLabel {
   }
 }
 
-impl SubjectFormatter<ProxyLabel> for KafkaProxy {
-  fn value(&self, label: &ProxyLabel, target_id: &str) -> Value {
+impl SubjectFormatter<KafkaProxyLabel> for KafkaProxy {
+  fn value(&self, label: &KafkaProxyLabel, target_id: &str) -> Value {
     match label {
-      ProxyLabel::AclGroupsEnabled => Value::some_or_hide(self.enable_kafka_acl_groups),
-      ProxyLabel::CaChainSecretName => Value::target(&self.secret_name_ca_chain),
-      ProxyLabel::Certificate => Value::target(&self.certificate),
-      ProxyLabel::Cpus => Value::plain(self.cpus),
-      ProxyLabel::Instances => Value::plain(self.instances),
-      ProxyLabel::Mem => Value::plain(self.mem),
-      ProxyLabel::Name => Value::some_or_empty(self.name.clone()),
-      ProxyLabel::SchemaStore => Value::some_or(
+      KafkaProxyLabel::AclGroupsEnabled => Value::some_or_hide(self.enable_kafka_acl_groups.map(|enabled| if enabled { "enabled" } else { "disabled" })),
+      KafkaProxyLabel::CaChainSecretName => Value::target(&self.secret_name_ca_chain),
+      KafkaProxyLabel::Certificate => Value::target(&self.certificate),
+      KafkaProxyLabel::Cpus => Value::plain(self.cpus),
+      KafkaProxyLabel::Instances => Value::plain(self.instances),
+      KafkaProxyLabel::Mem => Value::plain(self.mem),
+      KafkaProxyLabel::Name => Value::some_or_empty(self.name.clone()),
+      KafkaProxyLabel::SchemaStore => Value::some_or(
         self.schema_store.map(|enabled| {
           if enabled {
             format!(
-              "true (cpus: {}, mem: {})",
+              "enabled (cpus: {}, mem: {})",
               self.schema_store_cpus.map(|cpus| cpus.to_string()).unwrap_or("NA".to_string()),
               self.schema_store_mem.map(|mem| mem.to_string()).unwrap_or("NA".to_string())
             )
           } else {
-            "false".to_string()
+            "disabled".to_string()
           }
         }),
         "NA",
       ),
-      ProxyLabel::Target => Value::target(target_id),
-      ProxyLabel::Validations => {
+      KafkaProxyLabel::Target => Value::target(target_id),
+      KafkaProxyLabel::Validations => {
         if self.validations.is_empty() {
-          Value::plain("none")
+          Value::hide()
         } else {
           Value::plain(
             self
@@ -880,83 +540,7 @@ impl SubjectFormatter<ProxyLabel> for KafkaProxy {
           )
         }
       }
-      ProxyLabel::Zone => Value::plain(self.zone),
-    }
-  }
-}
-
-static PROXY_LABELS_SHOW: [ProxyLabel; 11] = [
-  ProxyLabel::Target,
-  ProxyLabel::Certificate,
-  ProxyLabel::CaChainSecretName,
-  ProxyLabel::Cpus,
-  ProxyLabel::Instances,
-  ProxyLabel::Zone,
-  ProxyLabel::Mem,
-  ProxyLabel::Name,
-  ProxyLabel::SchemaStore,
-  ProxyLabel::Validations,
-  ProxyLabel::AclGroupsEnabled,
-];
-
-#[derive(Eq, Hash, PartialEq, Serialize)]
-enum ProxyBundleLabel {
-  AclGroupId,
-  CaCommonName,
-  BrokerPrefix,
-  BundleDirectory,
-  BundleName,
-  HasSchemaStoreDnsRecord,
-  NumberOfDsnRecords,
-  Platform,
-  Tenant,
-  VhostZone,
-}
-
-impl Label for ProxyBundleLabel {
-  fn as_str(&self) -> &str {
-    match self {
-      Self::AclGroupId => "acl group id",
-      Self::BrokerPrefix => "prefix",
-      Self::BundleDirectory => "directory",
-      Self::BundleName => "bundle",
-      Self::CaCommonName => "ca common name",
-      Self::HasSchemaStoreDnsRecord => "schema",
-      Self::Platform => "platform",
-      Self::VhostZone => "vhost zone",
-      Self::Tenant => "tenant",
-      Self::NumberOfDsnRecords => "records",
-    }
-  }
-
-  fn is_target_label(&self) -> bool {
-    matches!(self, ProxyBundleLabel::BundleName)
-  }
-}
-
-impl SubjectFormatter<ProxyBundleLabel> for (ProxyCertificateBundleConfig, String) {
-  fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
-    let (config, directory) = self;
-    match label {
-      ProxyBundleLabel::BundleDirectory => Value::plain(directory),
-      _ => config.value(label, target_id),
-    }
-  }
-}
-
-impl SubjectFormatter<ProxyBundleLabel> for ProxyCertificateBundleConfig {
-  fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
-    match label {
-      ProxyBundleLabel::AclGroupId => Value::some_or_hide(self.acl_group_id.clone()),
-      ProxyBundleLabel::BrokerPrefix => Value::plain(&self.broker_prefix),
-      ProxyBundleLabel::BundleDirectory => Value::unreachable(),
-      ProxyBundleLabel::BundleName => Value::target(target_id),
-      ProxyBundleLabel::CaCommonName => Value::plain(&self.ca_common_name),
-      ProxyBundleLabel::HasSchemaStoreDnsRecord => Value::plain(self.include_schema_store_dns_record),
-      ProxyBundleLabel::Platform => Value::target(&self.platform),
-      ProxyBundleLabel::Tenant => Value::target(&self.tenant),
-      ProxyBundleLabel::VhostZone => Value::plain(&self.vhost_zone),
-      ProxyBundleLabel::NumberOfDsnRecords => Value::plain(self.number_of_dns_records),
+      KafkaProxyLabel::Zone => Value::plain(self.zone),
     }
   }
 }

@@ -484,7 +484,7 @@ impl CommandExecutor for SecretListUsage {
   }
 }
 
-static SECRET_LABELS_SHOW: [SecretLabel; 14] = [
+static SECRET_LABELS_SHOW: [SecretLabel; 16] = [
   SecretLabel::SecretName,
   SecretLabel::SecretId,
   SecretLabel::System,
@@ -499,6 +499,8 @@ static SECRET_LABELS_SHOW: [SecretLabel; 14] = [
   SecretLabel::DerivedFrom,
   SecretLabel::Subject,
   SecretLabel::Issuer,
+  SecretLabel::CaChain,
+  SecretLabel::SerialNumber,
 ];
 
 struct SecretShow {}
@@ -800,7 +802,6 @@ pub(crate) enum SecretLabel {
   CaChain,
   DerivedFrom,
   Description,
-  // Expires,
   Format,
   FormatKind,
   Issuer,
@@ -814,6 +815,7 @@ pub(crate) enum SecretLabel {
   Provisioned,
   SecretId,
   SecretName,
+  SerialNumber,
   Size,
   Subject,
   System,
@@ -838,6 +840,7 @@ impl Label for SecretLabel {
       Self::Provisioned => "provisioned",
       Self::SecretId => "secret id",
       Self::SecretName => "secret name",
+      Self::SerialNumber => "serial number",
       Self::Size => "size",
       Self::Subject => "subject",
       Self::System => "system",
@@ -900,6 +903,18 @@ impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
     let (secret_metadata, expiration_days) = self;
     match label {
+      SecretLabel::CaChain => match secret_metadata {
+        SecretMetadata::Certificate { chain, .. } => Value::plain(
+          chain
+            .iter()
+            .filter_map(|chain_metadata| match chain_metadata {
+              SecretMetadata::Certificate { serial_number, .. } => Some(serial_number),
+              _ => None,
+            })
+            .join("\n"),
+        ),
+        _ => Value::todo(),
+      },
       SecretLabel::Description => match secret_metadata.kind() {
         Some("error") => Value::error(secret_metadata.additional_info().map(|info| info.to_string()).unwrap_or_default()),
         _ => Value::some_or_hide(secret_metadata.additional_info()),
@@ -933,6 +948,10 @@ impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
         _ => Value::hide(),
       },
       SecretLabel::SecretName => Value::target(target_id),
+      SecretLabel::SerialNumber => match secret_metadata {
+        SecretMetadata::Certificate { serial_number, .. } => Value::plain(serial_number),
+        _ => Value::hide(),
+      },
       SecretLabel::Size => Value::some_or_hide(secret_metadata.secret_size()),
       SecretLabel::Subject => match secret_metadata {
         SecretMetadata::Certificate { subject, .. } => Value::distinguished_name(subject),

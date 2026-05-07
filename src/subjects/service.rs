@@ -173,9 +173,9 @@ impl Subject for ServiceSubject {
   }
 }
 
-const CPUS_OPTION: &str = "cpus";
+pub(crate) const CPUS_OPTION: &str = "cpus";
 
-fn cpus_option() -> Arg {
+pub(crate) fn cpus_option() -> Arg {
   Arg::new(CPUS_OPTION)
     .long(CPUS_OPTION)
     .action(ArgAction::Set)
@@ -190,9 +190,9 @@ fn cpus_option() -> Arg {
     )
 }
 
-const INSTANCES_OPTION: &str = "instances";
+pub(crate) const INSTANCES_OPTION: &str = "instances";
 
-fn instances_option() -> Arg {
+pub(crate) fn instances_option() -> Arg {
   Arg::new(INSTANCES_OPTION)
     .long("instances")
     .action(ArgAction::Set)
@@ -205,9 +205,9 @@ fn instances_option() -> Arg {
     )
 }
 
-const MEM_OPTION: &str = "mem";
+pub(crate) const MEM_OPTION: &str = "mem";
 
-fn mem_option() -> Arg {
+pub(crate) fn mem_option() -> Arg {
   Arg::new(MEM_OPTION)
     .long(MEM_OPTION)
     .action(ArgAction::Set)

@@ -19,7 +19,6 @@ pub(crate) const DRY_RUN_FLAG: &str = "dry-run-flag";
 pub(crate) const ENVIRONMENT_VARIABLE_OPTION: &str = "environment-variable-option";
 pub(crate) const EXPIRATION_OPTION: &str = "expiration-option";
 pub(crate) const FORCE_FLAG: &str = "force-flag";
-// pub(crate) const FROM_CLIPBOARD_FLAG: &str = "from-clipboard-flag";
 pub(crate) const LOG_LEVEL_API_OPTION: &str = "log-level-api-argument";
 pub(crate) const LOG_LEVEL_OPTION: &str = "log-level-argument";
 pub(crate) const NO_CSV_HEADERS_FLAG: &str = "no-csv-headers-flag";
@@ -35,7 +34,6 @@ pub(crate) const TENANT_OPTION: &str = "tenant-option";
 pub(crate) const TENANTS_ALL_FLAG: &str = "tenants-all-flag";
 pub(crate) const TENANTS_OPTION: &str = "tenants-option";
 pub(crate) const TERMINAL_WIDTH_OPTION: &str = "terminal-width-option";
-// pub(crate) const TO_CLIPBOARD_FLAG: &str = "to-clipboard-flag";
 pub(crate) const VERBOSITY_OPTION: &str = "set-verbosity-option";
 pub(crate) const VERSION_FLAG: &str = "version-flag";
 
@@ -135,19 +133,40 @@ pub(crate) fn force_flag() -> Arg {
     .global(true)
 }
 
-// pub(crate) fn from_clipboard_flag() -> Arg {
-//   Arg::new(FROM_CLIPBOARD_FLAG)
-//     .long("from-clipboard")
-//     .action(ArgAction::SetTrue)
-//     .help("Read input from clipboard")
-//     .long_help(
-//       "When this flag is provided the input for methods that require it \
-//           will be read from the clipboard, \
-//           instead of being read from the terminal, pipes or redirects.",
-//     )
-//     .global(true)
-//     .help_heading(MAIN_OPTIONS_HEADING)
-// }
+/// Gets expiration days
+///
+/// 1. Try flag `--expiration`
+/// 1. Try if environment variable `DSH_CLI_EXPIRATION` exists
+/// 1. Try settings file
+/// 1. Default to `30`
+pub(crate) fn get_expiration_days(matches: &ArgMatches, settings: &Settings) -> DshCliResult<u64> {
+  match matches.get_one::<u64>(EXPIRATION_OPTION) {
+    Some(expiration_argument) => Ok(expiration_argument.to_owned()),
+    None => match environment_variable(ENV_VAR_DSH_CLI_EXPIRATION, Some(matches))? {
+      Some(expiration_env_var) => match expiration_env_var.parse::<u64>() {
+        Ok(expiration) => {
+          if expiration > 100000 {
+            err!(
+              "expiration days value in environment variable '{}' must be lower than or equal to 10000",
+              ENV_VAR_DSH_CLI_EXPIRATION
+            )
+          } else {
+            Ok(expiration)
+          }
+        }
+        Err(_) => err!(
+          "non-numerical value '{}' in environment variable '{}'",
+          expiration_env_var,
+          ENV_VAR_DSH_CLI_EXPIRATION
+        ),
+      },
+      None => match settings.expiration {
+        Some(expiration_from_settings) => Ok(expiration_from_settings),
+        None => Ok(30),
+      },
+    },
+  }
+}
 
 pub(crate) fn log_level_api_option() -> Arg {
   Arg::new(LOG_LEVEL_API_OPTION)
@@ -406,19 +425,6 @@ pub(crate) fn set_verbosity_option() -> Arg {
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }
 
-// pub(crate) fn to_clipboard_flag() -> Arg {
-//   Arg::new(TO_CLIPBOARD_FLAG)
-//     .long("to-clipboard")
-//     .action(ArgAction::SetTrue)
-//     .help("Copy output to clipboard")
-//     .long_help(
-//       "When this flag is provided the output will be copied to the clipboard, \
-//           instead of being printed to the terminal.",
-//     )
-//     .global(true)
-//     .help_heading(MAIN_OPTIONS_HEADING)
-// }
-
 pub(crate) fn version_flag() -> Arg {
   Arg::new(VERSION_FLAG)
     .long("version")
@@ -430,39 +436,4 @@ pub(crate) fn version_flag() -> Arg {
     .exclusive(true)
     .hide_short_help(true)
     .help_heading(TOOL_OPTIONS_HEADING)
-}
-
-/// Gets expiration days
-///
-/// 1. Try flag `--expiration`
-/// 1. Try if environment variable `DSH_CLI_EXPIRATION` exists
-/// 1. Try settings file
-/// 1. Default to `30`
-pub(crate) fn get_expiration_days(matches: &ArgMatches, settings: &Settings) -> DshCliResult<u64> {
-  match matches.get_one::<u64>(EXPIRATION_OPTION) {
-    Some(expiration_argument) => Ok(expiration_argument.to_owned()),
-    None => match environment_variable(ENV_VAR_DSH_CLI_EXPIRATION, Some(matches))? {
-      Some(expiration_env_var) => match expiration_env_var.parse::<u64>() {
-        Ok(expiration) => {
-          if expiration > 100000 {
-            err!(
-              "expiration days value in environment variable '{}' must be lower than or equal to 10000",
-              ENV_VAR_DSH_CLI_EXPIRATION
-            )
-          } else {
-            Ok(expiration)
-          }
-        }
-        Err(_) => err!(
-          "non-numerical value '{}' in environment variable '{}'",
-          expiration_env_var,
-          ENV_VAR_DSH_CLI_EXPIRATION
-        ),
-      },
-      None => match settings.expiration {
-        Some(expiration_from_settings) => Ok(expiration_from_settings),
-        None => Ok(30),
-      },
-    },
-  }
 }

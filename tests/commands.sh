@@ -3,6 +3,8 @@
 export APP_NON_EXISTING=non_existing_app
 export APP_UNDER_TEST=eavesdropper
 export BUCKET_UNDER_TEST=schema-registry
+export BUNDLE_NON_EXISTING=non_existing_broker
+export BUNDLE_UNDER_TEST=broker
 export CERTIFICATE_UNDER_TEST=broker
 export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="dsh"
@@ -59,6 +61,13 @@ export SAFE_COMMANDS=(
   "bucket list --ids"
   "bucket show $BUCKET_UNDER_TEST"
   "buckets"
+
+  "bundle create $BUNDLE_NON_EXISTING --acl-group-id acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
+  "bundle delete $BUNDLE_UNDER_TEST --force --dry-run"
+  "bundle list"
+  "bundle show $BUNDLE_UNDER_TEST"
+  "bundle show $BUNDLE_UNDER_TEST --expiration 200"
+  "bundles"
 
   "certificate list"
   "certificate list --expiration 200"
@@ -142,6 +151,7 @@ export SAFE_COMMANDS=(
   "platform show"
   "platforms"
 
+  "proxy deploy $PROXY_UNDER_TEST --dry-run"
   "proxy list"
   "proxy list --ids"
   "proxy show $PROXY_UNDER_TEST"
