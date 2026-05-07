@@ -13,6 +13,7 @@ pub(crate) enum Value {
   Plain(String),
   Secret,
   Target(String),
+  Todo,
   Unreachable,
   Warn(String),
 }
@@ -242,6 +243,25 @@ impl Value {
     Self::Plain(value.to_string())
   }
 
+  /// Create `Value` representing a result value.
+  ///
+  /// # Parameters
+  /// * `value` - `Result<T, E>` that represents the value that might be incorrect.
+  ///
+  /// # Returns
+  /// * `Value::Plain(value)` - When `value` is `Ok`.
+  /// * `Value::Error(message)` - When `value` is an `Err`.
+  pub(crate) fn result<T, E>(value: Result<T, E>) -> Self
+  where
+    T: ToString,
+    E: ToString,
+  {
+    match value {
+      Ok(v) => Self::plain(v.to_string()),
+      Err(e) => Self::error(e.to_string()),
+    }
+  }
+
   /// Create `Value` representing a secret.
   ///
   /// # Returns
@@ -367,6 +387,14 @@ impl Value {
     }
   }
 
+  /// Create `Value` representing an unimplemented state.
+  ///
+  /// # Returns
+  /// * `Value::Todo`
+  pub(crate) fn todo() -> Self {
+    Self::Todo
+  }
+
   /// Create `Value` representing a program flow error.
   ///
   /// # Returns
@@ -399,6 +427,7 @@ impl Value {
       Self::Plain(value) => context.apply_stdout_style(value),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => context.apply_target_style(value),
+      Self::Todo => context.apply_error_style("TODO"),
       Self::Unreachable => context.apply_error_style("unreachable"),
       Self::Warn(value) => context.apply_warning_style(value),
     }
@@ -415,6 +444,7 @@ impl Value {
       Self::Plain(value) => value.to_string(),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => value.to_string(),
+      Self::Todo => "TODO".to_string(),
       Self::Unreachable => "unreachable".to_string(),
       Self::Warn(value) => value.to_string(),
     }
