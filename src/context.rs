@@ -790,7 +790,7 @@ impl Context {
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: Display>(&self, prompt: T) {
     if !self.quiet && self.stderr_is_terminal {
-      self.stderr_print(prompt);
+      self.stdout_print(prompt);
     }
   }
 
