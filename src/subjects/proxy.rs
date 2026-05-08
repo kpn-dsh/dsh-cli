@@ -191,8 +191,6 @@ impl CommandExecutor for ProxyDeploy {
 
     let (proxy_server_certificate, proxy_private_key, proxy_ca_certificate, configuration) = read_proxy_certificate_bundle(&platform, &tenant, &proxy_bundle_id)?;
 
-    let (schema_store, schema_store_cpus, schema_store_mem) = if configuration.enable_schema_store { (Some(true), Some(0.1), Some(256)) } else { (None, None, None) };
-
     let proxy_cpus = match matches.get_one::<f64>(CPUS_OPTION) {
       Some(cpus) => *cpus,
       None => f64::from_str(&context.read_single_line_with_default("proxy cpus", "0.1")?)?,
@@ -218,9 +216,9 @@ impl CommandExecutor for ProxyDeploy {
       instances: proxy_instances,
       enable_kafka_acl_groups: Some(false),
       validations: vec![],
-      schema_store,
-      schema_store_cpus,
-      schema_store_mem,
+      schema_store: Some(configuration.enable_schema_store),
+      schema_store_cpus: Some(0.1),
+      schema_store_mem: Some(256),
       zone: match configuration.vhost_zone {
         VhostZone::Private => KafkaProxyZone::Private,
         VhostZone::Public => KafkaProxyZone::Public,
@@ -251,6 +249,10 @@ impl CommandExecutor for ProxyDeploy {
         client.post_secret(&private_key_secret),
         client.post_secret(&ca_certificate_secret),
       );
+      context.print_outcome(format!("server certificate secret '{}' created", &server_certificate_secret));
+      context.print_outcome(format!("private key secret '{}' created", &private_key_secret));
+      context.print_outcome(format!("ca certificate secret '{}' created", &ca_certificate_secret));
+
       if let Err(error) = cert_secret_result {
         context.print_error(format!("error writing certificate secret '{}' ({})", proxy_server_certificate_secret_name, error));
       }
@@ -265,6 +267,7 @@ impl CommandExecutor for ProxyDeploy {
         .put_certificate_configuration(&proxy_certificate_name, &certificate_body)
         .await
         .map_err(|error| cli_error!("error writing certificate configuration '{}' ({})", proxy_certificate_name, error))?;
+      context.print_outcome(format!("certificate '{}' created", &proxy_certificate_name));
 
       client
         .put_kafkaproxy_configuration(&proxy_bundle_id, &kafka_proxy)
@@ -395,15 +398,42 @@ struct ProxyUndeploy {}
 impl CommandExecutor for ProxyUndeploy {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let proxy_id = target.unwrap_or_else(|| unreachable!());
-    if client.get_kafkaproxy_configuration(&proxy_id).await.is_err() {
-      return err!("proxy '{}' does not exists", proxy_id);
-    }
+    let kafka_proxy = client
+      .get_kafkaproxy_configuration(&proxy_id)
+      .await
+      .map_err(|_| DshCliError::from(format!("proxy '{}' does not exists", proxy_id)))?;
+    let certificate = client.get_certificate_configuration(&kafka_proxy.certificate).await?;
+    let certificate_secrets = match certificate.passphrase_secret {
+      Some(passphrase_secret) => vec![certificate.cert_chain_secret, certificate.key_secret, kafka_proxy.secret_name_ca_chain, passphrase_secret],
+      None => vec![certificate.cert_chain_secret, certificate.key_secret, kafka_proxy.secret_name_ca_chain],
+    };
     if context.confirmed(format!("undeploy proxy '{}'?", proxy_id))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, proxy not undeployed");
       } else {
         client.delete_kafkaproxy_configuration(&proxy_id).await?;
         context.print_outcome(format!("proxy '{}' undeployed", proxy_id));
+        if context.confirmed(format!("delete certificate '{}'?", &kafka_proxy.certificate))? {
+          if context.dry_run() {
+            context.print_warning("dry-run mode, certificate not deleted");
+          } else {
+            client.delete_certificate_configuration(&kafka_proxy.certificate).await?;
+            context.print_outcome(format!("certificate '{}' deleted", &kafka_proxy.certificate));
+            if context.confirmed(format!(
+              "delete secrets {}?",
+              certificate_secrets.iter().map(|secret| format!("'{}'", secret)).join(", ")
+            ))? {
+              if context.dry_run() {
+                context.print_warning("dry-run mode, certificate not deleted");
+              } else {
+                for secret in certificate_secrets {
+                  client.delete_secret_configuration(&secret).await?;
+                  context.print_outcome(format!("secret '{}' deleted", &secret));
+                }
+              }
+            }
+          }
+        }
       }
     } else {
       context.print_outcome(format!("cancelled, proxy '{}' not undeployed", proxy_id));
