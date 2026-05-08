@@ -1,5 +1,5 @@
 use crate::error::DshCliError;
-use crate::DshCliResult;
+use crate::{err, DshCliResult};
 use dsh_api::platform::{deserialize_platform, serialize_platform};
 use dsh_api::platform::{DshPlatform, VhostZone};
 use rcgen::{
@@ -7,7 +7,8 @@ use rcgen::{
   KeyUsagePurpose, RsaKeySize,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 use time::OffsetDateTime;
 
 /// Contains configuration for proxy certificate bundle.
@@ -78,6 +79,16 @@ pub(crate) struct LocalCertificate {
   pub(crate) filename: String,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+#[non_exhaustive]
+pub(crate) enum Language {
+  // Golang,
+  // Java,
+  Python,
+  Rust,
+  // Scala,
+}
+
 impl Debug for ProxyCertificateBundleConfig {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     let mut builder = f.debug_struct("DshCertificateConfig");
@@ -94,6 +105,26 @@ impl Debug for ProxyCertificateBundleConfig {
 }
 
 impl ProxyCertificateBundleConfig {
+  pub(crate) fn client_id(&self) -> String {
+    self.tenant.clone()
+  }
+
+  // Make sure that the CN has the same value as the first SAN so that we don't 'waste' a DNS
+  // record on a unique name.
+  pub(crate) fn common_name(&self) -> DshCliResult<String> {
+    Ok(self.platform.proxy_vhost(&self.proxy_name, &self.tenant, self.vhost_zone.clone(), 0)?)
+  }
+
+  pub(crate) fn domain_from_platform(&self) -> DshCliResult<String> {
+    match self.vhost_zone {
+      VhostZone::Private => match &self.platform.private_domain() {
+        Some(private_domain) => Ok(private_domain.to_string()),
+        None => Err(DshCliError::Configuration(format!("platform '{}' does not support private vhosts", &self.platform))),
+      },
+      VhostZone::Public => Ok(self.platform.public_domain().to_string()),
+    }
+  }
+
   pub(crate) fn dns_entries(&self) -> DshCliResult<Vec<String>> {
     let mut dns_entries: Vec<String> = vec![];
     if self.enable_schema_store {
@@ -109,16 +140,6 @@ impl ProxyCertificateBundleConfig {
     Ok(dns_entries)
   }
 
-  // Make sure that the CN has the same value as the first SAN so that we don't 'waste' a DNS
-  // record on a unique name.
-  pub(crate) fn common_name(&self) -> DshCliResult<String> {
-    Ok(self.platform.proxy_vhost(&self.proxy_name, &self.tenant, self.vhost_zone.clone(), 0)?)
-  }
-
-  pub(crate) fn client_id(&self) -> String {
-    "TODO".to_string()
-  }
-
   pub(crate) fn group_id(&self, index: usize) -> String {
     match &self.acl_group_id {
       Some(acl_group_id) => self.platform.proxy_consumer_group_acl(&self.proxy_name, acl_group_id, &self.tenant, index),
@@ -131,16 +152,6 @@ impl ProxyCertificateBundleConfig {
       .acl_group_id
       .clone()
       .map(|acl_group_id| self.platform.proxy_consumer_group_acl(&self.proxy_name, acl_group_id, &self.tenant, 0))
-  }
-
-  pub(crate) fn domain_from_platform(&self) -> DshCliResult<String> {
-    match self.vhost_zone {
-      VhostZone::Private => match &self.platform.private_domain() {
-        Some(private_domain) => Ok(private_domain.to_string()),
-        None => Err(DshCliError::Configuration(format!("platform '{}' does not support private vhosts", &self.platform))),
-      },
-      VhostZone::Public => Ok(self.platform.public_domain().to_string()),
-    }
   }
 }
 
@@ -164,6 +175,33 @@ impl Debug for DshCertificate {
   }
 }
 
+impl FromStr for Language {
+  type Err = DshCliError;
+
+  fn from_str(language: &str) -> Result<Self, Self::Err> {
+    match language {
+      // "Golang" => Ok(Self::Golang),
+      // "Java" => Ok(Self::Java),
+      "Python" => Ok(Self::Python),
+      "Rust" => Ok(Self::Rust),
+      // "Scala" => Ok(Self::Scala),
+      _ => err!("unrecognized language '{}'", language),
+    }
+  }
+}
+
+impl Display for Language {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      // Self::Golang => f.write_str("golang"),
+      // Self::Java => f.write_str("java"),
+      Self::Python => f.write_str("python"),
+      Self::Rust => f.write_str("rust"),
+      // Self::Scala => f.write_str("scala"),
+    }
+  }
+}
+
 /// Generates self-signed certificate authority certificate.
 ///
 /// # Parameters
@@ -184,7 +222,7 @@ fn generate_ca_certificate(common_name: String) -> DshCliResult<DshCertificate> 
 
 fn generate_client_certificate(config: &ProxyCertificateBundleConfig, ca_certificate: &DshCertificate) -> DshCliResult<DshCertificate> {
   let not_before_not_after = not_before_not_after(365);
-  let mut params: CertificateParams = CertificateParams::new(vec![config.client_id()])?;
+  let mut params: CertificateParams = CertificateParams::new(vec![])?;
   params.distinguished_name = kpn_distinguished_name(&config.client_id(), config.organizational_unit_name());
   (params.not_before, params.not_after) = not_before_not_after;
   params.key_usages = vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment, KeyUsagePurpose::KeyAgreement];
@@ -272,7 +310,6 @@ fn test2() -> Result<(), Box<dyn std::error::Error>> {
     let mut params: CertificateParams = CertificateParams::new(config.dns_entries().unwrap()).unwrap();
     params.is_ca = IsCa::NoCa;
     params.distinguished_name = distinguished_name;
-    // params.distinguished_name = distinguished_name(&config.cn());
     (params.not_before, params.not_after) = not_before_not_after(365);
     params.key_usages = vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment, KeyUsagePurpose::KeyAgreement];
     params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];

@@ -1,4 +1,4 @@
-use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{Capability, CommandExecutor, CODE_COMMAND, CREATE_COMMAND, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::directory::{
@@ -9,7 +9,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::Value;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::global_options::{expiration_option, get_expiration_days};
-use crate::proxy_bundles::{ProxyCertificateBundle, ProxyCertificateBundleConfig};
+use crate::proxy_bundles::{Language, LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::secret_metadata::secret_metadata;
 use crate::subject::{Requirements, Subject};
 use crate::subjects::certificate::CertificateLabel;
@@ -19,7 +19,7 @@ use crate::target_tenant::{get_target_tenant, tenant_name_argument};
 use crate::verbosity::Verbosity;
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
-use clap::builder::PossibleValue;
+use clap::builder::{EnumValueParser, PossibleValue};
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::platform::VhostZone;
 use itertools::Itertools;
@@ -27,6 +27,7 @@ use lazy_static::lazy_static;
 use log::trace;
 
 use crate::arguments::proxy_id_argument;
+use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use serde::Serialize;
 use std::convert::AsRef;
 use std::str::FromStr;
@@ -57,6 +58,7 @@ impl Subject for BundleSubject {
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
+      CODE_COMMAND => Some(BUNDLE_CODE_CAPABILITY.as_ref()),
       CREATE_COMMAND => Some(BUNDLE_CREATE_CAPABILITY.as_ref()),
       DELETE_COMMAND => Some(BUNDLE_DELETE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(BUNDLE_LIST_CAPABILITY.as_ref()),
@@ -70,6 +72,13 @@ impl Subject for BundleSubject {
   }
 }
 
+static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  Box::new(
+    CapabilityBuilder::new(CODE_COMMAND, None, &BundleCode {}, "Generate example client code")
+      .add_target_argument(proxy_id_argument())
+      .add_extra_argument(language_option().required(true)),
+  )
+});
 static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, None, &BundleCreate {}, "Create local proxy certificates bundle")
@@ -77,7 +86,6 @@ static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> =
       .add_target_argument(platform_name_argument())
       .add_target_argument(tenant_name_argument())
       .add_extra_argument(acl_group_id_option())
-      // .add_extra_argument(proxy_prefix_option())
       .add_extra_argument(number_of_dns_records_option())
       .add_extra_argument(ca_common_name_option())
       .add_extra_argument(vhost_zone_option())
@@ -106,8 +114,9 @@ static BUNDLE_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = L
   )
 });
 
-static BUNDLE_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> =
-  LazyLock::new(|| vec![BUNDLE_CREATE_CAPABILITY.as_ref(), BUNDLE_DELETE_CAPABILITY.as_ref(), BUNDLE_LIST_CAPABILITY.as_ref(), BUNDLE_SHOW_CAPABILITY.as_ref()]);
+static BUNDLE_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+  vec![BUNDLE_CODE_CAPABILITY.as_ref(), BUNDLE_CREATE_CAPABILITY.as_ref(), BUNDLE_DELETE_CAPABILITY.as_ref(), BUNDLE_LIST_CAPABILITY.as_ref(), BUNDLE_SHOW_CAPABILITY.as_ref()]
+});
 
 const ACL_GROUP_ID_OPTION: &str = "acl-group-id-option";
 
@@ -119,6 +128,42 @@ fn acl_group_id_option() -> Arg {
     .value_name("ACL_GROUP_ID")
     .help("Acl group id")
     .long_help("Acl group id used for fine-grained access control.")
+}
+
+const CA_COMMON_NAME_OPTION: &str = "ca-common-name-option";
+
+fn ca_common_name_option() -> Arg {
+  Arg::new(CA_COMMON_NAME_OPTION)
+    .long("ca-common-name")
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .help("Certificate authority common name")
+    .long_help("This option specifies the common name used to create certificate authority certificate.")
+}
+
+const ENABLE_SCHEMA_STORE_OPTION: &str = "enable-schema-store-option";
+
+fn enable_schema_store_option() -> Arg {
+  Arg::new(ENABLE_SCHEMA_STORE_OPTION)
+    .long("enable-schema-store")
+    .action(ArgAction::Set)
+    .value_parser(builder::BoolValueParser::new())
+    .help("Enable schema store")
+    .long_help(
+      "If this option is enabled the created certificates will include a dns entry \
+    for a schema store.",
+    )
+}
+
+const LANGUAGE_OPTION: &str = "language-option";
+
+fn language_option() -> Arg {
+  Arg::new(LANGUAGE_OPTION)
+    .long("language")
+    .action(ArgAction::Set)
+    .value_parser(EnumValueParser::<Language>::new())
+    .help("Language")
+    .long_help("Programming language for which example code will be generated.")
 }
 
 const NUMBER_OF_DNS_RECORDS_OPTION: &str = "number-of-dns-records-option";
@@ -136,17 +181,6 @@ fn number_of_dns_records_option() -> Arg {
     )
 }
 
-const CA_COMMON_NAME_OPTION: &str = "ca-common-name-option";
-
-fn ca_common_name_option() -> Arg {
-  Arg::new(CA_COMMON_NAME_OPTION)
-    .long("ca-common-name")
-    .action(ArgAction::Set)
-    .value_parser(builder::NonEmptyStringValueParser::new())
-    .help("Certificate authority common name")
-    .long_help("This option specifies the common name used to create certificate authority certificate.")
-}
-
 const VHOST_ZONE_OPTION: &str = "vhost-zone-option";
 
 fn vhost_zone_option() -> Arg {
@@ -159,20 +193,6 @@ fn vhost_zone_option() -> Arg {
     .long_help("This option indicates whether the certificates will be created for a public or a private vhost.")
 }
 
-const ENABLE_SCHEMA_STORE_OPTION: &str = "enable-schema-store-option";
-
-fn enable_schema_store_option() -> Arg {
-  Arg::new(ENABLE_SCHEMA_STORE_OPTION)
-    .long("enable-schema-store")
-    .action(ArgAction::Set)
-    .value_parser(builder::BoolValueParser::new())
-    .help("Enable schema store")
-    .long_help(
-      "If this option is enabled the created certificates will include a dns entry \
-    for a schema store.",
-    )
-}
-
 static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
   CertificateLabel::Target,
   CertificateLabel::DistinguishedName,
@@ -181,12 +201,11 @@ static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
   CertificateLabel::NotBefore,
   CertificateLabel::SerialNumber,
 ];
-static BUNDLE_LABELS_CREATE: [BundleLabel; 11] = [
+static BUNDLE_LABELS_CREATE: [BundleLabel; 10] = [
   BundleLabel::Platform,
   BundleLabel::Tenant,
   BundleLabel::ProxyName,
   BundleLabel::BundleName,
-  BundleLabel::ClientId,
   BundleLabel::GroupId,
   BundleLabel::CaCommonName,
   BundleLabel::SchemaStore,
@@ -194,6 +213,63 @@ static BUNDLE_LABELS_CREATE: [BundleLabel; 11] = [
   BundleLabel::AclGroupId,
   BundleLabel::NumberOfDsnRecords,
 ];
+
+struct BundleCode {}
+
+#[async_trait]
+impl CommandExecutor for BundleCode {
+  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant = get_target_tenant(matches, context.settings())?;
+    let bundle_id = target.unwrap_or_else(|| unreachable!());
+
+    let (bundle_configuration, directory) = match read_local_certificate_bundle(&platform, &tenant, &bundle_id) {
+      Ok(LocalCertificateBundle { configuration, .. }) => configuration,
+      Err(_) => return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant),
+    };
+
+    let language = match matches.get_one::<Language>(LANGUAGE_OPTION) {
+      Some(language) => language.clone(),
+      None => {
+        let language_string = context.read_single_line_with_default("language", "rust")?;
+        if language_string.is_empty() {
+          return err!("language string cannot be empty");
+        } else {
+          Language::from_str(&language_string)?
+        }
+      }
+    };
+    context.print_explanation(format!("generating {} example for bundle '{}' for '{}@{}'", language, bundle_id, platform, tenant));
+
+    if example_code_exists(&bundle_configuration, &language, context)? {
+      context.print_warning(format!("'{}' {} example code already exists for '{}@{}'", bundle_id, language, platform, tenant));
+      if !context.confirmed("do you want to delete the existing example code?")? {
+        context.print_outcome("cancelled");
+        return Ok(());
+      } else if context.dry_run() {
+        context.print_warning("dry-run mode, existing example code not deleted");
+        return Ok(());
+      } else {
+        delete_example_code(&bundle_configuration, &language, context)?;
+      }
+    }
+
+    if context.dry_run() {
+      context.print_warning("dry-run mode, no code generated");
+    } else {
+      let example_directory = generate_example_code(&bundle_configuration, &language, &directory, context)?;
+      context.print_outcome(format!(
+        "{} code for bundle '{}' generated in directory '{}'",
+        language, bundle_id, example_directory
+      ));
+    }
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
+  }
+}
 
 struct BundleCreate {}
 
@@ -412,15 +488,8 @@ static BUNDLE_LABELS_SHOW: [BundleLabel; 9] = [
   BundleLabel::BundleDirectory,
 ];
 
-static BUNDLE_DERIVED_LABELS_SHOW: [BundleLabel; 7] = [
-  BundleLabel::BundleName,
-  BundleLabel::ClientId,
-  BundleLabel::PlatformDomain,
-  BundleLabel::DnsEntries,
-  BundleLabel::GroupId,
-  BundleLabel::OrganizationalUnitName,
-  BundleLabel::ProxyCommonName,
-];
+static BUNDLE_DERIVED_LABELS_SHOW: [BundleLabel; 6] =
+  [BundleLabel::BundleName, BundleLabel::PlatformDomain, BundleLabel::DnsEntries, BundleLabel::GroupId, BundleLabel::OrganizationalUnitName, BundleLabel::ProxyCommonName];
 
 struct BundleShow {}
 
@@ -457,7 +526,6 @@ enum BundleLabel {
   BundleDirectory,
   BundleName,
   CaCommonName,
-  ClientId,
   DnsEntries,
   GroupId,
   NumberOfDsnRecords,
@@ -478,7 +546,6 @@ impl Label for BundleLabel {
       Self::BundleDirectory => "directory",
       Self::BundleName => "bundle",
       Self::CaCommonName => "ca common name",
-      Self::ClientId => "client id",
       Self::DnsEntries => "dns entries",
       Self::GroupId => "group id",
       Self::NumberOfDsnRecords => "records",
@@ -515,7 +582,6 @@ impl SubjectFormatter<BundleLabel> for ProxyCertificateBundleConfig {
       BundleLabel::BundleDirectory => Value::unreachable(),
       BundleLabel::BundleName => Value::target(target_id),
       BundleLabel::CaCommonName => Value::plain(&self.ca_common_name),
-      BundleLabel::ClientId => Value::error(self.client_id()),
       BundleLabel::DnsEntries => Value::result(self.dns_entries().map(|dns_entry| dns_entry.join("\n"))),
       BundleLabel::GroupId => Value::plain(self.group_id(0)),
       BundleLabel::NumberOfDsnRecords => Value::plain(self.number_of_dns_records),
