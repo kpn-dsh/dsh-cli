@@ -2,7 +2,7 @@ use crate::code::python::{delete_python_example_code, generate_python_example_co
 use crate::code::rust::{delete_rust_example_code, generate_rust_example_code, rust_example_code_exists};
 use crate::context::Context;
 use crate::proxy_bundles::{Language, ProxyCertificateBundleConfig};
-use crate::{err, DshCliResult};
+use crate::DshCliResult;
 
 pub(crate) mod python;
 pub(crate) mod rust;
@@ -11,7 +11,6 @@ pub(crate) fn generate_example_code(bundle_configuration: &ProxyCertificateBundl
   match language {
     Language::Python => generate_python_example_code(bundle_configuration, bundle_directory, context),
     Language::Rust => generate_rust_example_code(bundle_configuration, bundle_directory, context),
-    Language::Golang | Language::Java | Language::Scala => err!("code generation for {} not yet implemented", language),
   }
 }
 
@@ -19,7 +18,6 @@ pub(crate) fn example_code_exists(bundle_configuration: &ProxyCertificateBundleC
   match language {
     Language::Python => python_example_code_exists(bundle_configuration, context),
     Language::Rust => rust_example_code_exists(bundle_configuration, context),
-    Language::Golang | Language::Java | Language::Scala => err!("code generation for {} not yet implemented", language),
   }
 }
 
@@ -27,7 +25,6 @@ pub(crate) fn delete_example_code(bundle_configuration: &ProxyCertificateBundleC
   match language {
     Language::Python => delete_python_example_code(bundle_configuration, context),
     Language::Rust => delete_rust_example_code(bundle_configuration, context),
-    Language::Golang | Language::Java | Language::Scala => err!("code generation for {} not yet implemented", language),
   }
 }
 

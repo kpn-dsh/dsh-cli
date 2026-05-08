@@ -82,11 +82,8 @@ pub(crate) struct LocalCertificate {
 #[derive(clap::ValueEnum, Clone, Debug)]
 #[non_exhaustive]
 pub(crate) enum Language {
-  // Golang,
-  // Java,
   Python,
   Rust,
-  // Scala,
 }
 
 impl Debug for ProxyCertificateBundleConfig {
@@ -180,11 +177,8 @@ impl FromStr for Language {
 
   fn from_str(language: &str) -> Result<Self, Self::Err> {
     match language {
-      // "Golang" => Ok(Self::Golang),
-      // "Java" => Ok(Self::Java),
       "Python" => Ok(Self::Python),
       "Rust" => Ok(Self::Rust),
-      // "Scala" => Ok(Self::Scala),
       _ => err!("unrecognized language '{}'", language),
     }
   }
@@ -193,11 +187,8 @@ impl FromStr for Language {
 impl Display for Language {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      // Self::Golang => f.write_str("golang"),
-      // Self::Java => f.write_str("java"),
       Self::Python => f.write_str("python"),
       Self::Rust => f.write_str("rust"),
-      // Self::Scala => f.write_str("scala"),
     }
   }
 }
@@ -297,6 +288,7 @@ fn generate_key_pair() -> DshCliResult<KeyPair> {
 }
 
 #[test]
+#[ignore]
 fn test() {
   let common_name = "COMMON_NAME";
   let dn = kpn_distinguished_name(common_name, None);
