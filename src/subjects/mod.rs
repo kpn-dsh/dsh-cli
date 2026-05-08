@@ -201,8 +201,6 @@ where
 
 static DEPENDANT_LABELS_LIST: [DependantLabel; 5] =
   [DependantLabel::Target, DependantLabel::DependantKind, DependantLabel::DependantId, DependantLabel::Instances, DependantLabel::Dependencies];
-static _DEPENDANT_LABELS_SERVICES_LIST: [DependantLabel; 4] = [DependantLabel::Target, DependantLabel::DependantId, DependantLabel::Instances, DependantLabel::Injections];
-static _DEPENDANT_LABELS_APPS_LIST: [DependantLabel; 3] = [DependantLabel::Target, DependantLabel::DependantId, DependantLabel::Resources];
 
 static DEPENDANT_LABELS: [DependantLabel; 4] = [DependantLabel::DependantId, DependantLabel::DependantKind, DependantLabel::Instances, DependantLabel::Dependencies];
 static DEPENDANT_LABELS_SERVICES: [DependantLabel; 3] = [DependantLabel::DependantId, DependantLabel::Instances, DependantLabel::Injections];
