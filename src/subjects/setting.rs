@@ -24,6 +24,7 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::fmt::Display;
+use std::path::PathBuf;
 
 struct SettingSubject {}
 
@@ -78,6 +79,7 @@ const SETTING_MATCHING_COLOR: &str = "matching-color";
 const SETTING_MATCHING_STYLE: &str = "matching-style";
 const SETTING_NO_CSV_HEADERS: &str = "no-csv-headers";
 const SETTING_NO_ESCAPE: &str = "no-escape";
+const SETTING_OUTPUT_DIRECTORY: &str = "output-directory";
 const SETTING_OUTPUT_FORMAT: &str = "output-format";
 const SETTING_QUIET: &str = "quiet";
 const SETTING_SHOW_EXECUTION_TIME: &str = "show-execution-time";
@@ -234,6 +236,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
       .about("Styling to be used when printing matching results for the find functions"),
     Command::new(SETTING_NO_CSV_HEADERS).about("Disables headers in csv output"),
     Command::new(SETTING_NO_ESCAPE).about("Inhibits any color or other ansi escape sequences"),
+    Command::new(SETTING_OUTPUT_DIRECTORY)
+      .arg(
+        Arg::new(SETTING_OUTPUT_DIRECTORY)
+          .action(ArgAction::Set)
+          .value_parser(builder::PathBufValueParser::new())
+          .required(required),
+      )
+      .about("Default/preferred output directory"),
     Command::new(SETTING_OUTPUT_FORMAT)
       .arg(
         Arg::new(SETTING_OUTPUT_FORMAT)
@@ -378,7 +388,7 @@ impl CommandExecutor for SettingDefault {
 }
 
 static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [EnvironmentVariableLabel::Variable, EnvironmentVariableLabel::Value];
-static SETTING_LABELS: [SettingLabel; 36] = [
+static SETTING_LABELS: [SettingLabel; 37] = [
   SettingLabel::Authentication,
   SettingLabel::Browser,
   SettingLabel::CsvQuote,
@@ -400,6 +410,7 @@ static SETTING_LABELS: [SettingLabel; 36] = [
   SettingLabel::MatchingStyle,
   SettingLabel::NoCsvHeaders,
   SettingLabel::NoEscape,
+  SettingLabel::OutputDirectory,
   SettingLabel::OutputFormat,
   SettingLabel::Quiet,
   SettingLabel::ShowExecutionTime,
@@ -552,6 +563,17 @@ impl CommandExecutor for SettingSet {
         upsert_settings(|settings| Ok(Settings { no_escape: Some(true), ..settings }))?;
         context.print_outcome("no escape mode enabled");
       }
+      SETTING_OUTPUT_DIRECTORY => {
+        let output_directory = match matches.get_one::<PathBuf>(SETTING_OUTPUT_DIRECTORY) {
+          Some(one) => {
+            let cloned = one.clone();
+            context.print_outcome(format!("{} set to {}", SETTING_OUTPUT_DIRECTORY, &cloned.display()));
+            Ok(Some(cloned))
+          }
+          None => err!("{}", SETTING_OUTPUT_DIRECTORY),
+        }?;
+        upsert_settings(move |settings| Ok(Settings { output_directory, ..settings }))?;
+      }
       SETTING_OUTPUT_FORMAT => {
         upsert_settings(move |settings| Ok(Settings { output_format: get_some(SETTING_OUTPUT_FORMAT, matches, context)?, ..settings }))?;
       }
@@ -700,6 +722,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(|settings| Ok(Settings { no_escape: None, ..settings }))?;
         context.print_outcome("no escape mode disabled");
       }
+      SETTING_OUTPUT_DIRECTORY => {
+        upsert_settings(|settings| Ok(Settings { output_directory: None, ..settings }))?;
+        context.print_outcome("output directory unset");
+      }
       SETTING_OUTPUT_FORMAT => {
         upsert_settings(|settings| Ok(Settings { output_format: None, ..settings }))?;
         context.print_outcome("output format unset");
@@ -789,6 +815,7 @@ enum SettingLabel {
   MatchingStyle,
   NoCsvHeaders,
   NoEscape,
+  OutputDirectory,
   OutputFormat,
   Quiet,
   ShowExecutionTime,
@@ -830,6 +857,7 @@ impl Label for SettingLabel {
       Self::MatchingStyle => SETTING_MATCHING_STYLE,
       Self::NoCsvHeaders => SETTING_NO_CSV_HEADERS,
       Self::NoEscape => SETTING_NO_ESCAPE,
+      Self::OutputDirectory => SETTING_OUTPUT_DIRECTORY,
       Self::OutputFormat => SETTING_OUTPUT_FORMAT,
       Self::Quiet => SETTING_QUIET,
       Self::ShowExecutionTime => SETTING_SHOW_EXECUTION_TIME,
@@ -880,6 +908,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::MatchingStyle => Value::some_or_empty(self.matching_style.as_ref()),
       SettingLabel::NoCsvHeaders => Value::some_or_empty(self.no_csv_headers),
       SettingLabel::NoEscape => Value::some_or_empty(self.no_escape),
+      SettingLabel::OutputDirectory => Value::some_or_empty(self.output_directory.clone().map(|output_directory| output_directory.display().to_string())),
       SettingLabel::OutputFormat => Value::some_or_empty(self.output_format.as_ref()),
       SettingLabel::Quiet => Value::some_or_empty(self.quiet),
       SettingLabel::ShowExecutionTime => Value::some_or_empty(self.show_execution_time),

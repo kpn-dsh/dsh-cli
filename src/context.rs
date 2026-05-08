@@ -2,16 +2,16 @@ use crate::authentication::AuthenticationMethod;
 use crate::environment_variables::{
   environment_variable, is_environment_variable_specified, ENV_VAR_DSH_CLI_AUTHENTICATION, ENV_VAR_DSH_CLI_BROWSER, ENV_VAR_DSH_CLI_CSV_QUOTE, ENV_VAR_DSH_CLI_CSV_SEPARATOR,
   ENV_VAR_DSH_CLI_DRY_RUN, ENV_VAR_DSH_CLI_ERROR_COLOR, ENV_VAR_DSH_CLI_ERROR_STYLE, ENV_VAR_DSH_CLI_LABEL_COLOR, ENV_VAR_DSH_CLI_LABEL_STYLE, ENV_VAR_DSH_CLI_MATCHING_COLOR,
-  ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_CSV_HEADERS, ENV_VAR_DSH_CLI_NO_ESCAPE, ENV_VAR_DSH_CLI_OUTPUT_FORMAT, ENV_VAR_DSH_CLI_QUIET,
-  ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, ENV_VAR_DSH_CLI_STDERR_COLOR, ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR, ENV_VAR_DSH_CLI_STDOUT_STYLE,
-  ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TARGET_COLOR, ENV_VAR_DSH_CLI_TARGET_STYLE, ENV_VAR_DSH_CLI_TERMINAL_WIDTH, ENV_VAR_DSH_CLI_VERBOSITY,
-  ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
+  ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_CSV_HEADERS, ENV_VAR_DSH_CLI_NO_ESCAPE, ENV_VAR_DSH_CLI_OUTPUT_DIRECTORY, ENV_VAR_DSH_CLI_OUTPUT_FORMAT,
+  ENV_VAR_DSH_CLI_QUIET, ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, ENV_VAR_DSH_CLI_STDERR_COLOR, ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR,
+  ENV_VAR_DSH_CLI_STDOUT_STYLE, ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TARGET_COLOR, ENV_VAR_DSH_CLI_TARGET_STYLE, ENV_VAR_DSH_CLI_TERMINAL_WIDTH,
+  ENV_VAR_DSH_CLI_VERBOSITY, ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
 };
 use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::global_options::{
-  AUTHENTICATION_OPTION, BROWSER_OPTION, DRY_RUN_FLAG, FORCE_FLAG, NO_CSV_HEADERS_FLAG, NO_ESCAPE_FLAG, OUTPUT_FORMAT_OPTION, QUIET_FLAG, SHOW_EXECUTION_TIME_FLAG,
-  SUPPRESS_EXIT_STATUS_FLAG, TERMINAL_WIDTH_OPTION, VERBOSITY_OPTION,
+  AUTHENTICATION_OPTION, BROWSER_OPTION, DRY_RUN_FLAG, FORCE_FLAG, NO_CSV_HEADERS_FLAG, NO_ESCAPE_FLAG, OUTPUT_DIRECTORY_OPTION, OUTPUT_FORMAT_OPTION, QUIET_FLAG,
+  SHOW_EXECUTION_TIME_FLAG, SUPPRESS_EXIT_STATUS_FLAG, TERMINAL_WIDTH_OPTION, VERBOSITY_OPTION,
 };
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
+use std::path::PathBuf;
 use std::process;
 use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
@@ -87,6 +88,7 @@ pub(crate) struct Context {
   label_style: Style,
   matching_style: Style,
   no_csv_headers: bool,
+  output_directory: Option<PathBuf>,
   output_format_specification: Option<OutputFormat>,
   quiet: bool,
   settings: Settings,
@@ -142,6 +144,9 @@ impl Debug for Context {
     builder.field("label_style", &style_to_string(&self.label_style));
     builder.field("matching_style", &style_to_string(&self.matching_style));
     builder.field("no_csv_headers", &self.no_csv_headers);
+    if let Some(output_directory) = &self.output_directory {
+      builder.field("output_directory", output_directory);
+    }
     if let Some(output_format_specification) = &self.output_format_specification {
       builder.field("output_format_specification", output_format_specification);
     }
@@ -220,6 +225,7 @@ impl Context {
     let quiet = Self::get_quiet(matches, &settings);
     let force = Self::get_force(matches);
     let suppress_exit_status = Self::get_suppress_exit_status(matches, &settings);
+    let output_directory = Self::get_output_directory(matches, &settings)?;
     let output_format_specification = Self::get_output_format_specification(matches, &settings)?;
     let show_execution_time = Self::get_show_execution_time(matches, &settings);
     let verbosity = Self::get_verbosity(matches, &settings)?;
@@ -243,6 +249,7 @@ impl Context {
       label_style,
       matching_style,
       no_csv_headers,
+      output_directory,
       output_format_specification,
       quiet,
       settings,
@@ -559,6 +566,25 @@ impl Context {
     matches.get_flag(NO_CSV_HEADERS_FLAG) || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_CSV_HEADERS, matches) || settings.no_csv_headers.unwrap_or(false)
   }
 
+  /// Gets output directory
+  ///
+  /// 1. Try flag `--output-directory`
+  /// 1. Try environment variable `DSH_CLI_OUTPUT_DIRECTORY`
+  /// 1. Try settings file
+  /// 1. Else `None` will be returned
+  fn get_output_directory(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<PathBuf>> {
+    match matches.get_one::<PathBuf>(OUTPUT_DIRECTORY_OPTION) {
+      Some(output_directory_argument) => Ok(Some(output_directory_argument.to_owned())),
+      None => match environment_variable(ENV_VAR_DSH_CLI_OUTPUT_DIRECTORY, Some(matches))? {
+        Some(output_directory_env_var) => Ok(Some(PathBuf::from(output_directory_env_var.as_str()))),
+        None => match settings.output_directory.clone() {
+          Some(output_directory_from_settings) => Ok(Some(output_directory_from_settings)),
+          None => Ok(None),
+        },
+      },
+    }
+  }
+
   /// Gets output format specification
   ///
   /// 1. Try flag `--output-format`
@@ -578,6 +604,11 @@ impl Context {
         },
       },
     }
+  }
+
+  /// Gets output directory
+  pub(crate) fn output_directory(&self) -> Option<PathBuf> {
+    self.output_directory.clone()
   }
 
   /// Gets output_format context value

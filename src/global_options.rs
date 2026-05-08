@@ -23,6 +23,7 @@ pub(crate) const LOG_LEVEL_API_OPTION: &str = "log-level-api-argument";
 pub(crate) const LOG_LEVEL_OPTION: &str = "log-level-argument";
 pub(crate) const NO_CSV_HEADERS_FLAG: &str = "no-csv-headers-flag";
 pub(crate) const NO_ESCAPE_FLAG: &str = "no-escape-flag";
+pub(crate) const OUTPUT_DIRECTORY_OPTION: &str = "output-directory-option";
 pub(crate) const OUTPUT_FORMAT_OPTION: &str = "output-format-option";
 pub(crate) const PASSWORD_FILE_OPTION: &str = "password-file-option";
 pub(crate) const PLATFORM_OPTION: &str = "platform-option";
@@ -227,6 +228,23 @@ pub(crate) fn no_escape_flag() -> Arg {
           The default behavior is to use ansi escape styling where applicable.",
     )
     .hide_short_help(true)
+    .global(true)
+    .help_heading(OUTPUT_OPTIONS_HEADING)
+}
+
+pub(crate) fn output_directory_option() -> Arg {
+  Arg::new(OUTPUT_DIRECTORY_OPTION)
+    .long("output-directory")
+    .action(ArgAction::Set)
+    .value_parser(builder::PathBufValueParser::new())
+    .value_name("DIRECTORY")
+    .help("Set output directory")
+    .long_help(
+      "This option specifies the directory where output of a command will be written \
+          into. If this argument is not provided, the value from the environment variable \
+          DSH_CLI_OUTPUT_DIRECTORY or the value from the settings file will be used. \
+          By default, output will be written to the current working directory.",
+    )
     .global(true)
     .help_heading(OUTPUT_OPTIONS_HEADING)
 }

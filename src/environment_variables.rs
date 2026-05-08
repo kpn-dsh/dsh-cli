@@ -364,7 +364,7 @@ impl SubjectFormatter<EnvVarLabel> for (String, Option<String>, &EnvironmentVari
           Value::plain("no")
         }
       }
-      EnvVarLabel::DefaultValue => Value::some_or_empty(environment_variable.default_value),
+      EnvVarLabel::DefaultValue => Value::some_or_hide(environment_variable.default_value),
       EnvVarLabel::EnvVar => Value::plain(env_var_endorsed),
       EnvVarLabel::LongExplanation => Value::plain(environment_variable.long_explanation),
       EnvVarLabel::OverrideAllowed => {
@@ -383,7 +383,7 @@ impl SubjectFormatter<EnvVarLabel> for (String, Option<String>, &EnvironmentVari
             Value::plain(value)
           }
         }
-        None => Value::empty(),
+        None => Value::hide(),
       },
     }
   }
@@ -466,6 +466,7 @@ pub(crate) const ENV_VAR_DSH_CLI_MATCHING_COLOR: &str = "DSH_CLI_MATCHING_COLOR"
 pub(crate) const ENV_VAR_DSH_CLI_MATCHING_STYLE: &str = "DSH_CLI_MATCHING_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_NO_CSV_HEADERS: &str = "DSH_CLI_NO_CSV_HEADERS";
 pub(crate) const ENV_VAR_DSH_CLI_NO_ESCAPE: &str = "DSH_CLI_NO_ESCAPE";
+pub(crate) const ENV_VAR_DSH_CLI_OUTPUT_DIRECTORY: &str = "DSH_CLI_OUTPUT_DIRECTORY";
 pub(crate) const ENV_VAR_DSH_CLI_OUTPUT_FORMAT: &str = "DSH_CLI_OUTPUT_FORMAT";
 pub(crate) const ENV_VAR_DSH_CLI_PASSWORD: &str = "DSH_CLI_PASSWORD";
 pub(crate) const ENV_VAR_DSH_CLI_PASSWORD_FILE: &str = "DSH_CLI_PASSWORD_FILE";
@@ -488,7 +489,7 @@ pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
 
 lazy_static! {
-  static ref EnvironmentVariables: [EnvironmentVariable; 41] = [
+  static ref EnvironmentVariables: [EnvironmentVariable; 42] = [
     EnvironmentVariable::new(
       ENV_VAR_DSH_API_PLATFORMS_FILE,
       "Overrides the default list of available platforms.",
@@ -730,12 +731,23 @@ lazy_static! {
       --no-color or --no-ansi command line argument.",
     ),
     EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_OUTPUT_DIRECTORY,
+      "Specifies the directory where the output of a command will be written to.",
+      false,
+      true,
+      None,
+      "This option specifies the directory where the output of a command will be written to. If \n\
+      this variable is not provided, the value from the settings file will be used. Else, the \n\
+      current working directory will be used. This environment variable can be overridden via \n\
+      the --output-directory command line argument.",
+    ),
+    EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_OUTPUT_FORMAT,
       "Specifies the format used when printing the output.",
       false,
       true,
       Some("table / json"),
-      "This option specifies the format used when printing the output. If this argument is not \n\
+      "This value specifies the format used when printing the output. If this variable is not \n\
       provided, the value from the settings file will be used. Else, when stdout is a terminal the \n\
       default 'table' will be used, or if 'stdout' is not a terminal the value 'json' will be \n\
       used. The supported values are: 'csv', 'json', 'json-compact', 'plain', 'quiet', 'table', \n

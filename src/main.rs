@@ -17,8 +17,8 @@ use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::global_options::{
-  authentication_option, browser_option, environment_variable_option, log_level_api_option, log_level_option, no_csv_headers_flag, password_file_option, platform_option,
-  releases_flag, tenant_option, tenants_all_flag, tenants_option, RELEASES_FLAG, TENANTS_ALL_FLAG,
+  authentication_option, browser_option, environment_variable_option, log_level_api_option, log_level_option, no_csv_headers_flag, output_directory_option, password_file_option,
+  platform_option, releases_flag, tenant_option, tenants_all_flag, tenants_option, RELEASES_FLAG, TENANTS_ALL_FLAG,
 };
 use crate::releases::{newer_release, newer_release_notification, releases_from_github, ReleaseAsset};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
@@ -87,6 +87,7 @@ mod capability;
 mod capability_builder;
 mod cipher;
 mod clients;
+mod code;
 mod context;
 mod directory;
 mod environment_variables;
@@ -524,6 +525,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
       // Output options
       no_csv_headers_flag(),
       no_escape_flag(),
+      output_directory_option(),
       output_format_option(),
       quiet_flag(),
       set_verbosity_option(),
