@@ -62,20 +62,15 @@ use std::env::args;
 use std::time::Duration;
 use std::{process, thread};
 
-const PKI_CLIENT_KEY_LOCATION: &str = "{{bundle-directory}}/client.key";
-const PKI_CLIENT_CERTIFICATE_LOCATION: &str = "{{bundle-directory}}/client.pem";
-const PKI_CA_CERTIFICATE_LOCATION: &str = "{{bundle-directory}}/ca.pem";
-
+const PKI_DIRECTORY: &str = "{{bundle-directory}}";
 const CLIENT_ID: &str = "{{client-id}}";
 const GROUP_ID: &str = "{{group-id}}";
-const BROKERS: &str =
-  "{{brokers}}";
+const BROKERS: [&str; 3] = [
+{{brokers}}];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let _ = set_handler(move || {
-    eprintln!("interrupted");
-    process::exit(0);
-  });
+  // Allow handling of ctrl-c
+  set_handler(|| process::exit(0))?;
 
   let args: Vec<String> = args().collect();
   let topic = args.get(1).ok_or("missing topic argument")?;
@@ -83,13 +78,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut kafka_client_config = ClientConfig::new();
   kafka_client_config
     .set("auto.offset.reset", "latest")
-    .set("bootstrap.servers", BROKERS)
+    .set("bootstrap.servers", BROKERS.join(","))
     .set("client.id", CLIENT_ID)
     .set("group.id", GROUP_ID)
     .set("security.protocol", "ssl")
-    .set("ssl.ca.location", PKI_CA_CERTIFICATE_LOCATION)
-    .set("ssl.certificate.location", PKI_CLIENT_CERTIFICATE_LOCATION)
-    .set("ssl.key.location", PKI_CLIENT_KEY_LOCATION);
+    .set("ssl.ca.location", format!("{PKI_DIRECTORY}/ca.pem"))
+    .set("ssl.certificate.location", format!("{PKI_DIRECTORY}/client.pem"))
+    .set("ssl.key.location", format!("{PKI_DIRECTORY}/client.key"));
 
   let consumer: BaseConsumer = kafka_client_config.create().map_err(|error| format!("failed to create consumer: {error}"))?;
 

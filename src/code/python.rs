@@ -38,13 +38,12 @@ pub(crate) fn delete_python_example_code(bundle_configuration: &ProxyCertificate
 const PYTHON_TEMPLATE: &str = r#"from confluent_kafka import Consumer
 import sys
 
-PKI_CLIENT_KEY_LOCATION = "{{bundle-directory}}/client.key"
-PKI_CLIENT_CERTIFICATE_LOCATION = "{{bundle-directory}}/client.pem"
-PKI_CA_CERTIFICATE_LOCATION = "{{bundle-directory}}/ca.pem"
+PKI_DIRECTORY = "{{bundle-directory}}"
 
 CLIENT_ID = "{{client-id}}"
 GROUP_ID = "{{group-id}}"
-BROKERS = "{{brokers}}"
+BROKERS = [
+{{brokers}}]
 
 def main():
     if len(sys.argv) < 2:
@@ -54,13 +53,13 @@ def main():
 
     kafka_config = {
         "auto.offset.reset": "earliest",
-        "bootstrap.servers": BROKERS,
+        "bootstrap.servers": ",".join(BROKERS),
         "client.id": CLIENT_ID,
         "group.id": GROUP_ID,
         "security.protocol": "ssl",
-        "ssl.ca.location": PKI_CA_CERTIFICATE_LOCATION,
-        "ssl.certificate.location": PKI_CLIENT_CERTIFICATE_LOCATION,
-        "ssl.key.location": PKI_CLIENT_KEY_LOCATION
+        "ssl.ca.location": f"{PKI_DIRECTORY}/ca.pem",
+        "ssl.certificate.location": f"{PKI_DIRECTORY}/client.pem",
+        "ssl.key.location": f"{PKI_DIRECTORY}/client.key"
     }
 
     consumer = Consumer(kafka_config)
@@ -72,7 +71,8 @@ def main():
             while topic_full:
                 msg = consumer.poll(1.0)
                 if msg is not None:
-                    print(f"{msg.partition()}:{msg.offset()} {msg.key().decode()}")
+                    if msg.key() is not None:
+                        print(f"{msg.partition()}:{msg.offset()} {msg.key().decode()}")
                 else:
                     topic_full = False
     except KeyboardInterrupt:

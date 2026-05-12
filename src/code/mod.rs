@@ -3,6 +3,7 @@ use crate::code::rust::{delete_rust_example_code, generate_rust_example_code, ru
 use crate::context::Context;
 use crate::proxy_bundles::{Language, ProxyCertificateBundleConfig};
 use crate::DshCliResult;
+use itertools::Itertools;
 
 pub(crate) mod python;
 pub(crate) mod rust;
@@ -44,7 +45,10 @@ fn apply_template(template: &str, bundle_configuration: &ProxyCertificateBundleC
       bundle_configuration.vhost_zone.clone(),
       3,
     )?
-    .join(",");
+    .iter()
+    .map(|broker| format!("  \"{}\",\n", broker))
+    .collect_vec()
+    .join("");
   let rust_rs = template.replace(BROKERS_PLACEHOLDER, &brokers);
   let rust_rs = rust_rs.replace(BUNDLE_DIRECTORY_PLACEHOLDER, bundle_directory);
   let rust_rs = rust_rs.replace(CLIENT_ID_PLACEHOLDER, &bundle_configuration.client_id());
