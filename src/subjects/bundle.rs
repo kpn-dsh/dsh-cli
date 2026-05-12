@@ -75,7 +75,7 @@ impl Subject for BundleSubject {
 static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(CODE_COMMAND, None, &BundleCode {}, "Generate example client code")
-      .add_target_argument(proxy_id_argument())
+      .add_target_argument(proxy_id_argument().required(true))
       .add_extra_argument(language_option().required(true)),
   )
 });
