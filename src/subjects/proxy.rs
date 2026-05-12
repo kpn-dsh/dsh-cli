@@ -15,6 +15,7 @@ use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::certificate::{CertificateLabel, CERTIFICATE_LABELS_SHOW};
 use crate::subjects::secret::SecretLabel;
+use crate::subjects::service::{cpus_option, instances_option, mem_option, CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
 use crate::{cli_error, err, DshCliResult, COMMAND_OPTIONS_HEADING};
@@ -27,13 +28,13 @@ use futures::future::try_join_all;
 use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-
-use crate::subjects::service::{cpus_option, instances_option, mem_option, CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use serde::Serialize;
 use std::convert::AsRef;
 use std::num::NonZeroU64;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use std::time::Duration;
+use tokio::time::sleep;
 
 struct ProxySubject {}
 
@@ -417,6 +418,16 @@ impl CommandExecutor for ProxyUndeploy {
           if context.dry_run() {
             context.print_warning("dry-run mode, certificate not deleted");
           } else {
+            // Wait until the proxy is gone
+            loop {
+              context.print_progress_step();
+              sleep(Duration::from_millis(1000)).await;
+              match client.get_kafkaproxy_configuration(&proxy_id).await {
+                Ok(_) => {}
+                Err(_) => break,
+              }
+            }
+            context.print_error("");
             client.delete_certificate_configuration(&kafka_proxy.certificate).await?;
             context.print_outcome(format!("certificate '{}' deleted", &kafka_proxy.certificate));
             if context.confirmed(format!(
@@ -424,8 +435,18 @@ impl CommandExecutor for ProxyUndeploy {
               certificate_secrets.iter().map(|secret| format!("'{}'", secret)).join(", ")
             ))? {
               if context.dry_run() {
-                context.print_warning("dry-run mode, certificate not deleted");
+                context.print_warning("dry-run mode, secrets not deleted");
               } else {
+                // Wait until the certificate is gone
+                loop {
+                  context.print_progress_step();
+                  sleep(Duration::from_millis(1000)).await;
+                  match client.get_certificate_configuration(&kafka_proxy.certificate).await {
+                    Ok(_) => {}
+                    Err(_) => break,
+                  }
+                }
+                context.print_error("");
                 for secret in certificate_secrets {
                   client.delete_secret_configuration(&secret).await?;
                   context.print_outcome(format!("secret '{}' deleted", &secret));
