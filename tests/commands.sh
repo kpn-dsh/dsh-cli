@@ -4,8 +4,8 @@ export APP_NON_EXISTING=non_existing_app
 export APP_UNDER_TEST=eavesdropper
 export BUCKET_UNDER_TEST=schema-registry
 export BUNDLE_NON_EXISTING=non_existing_broker
-export BUNDLE_UNDER_TEST=broker
-export CERTIFICATE_UNDER_TEST=broker
+export BUNDLE_UNDER_TEST=vol
+export CERTIFICATE_UNDER_TEST=vol-certificate
 export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="dsh"
 export ENV_VAR_QUERY_UNDER_TEST=password
@@ -15,7 +15,7 @@ export IMAGE_UNDER_TEST_REGEX=registry
 export MANIFEST_UNDER_TEST=kpn/eavesdropper
 export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
-export PROXY_UNDER_TEST=broker
+export PROXY_UNDER_TEST=vol
 export SECRET_NON_EXISTING=non-existing-secret
 export SECRET_NAME_UNDER_TEST=broker-ca-cert
 export SYSTEM_SECRET_ID_UNDER_TEST="\!rest-api-client"
@@ -62,6 +62,8 @@ export SAFE_COMMANDS=(
   "bucket show $BUCKET_UNDER_TEST"
   "buckets"
 
+  "bundle code $BUNDLE_UNDER_TEST --language python --force --dry-run"
+  "bundle code $BUNDLE_UNDER_TEST --language rust --force --dry-run"
   "bundle create $BUNDLE_NON_EXISTING --acl-group-id acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
   "bundle delete $BUNDLE_UNDER_TEST --force --dry-run"
   "bundle list"
