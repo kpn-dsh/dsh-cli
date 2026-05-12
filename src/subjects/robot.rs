@@ -5,6 +5,7 @@ use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAN
 use crate::capability_builder::CapabilityBuilder;
 use crate::clients::create_client_access_token_from_platform_tenant;
 use crate::context::Context;
+#[cfg(feature = "robot")]
 use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
@@ -20,6 +21,7 @@ use clap::ArgMatches;
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
 #[cfg(feature = "robot")]
 use dsh_api::dsh_api_tenant::DshApiTenant;
+#[cfg(feature = "robot")]
 use dsh_api::error::DshApiError;
 use dsh_api::platform::DshPlatform;
 use dsh_api::secret::ROBOT_SECRET;
