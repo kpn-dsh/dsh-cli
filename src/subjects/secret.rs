@@ -904,16 +904,8 @@ impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
     let (secret_metadata, expiration_days) = self;
     match label {
       SecretLabel::CaChain => match secret_metadata {
-        SecretMetadata::Certificate { chain, .. } => Value::plain(
-          chain
-            .iter()
-            .filter_map(|chain_metadata| match chain_metadata {
-              SecretMetadata::Certificate { serial_number, .. } => Some(serial_number),
-              _ => None,
-            })
-            .join("\n"),
-        ),
-        _ => Value::todo(),
+        SecretMetadata::Certificate { chain, .. } => Value::plain(chain.join("\n")),
+        _ => Value::hide(),
       },
       SecretLabel::Description => match secret_metadata.kind() {
         Some("error") => Value::error(secret_metadata.additional_info().map(|info| info.to_string()).unwrap_or_default()),
