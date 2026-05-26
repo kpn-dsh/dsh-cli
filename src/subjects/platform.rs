@@ -607,7 +607,7 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
       DshPlatformLabel::ProxyBrokerVhost => Value::ok_or_empty(platform.proxy_vhost(tenant, proxy_name, VhostZone::Public, 0)),
       DshPlatformLabel::ProxyCommonName => Value::ok_or_hide(platform.proxy_common_name(proxy_name, tenant, VhostZone::Public)),
       DshPlatformLabel::ProxyConsumerGroup => Value::plain(platform.proxy_consumer_group(tenant, proxy_name, 0)),
-      DshPlatformLabel::ProxyConsumerGroupAcl => Value::plain(platform.proxy_consumer_group_acl(tenant, "acl-group-name", proxy_name, 0)),
+      DshPlatformLabel::ProxyConsumerGroupAcl => Value::plain(platform.proxy_consumer_group_acl(tenant, proxy_name, "acl-group-name", 0)),
       DshPlatformLabel::ProxySchemaStoreVhost => Value::ok_or_empty(platform.proxy_schema_store_vhost(tenant, proxy_name, VhostZone::Public)),
       DshPlatformLabel::ProxyVhostDomain => Value::ok_or_empty(platform.proxy_vhost_domain(tenant, VhostZone::Public)),
       DshPlatformLabel::PublicVhostDomain => Value::plain(platform.public_vhost_domain(vhost)),
