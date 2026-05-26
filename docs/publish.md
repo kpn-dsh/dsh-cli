@@ -23,12 +23,12 @@ repository for an explanation on how to publish the `dsh_api` crate.
 
 ## Publish `dsh`
 
-First make sure that the `dsh_api` dependency is pointing to `crates.io` and not to
-your local copy of `dsh_api`. Check the dependency in `Cargo.toml`:
+First make sure that the `dsh_api` dependency is pointing to the proper version at `crates.io`.
+Check the dependency in `Cargo.toml`:
 
 ```toml
 # When publishing, alway use the crates.io dependency.
-dsh_api = { version = "0.10.0", features = ["generic"] }
+dsh_api = { path = "../dsh-api/dsh-api", version = "0.10.0", features = ["generic"] }
 # While developing use the relative path dependency to dsh_api and enable the manage feature.
 #dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
 ```

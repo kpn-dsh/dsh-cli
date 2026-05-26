@@ -62,10 +62,7 @@ pkcs1 = { version = "0.7", features = ["pem"] }
 pkcs8 = { version = "0.10", features = ["pem"] }
 x509-cert = { version = "0.2", features = ["pem"] }
 
-# When publishing, alway use the crates.io dependency.
-#dsh_api = { version = "0.10.0", features = ["generic"] }
-# While developing use the relative path dependency to dsh_api and enable the manage feature.
-dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
+dsh_api = { version = "0.10.0", path = "../dsh-api/dsh-api", features = ["generic"] }
 
 [dev-dependencies]
 rdkafka = { version = "0.39", features = ["ssl-vendored"] }
