@@ -33,6 +33,8 @@ use rcgen::{DistinguishedName, DnType, DnValue, OtherNameValue, SanType};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::LazyLock;
+use std::time::Duration;
+use tokio::time::sleep;
 
 struct CertificateSubject {}
 
@@ -149,6 +151,15 @@ impl CommandExecutor for CertificateDelete {
         client.delete_certificate_configuration(&certificate_id).await?;
         context.print_outcome(format!("certificate '{}' deleted", certificate_id));
         if delete_existing_secrets {
+          // Wait until the certificate is gone
+          loop {
+            context.print_progress_step();
+            sleep(Duration::from_millis(1000)).await;
+            match client.get_certificate_configuration(&certificate_id).await {
+              Ok(_) => {}
+              Err(_) => break,
+            }
+          }
           for secret_name in existing_certificate_secrets {
             client.delete_secret_configuration(&secret_name).await?;
             context.print_outcome(format!("certificate secret '{}' deleted", secret_name));
