@@ -150,9 +150,9 @@ fn kafka_default_partitioner_flag() -> Arg {
   Arg::new(KAFKA_DEFAULT_PARTITIONER)
     .long("kafka-default-partitioner")
     .action(ArgAction::SetTrue)
-    .help("Use kafka default partitioner")
+    .help("Use Kafka default partitioner")
     .long_help(
-      "Use the kafka default partitioner to partition messages across different kafka partitions. \
+      "Use the Kafka default partitioner to partition messages across different Kafka partitions. \
       This option is only meaningful for public managed streams.",
     )
 }
@@ -167,7 +167,7 @@ fn topic_level_partitioner_arg() -> Arg {
     .value_name("LEVEL")
     .help("Use topic level partitioner")
     .long_help(
-      "Use the topic level partitioner to partition messages across different kafka partitions. \
+      "Use the topic level partitioner to partition messages across different Kafka partitions. \
       This option is only meaningful for public managed streams.",
     )
     .conflicts_with(KAFKA_DEFAULT_PARTITIONER)
