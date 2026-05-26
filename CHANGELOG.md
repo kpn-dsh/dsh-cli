@@ -8,15 +8,28 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Added
 
+* Include certificate and secrets with proxy details.
+* Capability to create proxy certificate bundle.
 * Capability to store robot secrets in keyring.
 * Capability to copy robot secret from secret store to keyring
 * Capability to renew the robot secret.
 * Descriptions for publish and release steps.
 * Task capabilities.
+* Open monitoring for specific task.
 * Dependency check when deleting or updating buckets, secrets, topics and volumes.
+* Capability to list `GitHub` releases.
+* Option to set number of days for upcoming expiration check.
+* Warning that volume content will not be preserved when restarting a service that uses volumes.
+* Delete resource when undeploying proxy.
+* Output directory can be specified.
+* Proxy code generation.
+* Kafka proxy ACL groups.
+* License check.
 
 ### Changed
 
+* Empty fields are hidden.
+* Show allocation status for secrets.
 * Updated `dsh-api` dependency to version `0.10.0`.
 * Removed the `target` capabilities.
 * Improved `GitHub` documentation
@@ -24,6 +37,12 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Changed configuration for robot authentication.
 * Resolved some technical debt.
 * Moved task capabilities to separate subject.
+* Restricted permissions on local files.
+* Default verbosity level set to `medium`.
+* Default warning color to `Magenta`.
+* Login still possible when dry-run is enabled.
+* Platform list shows public and private domains.
+* Some columns are right aligned.
 
 ## [0.9.0] - 2026-03-05
 
