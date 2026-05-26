@@ -74,13 +74,14 @@ back to the `crates.io` version of the library,
 ### Coding guidelines
 
 Before pushing code to `GitHub`, make sure that you adhere to the code formatting defined in
-`rustfmt.toml` and that you have run the `clippy` linter. The following commands should
-return without any remarks:
+`rustfmt.toml`, that you have run the `clippy` linter and that you did the license check.
+The following commands should return without any remarks:
 
 ```shell
 > cargo +nightly fmt --check
 > cargo clippy
 > cargo clippy --all-features
+> cargo deny check licenses
 ```
 
 Consider configuring your IDE to automatically apply the formatting rules when saving a file.
