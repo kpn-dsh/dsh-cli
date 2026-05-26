@@ -60,13 +60,13 @@ pub(crate) fn cpu_flag() -> Arg {
     )
 }
 
-pub(crate) fn kafka_acl_group_flag() -> Arg {
+pub(crate) fn kafka_acl_group_count_flag() -> Arg {
   Arg::new(KAFKA_ACL_GROUP_COUNT_OPTION)
     .long("kafka-acl-group-count")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<i64>::new(0, 100))
     .value_name("COUNT")
-    .help("Limit for number of kafka acl groups")
+    .help("Limit for number of Kafka ACL groups")
     .long_help(
       "Set the limit for the number of Kafka ACL groups available for the managed tenant. \
           The value must be greater than or equal to 0 and lower than or equal to 100.",

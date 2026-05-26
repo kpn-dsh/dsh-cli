@@ -13,7 +13,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::limits_options::{
-  certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
+  certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_count_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
   stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_OPTION, CONSUMER_RATE_OPTION, CPU_OPTION,
   KAFKA_ACL_GROUP_COUNT_OPTION, MEM_OPTION, PARTITION_COUNT_OPTION, PRODUCER_RATE_OPTION, REQUEST_RATE_OPTION, SECRET_COUNT_OPTION, STREAM_READ_OPTION, STREAM_RW_OPTION,
   STREAM_WRITE_OPTION, TOPIC_COUNT_OPTION, TRACING_OPTION, VPN_OPTION,
@@ -97,7 +97,7 @@ lazy_static! {
       .add_extra_argument(certificate_count_flag())
       .add_extra_argument(consumer_rate_flag())
       .add_extra_argument(cpu_flag())
-      .add_extra_argument(kafka_acl_group_flag())
+      .add_extra_argument(kafka_acl_group_count_flag())
       .add_extra_argument(mem_flag())
       .add_extra_argument(partition_count_flag())
       .add_extra_argument(producer_rate_flag())

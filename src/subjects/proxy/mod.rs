@@ -1,3 +1,5 @@
+pub(crate) mod labels;
+
 use crate::arguments::proxy_id_argument;
 use crate::capability::{Capability, CommandExecutor, DEPLOY_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS, UNDEPLOY_COMMAND, UPDATE_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
@@ -8,12 +10,12 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{ColumnAlignment, Label, SubjectFormatter};
-use crate::formatters::{OutputFormat, Value};
+use crate::formatters::OutputFormat;
 use crate::global_options::{expiration_option, get_expiration_days};
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::certificate::{CertificateLabel, CERTIFICATE_LABELS_SHOW};
+use crate::subjects::proxy::labels::KafkaProxyLabel;
 use crate::subjects::secret::SecretLabel;
 use crate::subjects::service::{cpus_option, instances_option, mem_option, CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use crate::target_platform::get_target_platform;
@@ -23,12 +25,11 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::platform::VhostZone;
-use dsh_api::types::{Certificate, KafkaProxy, KafkaProxyZone, Secret};
+use dsh_api::types::{Certificate, KafkaProxy, KafkaProxyZone, Secret, Validations};
 use futures::future::try_join_all;
 use futures::join;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use serde::Serialize;
 use std::convert::AsRef;
 use std::num::NonZeroU64;
 use std::str::FromStr;
@@ -215,8 +216,8 @@ impl CommandExecutor for ProxyDeploy {
       cpus: proxy_cpus,
       mem: proxy_mem as i64,
       instances: proxy_instances,
-      enable_kafka_acl_groups: Some(false),
-      validations: vec![],
+      enable_kafka_acl_groups: Some(configuration.acl_group_name.is_some()),
+      validations: vec![Validations { common_name: None, country: None, locality: None, organization: None, organizational_unit: None, province: None, subject_type: None }],
       schema_store: Some(configuration.enable_schema_store),
       schema_store_cpus: Some(0.1),
       schema_store_mem: Some(256),
@@ -490,108 +491,5 @@ impl CommandExecutor for ProxyUpdate {
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
     Requirements::standard_with_api()
-  }
-}
-
-#[derive(Eq, Hash, PartialEq, Serialize)]
-enum KafkaProxyLabel {
-  AclGroupsEnabled,
-  CaChainSecretName,
-  Certificate,
-  Cpus,
-  Instances,
-  Mem,
-  Name,
-  SchemaStore,
-  Target,
-  Validations,
-  Zone,
-}
-
-impl Label for KafkaProxyLabel {
-  fn as_str(&self) -> &str {
-    match self {
-      KafkaProxyLabel::AclGroupsEnabled => "acl groups",
-      KafkaProxyLabel::CaChainSecretName => "ca certificate secret",
-      KafkaProxyLabel::Certificate => "certificate",
-      KafkaProxyLabel::Cpus => "cpus",
-      KafkaProxyLabel::Instances => "instances",
-      KafkaProxyLabel::Mem => "memory",
-      KafkaProxyLabel::Name => "name",
-      KafkaProxyLabel::SchemaStore => "schema store",
-      KafkaProxyLabel::Target => "proxy id",
-      KafkaProxyLabel::Validations => "validations",
-      KafkaProxyLabel::Zone => "zone",
-    }
-  }
-
-  fn as_str_for_list(&self) -> &str {
-    match self {
-      KafkaProxyLabel::AclGroupsEnabled => "acl groups",
-      KafkaProxyLabel::CaChainSecretName => "ca certificate",
-      KafkaProxyLabel::Certificate => "certificate",
-      KafkaProxyLabel::Cpus => "cpus",
-      KafkaProxyLabel::Instances => "instances",
-      KafkaProxyLabel::Mem => "memory",
-      KafkaProxyLabel::Name => "proxy name",
-      KafkaProxyLabel::SchemaStore => "schema store",
-      KafkaProxyLabel::Target => "proxy id",
-      KafkaProxyLabel::Validations => "validations",
-      KafkaProxyLabel::Zone => "zone",
-    }
-  }
-
-  fn is_target_label(&self) -> bool {
-    matches!(self, Self::Target)
-  }
-
-  fn column_alignment(&self) -> ColumnAlignment {
-    match self {
-      Self::Mem => ColumnAlignment::Right,
-      _ => ColumnAlignment::default(),
-    }
-  }
-}
-
-impl SubjectFormatter<KafkaProxyLabel> for KafkaProxy {
-  fn value(&self, label: &KafkaProxyLabel, target_id: &str) -> Value {
-    match label {
-      KafkaProxyLabel::AclGroupsEnabled => Value::some_or_hide(self.enable_kafka_acl_groups.map(|enabled| if enabled { "enabled" } else { "disabled" })),
-      KafkaProxyLabel::CaChainSecretName => Value::target(&self.secret_name_ca_chain),
-      KafkaProxyLabel::Certificate => Value::target(&self.certificate),
-      KafkaProxyLabel::Cpus => Value::plain(self.cpus),
-      KafkaProxyLabel::Instances => Value::plain(self.instances),
-      KafkaProxyLabel::Mem => Value::plain(self.mem),
-      KafkaProxyLabel::Name => Value::some_or_empty(self.name.clone()),
-      KafkaProxyLabel::SchemaStore => Value::some_or(
-        self.schema_store.map(|enabled| {
-          if enabled {
-            format!(
-              "enabled (cpus: {}, mem: {})",
-              self.schema_store_cpus.map(|cpus| cpus.to_string()).unwrap_or("NA".to_string()),
-              self.schema_store_mem.map(|mem| mem.to_string()).unwrap_or("NA".to_string())
-            )
-          } else {
-            "disabled".to_string()
-          }
-        }),
-        "NA",
-      ),
-      KafkaProxyLabel::Target => Value::target(target_id),
-      KafkaProxyLabel::Validations => {
-        if self.validations.is_empty() {
-          Value::hide()
-        } else {
-          Value::plain(
-            self
-              .validations
-              .iter()
-              .map(|validation| validation.common_name.clone().unwrap_or_default())
-              .join("\n"),
-          )
-        }
-      }
-      KafkaProxyLabel::Zone => Value::plain(self.zone),
-    }
   }
 }

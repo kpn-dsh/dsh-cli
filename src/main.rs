@@ -22,6 +22,7 @@ use crate::global_options::{
 };
 use crate::releases::{newer_release, newer_release_notification, releases_from_github, ReleaseAsset};
 use crate::style::{apply_default_error_style, apply_default_warning_style};
+use crate::subjects::aclgroup::ACL_GROUP_SUBJECT;
 use crate::subjects::bundle::BUNDLE_SUBJECT;
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
 use crate::subjects::task::TASK_SUBJECT;
@@ -244,6 +245,7 @@ async fn inner_main() -> DshCliExit {
   }
 
   let subjects: Vec<&(dyn Subject + Send + Sync)> = vec![
+    ACL_GROUP_SUBJECT.as_ref(),
     API_SUBJECT.as_ref(),
     APP_SUBJECT.as_ref(),
     BUCKET_SUBJECT.as_ref(),

@@ -1,5 +1,6 @@
 use clap::{builder, Arg, ArgAction};
 
+pub(crate) const ACL_GROUP_NAME_ARGUMENT: &str = "acl-group-name-argument";
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
 pub(crate) const CERTIFICATE_ID_ARGUMENT: &str = "certificate-id-argument";
@@ -19,6 +20,15 @@ pub(crate) const VENDOR_NAME_ARGUMENT: &str = "vendor-name-argument";
 pub(crate) const MANIFEST_VERSION_ARGUMENT: &str = "version-argument";
 pub(crate) const VHOST_ID_ARGUMENT: &str = "vhost-id-argument";
 pub(crate) const VOLUME_ID_ARGUMENT: &str = "volume-id-argument";
+
+pub(crate) fn acl_group_name_argument() -> Arg {
+  Arg::new(ACL_GROUP_NAME_ARGUMENT)
+    .action(ArgAction::Set)
+    .value_parser(builder::NonEmptyStringValueParser::new())
+    .value_name("GROUP")
+    .help("Acl group name")
+    .long_help("Identifies an ACL group name.")
+}
 
 pub(crate) fn app_id_argument() -> Arg {
   Arg::new(APP_ID_ARGUMENT)

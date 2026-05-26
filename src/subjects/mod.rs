@@ -1,3 +1,4 @@
+pub(crate) mod aclgroup;
 pub(crate) mod api;
 pub(crate) mod app;
 pub(crate) mod bucket;
