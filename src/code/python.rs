@@ -1,41 +1,41 @@
-use crate::code::apply_template;
+use crate::code::{apply_template, example_directory, EXAMPLE_CONSUMER, EXAMPLE_PRODUCER, EXAMPLE_TOPICS, LANGUAGE_PYTHON};
 use crate::context::Context;
 use crate::proxy_bundles::ProxyCertificateBundleConfig;
-use crate::DshCliResult;
+use crate::{err, DshCliResult};
 use std::fs;
 use std::fs::{create_dir_all, exists, remove_dir_all};
 
-fn python_example_directory(bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> String {
-  match context.output_directory() {
-    Some(output_directory) => format!("{}/{}-python-example", output_directory.display(), bundle_configuration.proxy_name),
-    None => format!("{}-python-example", bundle_configuration.proxy_name),
-  }
-}
+pub(crate) fn generate_python_example_code(example: &str, bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str, context: &Context) -> DshCliResult<String> {
+  let python_template = match example {
+    EXAMPLE_CONSUMER => PYTHON_TEMPLATE_CONSUMER,
+    EXAMPLE_PRODUCER => return err!("python producer example not yet available"),
+    EXAMPLE_TOPICS => return err!("python topics example not yet available"),
+    _ => return err!("unrecognized example '{}'", example),
+  };
 
-pub(crate) fn generate_python_example_code(bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str, context: &Context) -> DshCliResult<String> {
-  let example_directory = python_example_directory(bundle_configuration, context);
+  let example_directory = example_directory(LANGUAGE_PYTHON, &example, bundle_configuration, context);
   create_dir_all(&example_directory)?;
   context.print_outcome(format!("created directory '{}'", example_directory));
 
-  let python = apply_template(PYTHON_TEMPLATE, bundle_configuration, bundle_directory)?;
-  let python_filename = format!("{}/{}-consumer.py", example_directory, bundle_configuration.proxy_name);
+  let python = apply_template(python_template, bundle_configuration, bundle_directory)?;
+  let python_filename = format!("{}/{}-{}.py", example_directory, bundle_configuration.proxy_name, example);
   fs::write(&python_filename, &python)?;
   context.print_outcome(format!("created file '{}'", python_filename));
   Ok(example_directory)
 }
 
-pub(crate) fn python_example_code_exists(bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<bool> {
-  Ok(exists(python_example_directory(bundle_configuration, context))?)
+pub(crate) fn python_example_code_exists(example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<bool> {
+  Ok(exists(example_directory(LANGUAGE_PYTHON, example, bundle_configuration, context))?)
 }
 
-pub(crate) fn delete_python_example_code(bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<()> {
-  let example_directory = python_example_directory(bundle_configuration, context);
+pub(crate) fn delete_python_example_code(example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<()> {
+  let example_directory = example_directory(LANGUAGE_PYTHON, example, bundle_configuration, context);
   remove_dir_all(&example_directory)?;
   context.print_outcome(format!("deleted python example directory '{}'", example_directory));
   Ok(())
 }
 
-const PYTHON_TEMPLATE: &str = r#"from confluent_kafka import Consumer
+const PYTHON_TEMPLATE_CONSUMER: &str = r#"from confluent_kafka import Consumer
 import sys
 
 PKI_DIRECTORY = "{{bundle-directory}}"

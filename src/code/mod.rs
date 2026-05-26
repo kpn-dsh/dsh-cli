@@ -1,31 +1,47 @@
 use crate::code::python::{delete_python_example_code, generate_python_example_code, python_example_code_exists};
 use crate::code::rust::{delete_rust_example_code, generate_rust_example_code, rust_example_code_exists};
 use crate::context::Context;
-use crate::proxy_bundles::{Language, ProxyCertificateBundleConfig};
-use crate::DshCliResult;
+use crate::proxy_bundles::ProxyCertificateBundleConfig;
+use crate::{err, DshCliResult};
 use itertools::Itertools;
 
 pub(crate) mod python;
 pub(crate) mod rust;
 
-pub(crate) fn generate_example_code(bundle_configuration: &ProxyCertificateBundleConfig, language: &Language, bundle_directory: &str, context: &Context) -> DshCliResult<String> {
+pub(crate) const LANGUAGE_PYTHON: &str = "python";
+pub(crate) const LANGUAGE_RUST: &str = "rust";
+
+pub(crate) const EXAMPLE_CONSUMER: &str = "consumer";
+pub(crate) const EXAMPLE_PRODUCER: &str = "producer";
+pub(crate) const EXAMPLE_TOPICS: &str = "topics";
+
+pub(crate) fn generate_example_code(
+  language: &str,
+  example: &str,
+  bundle_configuration: &ProxyCertificateBundleConfig,
+  bundle_directory: &str,
+  context: &Context,
+) -> DshCliResult<String> {
   match language {
-    Language::Python => generate_python_example_code(bundle_configuration, bundle_directory, context),
-    Language::Rust => generate_rust_example_code(bundle_configuration, bundle_directory, context),
+    LANGUAGE_PYTHON => generate_python_example_code(example, bundle_configuration, bundle_directory, context),
+    LANGUAGE_RUST => generate_rust_example_code(example, bundle_configuration, bundle_directory, context),
+    _ => err!("unrecognized language '{}'", language),
   }
 }
 
-pub(crate) fn example_code_exists(bundle_configuration: &ProxyCertificateBundleConfig, language: &Language, context: &Context) -> DshCliResult<bool> {
+pub(crate) fn example_code_exists(language: &str, example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<bool> {
   match language {
-    Language::Python => python_example_code_exists(bundle_configuration, context),
-    Language::Rust => rust_example_code_exists(bundle_configuration, context),
+    LANGUAGE_PYTHON => python_example_code_exists(example, bundle_configuration, context),
+    LANGUAGE_RUST => rust_example_code_exists(example, bundle_configuration, context),
+    _ => err!("unrecognized language '{}'", language),
   }
 }
 
-pub(crate) fn delete_example_code(bundle_configuration: &ProxyCertificateBundleConfig, language: &Language, context: &Context) -> DshCliResult<()> {
+pub(crate) fn delete_example_code(language: &str, example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<()> {
   match language {
-    Language::Python => delete_python_example_code(bundle_configuration, context),
-    Language::Rust => delete_rust_example_code(bundle_configuration, context),
+    LANGUAGE_PYTHON => delete_python_example_code(example, bundle_configuration, context),
+    LANGUAGE_RUST => delete_rust_example_code(example, bundle_configuration, context),
+    _ => err!("unrecognized language '{}'", language),
   }
 }
 
@@ -40,8 +56,8 @@ fn apply_template(template: &str, bundle_configuration: &ProxyCertificateBundleC
   let brokers = bundle_configuration
     .platform
     .tenant_proxy_bootstrap_servers(
-      &bundle_configuration.proxy_name,
       &bundle_configuration.tenant,
+      &bundle_configuration.proxy_name,
       bundle_configuration.vhost_zone.clone(),
       3,
     )?
@@ -52,8 +68,33 @@ fn apply_template(template: &str, bundle_configuration: &ProxyCertificateBundleC
   let rust_rs = template.replace(BROKERS_PLACEHOLDER, &brokers);
   let rust_rs = rust_rs.replace(BUNDLE_DIRECTORY_PLACEHOLDER, bundle_directory);
   let rust_rs = rust_rs.replace(CLIENT_ID_PLACEHOLDER, &bundle_configuration.client_id());
-  let rust_rs = rust_rs.replace(GROUP_ID_PLACEHOLDER, &bundle_configuration.group_id(0));
+  let rust_rs = rust_rs.replace(GROUP_ID_PLACEHOLDER, &bundle_configuration.group_id(1));
   let rust_rs = rust_rs.replace(PROXY_NAME_PLACEHOLDER, &bundle_configuration.proxy_name);
   let rust_rs = rust_rs.replace(TENANT_PLACEHOLDER, &bundle_configuration.tenant);
   Ok(rust_rs)
+}
+
+/// Get example directory name
+///
+/// `[OUTPUT_DIR]/[PROXY_NAME]-[LANGUAGE]-[EXAMPLE]`
+///
+/// ## Example
+/// `/Users/wilbert/Workspaces/dsh/dcli/output/demo-rust-topics-example`
+///
+/// ## Parameters
+/// * `language` - Programming language: `python` or `rust`.
+/// * `example` - Example type: `consumer`, `producer` or `topics`.
+/// * `bundle_configuration` - Contains the bundle/proxy configuration.
+/// * `context` - DSH tool context.
+fn example_directory(language: &str, example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> String {
+  match context.output_directory() {
+    Some(output_directory) => format!(
+      "{}/{}-{}-example-{}",
+      output_directory.display(),
+      bundle_configuration.proxy_name,
+      language,
+      example,
+    ),
+    None => format!("{}-{}-{}-example", bundle_configuration.proxy_name, example, language),
+  }
 }
