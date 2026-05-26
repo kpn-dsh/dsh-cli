@@ -351,11 +351,11 @@ pub(crate) fn read_local_certificate_bundle(platform: &DshPlatform, tenant: &str
           read_local_certificate_bundle_configuration(&certificate_bundle_directory_pathbuf)?,
           certificate_bundle_directory_pathbuf.display().to_string(),
         ),
-        _ca_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_KEY_FILENAME)?,
+        ca_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_KEY_FILENAME)?,
         ca_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_CERTIFICATE_FILENAME)?,
         client_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_KEY_FILENAME)?,
-        _client_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_CERTIFICATE_FILENAME)?,
-        _server_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_KEY_FILENAME)?,
+        client_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_CERTIFICATE_FILENAME)?,
+        server_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_KEY_FILENAME)?,
         server_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_CERTIFICATE_FILENAME)?,
       })
     }
@@ -370,7 +370,7 @@ pub(crate) fn read_local_certificate_bundle(platform: &DshPlatform, tenant: &str
 /// * `tenant` - Tenant for which the proxy certificate bundle is requested.
 ///
 /// # Returns
-/// * `Ok<Vec<(String, ProxyCertificateBundleConfig)>>` - Certificate bundle consisting of:
+/// * `Ok<Vec<(String, ProxyCertificateBundleConfig, String)>>` - Certificate bundle consisting of:
 ///   * Bundle name
 ///   * Bundle configuration
 ///   * Bundle directory
