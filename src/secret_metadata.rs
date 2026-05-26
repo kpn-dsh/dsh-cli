@@ -20,7 +20,7 @@ pub(crate) enum SecretMetadata {
   /// * `label` - Label in the pem file that contained the certificate.
   /// * `chain` - Chain of certificate authorities that issued the certificate. This will
   ///   always be a `SecretMetadata::Certificate` variant.
-  Certificate { subject: String, not_after: u64, not_before: u64, issuer: String, label: String, chain: Vec<SecretMetadata>, serial_number: String },
+  Certificate { subject: String, not_after: u64, not_before: u64, issuer: String, label: String, chain: Vec<String>, serial_number: String },
 
   /// Secret is empty.
   Empty,
@@ -375,26 +375,18 @@ pub(crate) fn secret_metadata(secret: &str) -> SecretMetadata {
 fn try_certificates(secret: &str) -> Result<SecretMetadata, ()> {
   match Certificate::load_pem_chain(secret.as_bytes()) {
     Ok(certificates) => {
+      let chain = certificates
+        .iter()
+        .map(|certificate| certificate.tbs_certificate.serial_number.to_string())
+        .collect_vec();
       if let Some(certificate) = certificates.first() {
-        let certificate_chain = certificates
-          .iter()
-          .map(|certificate| SecretMetadata::Certificate {
-            subject: certificate.tbs_certificate.subject.to_string(),
-            not_after: certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs(),
-            not_before: certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs(),
-            issuer: certificate.tbs_certificate.issuer.to_string(),
-            label: "".to_string(),
-            chain: vec![],
-            serial_number: certificate.tbs_certificate.serial_number.to_string(),
-          })
-          .collect_vec();
         Ok(SecretMetadata::Certificate {
           subject: certificate.tbs_certificate.subject.to_string(),
           not_after: certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs(),
           not_before: certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs(),
           issuer: certificate.tbs_certificate.issuer.to_string(),
           label: "".to_string(),
-          chain: certificate_chain,
+          chain,
           serial_number: certificate.tbs_certificate.serial_number.to_string(),
         })
       } else {
