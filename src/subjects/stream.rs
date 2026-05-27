@@ -15,7 +15,9 @@ use dsh_api::types::{
 };
 
 use crate::arguments::{managed_stream_argument, MANAGED_STREAM_ARGUMENT};
-use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::error::DshCliError;
 use crate::filter_flags::FilterFlagType;
@@ -78,7 +80,7 @@ const CREATE_PUBLIC_FLAG: &str = "create-public-flag";
 
 lazy_static! {
   static ref STREAM_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, None, &StreamCreate {}, "Create stream")
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &StreamCreate {}, "Create stream")
       .add_extra_argument(
         Arg::new(CREATE_INTERNAL_FLAG)
           .long("internal")

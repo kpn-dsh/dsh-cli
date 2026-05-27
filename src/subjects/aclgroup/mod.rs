@@ -3,8 +3,8 @@ pub(crate) mod options;
 
 use crate::arguments::acl_group_name_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, DELETE_COMMAND_ALIAS, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND, SHOW_COMMAND,
-  SHOW_COMMAND_ALIAS,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND,
+  SHOW_COMMAND, SHOW_COMMAND_ALIAS,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -76,7 +76,7 @@ impl Subject for AclGroupSubject {
 
 static ACL_GROUP_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, None, &AclGroupCreate {}, "Create proxy ACL group on dsh")
+    CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &AclGroupCreate {}, "Create proxy ACL group on dsh")
       .set_long_about(
         "Create a Kafka proxy ACL group on the DSH platform. Note that the default limit on \
         the number of ACL groups for a tenant is zero, so you likely have to request to raise \
