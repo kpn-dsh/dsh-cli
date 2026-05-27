@@ -1,7 +1,7 @@
 use crate::arguments::secret_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, COPY_COMMAND, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS,
-  UPDATE_COMMAND,
+  Capability, CommandExecutor, COPY_COMMAND, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND,
+  SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -84,7 +84,7 @@ lazy_static! {
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );
   static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &SecretDelete {}, "Delete secret")
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &SecretDelete {}, "Delete secret")
       .set_long_about("Delete a secret.")
       .add_target_argument(secret_id_argument().required(true))
   );

@@ -1,7 +1,7 @@
 use crate::arguments::managed_tenant_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND, SHOW_COMMAND,
-  SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND,
+  SHOW_COMMAND, SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -51,7 +51,7 @@ lazy_static! {
       .add_extra_argument(vpn_flag())
   );
   static ref TENANT_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &TenantDelete {}, "Delete managed tenant")
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &TenantDelete {}, "Delete managed tenant")
       .set_long_about("Delete a managed tenant and its configuration.")
       .add_target_argument(managed_tenant_argument().required(true))
   );

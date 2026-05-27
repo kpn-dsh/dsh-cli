@@ -13,6 +13,7 @@ pub(crate) const DEFAULT_COMMAND: &str = "default";
 pub(crate) const DEFAULT_COMMAND_ALIAS: &str = "d";
 pub(crate) const DEPLOY_COMMAND: &str = "deploy";
 pub(crate) const DELETE_COMMAND: &str = "delete";
+pub(crate) const DELETE_COMMAND_ALIAS: &str = "d";
 pub(crate) const DUPLICATE_COMMAND: &str = "duplicate";
 pub(crate) const EDIT_COMMAND: &str = "edit";
 pub(crate) const EXPLAIN_COMMAND: &str = "explain";

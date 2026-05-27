@@ -1,5 +1,5 @@
 use crate::arguments::certificate_id_argument;
-use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::error::DshCliError;
@@ -77,7 +77,15 @@ impl Subject for CertificateSubject {
 }
 
 static CERTIFICATE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(CapabilityBuilder::new(DELETE_COMMAND, None, &CertificateDelete {}, "Delete certificate configuration").add_target_argument(certificate_id_argument().required(true)))
+  Box::new(
+    CapabilityBuilder::new(
+      DELETE_COMMAND,
+      Some(DELETE_COMMAND_ALIAS),
+      &CertificateDelete {},
+      "Delete certificate configuration",
+    )
+    .add_target_argument(certificate_id_argument().required(true)),
+  )
 });
 static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(

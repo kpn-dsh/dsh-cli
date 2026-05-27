@@ -3,7 +3,8 @@ pub(crate) mod options;
 
 use crate::arguments::acl_group_name_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS,
+  Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, DELETE_COMMAND_ALIAS, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND, SHOW_COMMAND,
+  SHOW_COMMAND_ALIAS,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -91,7 +92,9 @@ static ACL_GROUP_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>
   )
 });
 static ACL_GROUP_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(CapabilityBuilder::new(DELETE_COMMAND, None, &AclGroupDelete {}, "Delete Kafka ACL group").add_target_argument(acl_group_name_argument().required(true)))
+  Box::new(
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &AclGroupDelete {}, "Delete Kafka ACL group").add_target_argument(acl_group_name_argument().required(true)),
+  )
 });
 static ACL_GROUP_GRANT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
@@ -161,10 +164,7 @@ impl CommandExecutor for AclGroupCreate {
       }
     } else {
       let mut formatter = ListFormatter::new(&ACL_GROUP_LABELS, context);
-      let streams = get_streams(&readable_streams, &writable_streams)
-        .into_iter()
-        .map(|streams| Some(streams))
-        .collect_vec();
+      let streams = get_streams(&readable_streams, &writable_streams).into_iter().map(Some).collect_vec();
       formatter.push_values(&streams);
       formatter.print(None)?;
       if !context.confirmed("create acl group?")? {
@@ -296,7 +296,7 @@ impl CommandExecutor for AclGroupList {
       .map(|acl_group| {
         get_streams(&acl_group.readable_streams, &acl_group.writable_streams)
           .into_iter()
-          .map(|streams| Some(streams))
+          .map(Some)
           .collect_vec()
       })
       .collect_vec();
@@ -425,7 +425,7 @@ impl CommandExecutor for AclGroupShow {
 fn list_streams(acl_group_name: &String, acl_group: &KafkaAclGroup, context: &Context) -> Result<(), DshCliError> {
   let streams = get_streams(&acl_group.readable_streams, &acl_group.writable_streams)
     .into_iter()
-    .map(|streams| Some(streams))
+    .map(Some)
     .collect_vec();
   if streams.is_empty() {
     context.print_warning(format!(

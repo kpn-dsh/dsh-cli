@@ -15,7 +15,7 @@ use dsh_api::types::{
 };
 
 use crate::arguments::{managed_stream_argument, MANAGED_STREAM_ARGUMENT};
-use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::error::DshCliError;
 use crate::filter_flags::FilterFlagType;
@@ -110,7 +110,7 @@ lazy_static! {
       .set_long_about("Create an internal or public managed stream.")
   );
   static ref STREAM_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &StreamDelete {}, "Delete managed stream")
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &StreamDelete {}, "Delete managed stream")
       .set_long_about("Delete an internal or public managed stream.")
       .add_target_argument(managed_stream_argument().required(true))
   );
