@@ -595,9 +595,9 @@ lazy_static! {
       true,
       Some("bold"),
       "This environment variable specifies the styling to be used when printing error messages. \n\
-      If this variable is not set, the settings file will be checked for the 'error-style' entry. \n\
-      Else the default value 'bold' will be used. The supported styles are: 'normal' (no styling), \n\
-      'bold', 'dim', 'italic', 'underline' or 'reverse'.",
+      If this variable is not set, the settings file will be checked for the 'error-style' \n\
+      entry. Else the default value 'bold' will be used. The supported styles are: 'normal' \n\
+      (no styling), 'bold', 'dim', 'italic', 'underline' or 'reverse'.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_EXPIRATION,
@@ -605,9 +605,9 @@ lazy_static! {
       false,
       true,
       Some("30"),
-      "Number of days used to check if some resource is about to expire. \n\
-      If this variable is not set, the settings file will be checked for the 'expiration' entry. \n\
-      Else the default value '30' will be used.",
+      "Number of days used to check if some resource is about to expire. If this variable is \n\
+      not set, the settings file will be checked for the 'expiration' entry. Else the default \n\
+      value '30' will be used.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_HOME,

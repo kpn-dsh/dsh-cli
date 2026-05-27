@@ -289,7 +289,7 @@ pub(crate) fn password_file_option() -> Arg {
 /// Create target platform command line option
 ///
 /// Creates a global option that provides the target platform option to all commands that need it.
-/// If a target platform is required, use the function [`get_target_platform`] to get the value.
+/// If a target platform is required, use the function `get_target_platform` to get the value.
 pub(crate) fn platform_option() -> Arg {
   let possible_values = DshPlatform::all()
     .iter()

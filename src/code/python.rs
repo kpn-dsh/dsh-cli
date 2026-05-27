@@ -13,7 +13,7 @@ pub(crate) fn generate_python_example_code(example: &str, bundle_configuration: 
     _ => return err!("unrecognized example '{}'", example),
   };
 
-  let example_directory = example_directory(LANGUAGE_PYTHON, &example, bundle_configuration, context);
+  let example_directory = example_directory(LANGUAGE_PYTHON, example, bundle_configuration, context);
   create_dir_all(&example_directory)?;
   context.print_outcome(format!("created directory '{}'", example_directory));
 

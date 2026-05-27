@@ -18,16 +18,16 @@ pub(crate) enum Value {
   Warn(String),
 }
 
-/// Creates a `Value::PLain` with a formatted string.
+/// Creates a `Value::Plain` with a formatted string.
 ///
 /// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// let id = "my-id";
 /// let plain_value = plain!("id:{}", id);
 /// assert!(matches!(plain_value, Value::Plain { .. }));
-/// assert_eq!(plain_value.to_undecorated_string, "id:my-id"));
+/// assert_eq!(plain_value.to_undecorated_string, "id:my-id");
 /// ```
 #[macro_export]
 macro_rules! plain {
@@ -41,11 +41,11 @@ macro_rules! plain {
 /// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// let id = "my-id";
 /// let warn_value = warn!("{} not found", id);
 /// assert!(matches!(warn_value, Value::Warn { .. }));
-/// assert_eq!(warn_value.to_undecorated_string, "my-id not found"));
+/// assert_eq!(warn_value.to_undecorated_string, "my-id not found");
 /// ```
 #[macro_export]
 macro_rules! warn {

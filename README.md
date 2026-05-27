@@ -58,11 +58,11 @@ the executable is included in your `PATH` variable and that you set the execute 
 
 ## Next steps
 
-* [Quick start](docs/quick_start.md)
-* [User guide](docs/user_guide.md)
-* [Authentication and authorization](docs/authentication_authorization.md)
-* [Environment variables](docs/environment_variables.md)
-* [Settings and targets](docs/settings_targets.md)
+* [Quick start](docs/quick-start.md)
+* [User guide](docs/user-guide.md)
+* [Authentication and authorization](docs/authentication-authorization.md)
+* [Environment variables](docs/environment-variables.md)
+* [Settings and targets](docs/settings-targets.md)
 * [Platforms specification](docs/platforms-specification.md)
 * [Set up autocompletion](docs/autocompletion.md)
 * [Developers](docs/developers.md)

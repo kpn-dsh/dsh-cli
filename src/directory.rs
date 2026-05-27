@@ -4,7 +4,7 @@
 //! and certificates. The default root of this directory structure is `$HOME/.dsh_cli`,
 //! but this can be overridden via the environment variable `DSH_CLI_HOME`.
 //!
-//! ```
+//! ```text
 //! $HOME/.dsh_cli/
 //!  ├── targets/
 //!  │    ├── platform1/
