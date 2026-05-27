@@ -106,4 +106,4 @@ Note that the environment variables take precedence over the default settings wh
 command line options take precedence over the environment variables. See the
 next page for an overview of all ways to define the platform and tenant names.
 
-[User guide &#x2192;](user_guide.md)
+[User guide &#x2192;](user-guide.md)

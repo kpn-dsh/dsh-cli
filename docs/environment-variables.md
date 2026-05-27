@@ -1,6 +1,6 @@
 # Environment variables
 
-[&#x2190; Authentication and authorization](authentication_authorization.md)
+[&#x2190; Authentication and authorization](authentication-authorization.md)
 
 The `dsh` tool can be run entirely from the command line and
 all configurations and parameters can be specified via command line arguments.
@@ -179,6 +179,15 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_EXPIRATION</code></td>
+        <td> 
+            Use this environment variable to specify the number of days used to check if some 
+            resource is about to expire. If this variable is not set, the settings file will be 
+            checked for the <code>expiration</code> entry. Else the default value <code>30</code> 
+            will be used.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_HOME</code></td>
         <td> 
             Use this environment variable to change the location where <code>dsh</code> 
@@ -299,6 +308,16 @@ The following table describes all environment variables.
             This environment variable can be overridden via the 
             <code>--no-color</code> or <code>--no-ansi</code> command line argument.
             Note that <code>NO_COLOR</code> is an alias for this environment variable.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_OUTPUT_DIRECTORY</code></td>
+        <td>
+            This environment variable specifies the directory where the output of a command will 
+            be written to. If this variable is not provided, the value from the settings file 
+            will be used. Else, the current working directory will be used. This environment 
+            variable can be overridden via the <code>--output-directory</code> command line 
+            argument.
         </td>
     </tr>
     <tr valign="top">
@@ -555,4 +574,4 @@ The following table describes all environment variables.
 
 </table>
 
-[Settings and targets &#x2192;](settings_targets.md)
+[Settings and targets &#x2192;](settings-targets.md)

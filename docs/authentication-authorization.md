@@ -1,6 +1,6 @@
 # Authentication and authorization
 
-[&#x2190; User guide](user_guide.md)
+[&#x2190; User guide](user-guide.md)
 
 There are two method to authenticate and authorize for the `cli` tool.
 
@@ -152,4 +152,4 @@ without showing it. To list the available robot passwords in your local keyring,
 └───────────────┴────────────┘
 ```
 
-[Environment variables &#x2192;](environment_variables.md)
+[Environment variables &#x2192;](environment-variables.md)

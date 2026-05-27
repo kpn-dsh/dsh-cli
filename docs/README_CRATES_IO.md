@@ -55,14 +55,15 @@ DSH resource management api command line interface.
 Usage: dsh [OPTIONS] [SUBJECT/COMMAND]
 
 Subjects/commands:
+  aclgroup     Show, manage and list DSH Kafka proxy ACL groups.
   api          List and call DSH resource management api.
   app          Show, manage and list apps deployed from the DSH app catalog.
   bucket       Show, manage and list DSH buckets.
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
   image        Show image usage.
-  login        Login via single sign on
-  logout       Logout from single sign on
+  login        Login via single-sign-on
+  logout       Logout from single-sign-on
   manifest     Show App Catalog manifests.
   metric       Show metric exports.
   nodepool     Show node pool resources.
@@ -73,6 +74,7 @@ Subjects/commands:
   service      Show, manage and list services deployed on the DSH.
   setting      Show, manage and list dsh settings.
   stream       Show, manage and list internal and public managed streams.
+  task         List and show DSH service tasks.
   tenant       Show and manage tenants on the DSH.
   token        Request DSH tokens.
   topic        Show, manage and list DSH scratch topics.
@@ -85,14 +87,11 @@ Options:
   -h, --help     Print help (see more with '--help')
 
 Output options:
-  -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, 
-                                plain, quiet, table, table-no-border, toml, toml-compact, yaml]
-  -q, --quiet                   Run in quiet mode
-  -v, --verbosity <VERBOSITY>   Set verbosity level [possible values: off, low, medium, high]
-
-
-Settings:
-  file-name  /Users/me/.dsh_cli/settings.toml
+      --output-directory <DIRECTORY>  Set output directory
+  -o, --output-format <FORMAT>        Set output format [possible values: csv, json, json-compact, plain, quiet, table,
+                                      table-no-border, toml, toml-compact, yaml]
+  -q, --quiet                         Run in quiet mode
+  -v, --verbosity <VERBOSITY>         Set verbosity level [possible values: off, low, medium, high]
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.
