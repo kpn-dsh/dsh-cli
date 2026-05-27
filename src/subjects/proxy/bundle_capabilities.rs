@@ -1,19 +1,24 @@
-pub(crate) mod labels;
-pub(crate) mod options;
-
-use crate::capability::{Capability, CommandExecutor, CODE_COMMAND, CREATE_COMMAND, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::arguments::proxy_id_argument;
+use crate::capability::{Capability, CommandExecutor, CODE_COMMAND, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
+use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
 use crate::directory::{
   delete_proxy_certificate_bundle, list_proxy_certificate_bundles, proxy_certificate_bundle_exists, read_local_certificate_bundle, store_proxy_certificate_bundle,
 };
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::global_options::{expiration_option, get_expiration_days};
+use crate::global_options::get_expiration_days;
 use crate::proxy_bundles::{LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::secret_metadata::secret_metadata;
-use crate::subject::{Requirements, Subject};
+use crate::subject::Requirements;
+use crate::subjects::aclgroup::options::{acl_group_name_option, ACL_GROUP_NAME_OPTION};
 use crate::subjects::certificate::CertificateLabel;
+use crate::subjects::proxy::labels::BundleLabel;
+use crate::subjects::proxy::options::{
+  ca_common_name_option, enable_schema_store_option, example_argument, get_ca_common_name, get_number_of_dns_records, get_vhost_zone, language_argument,
+  number_of_dns_records_option, vhost_zone_option, ENABLE_SCHEMA_STORE_OPTION, EXAMPLE_ARGUMENT, LANGUAGE_ARGUMENT,
+};
 use crate::subjects::secret::SecretLabel;
 use crate::target_platform::{get_target_platform, platform_name_argument};
 use crate::target_tenant::{get_target_tenant, tenant_name_argument};
@@ -22,59 +27,10 @@ use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use log::trace;
-
-use crate::arguments::proxy_id_argument;
-use crate::code::{delete_example_code, example_code_exists, generate_example_code};
-use crate::subjects::aclgroup::options::{acl_group_name_option, ACL_GROUP_NAME_OPTION};
-use crate::subjects::bundle::labels::BundleLabel;
-use crate::subjects::bundle::options::{
-  ca_common_name_option, enable_schema_store_option, example_argument, get_ca_common_name, get_number_of_dns_records, get_vhost_zone, language_argument,
-  number_of_dns_records_option, vhost_zone_option, ENABLE_SCHEMA_STORE_OPTION, EXAMPLE_ARGUMENT, LANGUAGE_ARGUMENT,
-};
-use std::convert::AsRef;
 use std::sync::LazyLock;
 
-struct BundleSubject {}
-
-const BUNDLE_SUBJECT_TARGET: &str = "bundle";
-
-lazy_static! {
-  pub(crate) static ref BUNDLE_SUBJECT: Box<dyn Subject + Send + Sync> = Box::new(BundleSubject {});
-}
-
-#[async_trait]
-impl Subject for BundleSubject {
-  fn subject(&self) -> &'static str {
-    BUNDLE_SUBJECT_TARGET
-  }
-
-  fn subject_command_about(&self) -> String {
-    "Show, manage and list proxy certificate bundles.".to_string()
-  }
-
-  fn subject_command_long_about(&self) -> String {
-    "Show, manage and list proxy certificate bundles supporting DSH Kafka proxies.".to_string()
-  }
-
-  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
-    match capability_command {
-      CODE_COMMAND => Some(BUNDLE_CODE_CAPABILITY.as_ref()),
-      CREATE_COMMAND => Some(BUNDLE_CREATE_CAPABILITY.as_ref()),
-      DELETE_COMMAND => Some(BUNDLE_DELETE_CAPABILITY.as_ref()),
-      LIST_COMMAND => Some(BUNDLE_LIST_CAPABILITY.as_ref()),
-      SHOW_COMMAND => Some(BUNDLE_SHOW_CAPABILITY.as_ref()),
-      _ => None,
-    }
-  }
-
-  fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
-    &BUNDLE_CAPABILITIES
-  }
-}
-
-static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+pub(crate) static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(CODE_COMMAND, None, &BundleCode {}, "Generate example client code")
       .add_target_argument(proxy_id_argument().required(true))
@@ -82,43 +38,36 @@ static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = L
       .add_target_argument(example_argument()),
   )
 });
-static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+pub(crate) static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(CREATE_COMMAND, None, &BundleCreate {}, "Create local proxy certificates bundle")
-      .add_target_argument(proxy_id_argument().required(true))
-      .add_target_argument(platform_name_argument())
-      .add_target_argument(tenant_name_argument())
-      .add_extra_argument(acl_group_name_option())
-      .add_extra_argument(ca_common_name_option())
-      .add_extra_argument(enable_schema_store_option())
-      .add_extra_argument(number_of_dns_records_option())
-      .add_extra_argument(vhost_zone_option()),
+    CapabilityBuilder::new(
+      CREATE_COMMAND,
+      Some(CREATE_COMMAND_ALIAS),
+      &BundleCreate {},
+      "Create local proxy certificates bundle",
+    )
+    .add_target_argument(proxy_id_argument().required(true))
+    .add_target_argument(platform_name_argument())
+    .add_target_argument(tenant_name_argument())
+    .add_extra_argument(acl_group_name_option())
+    .add_extra_argument(ca_common_name_option())
+    .add_extra_argument(enable_schema_store_option())
+    .add_extra_argument(number_of_dns_records_option())
+    .add_extra_argument(vhost_zone_option()),
   )
 });
-static BUNDLE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+pub(crate) static BUNDLE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &BundleDelete {}, "Delete local proxy certificates bundle")
-      .add_target_argument(proxy_id_argument().required(true))
-      .add_target_argument(platform_name_argument())
-      .add_target_argument(tenant_name_argument()),
+    CapabilityBuilder::new(
+      DELETE_COMMAND,
+      Some(DELETE_COMMAND_ALIAS),
+      &BundleDelete {},
+      "Delete local proxy certificates bundle",
+    )
+    .add_target_argument(proxy_id_argument().required(true))
+    .add_target_argument(platform_name_argument())
+    .add_target_argument(tenant_name_argument()),
   )
-});
-static BUNDLE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &BundleList {}, "List dsh proxies")
-      .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH."),
-  )
-});
-static BUNDLE_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &BundleShow {}, "Show local proxy certificate bundle")
-      .add_target_argument(proxy_id_argument().required(true))
-      .add_extra_argument(expiration_option()),
-  )
-});
-
-static BUNDLE_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  vec![BUNDLE_CODE_CAPABILITY.as_ref(), BUNDLE_CREATE_CAPABILITY.as_ref(), BUNDLE_DELETE_CAPABILITY.as_ref(), BUNDLE_LIST_CAPABILITY.as_ref(), BUNDLE_SHOW_CAPABILITY.as_ref()]
 });
 
 static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
@@ -166,7 +115,7 @@ impl CommandExecutor for BundleCode {
       language, example, bundle_id, platform, tenant
     ));
 
-    if example_code_exists(&language, &example, &bundle_configuration, context)? {
+    if example_code_exists(language, &example, &bundle_configuration, context)? {
       context.print_warning(format!(
         "'{}' {} {} example code already exists for '{}@{}'",
         bundle_id, language, example, platform, tenant
@@ -178,14 +127,14 @@ impl CommandExecutor for BundleCode {
         context.print_warning("dry-run mode, existing example code not deleted");
         return Ok(());
       } else {
-        delete_example_code(&language, &example, &bundle_configuration, context)?;
+        delete_example_code(language, &example, &bundle_configuration, context)?;
       }
     }
 
     if context.dry_run() {
       context.print_warning("dry-run mode, no code generated");
     } else {
-      let example_directory = generate_example_code(&language, &example, &bundle_configuration, &directory, context)?;
+      let example_directory = generate_example_code(language, &example, &bundle_configuration, &directory, context)?;
       context.print_outcome(format!(
         "{} code for bundle '{}' generated in directory '{}'",
         language, bundle_id, example_directory
@@ -280,6 +229,24 @@ impl CommandExecutor for BundleCreate {
   }
 }
 
+fn get_acl_group_name(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<String>> {
+  match matches.get_one::<String>(ACL_GROUP_NAME_OPTION) {
+    Some(acl_group_name) => Ok(Some(acl_group_name.clone())),
+    None => {
+      if context.confirmed("enable acl groups?")? {
+        let acl_group_name = context.read_single_line("acl group name")?;
+        if acl_group_name.is_empty() {
+          err!("acl group name cannot be empty")
+        } else {
+          Ok(Some(acl_group_name))
+        }
+      } else {
+        Ok(None)
+      }
+    }
+  }
+}
+
 struct BundleDelete {}
 
 #[async_trait]
@@ -320,7 +287,7 @@ static BUNDLE_LABELS_LIST: [BundleLabel; 7] = [
   BundleLabel::BundleDirectory,
 ];
 
-struct BundleList {}
+pub(crate) struct BundleList {}
 
 #[async_trait]
 impl CommandExecutor for BundleList {
@@ -373,7 +340,7 @@ static BUNDLE_LABELS_SHOW: [BundleLabel; 9] = [
 static BUNDLE_DERIVED_LABELS_SHOW: [BundleLabel; 5] =
   [BundleLabel::BundleName, BundleLabel::PlatformDomain, BundleLabel::DnsEntries, BundleLabel::GroupId, BundleLabel::ProxyCommonName];
 
-struct BundleShow {}
+pub(crate) struct BundleShow {}
 
 #[async_trait]
 impl CommandExecutor for BundleShow {
@@ -415,23 +382,5 @@ impl CommandExecutor for BundleShow {
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
     Requirements::standard_without_api()
-  }
-}
-
-fn get_acl_group_name(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<String>> {
-  match matches.get_one::<String>(ACL_GROUP_NAME_OPTION) {
-    Some(acl_group_name) => Ok(Some(acl_group_name.clone())),
-    None => {
-      if context.confirmed("enable acl groups?")? {
-        let acl_group_name = context.read_single_line("acl group name")?;
-        if acl_group_name.is_empty() {
-          err!("acl group name cannot be empty")
-        } else {
-          Ok(Some(acl_group_name))
-        }
-      } else {
-        Ok(None)
-      }
-    }
   }
 }

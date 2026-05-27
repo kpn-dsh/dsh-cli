@@ -9,8 +9,6 @@ use whoami::username;
 
 pub(crate) const CA_COMMON_NAME_OPTION: &str = "ca-common-name-option";
 
-// validations
-
 pub(crate) fn ca_common_name_option() -> Arg {
   Arg::new(CA_COMMON_NAME_OPTION)
     .long("ca-common-name")
