@@ -20,8 +20,8 @@ set -e
 
 PLATFORM_UNDER_TEST="np-aws-lz-dsh"
 TENANT_UNDER_TEST="greenbox-dev"
-PASSWORD_DIRECTORY="$(dirname "$0")/../ignore"
-SECRET_UNDER_TEST="test"
+PASSWORD_DIRECTORY="$(dirname "$0")"
+SECRET_UNDER_TEST="cli-test"
 
 PLATFORM="$PLATFORM_UNDER_TEST"
 TENANT="$TENANT_UNDER_TEST"

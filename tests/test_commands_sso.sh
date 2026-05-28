@@ -18,6 +18,9 @@ export DSH_CLI_OUTPUT_FORMAT="table"
 export DSH_CLI_SHOW_EXECUTION_TIME=""
 export DSH_CLI_VERBOSITY="high"
 
+# uncomment the following line to filter out ansi sequences
+# export DSH_CLI_NO_ESCAPE=true
+
 source "$(dirname "$0")/commands.sh"
 
 set -f
