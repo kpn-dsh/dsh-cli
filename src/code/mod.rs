@@ -13,7 +13,7 @@ pub(crate) const LANGUAGE_RUST: &str = "rust";
 
 pub(crate) const EXAMPLE_CONSUMER: &str = "consumer";
 pub(crate) const EXAMPLE_PRODUCER: &str = "producer";
-pub(crate) const EXAMPLE_TOPICS: &str = "topics";
+pub(crate) const EXAMPLE_LIST_TOPICS: &str = "list-topics";
 
 pub(crate) fn generate_example_code(
   language: &str,
@@ -48,11 +48,12 @@ pub(crate) fn delete_example_code(language: &str, example: &str, bundle_configur
 const BROKERS_PLACEHOLDER: &str = "{{brokers}}";
 const BUNDLE_DIRECTORY_PLACEHOLDER: &str = "{{bundle-directory}}";
 const CLIENT_ID_PLACEHOLDER: &str = "{{client-id}}";
+const EXAMPLE_PLACEHOLDER: &str = "{{example}}";
 const GROUP_ID_PLACEHOLDER: &str = "{{group-id}}";
 const PROXY_NAME_PLACEHOLDER: &str = "{{proxy-name}}";
 const TENANT_PLACEHOLDER: &str = "{{tenant}}";
 
-fn apply_template(template: &str, bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str) -> DshCliResult<String> {
+fn apply_template(template: &str, example: &str, bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str) -> DshCliResult<String> {
   let brokers = bundle_configuration
     .platform
     .tenant_proxy_bootstrap_servers(
@@ -68,6 +69,7 @@ fn apply_template(template: &str, bundle_configuration: &ProxyCertificateBundleC
   let rust_rs = template.replace(BROKERS_PLACEHOLDER, &brokers);
   let rust_rs = rust_rs.replace(BUNDLE_DIRECTORY_PLACEHOLDER, bundle_directory);
   let rust_rs = rust_rs.replace(CLIENT_ID_PLACEHOLDER, &bundle_configuration.client_id());
+  let rust_rs = rust_rs.replace(EXAMPLE_PLACEHOLDER, example);
   let rust_rs = rust_rs.replace(GROUP_ID_PLACEHOLDER, &bundle_configuration.group_id(1));
   let rust_rs = rust_rs.replace(PROXY_NAME_PLACEHOLDER, &bundle_configuration.proxy_name);
   let rust_rs = rust_rs.replace(TENANT_PLACEHOLDER, &bundle_configuration.tenant);
@@ -79,7 +81,7 @@ fn apply_template(template: &str, bundle_configuration: &ProxyCertificateBundleC
 /// `[OUTPUT_DIR]/[PROXY_NAME]-[LANGUAGE]-[EXAMPLE]`
 ///
 /// ## Example
-/// `/Users/wilbert/Workspaces/dsh/dcli/output/demo-rust-topics-example`
+/// `/Users/username/Workspaces/dsh/dcli/output/demo-rust-topics-example`
 ///
 /// ## Parameters
 /// * `language` - Programming language: `python` or `rust`.
