@@ -43,6 +43,7 @@ rdkafka = { version = "0.39", features = ["ssl-vendored"], default-features = fa
 
 <details>
 <summary>See <code>src/main.rs</code></summary>
+<div>
 <pre>
 use ctrlc::set_handler;
 use rdkafka::config::ClientConfig;
@@ -95,6 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   }
 }
 </pre>
+</div>
 </details>
 
 To build the example, we first change to the created directory and use `cargo build` to build
