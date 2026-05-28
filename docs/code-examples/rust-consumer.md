@@ -66,7 +66,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set("ssl.certificate.location", format!("{PKI_DIRECTORY}/client.pem"))
     .set("ssl.key.location", format!("{PKI_DIRECTORY}/client.key"));
 
-  let consumer: BaseConsumer = kafka_client_config.create().map_err(|error| format!("failed to create consumer: {error}"))?;
+  let consumer: BaseConsumer =
+    kafka_client_config
+      .create()
+      .map_err(|error| format!("failed to create consumer: {error}"))?;
 
   consumer
     .subscribe(&[topic])
@@ -74,7 +77,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   loop {
     match consumer.poll(Duration::ZERO) {
-      Some(Ok(message)) => println!("{}:{} {}", message.partition(), message.offset(), String::from_utf8_lossy(message.key().unwrap())),
+      Some(Ok(message)) => println!(
+        "{}:{} {}",
+        message.partition(),
+        message.offset(),
+        String::from_utf8_lossy(message.key().unwrap())
+      ),
       Some(Err(error)) => println!("error: {error}"),
       None => {}
     }
