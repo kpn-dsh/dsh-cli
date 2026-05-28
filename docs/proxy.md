@@ -45,7 +45,7 @@ press the enter-key after each prompt.
 
 ```shell
 > dsh proxy create my-proxy
-create proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@greenbox-dev'
+create proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
 enable acl groups? [y/N]
 certificate authority common name [username]:
 enable schema store? [y/N]
@@ -56,7 +56,7 @@ vhost zone [PRIVATE/public]:
 │ platform       │ np-aws-lz-dsh           │
 │ tenant         │ my-tenant               │
 │ proxy name     │ my-proxy                │
-│ group id       │ greenbox-dev_my-proxy_1 │
+│ group id       │ my-tenant_my-proxy_1 │
 │ ca common name │ username                │
 │ schema store   │ disabled                │
 │ vhost zone     │ private                 │
@@ -72,7 +72,7 @@ listed and the bundle will be ready. You can list the available proxy certificat
 
 ```shell
 > dsh proxy list --bundle
-list all local proxy certificate bundles for 'np-aws-lz-dsh@greenbox-dev'
+list all local proxy certificate bundles for 'np-aws-lz-dsh@my-tenant'
 ┌──────────┬────────────────┬──────────────┬────────────┬─────────┬────────────────┬───────────────────────────────────────────────────────────────────────────┐
 │ bundle   │ ca common name │ schema store │ vhost zone │ records │ acl group name │ directory                                                                 │
 ├──────────┼────────────────┼──────────────┼────────────┼─────────┼────────────────┼───────────────────────────────────────────────────────────────────────────┤
@@ -83,7 +83,7 @@ list all local proxy certificate bundles for 'np-aws-lz-dsh@greenbox-dev'
 You can also list the files in the directory where the bundle is stored:
 
 ```shell
-> ls -l /Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/greenbox-dev/bundles/my-proxy
+> ls -l /Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy
 total 56
 -rw-------  1 username  staff   180 28 mei  17:07 bundle.toml
 -rw-------  1 username  staff  3272 28 mei  17:07 ca.key
