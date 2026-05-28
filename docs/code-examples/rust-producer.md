@@ -38,7 +38,7 @@ use std::env::args;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{process, thread};
 
-const PKI_DIRECTORY: &str = "/Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
+const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
 const CLIENT_ID: &str = "my-tenant";
 const BROKERS: [&str; 3] = [
   "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",

@@ -42,7 +42,7 @@ The settings are stored in the file `$HOME/.dsh_cli/settings.toml`. Some example
 
 ```toml
 default-platform = "np-aws-lz-dsh"
-default-tenant = "greenbox-dev"
+default-tenant = "my-tenant"
 matching-color = "red"
 matching-style = "bold"
 show-execution-time = false

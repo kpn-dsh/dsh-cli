@@ -39,7 +39,7 @@ use std::env::args;
 use std::time::Duration;
 use std::{process, thread};
 
-const PKI_DIRECTORY: &str = "/Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
+const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
 const CLIENT_ID: &str = "my-tenant";
 const GROUP_ID: &str = "my-tenant_my-proxy_1";
 const BROKERS: [&str; 3] = [

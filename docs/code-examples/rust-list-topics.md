@@ -34,7 +34,7 @@ use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use std::time::Duration;
 
-const PKI_DIRECTORY: &str = "/Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
+const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
 const CLIENT_ID: &str = "my-tenant";
 const GROUP_ID: &str = "my-tenant_my-proxy_1";
 const BROKERS: [&str; 3] = [

@@ -17,7 +17,7 @@ a Python script named `my-proxy-consumer.py`.
 from confluent_kafka import Consumer
 import sys
 
-PKI_DIRECTORY = "/Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy"
+PKI_DIRECTORY = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy"
 
 CLIENT_ID = "my-tenant"
 GROUP_ID = "my-tenant_my-proxy_1"
