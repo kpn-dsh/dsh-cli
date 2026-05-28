@@ -40,7 +40,7 @@ If you have the Rust tool-chain installed, the `dsh` tool can be installed on yo
 directly from `crates.io`, by executing the following command:
 
 ```shell
-> cargo install dsh --all-features
+> cargo install dsh --all-features --locked
 ```
 
 This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/dsh`.

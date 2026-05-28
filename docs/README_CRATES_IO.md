@@ -39,7 +39,7 @@ The DSH Api Command Line Tool (`dsh`) can be installed on your local machine
 by executing the following command.
 
 ```shell
-> cargo install dsh
+> cargo install dsh --locked
 ...
 ```
 
