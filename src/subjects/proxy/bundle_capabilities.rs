@@ -1,6 +1,4 @@
-use crate::arguments::proxy_id_argument;
-use crate::capability::{Capability, CommandExecutor, CODE_COMMAND, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS};
-use crate::capability_builder::CapabilityBuilder;
+use crate::capability::CommandExecutor;
 use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
 use crate::directory::{
@@ -12,63 +10,19 @@ use crate::global_options::get_expiration_days;
 use crate::proxy_bundles::{LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::secret_metadata::secret_metadata;
 use crate::subject::Requirements;
-use crate::subjects::aclgroup::options::{acl_group_name_option, ACL_GROUP_NAME_OPTION};
+use crate::subjects::aclgroup::options::ACL_GROUP_NAME_OPTION;
 use crate::subjects::certificate::CertificateLabel;
 use crate::subjects::proxy::labels::BundleLabel;
-use crate::subjects::proxy::options::{
-  ca_common_name_option, enable_schema_store_option, example_argument, get_ca_common_name, get_number_of_dns_records, get_vhost_zone, language_argument,
-  number_of_dns_records_option, vhost_zone_option, ENABLE_SCHEMA_STORE_OPTION, EXAMPLE_ARGUMENT, LANGUAGE_ARGUMENT,
-};
+use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone, ENABLE_SCHEMA_STORE_OPTION, EXAMPLE_ARGUMENT, LANGUAGE_ARGUMENT};
 use crate::subjects::secret::SecretLabel;
-use crate::target_platform::{get_target_platform, platform_name_argument};
-use crate::target_tenant::{get_target_tenant, tenant_name_argument};
+use crate::target_platform::get_target_platform;
+use crate::target_tenant::get_target_tenant;
 use crate::verbosity::Verbosity;
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use itertools::Itertools;
 use log::trace;
-use std::sync::LazyLock;
-
-pub(crate) static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(CODE_COMMAND, None, &BundleCode {}, "Generate example client code")
-      .add_target_argument(proxy_id_argument().required(true))
-      .add_target_argument(language_argument().required(true))
-      .add_target_argument(example_argument()),
-  )
-});
-pub(crate) static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(
-      CREATE_COMMAND,
-      Some(CREATE_COMMAND_ALIAS),
-      &BundleCreate {},
-      "Create local proxy certificates bundle",
-    )
-    .add_target_argument(proxy_id_argument().required(true))
-    .add_target_argument(platform_name_argument())
-    .add_target_argument(tenant_name_argument())
-    .add_extra_argument(acl_group_name_option())
-    .add_extra_argument(ca_common_name_option())
-    .add_extra_argument(enable_schema_store_option())
-    .add_extra_argument(number_of_dns_records_option())
-    .add_extra_argument(vhost_zone_option()),
-  )
-});
-pub(crate) static BUNDLE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(
-      DELETE_COMMAND,
-      Some(DELETE_COMMAND_ALIAS),
-      &BundleDelete {},
-      "Delete local proxy certificates bundle",
-    )
-    .add_target_argument(proxy_id_argument().required(true))
-    .add_target_argument(platform_name_argument())
-    .add_target_argument(tenant_name_argument()),
-  )
-});
 
 static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
   CertificateLabel::Target,
@@ -91,7 +45,7 @@ static BUNDLE_LABELS_CREATE: [BundleLabel; 10] = [
   BundleLabel::NumberOfDsnRecords,
 ];
 
-struct BundleCode {}
+pub(crate) struct BundleCode {}
 
 #[async_trait]
 impl CommandExecutor for BundleCode {
@@ -148,7 +102,7 @@ impl CommandExecutor for BundleCode {
   }
 }
 
-struct BundleCreate {}
+pub(crate) struct BundleCreate {}
 
 #[async_trait]
 impl CommandExecutor for BundleCreate {
@@ -247,7 +201,7 @@ fn get_acl_group_name(matches: &ArgMatches, context: &Context) -> DshCliResult<O
   }
 }
 
-struct BundleDelete {}
+pub(crate) struct BundleDelete {}
 
 #[async_trait]
 impl CommandExecutor for BundleDelete {

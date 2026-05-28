@@ -1,6 +1,4 @@
-use crate::arguments::proxy_id_argument;
-use crate::capability::{Capability, CommandExecutor, DEPLOY_COMMAND, UNDEPLOY_COMMAND};
-use crate::capability_builder::CapabilityBuilder;
+use crate::capability::CommandExecutor;
 use crate::context::Context;
 use crate::directory::{proxy_certificate_bundle_exists, read_proxy_certificate_bundle};
 use crate::error::DshCliError;
@@ -15,10 +13,10 @@ use crate::subjects::certificate::{CertificateLabel, CERTIFICATE_LABELS_SHOW};
 use crate::subjects::proxy::labels::KafkaProxyLabel;
 use crate::subjects::proxy::PROXY_SUBJECT_TARGET;
 use crate::subjects::secret::SecretLabel;
-use crate::subjects::service::{cpus_option, instances_option, mem_option, CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
+use crate::subjects::service::{CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
-use crate::{cli_error, err, DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::{cli_error, err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
@@ -29,28 +27,8 @@ use futures::join;
 use itertools::Itertools;
 use std::num::NonZeroU64;
 use std::str::FromStr;
-use std::sync::LazyLock;
 use std::time::Duration;
 use tokio::time::sleep;
-
-pub(crate) static PROXY_DEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(DEPLOY_COMMAND, None, &ProxyDeploy {}, "Deploy local proxy on dsh")
-      .set_long_about("Deploy a Kafka proxy.")
-      .add_target_argument(proxy_id_argument().required(true))
-      .add_extra_argument(cpus_option().help_heading(COMMAND_OPTIONS_HEADING))
-      .add_extra_argument(instances_option().help_heading(COMMAND_OPTIONS_HEADING))
-      .add_extra_argument(mem_option().help_heading(COMMAND_OPTIONS_HEADING)),
-  )
-});
-
-pub(crate) static PROXY_UNDEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
-  Box::new(
-    CapabilityBuilder::new(UNDEPLOY_COMMAND, None, &ProxyUndeploy {}, "Undeploy proxy from dsh")
-      .set_long_about("Undeploy a Kafka proxy.")
-      .add_target_argument(proxy_id_argument().required(true)),
-  )
-});
 
 static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 4] =
   [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
@@ -82,7 +60,7 @@ static PROXY_LABELS_SHOW: [KafkaProxyLabel; 11] = [
   KafkaProxyLabel::Validations,
 ];
 
-struct ProxyDeploy {}
+pub(crate) struct ProxyDeploy {}
 
 #[async_trait]
 impl CommandExecutor for ProxyDeploy {
@@ -328,7 +306,7 @@ impl CommandExecutor for ProxyShow {
   }
 }
 
-struct ProxyUndeploy {}
+pub(crate) struct ProxyUndeploy {}
 
 #[async_trait]
 impl CommandExecutor for ProxyUndeploy {

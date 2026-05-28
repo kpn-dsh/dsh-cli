@@ -1,4 +1,4 @@
-use crate::code::{EXAMPLE_CONSUMER, EXAMPLE_PRODUCER, EXAMPLE_TOPICS, LANGUAGE_PYTHON, LANGUAGE_RUST};
+use crate::code::{EXAMPLE_CONSUMER, EXAMPLE_LIST_TOPICS, EXAMPLE_PRODUCER, LANGUAGE_PYTHON, LANGUAGE_RUST};
 use crate::context::Context;
 use crate::{err, DshCliResult};
 use clap::builder::PossibleValue;
@@ -126,8 +126,8 @@ pub(crate) fn example_argument() -> Arg {
     .action(ArgAction::Set)
     .value_parser(builder::PossibleValuesParser::new(vec![
       PossibleValue::new(EXAMPLE_CONSUMER),
+      PossibleValue::new(EXAMPLE_LIST_TOPICS),
       PossibleValue::new(EXAMPLE_PRODUCER),
-      PossibleValue::new(EXAMPLE_TOPICS),
     ]))
     .value_name("EXAMPLE")
     .help("Generated example")
