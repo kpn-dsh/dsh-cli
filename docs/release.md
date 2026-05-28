@@ -46,8 +46,8 @@ This will result in two executables in your project directory, one with `robot`,
 > ls -al
 total 87072
 ...
--rwxr-xr-x   1 wilbert  staff  23506384  6 mrt. 09:51 dsh-manage-v0.10.0-aarch64-apple-darwin
--rwxr-xr-x   1 wilbert  staff  21444176  6 mrt. 09:51 dsh-v0.10.0-aarch64-apple-darwin
+-rwxr-xr-x   1 username  staff  23506384  6 mrt. 09:51 dsh-manage-v0.10.0-aarch64-apple-darwin
+-rwxr-xr-x   1 username  staff  21444176  6 mrt. 09:51 dsh-v0.10.0-aarch64-apple-darwin
 ...
 ```
 
@@ -80,8 +80,8 @@ This will result in two executables in your project directory, one with `robot`,
 > ls -al
 total 87072
 ...
--rwxr-xr-x   1 wilbert  staff  23506384  6 mrt. 09:51 dsh-manage-v0.10.0-x86_64-unknown-linux-gnu
--rwxr-xr-x   1 wilbert  staff  21444176  6 mrt. 09:51 dsh-v0.10.0-x86_64-unknown-linux-gnu
+-rwxr-xr-x   1 username  staff  23506384  6 mrt. 09:51 dsh-manage-v0.10.0-x86_64-unknown-linux-gnu
+-rwxr-xr-x   1 username  staff  21444176  6 mrt. 09:51 dsh-v0.10.0-x86_64-unknown-linux-gnu
 ...
 ```
 

@@ -83,7 +83,7 @@ list all local proxy certificate bundles for 'np-aws-lz-dsh@my-tenant'
 You can also list the files in the directory where the bundle is stored:
 
 ```shell
-> ls -l /Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy
+> ls -l /Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy
 total 56
 -rw-------  1 username  staff   180 28 mei  17:07 bundle.toml
 -rw-------  1 username  staff  3272 28 mei  17:07 ca.key
@@ -149,9 +149,9 @@ If you are curious, you can also check the installed certificate and secrets:
 
 Now that we have a running proxy, we want to use it to connect to a Kafka cluster on the DSH
 platform. The easiest way to do this is to let the `dsh` tool create a code example and run it.
-At this time code examples can be generated for the `python` and `rust` programming languages.
-The next version of the tool will support more languages (`go`, `java`, `javascript/typescript`
-and `scala` are on the roadmap).
+At this time code examples can be generated for the `Python` and `Rust` programming languages.
+The next version of the tool will support more languages (`Go`, `Java`, `Javascript/Typescript`
+and `Scala` are on the roadmap).
 
 For each supported programming language there are (will be) three different codes examples:
 
@@ -159,21 +159,26 @@ For each supported programming language there are (will be) three different code
   <dt><code>consumer</code></dt>
   <dd>Will create a client that connects to the Kafka cluster as a consumer, subscribes
   to a topic and prints the keys of the records that it receives from the topic.</dd>
-  <dt><code>producer</code></dt>
-  <dd>Will create a client that connects to the Kafka cluster as a producer and sends a
-  record to a topic each second, with the timestamp as record key.</dd>
   <dt><code>list-topic</code></dt>
   <dd>Will will create a client that connects to the Kafka cluster as a consumer and lists
   all topics that the client can read from.</dd>
+  <dt><code>producer</code></dt>
+  <dd>Will create a client that connects to the Kafka cluster as a producer and sends a
+  record to a topic each second, with the timestamp as record key.</dd>
 </dl>
 
 At this time, only a limited set of code examples are supported. Click on the link to see the
 explanation.
 
-* [python consumer](code-examples/python-consumer.md)
-* [rust consumer](code-examples/rust-consumer.md)
-* [rust producer](code-examples/rust-producer.md)
-* [rust list-topics](code-examples/rust-list-topics.md)
+### `Python`
+
+* [consumer](code-examples/python-consumer.md)
+
+### `Rust`
+
+* [consumer](code-examples/rust-consumer.md)
+* [list-topics](code-examples/rust-list-topics.md)
+* [producer](code-examples/rust-producer.md)
 
 ## Proxy with ACL groups
 
