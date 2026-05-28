@@ -25,6 +25,8 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Proxy code generation.
 * Kafka proxy ACL groups.
 * License check.
+* Alias `d` for `delete` capability.
+* `README.md` file to `tests` directory.
 
 ### Changed
 
@@ -43,6 +45,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Login still possible when dry-run is enabled.
 * Platform list shows public and private domains.
 * Some columns are right aligned.
+* Removed `examples` directory.
 
 ## [0.9.0] - 2026-03-05
 
