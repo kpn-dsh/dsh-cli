@@ -1,4 +1,3 @@
-[//]: @formatter:off
 # Code example `rust consumer`
 
 For this example we will create a `consumer` example for the `rust` programming language:
@@ -13,23 +12,12 @@ created file 'my-proxy-consumer-rust-example/Cargo.toml'
 rust code for bundle 'my-proxy' generated in directory 'my-proxy-consumer-rust-example'
 ```
 
-As is shown in the output, the example is generated in a newly created directory which contains
-a `Cargo.toml` manifest and a `src/main.rs` binary module.
+As is shown in the output of the command, the example is generated in a newly created directory
+which contains a `Cargo.toml` manifest and a `src/main.rs` binary module.
 
-```shell
-> ls -lR my-proxy-consumer-rust-example
-total 8
--rw-r--r--  1 username  staff  186 28 mei  18:07 Cargo.toml
-drwxr-xr-x  3 username  staff   96 28 mei  18:07 src
+## `Cargo.toml`
 
-my-proxy-consumer-rust-example/src:
-total 8
--rw-r--r--  1 username  staff  1908 28 mei  18:07 main.rs
-```
-
-<details>
-<summary>See <code>Cargo.toml</code></summary>
-<pre>
+```toml
 [package]
 name = "my-proxy-consumer"
 version = "0.1.0"
@@ -38,13 +26,11 @@ edition = "2024"
 [dependencies]
 ctrlc = "3"
 rdkafka = { version = "0.39", features = ["ssl-vendored"], default-features = false }
-</pre>
-</details>
+```
 
-<details>
-<summary>See <code>src/main.rs</code></summary>
-<div>
-<pre>
+## `src/main.rs`
+
+```rust
 use ctrlc::set_handler;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
@@ -95,9 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     thread::sleep(Duration::from_millis(10));
   }
 }
-</pre>
-</div>
-</details>
+```
 
 To build the example, we first change to the created directory and use `cargo build` to build
 the executable. This will take a few minutes due to dependencies on `rdkafka` and (indirect)
@@ -109,7 +93,7 @@ the executable. This will take a few minutes due to dependencies on `rdkafka` an
 ```
 
 Now finally we can run the executable and receive messages from a Kafka topic. In the example below
-we use the same topic as for the [`rust producer`](code-examples/rust-producer.md) example
+we use the same topic as for the [`rust producer`](rust-producer.md) example
 (`scratch.example.my-tenant`). Use `ctrl-c` to stop the program.
 
 ```shell
