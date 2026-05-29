@@ -20,7 +20,8 @@ which contains a `Cargo.toml` manifest and a `src/main.rs` binary module.
 
 <details>
 <summary>Cargo.toml</summary>
-<div><pre>
+
+```rust
 use ctrlc::set_handler;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
@@ -79,7 +80,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     thread::sleep(Duration::from_millis(10));
   }
 }
-</pre></div>
+```
+
 </details>
 
 ```toml
