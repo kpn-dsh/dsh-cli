@@ -212,6 +212,8 @@ In order to get access we first have to create the ACL group:
 
 ```shell
 > dsh aclgroup create my-aclgroup
+no readable or writable streams are provided
+create empty acl group? [y/N]y
 > dsh aclgroups
 list all proxy acl groups
 ┌─────────────┬────────┬──────┬──────────┬──────────┐
@@ -228,7 +230,9 @@ or `--write-topic` grant command.
 
 ```shell
 > dsh aclgroup grant my-aclgroup --read-topic example
+...
 > dsh aclgroup grant my-aclgroup --write-topic example
+...
 > dsh aclgroups
 list all proxy acl groups
 ┌─────────────┬─────────┬───────┬──────────┬──────────┐
