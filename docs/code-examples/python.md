@@ -13,7 +13,7 @@ python code for bundle 'my-proxy' generated in directory 'my-proxy-example-pytho
 
 As is shown in the output, the example is generated in a newly created directory which contains
 two Python scripts named `my-proxy-consumer.py` and `my-proxy-producer.py`. Click below to see
-how the generated code looks like.
+the generated code.
 
 <details>
 <summary><code>my-proxy-consumer.py</code></summary>
