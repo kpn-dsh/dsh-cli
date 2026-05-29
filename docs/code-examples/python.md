@@ -16,7 +16,7 @@ two Python scripts named `my-proxy-consumer.py` and `my-proxy-producer.py`. Clic
 how the generated code looks like.
 
 <details>
-<summery><code>my-proxy-consumer.py</code></summery>
+<summary><code>my-proxy-consumer.py</code></summary>
 
 ```python
 from confluent_kafka import Consumer
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 </details>
 
 <details>
-<summery>my-proxy-producer.py</summery>
+<summary><code>my-proxy-producer.py</code></summary>
 
 ```python
 from confluent_kafka import Producer
