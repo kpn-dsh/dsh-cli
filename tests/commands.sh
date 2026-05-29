@@ -1,12 +1,12 @@
 #!/bin/bash
 
-export ACLGROUP_UNDER_TEST=demogroup
+export ACLGROUP_UNDER_TEST=cli-test
 export ACLGROUP_NON_EXISTING=non-existing-aclgroup
 export APP_NON_EXISTING=non-existing-app
 export APP_UNDER_TEST=eavesdropper
 export BUCKET_NON_EXISTING=non-existing-bucket
-export BUCKET_UNDER_TEST=schema-registry
-export CERTIFICATE_UNDER_TEST=demo-certificate
+export BUCKET_UNDER_TEST=cli-test
+export CERTIFICATE_UNDER_TEST=cli-test-certificate
 export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="dsh"
 export ENV_VAR_QUERY_UNDER_TEST=password
@@ -17,9 +17,9 @@ export MANIFEST_UNDER_TEST=kpn/eavesdropper
 export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
 export PROXY_NON_EXISTING=non-existing-proxy
-export PROXY_UNDER_TEST=demo
+export PROXY_UNDER_TEST=cli-test
 export SECRET_NON_EXISTING=non-existing-secret
-export SECRET_NAME_UNDER_TEST=broker-ca-cert
+export SECRET_NAME_UNDER_TEST=cli-test
 export SYSTEM_SECRET_ID_UNDER_TEST="\!rest-api-client"
 export SYSTEM_SECRET_NAME_UNDER_TEST=system/rest-api-client
 export SERVICE_NON_EXISTING=non-existing-service
@@ -27,11 +27,11 @@ export SERVICE_UNDER_TEST=keyring-dev
 export SERVICE_TASK_UNDER_TEST=58b9fc6c48-z9t46-00000000
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
-export TOPIC_UNDER_TEST=reference-implementation-avro
+export TOPIC_UNDER_TEST=cli-test
 export VENDOR_UNDER_TEST=kpn
 export VHOST_UNDER_TEST=greenbox-dev
 export VOLUME_NON_EXISTING=non-existing-volume
-export VOLUME_UNDER_TEST=github-action-runner-home
+export VOLUME_UNDER_TEST=cli-test
 
 export SAFE_COMMANDS=(
   "--env-vars"
