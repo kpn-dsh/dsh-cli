@@ -182,10 +182,8 @@ export SAFE_COMMANDS=(
   "platforms"
   "ps"
 
-  "proxy code $PROXY_UNDER_TEST python consumer --force --dry-run"
-  "proxy code $PROXY_UNDER_TEST rust consumer --force --dry-run"
-  "proxy code $PROXY_UNDER_TEST rust producer --force --dry-run"
-  "proxy code $PROXY_UNDER_TEST rust topics --force --dry-run"
+  "proxy code $PROXY_UNDER_TEST python --force --dry-run"
+  "proxy code $PROXY_UNDER_TEST rust --force --dry-run"
   "proxy create $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
   "proxy c $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
   "proxy delete $PROXY_UNDER_TEST --force --dry-run"
