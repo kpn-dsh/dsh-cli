@@ -1,3 +1,4 @@
+[//]: # @formatter:off
 # Code example `rust consumer`
 
 For this example we will create a `consumer` example for the `rust` programming language:
@@ -16,6 +17,70 @@ As is shown in the output of the command, the example is generated in a newly cr
 which contains a `Cargo.toml` manifest and a `src/main.rs` binary module.
 
 ## `Cargo.toml`
+
+<details>
+<summary>Cargo.toml</summary>
+<div><pre>
+use ctrlc::set_handler;
+use rdkafka::config::ClientConfig;
+use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::message::Message;
+use std::env::args;
+use std::time::Duration;
+use std::{process, thread};
+
+const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
+const CLIENT_ID: &str = "my-tenant";
+const GROUP_ID: &str = "my-tenant_my-proxy_1";
+const BROKERS: [&str; 3] = [
+  "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+];
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  // Allow handling of ctrl-c
+  set_handler(|| process::exit(0))?;
+
+  let args: Vec<String> = args().collect();
+  let topic = args.get(1).ok_or("missing topic argument")?;
+
+  let mut kafka_client_config = ClientConfig::new();
+  kafka_client_config
+    .set("auto.offset.reset", "latest")
+    .set("bootstrap.servers", BROKERS.join(","))
+    .set("client.id", CLIENT_ID)
+    .set("group.id", GROUP_ID)
+    .set("security.protocol", "ssl")
+    .set("ssl.ca.location", format!("{PKI_DIRECTORY}/ca.pem"))
+    .set("ssl.certificate.location", format!("{PKI_DIRECTORY}/client.pem"))
+    .set("ssl.key.location", format!("{PKI_DIRECTORY}/client.key"));
+
+  let consumer: BaseConsumer =
+    kafka_client_config
+      .create()
+      .map_err(|error| format!("failed to create consumer: {error}"))?;
+
+  consumer
+    .subscribe(&[topic])
+    .map_err(|error| format!("failed to subscribe to topic '{topic}': {error}"))?;
+
+  loop {
+    match consumer.poll(Duration::ZERO) {
+      Some(Ok(message)) => println!(
+        "{}:{} {}",
+        message.partition(),
+        message.offset(),
+        String::from_utf8_lossy(message.key().unwrap())
+      ),
+      Some(Err(error)) => println!("error: {error}"),
+      None => {}
+    }
+    thread::sleep(Duration::from_millis(10));
+  }
+}
+</pre></div>
+</details>
 
 ```toml
 [package]
