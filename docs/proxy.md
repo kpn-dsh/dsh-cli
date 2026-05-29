@@ -176,26 +176,75 @@ Select one of the supported programming language to generate code examples:
 
 ## Proxy with ACL groups
 
-Although proxy with ACL groups enabled are supported by the `dsh` tool, the documentation is not
-yet complete. In short there are two extra steps.
+Using a proxy with ACL groups enabled is very similar to using them without ACL groups.
+In short there are two extra steps.
 
 ### Enable ACL groups
 
-To enable ACL groups, you have to answer `y` when asked for this in the first step described above.
-Then you will be prompted for the ACL group name:
+To enable ACL groups when creating and deploying a proxy, you have to answer `y` when asked for
+this in the first step described above. Then you will be prompted for the ACL group name:
 
 ```shell
-> dsh proxy create my-proxy
-create proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
+> dsh proxy create my-acl-proxy
+create proxy certificates bundle 'my-acl-proxy' for 'np-aws-lz-dsh@my-tenant'
 enable acl groups? [y/N]y
 acl group name: my-aclgroup
 ...
 ```
 
-We entered `my-aclgroup` as the ACL group name. Deploying the proxy and generating example
-code are the same as for the case without ACL groups, but before you can run the code examples you
-first have to create and configurae the ACL group.
+Here we created a new proxy certificate bundle `my-acl-proxy` with `my-aclgroup` as the ACL group
+name. For the remainder of this explanation it is assumed that you deployed the `my-acl-proxy`
+proxy and generated the `Python `version of the example code, which works exactly the same as
+for the case without ACL groups. There is only one minor difference between code generated
+with or without ACL groups enabled, namely the value of the `GROUP_ID` constant.
 
 ### Create and configure ACL group
+
+When a proxy has ACL groups enabled, it can not be used without ACL groups. If you list the
+topics that we have read access to, you will receive an empty list:
+
+```shell
+(.venv) my-acl-proxy-example-python> python my-acl-proxy-list-topics.py
+(.venv) my-acl-proxy-example-python>
+```
+
+In order to get access we first have to create the ACL group:
+
+```shell
+> dsh aclgroup create my-aclgroup
+> dsh aclgroups
+list all proxy acl groups
+┌─────────────┬────────┬──────┬──────────┬──────────┐
+│ acl group   │ stream │ kind │ readable │ writable │
+├─────────────┼────────┼──────┼──────────┼──────────┤
+│ my-aclgroup │ none   │      │          │          │
+└─────────────┴────────┴──────┴──────────┴──────────┘
+```
+
+Next we need to grant read and write access to the topic we want to access. Again we will use the
+topic `scratch.example.my-tenant`. In the `aclgroup grant` command we only have to provide the
+topic name. The `scratch` part and the tenant name are implicit if we use the `--read-topic`
+or `--write-topic` grant command.
+
+```shell
+> dsh aclgroup grant my-aclgroup --read-topic example
+> dsh aclgroup grant my-aclgroup --write-topic example
+> dsh aclgroups
+list all proxy acl groups
+┌─────────────┬─────────┬───────┬──────────┬──────────┐
+│ acl group   │ stream  │ kind  │ readable │ writable │
+├─────────────┼─────────┼───────┼──────────┼──────────┤
+│ my-aclgroup │ example │ topic │ true     │ true     │
+└─────────────┴─────────┴───────┴──────────┴──────────┘
+```
+
+We now have an ACL group called `my-aclgroup` which grants read and write access to the topic
+`scratch.example.my-topic`. If we list the topics to which we have read access again, we can see
+that we succeeded.
+
+```shell
+(.venv) my-acl-proxy-example-python> python my-acl-proxy-list-topics.py
+scratch.example.greenbox-dev (1)
+```
 
 [Platforms specification &#x2192;](platforms-specification.md)
