@@ -194,7 +194,7 @@ In the example below we use topic `scratch.example.my-tenant`. First we will pro
 Use `ctrl-c` to stop the program.
 
 ```shell
-(.venv) my-proxy-example-python> python3 my-proxy-producer.py scratch.example.my-tenant
+(.venv) my-proxy-example-python> python my-proxy-producer.py scratch.example.my-tenant
 my-proxy-producer-python: 1780045672
 my-proxy-producer-python: 1780045674
 my-proxy-producer-python: 1780045675
@@ -206,7 +206,7 @@ my-proxy-producer-python: 1780045677
 Next we will consume records from the topic. Again, use `ctrl-c` to stop the program.
 
 ```shell
-(.venv) my-proxy-example-python> python3 my-proxy-consumer.py scratch.example.my-tenant
+(.venv) my-proxy-example-python> python my-proxy-consumer.py scratch.example.my-tenant
 0:2729 my-proxy-producer-python: 1780045672
 0:2730 my-proxy-producer-python: 1780045674
 0:2731 my-proxy-producer-python: 1780045675
