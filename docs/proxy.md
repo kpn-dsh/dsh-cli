@@ -169,8 +169,7 @@ For each supported programming language there are (will be) three different exam
   record to a topic each second, with the timestamp as record key.</dd>
 </dl>
 
-At this time, only a limited set of code examples are supported. Click on the link to see the
-explanation.
+Select one of the supported programming language to generate code examples:
 
 * [Python code example](code-examples/python.md)
 * [Rust code example](code-examples/rust.md)

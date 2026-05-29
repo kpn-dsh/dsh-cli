@@ -1,4 +1,4 @@
-# Code example `Rust`
+# `Rust` code example
 
 For this example we will create example code for the `Rust` programming language:
 

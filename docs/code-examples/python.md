@@ -1,4 +1,4 @@
-# Code example `Python`
+# `Python` code example
 
 We will create the example code for the `Python` programming language with the following command:
 
