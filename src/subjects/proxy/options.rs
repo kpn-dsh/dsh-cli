@@ -1,4 +1,4 @@
-use crate::code::{EXAMPLE_CONSUMER, EXAMPLE_LIST_TOPICS, EXAMPLE_PRODUCER, LANGUAGE_PYTHON, LANGUAGE_RUST};
+use crate::code::{LANGUAGE_PYTHON, LANGUAGE_RUST};
 use crate::context::Context;
 use crate::{err, DshCliResult};
 use clap::builder::PossibleValue;
@@ -117,19 +117,4 @@ pub(crate) fn language_argument() -> Arg {
     .value_name("LANGUAGE")
     .help("Programming language")
     .long_help("Identifies the programming language used by the code examples.")
-}
-
-pub(crate) const EXAMPLE_ARGUMENT: &str = "example-argument";
-
-pub(crate) fn example_argument() -> Arg {
-  Arg::new(EXAMPLE_ARGUMENT)
-    .action(ArgAction::Set)
-    .value_parser(builder::PossibleValuesParser::new(vec![
-      PossibleValue::new(EXAMPLE_CONSUMER),
-      PossibleValue::new(EXAMPLE_LIST_TOPICS),
-      PossibleValue::new(EXAMPLE_PRODUCER),
-    ]))
-    .value_name("EXAMPLE")
-    .help("Generated example")
-    .long_help("Identifies which example program is generated.")
 }

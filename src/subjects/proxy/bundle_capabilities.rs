@@ -13,7 +13,7 @@ use crate::subject::Requirements;
 use crate::subjects::aclgroup::options::ACL_GROUP_NAME_OPTION;
 use crate::subjects::certificate::CertificateLabel;
 use crate::subjects::proxy::labels::BundleLabel;
-use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone, ENABLE_SCHEMA_STORE_OPTION, EXAMPLE_ARGUMENT, LANGUAGE_ARGUMENT};
+use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone, ENABLE_SCHEMA_STORE_OPTION, LANGUAGE_ARGUMENT};
 use crate::subjects::secret::SecretLabel;
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
@@ -54,26 +54,16 @@ impl CommandExecutor for BundleCode {
     let tenant = get_target_tenant(matches, context.settings())?;
     let bundle_id = target.unwrap_or_else(|| unreachable!());
     let language = matches.get_one::<String>(LANGUAGE_ARGUMENT).unwrap_or_else(|| unreachable!());
-    let example = match matches.get_one::<String>(EXAMPLE_ARGUMENT) {
-      Some(example) => example.to_string(),
-      None => "topics".to_string(),
-    };
 
     let (bundle_configuration, directory) = match read_local_certificate_bundle(&platform, &tenant, &bundle_id) {
       Ok(LocalCertificateBundle { configuration, .. }) => configuration,
       Err(_) => return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant),
     };
 
-    context.print_explanation(format!(
-      "generating {} {} example for bundle '{}' for '{}@{}'",
-      language, example, bundle_id, platform, tenant
-    ));
+    context.print_explanation(format!("generating {} example for bundle '{}' for '{}@{}'", language, bundle_id, platform, tenant));
 
-    if example_code_exists(language, &example, &bundle_configuration, context)? {
-      context.print_warning(format!(
-        "'{}' {} {} example code already exists for '{}@{}'",
-        bundle_id, language, example, platform, tenant
-      ));
+    if example_code_exists(language, &bundle_configuration, context)? {
+      context.print_warning(format!("'{}' {} example code already exists for '{}@{}'", bundle_id, language, platform, tenant));
       if !context.confirmed("do you want to delete the existing example code?")? {
         context.print_outcome("cancelled");
         return Ok(());
@@ -81,14 +71,14 @@ impl CommandExecutor for BundleCode {
         context.print_warning("dry-run mode, existing example code not deleted");
         return Ok(());
       } else {
-        delete_example_code(language, &example, &bundle_configuration, context)?;
+        delete_example_code(language, &bundle_configuration, context)?;
       }
     }
 
     if context.dry_run() {
       context.print_warning("dry-run mode, no code generated");
     } else {
-      let example_directory = generate_example_code(language, &example, &bundle_configuration, &directory, context)?;
+      let example_directory = generate_example_code(language, &bundle_configuration, &directory, context)?;
       context.print_outcome(format!(
         "{} code for bundle '{}' generated in directory '{}'",
         language, bundle_id, example_directory

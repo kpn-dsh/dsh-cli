@@ -1,19 +1,12 @@
 use crate::code::{apply_template, example_directory, EXAMPLE_CONSUMER, EXAMPLE_LIST_TOPICS, EXAMPLE_PRODUCER, LANGUAGE_RUST};
 use crate::context::Context;
 use crate::proxy_bundles::ProxyCertificateBundleConfig;
-use crate::{err, DshCliResult};
+use crate::DshCliResult;
 use std::fs;
 use std::fs::{create_dir_all, exists, remove_dir_all};
 
-pub(crate) fn generate_rust_example_code(example: &str, bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str, context: &Context) -> DshCliResult<String> {
-  let (rust_template, cargo_template) = match example {
-    EXAMPLE_CONSUMER => (MAIN_RS_TEMPLATE_CONSUMER, CARGO_TOML_TEMPLATE_CTRLC),
-    EXAMPLE_LIST_TOPICS => (MAIN_RS_TEMPLATE_LIST_TOPICS, CARGO_TOML_TEMPLATE),
-    EXAMPLE_PRODUCER => (MAIN_RS_TEMPLATE_PRODUCER, CARGO_TOML_TEMPLATE_CTRLC),
-    _ => return err!("unrecognized example '{}'", example),
-  };
-
-  let example_directory = example_directory(LANGUAGE_RUST, example, bundle_configuration, context);
+pub(crate) fn generate_rust_example_code(bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str, context: &Context) -> DshCliResult<String> {
+  let example_directory = example_directory(LANGUAGE_RUST, bundle_configuration, context);
   create_dir_all(&example_directory)?;
   context.print_outcome(format!("created directory '{}'", example_directory));
 
@@ -21,37 +14,43 @@ pub(crate) fn generate_rust_example_code(example: &str, bundle_configuration: &P
   create_dir_all(&src_directory)?;
   context.print_outcome(format!("created directory '{}'", src_directory));
 
-  let rust_rs = apply_template(rust_template, example, bundle_configuration, bundle_directory)?;
-  let rust_rs_filename = format!("{}/src/main.rs", example_directory);
-  fs::write(&rust_rs_filename, &rust_rs)?;
-  context.print_outcome(format!("created file '{}'", rust_rs_filename));
+  let bin_directory = format!("{}/src/bin", &example_directory);
+  create_dir_all(&bin_directory)?;
+  context.print_outcome(format!("created directory '{}'", bin_directory));
 
-  let cargo_toml = apply_template(cargo_template, example, bundle_configuration, bundle_directory)?;
+  let cargo_toml = apply_template(CARGO_TOML_TEMPLATE_CTRLC, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory)?;
   let cargo_toml_filename = format!("{}/Cargo.toml", example_directory);
   fs::write(&cargo_toml_filename, &cargo_toml)?;
   context.print_outcome(format!("created file '{}'", cargo_toml_filename));
+
+  let rust_main_rs = apply_template(MAIN_RS_TEMPLATE_LIST_TOPICS, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory)?;
+  let rust_main_rs_filename = format!("{}/src/main.rs", example_directory);
+  fs::write(&rust_main_rs_filename, &rust_main_rs)?;
+  context.print_outcome(format!("created file '{}'", rust_main_rs_filename));
+
+  let rust_consumer_rs = apply_template(MAIN_RS_TEMPLATE_CONSUMER, EXAMPLE_CONSUMER, bundle_configuration, bundle_directory)?;
+  let rust_consumer_rs_filename = format!("{}/src/bin/consumer.rs", example_directory);
+  fs::write(&rust_consumer_rs_filename, &rust_consumer_rs)?;
+  context.print_outcome(format!("created file '{}'", rust_consumer_rs_filename));
+
+  let rust_producer_rs = apply_template(MAIN_RS_TEMPLATE_PRODUCER, EXAMPLE_PRODUCER, bundle_configuration, bundle_directory)?;
+  let rust_producer_rs_filename = format!("{}/src/bin/producer.rs", example_directory);
+  fs::write(&rust_producer_rs_filename, &rust_producer_rs)?;
+  context.print_outcome(format!("created file '{}'", rust_producer_rs_filename));
+
   Ok(example_directory)
 }
 
-pub(crate) fn rust_example_code_exists(example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<bool> {
-  Ok(exists(example_directory(LANGUAGE_RUST, example, bundle_configuration, context))?)
+pub(crate) fn rust_example_code_exists(bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<bool> {
+  Ok(exists(example_directory(LANGUAGE_RUST, bundle_configuration, context))?)
 }
 
-pub(crate) fn delete_rust_example_code(example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<()> {
-  let example_directory = example_directory(LANGUAGE_RUST, example, bundle_configuration, context);
+pub(crate) fn delete_rust_example_code(bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<()> {
+  let example_directory = example_directory(LANGUAGE_RUST, bundle_configuration, context);
   remove_dir_all(&example_directory)?;
   context.print_outcome(format!("deleted rust example directory '{}'", example_directory));
   Ok(())
 }
-
-const CARGO_TOML_TEMPLATE: &str = r#"[package]
-name = "{{proxy-name}}-{{example}}"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-rdkafka = { version = "0.39", features = ["ssl-vendored"], default-features = false }
-"#;
 
 const CARGO_TOML_TEMPLATE_CTRLC: &str = r#"[package]
 name = "{{proxy-name}}-{{example}}"
@@ -187,7 +186,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let producer: BaseProducer = kafka_client_config.create().map_err(|error| format!("failed to create producer: {error}"))?;
   loop {
-    let key = format!("timestamp: {}", SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
+    let key = format!("{{proxy-name}}-{{example}}-rust: {}", SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
     let record = BaseRecord::to(topic).key(&key).payload("payload");
     match producer.send(record) {
       Ok(_) => println!("{}", key),

@@ -218,9 +218,8 @@ the executables. This will take a few minutes due to the dependency on `rdkafka`
 > cargo build
 ```
 
-Now finally we are able to run the executables. First we will list all Kafka topics that we have
-read
-access to.
+Now we are able to run the executables. First we will list all Kafka topics that we have
+read access to.
 
 ```shell
 > target/debug/my-proxy-list-topic
@@ -229,9 +228,8 @@ scratch.example.my-tenant (1)
 ...
 ```
 
-Now finally we can run the executables and send and receive messages to and from a Kafka topic.
-In the example below we use topic `scratch.example.my-tenant`. First we will produce some records.
-Use `ctrl-c` to stop the program.
+Then we will send messages to a Kafka topic. In the example below we use topic
+`scratch.example.my-tenant`. Use `ctrl-c` to stop the program.
 
 ```shell
 > target/debug/producer scratch.example.my-tenant
@@ -245,7 +243,7 @@ my-proxy-producer-rust: 1780047898
 Next we will consume records from the same topic. Again, use `ctrl-c` to stop the program.
 
 ```shell
-> target/debug/consumer scratch.example.greenbox-dev
+> target/debug/consumer scratch.example.my-tenant
 0:2808 my-proxy-producer-rust: 1780047895
 0:2809 my-proxy-producer-rust: 1780047896
 0:2810 my-proxy-producer-rust: 1780047897

@@ -153,15 +153,15 @@ At this time code examples can be generated for the `Python` and `Rust` programm
 The next version of the tool will support more languages (`Go`, `Java`, `Javascript/Typescript`
 and `Scala` are on the roadmap).
 
-For each supported programming language there are (will be) three different codes examples:
+For each supported programming language there are (will be) three different examples generated:
 
 <dl>
   <dt><code>consumer</code></dt>
   <dd>Will create a client that connects to the Kafka cluster as a consumer, subscribes
   to a topic and prints the keys of the records that it receives from the topic.</dd>
   <dt><code>list-topic</code></dt>
-  <dd>Will will create a client that connects to the Kafka cluster as a consumer and lists
-  all topics that the client can read from.</dd>
+  <dd>Will will create a client that connects to the Kafka cluster as an admin or consumer and 
+  lists all topics that the client can read from.</dd>
   <dt><code>producer</code></dt>
   <dd>Will create a client that connects to the Kafka cluster as a producer and sends a
   record to a topic each second, with the timestamp as record key.</dd>
@@ -170,20 +170,30 @@ For each supported programming language there are (will be) three different code
 At this time, only a limited set of code examples are supported. Click on the link to see the
 explanation.
 
-### `Python`
-
-* [consumer](code-examples/python-consumer.md)
-
-### `Rust`
-
-* [consumer](code-examples/rust-consumer.md)
-* [list-topics](code-examples/rust-list-topics.md)
-* [producer](code-examples/rust-producer.md)
+* [Python code example](code-examples/python.md)
+* [Rust code example](code-examples/rust.md)
 
 ## Proxy with ACL groups
 
-* Create a proxy certificate bundle with acl groups enabled
-* Deploy the proxy
-* Create and configure the acl group
-* Generate a code example
-* Run the code example
+Although proxy with ACL groups enabled are supported by the `dsh` tool, the documentation is not
+yet complete. In short there are two extra steps.
+
+### Enable ACL groups
+
+To enable ACL groups, you have to answer `y` when asked for this in the first step described above.
+Then you will be prompted for the ACL group name:
+
+```shell
+> dsh proxy create my-proxy
+create proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
+enable acl groups? [y/N]y
+acl group name: my-aclgroup
+...
+```
+
+We entered `my-aclgroup` as the ACL group name. Deploying the proxy and generating example
+code are the same as for the case without ACL groups, but before you run the code examples you
+first have to create and configurae the ACL group.
+
+### Create and configure ACL group
+
