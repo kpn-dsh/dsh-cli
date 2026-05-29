@@ -5,11 +5,11 @@ For this example we will create a `list-topics` example for the `rust` programmi
 ```shell
 > dsh proxy code my-proxy rust list-topics
 generating rust list-topics example for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
-created directory 'my-proxy-list-topics-rust-example'
-created directory 'my-proxy-list-topics-rust-example/src'
-created file 'my-proxy-list-topics-rust-example/src/main.rs'
-created file 'my-proxy-list-topics-rust-example/Cargo.toml'
-rust code for bundle 'my-proxy' generated in directory 'my-proxy-list-topics-rust-example'
+created directory 'my-proxy-list-topics-example-rust'
+created directory 'my-proxy-list-topics-example-rust/src'
+created file 'my-proxy-list-topics-example-rust/src/main.rs'
+created file 'my-proxy-list-topics-example-rust/Cargo.toml'
+rust code for bundle 'my-proxy' generated in directory 'my-proxy-list-topics-example-rust'
 ```
 
 As is shown in the output, the example is generated in a newly created directory which contains
@@ -80,7 +80,7 @@ the executable. This will take a few minutes due to dependencies on `rdkafka` an
 `openssl`.
 
 ```shell
-> cd my-proxy-list-topics-rust-example
+> cd my-proxy-list-topics-example-rust
 > cargo build
 ```
 

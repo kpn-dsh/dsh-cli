@@ -5,9 +5,9 @@ For this example we will create a `consumer` example for the `Python` programmin
 ```shell
 > dsh proxy code my-proxy python consumer
 generating python consumer example for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
-created directory 'my-proxy-consumer-python-example'
-created file 'my-proxy-consumer-python-example/my-proxy-consumer.py'
-python code for bundle 'my-proxy' generated in directory 'my-proxy-consumer-python-example'
+created directory 'my-proxy-consumer-example-python'
+created file 'my-proxy-consumer-example-python/my-proxy-consumer.py'
+python code for bundle 'my-proxy' generated in directory 'my-proxy-consumer-example-python'
 ```
 
 As is shown in the output, the example is generated in a newly created directory which contains
@@ -73,10 +73,10 @@ To run the example, we first change to the created directory, create a virtual e
 install the `confluent_kafka` client library.
 
 ```shell
-> cd my-proxy-consumer-python-example
-> python3 -m venv .venv
+> cd my-proxy-consumer-example-python
+> python -m venv .venv
 > . .venv/bin/activate
-(.venv) my-proxy-consumer-python-example> python3 -m pip install confluent_kafka
+(.venv) my-proxy-consumer-example-python> python -m pip install confluent_kafka
 ```
 
 Now finally we can run the script and receive messages from a Kafka topic. In the example below
@@ -84,7 +84,7 @@ we use the same topic as for the [`python producer`](python-producer.md) example
 (`scratch.example.my-tenant`). Use `ctrl-c` to stop the program.
 
 ```shell
-(.venv) my-proxy-consumer-python-example> python3 my-proxy-consumer.py scratch.example.my-tenant
+(.venv) my-proxy-consumer-example-python> python my-proxy-consumer.py scratch.example.my-tenant
 0:1999 timestamp: 1779997678
 0:2000 timestamp: 1779997679
 0:2001 timestamp: 1779997680

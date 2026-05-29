@@ -5,11 +5,11 @@ For this example we will create a `consumer` example for the `rust` programming 
 ```shell
 > dsh proxy code my-proxy rust consumer
 generating rust consumer example for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
-created directory 'my-proxy-consumer-rust-example'
-created directory 'my-proxy-consumer-rust-example/src'
-created file 'my-proxy-consumer-rust-example/src/main.rs'
-created file 'my-proxy-consumer-rust-example/Cargo.toml'
-rust code for bundle 'my-proxy' generated in directory 'my-proxy-consumer-rust-example'
+created directory 'my-proxy-consumer-example-rust'
+created directory 'my-proxy-consumer-example-rust/src'
+created file 'my-proxy-consumer-example-rust/src/main.rs'
+created file 'my-proxy-consumer-example-rust/Cargo.toml'
+rust code for bundle 'my-proxy' generated in directory 'my-proxy-consumer-example-rust'
 ```
 
 As is shown in the output of the command, the example is generated in a newly created directory
@@ -96,7 +96,7 @@ the executable. This will take a few minutes due to dependencies on `rdkafka` an
 `openssl`.
 
 ```shell
-> cd my-proxy-consumer-rust-example
+> cd my-proxy-consumer-example-rust
 > cargo build
 ```
 

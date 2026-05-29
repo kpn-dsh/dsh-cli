@@ -78,10 +78,10 @@ fn apply_template(template: &str, example: &str, bundle_configuration: &ProxyCer
 
 /// Get example directory name
 ///
-/// `[OUTPUT_DIR]/[PROXY_NAME]-[LANGUAGE]-[EXAMPLE]`
+/// `[OUTPUT_DIR]/[PROXY_NAME]-[EXAMPLE]-example-[LANGUAGE]`
 ///
 /// ## Example
-/// `/Users/username/Workspaces/dsh/dcli/output/demo-rust-topics-example`
+/// `/Users/username/Workspaces/dsh/dcli/output/my-proxy-list-topics-example-rust`
 ///
 /// ## Parameters
 /// * `language` - Programming language: `python` or `rust`.
@@ -89,14 +89,9 @@ fn apply_template(template: &str, example: &str, bundle_configuration: &ProxyCer
 /// * `bundle_configuration` - Contains the bundle/proxy configuration.
 /// * `context` - DSH tool context.
 fn example_directory(language: &str, example: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> String {
+  let directory_name = format!("{}-{}-example-{}", bundle_configuration.proxy_name, example, language);
   match context.output_directory() {
-    Some(output_directory) => format!(
-      "{}/{}-{}-example-{}",
-      output_directory.display(),
-      bundle_configuration.proxy_name,
-      language,
-      example,
-    ),
-    None => format!("{}-{}-{}-example", bundle_configuration.proxy_name, example, language),
+    Some(output_directory) => format!("{}/{}", output_directory.display(), directory_name),
+    None => directory_name,
   }
 }
