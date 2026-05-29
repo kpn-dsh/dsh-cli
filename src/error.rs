@@ -6,6 +6,7 @@ use std::fmt::{Debug, Display, Formatter};
 #[derive(Clone)]
 pub(crate) enum DshCliError {
   AesGcm(String),
+  Canceled,
   Configuration(String),
   Conversion(String),
   Decode(String),
@@ -14,13 +15,16 @@ pub(crate) enum DshCliError {
   Home(String),
   Io(String),
   Keyring(String),
+  Rcgen(String),
   Reqwest(String),
   SerdeJson(String),
   String(String),
   Time(String),
+  Toml(String),
   TokioJoin(String),
   UrlParse(String),
   Utf8(String),
+  Whoami(String),
   _X509(String),
 }
 
@@ -44,7 +48,7 @@ impl Error for DshCliError {}
 /// The values must all implement `Display`. The macro will create an
 /// [`Err<DshCliError::String>`], where the message will be generated from the format string.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn divide(numerator: i64, denominator: i64) -> Result<i64, DshCliError> {
 ///   if denominator == 0 {
@@ -68,7 +72,7 @@ macro_rules! err {
 /// The values must all implement `Display`. The macro will create an
 /// [`DshCliError::String`], where the message will be generated from the format string.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn divide(numerator: i64, denominator: i64) -> Result<i64, DshCliError> {
 ///   if denominator == 0 {
@@ -96,7 +100,7 @@ macro_rules! cli_error {
 /// The intended use for `error_map!` is as a closure for the [`Result::map_err`] method, mapping
 /// any error value (as long as its type implements `Display`) into a `DshCliError::String`.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn save(path: PathBuf, data: &[u8]) -> Result<(), DshCliError> {
 ///   fs::write(path, data).map_err(error_map!("write failed with error: {}"))
@@ -121,7 +125,7 @@ macro_rules! error_map {
 /// The intended use for `error_append!` is as a closure for the [`Result::map_err`] method,
 /// mapping any error value (as long as its type implements `Display`) into a `DshCliError::String`.
 ///
-/// # Examples
+/// ## Examples
 /// ```
 /// fn save(path: PathBuf, data: &[u8]) -> Result<(), DshCliError> {
 ///   fs::write(path, data).map_err(error_append!("writing {} failed with error: ", path))
@@ -138,6 +142,7 @@ impl Debug for DshCliError {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::AesGcm(message) => write!(f, "DshCliError(aes gcm, {})", message),
+      Self::Canceled => write!(f, "DshCliError(canceled)"),
       Self::Configuration(message) => write!(f, "DshCliError(configuration, {})", message),
       Self::Conversion(message) => write!(f, "DshCliError(conversion, {})", message),
       Self::Decode(message) => write!(f, "DshCliError(decode, {})", message),
@@ -146,13 +151,16 @@ impl Debug for DshCliError {
       Self::Home(message) => write!(f, "DshCliError(home, {})", message),
       Self::Io(message) => write!(f, "DshCliError(io, {})", message),
       Self::Keyring(message) => write!(f, "DshCliError(ikeyring, {})", message),
+      Self::Rcgen(message) => write!(f, "DshCliError(rcgen, {})", message),
       Self::Reqwest(message) => write!(f, "DshCliError(reqwest, {})", message),
       Self::SerdeJson(message) => write!(f, "DshCliError(json, {})", message),
       Self::String(message) => write!(f, "DshCliError({})", message),
       Self::Time(message) => write!(f, "DshCliError(time, {})", message),
+      Self::Toml(message) => write!(f, "DshCliError(toml, {})", message),
       Self::TokioJoin(message) => write!(f, "DshCliError(tokio join, {})", message),
       Self::UrlParse(message) => write!(f, "DshCliError(url parse, {})", message),
       Self::Utf8(message) => write!(f, "DshCliError(utf8, {})", message),
+      Self::Whoami(message) => write!(f, "DshCliError(whoami, {})", message),
       Self::_X509(message) => write!(f, "DshCliError(x509, {})", message),
     }
   }
@@ -162,6 +170,7 @@ impl Display for DshCliError {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::AesGcm(message) => write!(f, "{}", message),
+      Self::Canceled => f.write_str("canceled"),
       Self::Configuration(message) => write!(f, "{}", message),
       Self::Conversion(message) => write!(f, "{}", message),
       Self::Decode(message) => write!(f, "{}", message),
@@ -170,13 +179,16 @@ impl Display for DshCliError {
       Self::Home(message) => write!(f, "{}", message),
       Self::Io(message) => write!(f, "{}", message),
       Self::Keyring(message) => write!(f, "{}", message),
+      Self::Rcgen(message) => write!(f, "{}", message),
       Self::Reqwest(message) => write!(f, "{}", message),
       Self::SerdeJson(message) => write!(f, "{}", message),
       Self::String(message) => write!(f, "{}", message),
       Self::Time(message) => write!(f, "{}", message),
+      Self::Toml(message) => write!(f, "{}", message),
       Self::TokioJoin(message) => write!(f, "{}", message),
       Self::UrlParse(message) => write!(f, "{}", message),
       Self::Utf8(message) => write!(f, "{}", message),
+      Self::Whoami(message) => write!(f, "{}", message),
       Self::_X509(message) => write!(f, "{}", message),
     }
   }
@@ -213,7 +225,7 @@ impl From<dsh_api::types::error::ConversionError> for DshCliError {
 }
 
 impl From<DshApiError> for DshCliError {
-  fn from(dsh_api_error: dsh_api::error::DshApiError) -> Self {
+  fn from(dsh_api_error: DshApiError) -> Self {
     Self::DshApi(dsh_api_error.to_string())
   }
 }
@@ -272,15 +284,51 @@ impl From<tokio::task::JoinError> for DshCliError {
   }
 }
 
+impl From<toml::de::Error> for DshCliError {
+  fn from(toml_error: toml::de::Error) -> Self {
+    Self::Toml(toml_error.to_string())
+  }
+}
+
+impl From<toml::ser::Error> for DshCliError {
+  fn from(toml_error: toml::ser::Error) -> Self {
+    Self::Toml(toml_error.to_string())
+  }
+}
+
 impl From<openidconnect::url::ParseError> for DshCliError {
   fn from(parse_error: openidconnect::url::ParseError) -> Self {
     Self::UrlParse(parse_error.to_string())
   }
 }
 
+impl From<std::num::ParseIntError> for DshCliError {
+  fn from(parse_error: std::num::ParseIntError) -> Self {
+    Self::Conversion(parse_error.to_string())
+  }
+}
+
+impl From<std::num::ParseFloatError> for DshCliError {
+  fn from(parse_error: std::num::ParseFloatError) -> Self {
+    Self::Conversion(parse_error.to_string())
+  }
+}
+
+impl From<rcgen::Error> for DshCliError {
+  fn from(rcgen_error: rcgen::Error) -> Self {
+    Self::Rcgen(rcgen_error.to_string())
+  }
+}
+
 impl From<std::string::FromUtf8Error> for DshCliError {
   fn from(utf8_error: std::string::FromUtf8Error) -> Self {
     Self::Utf8(utf8_error.to_string())
+  }
+}
+
+impl From<whoami::Error> for DshCliError {
+  fn from(whoami_error: whoami::Error) -> Self {
+    Self::Whoami(whoami_error.to_string())
   }
 }
 

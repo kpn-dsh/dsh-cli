@@ -123,6 +123,17 @@ impl CommandExecutor for ImageListAll {
   }
 }
 
+static IMAGE_USAGE_LABELS: [ImageUsageLabel; 8] = [
+  ImageUsageLabel::Id,
+  ImageUsageLabel::Service,
+  ImageUsageLabel::Instances,
+  ImageUsageLabel::Version,
+  ImageUsageLabel::Source,
+  ImageUsageLabel::Stage,
+  ImageUsageLabel::Supplier,
+  ImageUsageLabel::Tenant,
+];
+
 fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
   let (include_started, include_stopped) = include_started_stopped(matches);
   let mut services = services.iter().collect_vec();
@@ -208,25 +219,14 @@ impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
       ImageUsageLabel::Source => Value::plain(self.image.source()),
       ImageUsageLabel::Stage => match &self.image {
         ImageString::App { image } => Value::plain(&image.stage),
-        _ => Value::empty(),
+        _ => Value::hide(),
       },
       ImageUsageLabel::Supplier => match &self.image {
         ImageString::App { image } => Value::plain(&image.supplier),
-        _ => Value::empty(),
+        _ => Value::hide(),
       },
       ImageUsageLabel::Tenant => Value::plain(self.image.tenant()),
       ImageUsageLabel::Version => Value::plain(self.image.version()),
     }
   }
 }
-
-const IMAGE_USAGE_LABELS: [ImageUsageLabel; 8] = [
-  ImageUsageLabel::Id,
-  ImageUsageLabel::Service,
-  ImageUsageLabel::Instances,
-  ImageUsageLabel::Version,
-  ImageUsageLabel::Source,
-  ImageUsageLabel::Stage,
-  ImageUsageLabel::Supplier,
-  ImageUsageLabel::Tenant,
-];

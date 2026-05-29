@@ -44,13 +44,13 @@ impl<'a> IdsFormatter<'a> {
     } else {
       match self.context.output_format(default_output_format) {
         OutputFormat::Csv => {
-          self.context.print(self.ids.join(","));
+          self.context.println(self.ids.join(","));
           Ok(())
         }
 
         OutputFormat::Json => match serde_json::to_string_pretty(&self.ids) {
           Ok(json) => {
-            self.context.print(json);
+            self.context.println(json);
             Ok(())
           }
           Err(error) => err!("could not convert target ids to json ({})", error),
@@ -58,14 +58,14 @@ impl<'a> IdsFormatter<'a> {
 
         OutputFormat::JsonCompact => match serde_json::to_string(&self.ids) {
           Ok(json) => {
-            self.context.print(json);
+            self.context.println(json);
             Ok(())
           }
           Err(error) => err!("could not convert target ids to json compact ({})", error),
         },
 
         OutputFormat::Plain => {
-          self.context.print(self.ids.join("\n"));
+          self.context.println(self.ids.join("\n"));
           Ok(())
         }
 
@@ -83,7 +83,7 @@ impl<'a> IdsFormatter<'a> {
           }
           table.with(Padding::new(1, 1, 0, 0));
           table.with(Style::sharp());
-          self.context.print(table.to_string());
+          self.context.println(table.to_string());
           Ok(())
         }
 
@@ -99,13 +99,13 @@ impl<'a> IdsFormatter<'a> {
           }
           table.with(Padding::new(0, 2, 0, 0));
           table.with(Style::empty());
-          self.context.print(table.to_string());
+          self.context.println(table.to_string());
           Ok(())
         }
 
         OutputFormat::Toml => match toml::to_string_pretty(&HashMap::from([(&self.label, &self.ids)])) {
           Ok(toml) => {
-            self.context.print(toml);
+            self.context.println(toml);
             Ok(())
           }
           Err(error) => err!("could not convert target ids to toml ({})", error),
@@ -113,7 +113,7 @@ impl<'a> IdsFormatter<'a> {
 
         OutputFormat::TomlCompact => match toml::to_string(&HashMap::from([(&self.label, &self.ids)])) {
           Ok(toml) => {
-            self.context.print(toml);
+            self.context.println(toml);
             Ok(())
           }
           Err(error) => err!("could not convert target ids to toml compact ({})", error),
@@ -121,7 +121,7 @@ impl<'a> IdsFormatter<'a> {
 
         OutputFormat::Yaml => match serde_yaml::to_string(&self.ids) {
           Ok(yaml) => {
-            self.context.print(yaml);
+            self.context.println(yaml);
             Ok(())
           }
           Err(error) => err!("could not convert target ids to yaml ({})", error),

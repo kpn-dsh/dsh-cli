@@ -7,14 +7,14 @@ use serde::Serialize;
 pub(crate) enum Issue {
   /// Configuration item is not yet valid
   ///
-  /// # Fields
+  /// ## Fields
   /// * `not_before` - Timestamp at which the configuration item becomes valid in seconds
   ///   since epoch.
   Before { not_before: i64 },
 
   /// Configuration item has a creation/update notification
   ///
-  /// # Fields
+  /// ## Fields
   /// * `notification` - Creation/update notification.
   CreationUpdateNotification { notification: Notification },
 
@@ -23,25 +23,25 @@ pub(crate) enum Issue {
 
   /// Configuration item has expired
   ///
-  /// # Fields
+  /// ## Fields
   /// * `not_after` - Not after timestamp value of the configuration item in seconds since epoch.
   Expired { not_after: i64 },
 
   /// Configuration item is about to expire
   ///
-  /// # Fields
+  /// ## Fields
   /// * `not_after` - Not after timestamp value of the configuration item in seconds since epoch.
-  ExpirationOncoming { not_after: i64 },
+  ExpirationUpcoming { not_after: i64 },
 
   /// Configuration item has an incorrect/illegal value
   ///
-  /// # Fields
+  /// ## Fields
   /// * `explanation` - Additional explanatory text.
   IncorrectValue { explanation: String },
 
   /// Configuration item is not properly configured
   ///
-  /// # Fields
+  /// ## Fields
   /// * `explanation` - Additional explanatory text.
   Misconfiguration { explanation: String },
 
@@ -56,13 +56,13 @@ pub(crate) enum Issue {
 
   /// Configuration item has a removal notification
   ///
-  /// # Fields
+  /// ## Fields
   /// * `notification` - Removal notification.
   RemovalNotification { notification: Notification },
 
   /// Something unexpected happened
   ///
-  /// # Fields
+  /// ## Fields
   /// * `message` - Describes what happened.
   Unexpected { message: String },
 }
@@ -86,7 +86,7 @@ impl Issue {
       | Self::NotProvisioned
       | Self::Unexpected { .. } => Severity::Error,
       Self::Empty | Self::NotUsed => Severity::Ignore,
-      Self::CreationUpdateNotification { .. } | Self::ExpirationOncoming { .. } | Self::RemovalNotification { .. } => Severity::Warning,
+      Self::CreationUpdateNotification { .. } | Self::ExpirationUpcoming { .. } | Self::RemovalNotification { .. } => Severity::Warning,
     }
   }
 
@@ -96,7 +96,7 @@ impl Issue {
       Self::Before { .. } => "before",
       Self::CreationUpdateNotification { .. } => "creation/update notification",
       Self::Empty { .. } => "empty",
-      Self::ExpirationOncoming { .. } => "expiration oncoming",
+      Self::ExpirationUpcoming { .. } => "expiration upcoming",
       Self::Expired { .. } => "expired",
       Self::IncorrectValue { .. } => "incorrect value",
       Self::Misconfiguration { .. } => "misconfiguration",
@@ -113,7 +113,7 @@ impl Issue {
       Self::Before { not_before, .. } => Some(format!("not before {}", timestamp_to_string(*not_before))),
       Self::CreationUpdateNotification { notification } => Some(notification.render_message()),
       Self::Empty => None,
-      Self::ExpirationOncoming { not_after } => Some(format!("will expire at {}", timestamp_to_string(*not_after))),
+      Self::ExpirationUpcoming { not_after } => Some(format!("will expire at {}", timestamp_to_string(*not_after))),
       Self::Expired { not_after } => Some(format!("not after {}", timestamp_to_string(*not_after))),
       Self::IncorrectValue { explanation } => Some(explanation.clone()),
       Self::Misconfiguration { explanation } => Some(explanation.clone()),
@@ -141,12 +141,12 @@ impl Issue {
         Some(warning_days) => match Utc::now().checked_add_days(Days::new(warning_days)) {
           Some(expiration_warning_date) => {
             if not_after < &expiration_warning_date {
-              Some(Self::ExpirationOncoming { not_after: not_after.timestamp() })
+              Some(Self::ExpirationUpcoming { not_after: not_after.timestamp() })
             } else {
               None
             }
           }
-          None => Some(Self::IncorrectValue { explanation: format!("could not determine oncoming expiration ({}/{})", not_after, warning_days) }),
+          None => Some(Self::IncorrectValue { explanation: format!("could not determine upcoming expiration ({}/{})", not_after, warning_days) }),
         },
         None => None,
       }
@@ -156,14 +156,14 @@ impl Issue {
   pub(crate) fn timestamp_before(not_before: i64) -> Option<Self> {
     match DateTime::from_timestamp_secs(not_before) {
       Some(not_before_datetime) => Self::datetime_before(&not_before_datetime),
-      None => Some(Self::IncorrectValue { explanation: format!("could not convert {} to valid datetime", not_before) }),
+      None => Some(Self::IncorrectValue { explanation: format!("could not convert '{}' to valid datetime", not_before) }),
     }
   }
 
   pub(crate) fn timestamp_expired(not_after: i64, days: Option<u64>) -> Option<Self> {
     match DateTime::from_timestamp_secs(not_after) {
       Some(not_after_datetime) => Self::datetime_expired(&not_after_datetime, days),
-      None => Some(Self::IncorrectValue { explanation: format!("could not convert {} to valid datetime", not_after) }),
+      None => Some(Self::IncorrectValue { explanation: format!("could not convert '{}' to valid datetime", not_after) }),
     }
   }
 }
@@ -217,16 +217,12 @@ impl SubjectFormatter<IssueLabel> for IssueDescription<'_> {
         IssueLabel::DependencyName => Value::plain(dependency_name),
         IssueLabel::DependencySubject => Value::plain(dependency_subject),
         IssueLabel::DependencyValue => Value::plain(dependency_value),
-        IssueLabel::SubjectDescription => Value::empty(),
-        IssueLabel::SubjectKind => Value::empty(),
+        IssueLabel::SubjectDescription => Value::hide(),
+        IssueLabel::SubjectKind => Value::hide(),
         _ => issue.value(label, target_id),
       },
       None => match label {
-        IssueLabel::DependencyName => Value::empty(),
-        IssueLabel::DependencySubject => Value::empty(),
-        IssueLabel::DependencyValue => Value::empty(),
-        IssueLabel::SubjectDescription => Value::empty(),
-        IssueLabel::SubjectKind => Value::empty(),
+        IssueLabel::DependencyName | IssueLabel::DependencySubject | IssueLabel::DependencyValue | IssueLabel::SubjectDescription | IssueLabel::SubjectKind => Value::hide(),
         _ => issue.value(label, target_id),
       },
     }
@@ -239,7 +235,7 @@ impl SubjectFormatter<IssueLabel> for Issue {
       IssueLabel::DependencyName => Value::unreachable(),
       IssueLabel::DependencySubject => Value::unreachable(),
       IssueLabel::DependencyValue => Value::unreachable(),
-      IssueLabel::IssueDetails => Value::option(self.details()),
+      IssueLabel::IssueDetails => Value::some_or_hide(self.details()),
       IssueLabel::IssueKind => match self.severity() {
         Severity::Error => Value::error(self.issue_kind()),
         Severity::Ignore => Value::ignore(self.issue_kind()),

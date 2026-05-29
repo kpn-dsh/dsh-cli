@@ -16,7 +16,7 @@ Below in an overview of the capabilities of the `dsh` tool:
 * Extensive help information on each level using the `--help` and `-h` flags,
   including listings of all available operations.
 * Configuring platform and tenant credentials interactively via the `dsh` tool.
-  Sensitive passwords are stored in your computer's keychain, if available.
+  Sensitive passwords are stored in your computer's keyring, if available.
 * Retrieving information about the available platforms.
 * Opening web applications (e.g. the console, the swagger ui or the vhost of your app or service)
   from the command line.
@@ -35,11 +35,11 @@ The following features are defined:
 ## Installation
 
 The DSH Api Command Line Tool (`dsh`) can be installed on your local machine
-(assuming you have the `rust` tool-chain installed),
+(assuming you have the Rust tool-chain installed),
 by executing the following command.
 
-```bash
-> cargo install dsh
+```shell
+> cargo install dsh --locked
 ...
 ```
 
@@ -48,30 +48,33 @@ by executing the following command.
 When installation completed without any errors,
 you should be able to start the `dsh` tool from the command line.
 
-```bash
+```shell
 > dsh
 DSH resource management api command line interface.
 
 Usage: dsh [OPTIONS] [SUBJECT/COMMAND]
 
 Subjects/commands:
+  aclgroup     Show, manage and list DSH Kafka proxy ACL groups.
   api          List and call DSH resource management api.
   app          Show, manage and list apps deployed from the DSH app catalog.
   bucket       Show, manage and list DSH buckets.
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
   image        Show image usage.
-  login        Login via single sign on
-  logout       Logout from single sign on
+  login        Login via single-sign-on
+  logout       Logout from single-sign-on
   manifest     Show App Catalog manifests.
   metric       Show metric exports.
+  nodepool     Show node pool resources.
   platform     Show, list and open platform resources.
   proxy        Show, manage and list DSH Kafka proxies.
+  robot        Manage and store robot secrets.
   secret       Show, manage and list DSH secrets.
   service      Show, manage and list services deployed on the DSH.
   setting      Show, manage and list dsh settings.
   stream       Show, manage and list internal and public managed streams.
-  target       Show, manage and list dsh target configurations.
+  task         List and show DSH service tasks.
   tenant       Show and manage tenants on the DSH.
   token        Request DSH tokens.
   topic        Show, manage and list DSH scratch topics.
@@ -79,19 +82,16 @@ Subjects/commands:
   volume       Show, manage and list DSH volumes.
 
 Options:
-      --dry-run               Execute in dry-run mode
-      --force                 Force changes without confirmation
-      --password-file <FILE>  Provide target password file name
-  -p, --platform <PLATFORM>   Provide target platform [possible values: k8s-dev-aws-lz-dsh, np-aws-lz-dsh, poc-aws-dsh,
-                              prod-aws-dsh, prod-aws-lz-dsh, prod-azure-dsh]
-  -t, --tenant <TENANT>       Provide target tenant
-  -h, --help                  Print help (see more with '--help')
+      --dry-run  Execute in dry-run mode
+      --force    Force changes without confirmation
+  -h, --help     Print help (see more with '--help')
 
 Output options:
-  -o, --output-format <FORMAT>  Set output format [possible values: csv, json, json-compact, plain, quiet, table,
-                                table-no-border, toml, toml-compact, yaml]
-  -q, --quiet                   Run in quiet mode
-  -v, --verbosity <VERBOSITY>   Set verbosity level [possible values: off, low, medium, high]
+      --output-directory <DIRECTORY>  Set output directory
+  -o, --output-format <FORMAT>        Set output format [possible values: csv, json, json-compact, plain, quiet, table,
+                                      table-no-border, toml, toml-compact, yaml]
+  -q, --quiet                         Run in quiet mode
+  -v, --verbosity <VERBOSITY>         Set verbosity level [possible values: off, low, medium, high]
 ```
 
 You can have a more comprehensive explanation by using the `--help` command line option.

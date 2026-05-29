@@ -1,8 +1,7 @@
 # DSH resource management API command line tool
 
 > **NOTE**  
-> This tool is still under development and will most likely contain many bugs.
-> If you encounter any of these bugs (and you will), you can report them to `unibox@kpn.com`.
+> If you encounter any bugs or issues you can report them to `unibox@kpn.com`.
 > Please include the exact command, the erroneous output and an explanation of the expected output.
 > You can also send requests for new features to this e-mail address.
 
@@ -16,12 +15,12 @@ Some of the capabilities of the `dsh` tool are:
 * Extensive help information on each level using the `--help` and `-h` flags,
   including listings of all available operations.
 * Configuring platform and tenant credentials interactively via the `dsh` tool.
-  Sensitive passwords are stored in your computer's keychain, if available.
+  Sensitive passwords are stored in your computer's keyring, if available.
 * Retrieving information about the available platforms.
 * Opening web applications (e.g. the console, the swagger ui or the vhost of your app or service)
   from the command line.
 * Reversed lookup functions. For example find all services that use a given secret or volume,
-  or have an environment value with a given value in their configuration.
+  or contain an environment value with a given value in their configuration.
 
 ## Features
 
@@ -35,30 +34,39 @@ The following features are defined:
 
 ## Installation
 
-If you have the `rust` tool-chain installed, the DSH Api Command Line Tool (`dsh`) can be
-installed on your local machine directly from `crates.io` by executing the following command.
+### Cargo install
 
-```bash
-> cargo install dsh
+If you have the Rust tool-chain installed, the `dsh` tool can be installed on your local machine
+directly from `crates.io`, by executing the following command:
+
+```shell
+> cargo install dsh --all-features --locked
 ```
 
-This will install the `dsh` tool without any features.
+This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/dsh`.
 
-You can add one or more features by providing the appropriate flags.
-For example, to install the `manage` and the `robot` features, use:
+### Pre-built binaries
 
-```bash
-> cargo install dsh --features manage,robot
+For some platforms a pre-built binary is available at the `GitHub` release page:
+[`https://github.com/kpn-dsh/dsh-cli/releases`](https://github.com/kpn-dsh/dsh-cli/releases).
+You can download this file to your workstation. Make sure that the directory where you store
+the executable is included in your `PATH` variable and that you set the execute flag:
+
+```shell
+> chmod $DIR/dsh u+x
 ```
-
-You can also use the `--all-features` flag to install all features.
 
 ## Next steps
 
-* [Quick start](quick_start.md)
-* [User guide](user_guide.md)
-* [Environment variables](environment_variables.md)
-* [Settings and targets](settings_targets.md)
-* [Platforms specification](platforms-specification.md)
-* [Set up autocompletion](autocompletion.md)
-* [Developers](developers.md)
+* [Quick start](docs/quick-start.md)
+* [User guide](docs/user-guide.md)
+* [Authentication and authorization](docs/authentication-authorization.md)
+* [Environment variables](docs/environment-variables.md)
+* [Settings and targets](docs/settings-targets.md)
+* [Kafka proxy](docs/proxy.md)
+* [Platforms specification](docs/platforms-specification.md)
+* [Set up autocompletion](docs/autocompletion.md)
+* [Developers](docs/developers.md)
+* [Publish](docs/publish.md)
+* [Release](docs/release.md)
+* [Codesign and notarize for macOS](docs/code-signing-macos.md)

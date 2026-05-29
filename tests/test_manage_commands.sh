@@ -1,24 +1,22 @@
 #!/bin/bash
 set -e
 
-# This script can be used as a run test for dsh.
-# It will run a large number of commands from a file and print the output to the console.
-# This tests must be run from within the 'tests' directory.
+# Run dsh manage commands
+#
+# This script will run a large number of commands and print the output to the console.
+#
+# To run this test the following is expected:
+# * User is logged in via the single-sign-on authentication method at platform $DSH_CLI_PLATFORM
+# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM and has manage rights
+# * User is authenticated for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
+# *  Managed internal stream $INTERNAL_STREAM exists at platform $DSH_CLI_PLATFORM and is managed by $DSH_CLI_TENANT
+# *  Managed public stream $PUBLIC_STREAM exists at platform $DSH_CLI_PLATFORM and is managed by $DSH_CLI_TENANT
+# *  Managed stream $STREAM_NON_EXISTING does not exist at platform $DSH_CLI_PLATFORM
+# *  Managed tenant $TENANT exists at platform $DSH_CLI_PLATFORM and is managed by $DSH_CLI_TENANT
+# *  Managed tenant $TENANT_NON_EXISTING does not exist at platform $DSH_CLI_PLATFORM
 
 export DSH_CLI_PLATFORM=nplz
 export DSH_CLI_TENANT=ajuc
-export DSH_CLI_PASSWORD_FILE=../np-aws-lz-dsh.ajuc.pwd
-
-# For this test to run the following is expected:
-#
-# * Tenant $DSH_CLI_TENANT exists at platform $DSH_CLI_PLATFORM and has manage rights
-# * Password file $DSH_CLI_PASSWORD_FILE exists and contains the password
-#   for tenant $DSH_CLI_TENANT at platform $DSH_CLI_PLATFORM
-# * Managed internal stream $INTERNAL_STREAM exists at platform $DSH_CLI_PLATFORM and is managed by $DSH_CLI_TENANT
-# * Managed public stream $PUBLIC_STREAM exists at platform $DSH_CLI_PLATFORM and is managed by $DSH_CLI_TENANT
-# * Managed stream $STREAM_NON_EXISTING does not exist at platform $DSH_CLI_PLATFORM
-# * Managed tenant $TENANT exists at platform $DSH_CLI_PLATFORM and is managed by $DSH_CLI_TENANT
-# * Managed tenant $TENANT_NON_EXISTING does not exist at platform $DSH_CLI_PLATFORM
 
 export DSH_CLI_VERBOSITY="high"
 export DSH_CLI_SHOW_EXECUTION_TIME=""

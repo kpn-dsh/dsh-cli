@@ -1,4 +1,6 @@
-# Codesign for macOS
+# Codesign and notarize for macOS
+
+[&#x2190; Release](release.md)
 
 On devices with macOS 10.15 or higher all apps distributed outside the App Store must be signed
 by the developer using an Apple-issued Developer ID certificate and notarised by Apple to run
@@ -9,12 +11,13 @@ Code signing is performed by the developer using their Developer ID certificate 
 Verification of this signature proves to the user that a developer’s software hasn’t been tampered
 with since the developer built and signed it.
 
-Notarisation can be performed by anyone in the software distribution chain and proves
+Notarization can be performed by anyone in the software distribution chain and proves
 that Apple has been provided a copy of the code to check for malware and no known malware was found.
-The output of Notarisation is a ticket which is stored on Apple servers and can be optionally stapled to the app
+The output of Notarization is a ticket which is stored on Apple servers and can be optionally
+stapled to the app
 (by anyone) without invalidating the signature of the developer.
 
-More information about codesigning, notarisation and some of the other steps can be found on the
+More information about codesigning, notarization and some of the other steps can be found on the
 following pages:
 
 * [App code signing process in macOS](https://support.apple.com/en-gb/guide/security/sec3ad8e6e53/web)
@@ -59,13 +62,13 @@ install it from [DeveloperIDG2CA](https://www.apple.com/certificateauthority/Dev
 
 You can check whether the KPN Developer Certificate is properly installed using the command:
 
-```bash
+```shell
 > security find-identity -v -p codesigning
 ```
 
 If everything is ok this command should return something like:
 
-```bash
+```shell
 1) FA675DE5B91B034C50FF28367713EE347A5A5C0C "Developer ID Application: KPN B.V. (B86ZND72C8)"
    1 valid identities found
 ```
@@ -88,7 +91,7 @@ rest of this text once for each binary.
 
 Build the tool with the following command:
 
-```bash
+```shell
 > cargo build --release --all-features
 ```
 
@@ -99,13 +102,13 @@ The build step will result in a binary file (`target/release/dsh`).
 Next step is signing the binary with the KPN developers certificate.
 Code signing is executed by the `codesign` command:
 
-```bash
+```shell
 > codesign -o runtime -s "Developer ID Application: KPN B.V. (B86ZND72C8)" target/release/dsh
 ```
 
 This command will most likely ask four your Keychain password. You can check the result by:
 
-```bash
+```shell
 > codesign -vvv --deep --strict target/release/dsh
 target/release/dsh: valid on disk
 target/release/dsh: satisfies its Designated Requirement
@@ -130,15 +133,16 @@ For the rest of this explanation `abcd-efgh-ijkl-mnop` will be used for the pass
 
 In order to notarise the `dsh` tool it must first be packed in a zip file:
 
-```bash
+```shell
 > zip dsh.zip target/release/dsh
 ```
 
 This creates the file `dsh.zip` containing only the `dsh` binary.
 This zip file can then be submitted to be notarised by the following command:
 
-```bash
-> xcrun notarytool submit dsh.zip --apple-id your.name@kpn.com --team-id B86ZND72C8 --password abcd-efgh-ijkl-mnop
+```shell
+> xcrun notarytool submit dsh.zip --apple-id your.name@kpn.com \
+        --team-id B86ZND72C8 --password abcd-efgh-ijkl-mnop
 Conducting pre-submission checks for dsh.zip and initiating connection to the Apple notary service...
 Submission ID received
   id: abcdef01-2345-6789-abcd-ef0123456789
@@ -151,11 +155,12 @@ Successfully uploaded file
 Be sure to save the provided id (in the example `abcdef01-2345-6789-abcd-ef0123456789`), since you
 might need it to check the status of the process.
 
-Notarisation usually takes less than 5 minutes, but in some cases it can take quite a bit longer.
+Notarization usually takes less than 5 minutes, but in some cases it can take quite a bit longer.
 In order to poll the status of the process you can use the following command:
 
-```bash
-> xcrun notarytool log abcdef01-2345-6789-abcd-ef0123456789 --apple-id your.name@kpn.com --team-id B86ZND72C8  --password abcd-efgh-ijkl-mnop
+```shell
+> xcrun notarytool log abcdef01-2345-6789-abcd-ef0123456789 --apple-id your.name@kpn.com \
+        --team-id B86ZND72C8  --password abcd-efgh-ijkl-mnop
 {
   "logFormatVersion": 1,
   "jobId": "abcdef01-2345-6789-abcd-ef0123456789",
@@ -180,24 +185,12 @@ In order to poll the status of the process you can use the following command:
 When the notarise process is finished, you can check whether it was successful using the
 `codesign` command:
 
-```bash
+```shell
 > codesign -vvvv -R="notarized" --check-notarization target/release/dsh
 target/release/dsh: valid on disk
 target/release/dsh: satisfies its Designated Requirement
 target/release/dsh: explicit requirement satisfied
 ```
-
-## Create a GitHub release
-
-To create a GitHub release, first rename the binary:
-
-```bash
-> mv target/release/dsh dsh-v0.9.0-aarch64-apple-darwin
-```
-
-Then go to [GitHub\releases](https://github.com/kpn-dsh/dsh-cli/releases), click
-`Draft a new release` and follow the steps, attaching the renamed binary by dropping it on the
-page or by selecting it.
 
 ## Tool
 
@@ -206,7 +199,6 @@ It allows you to check the status by right-clicking the `dsh` binary in the Find
 `Signing Info` context menu. When codesigning and notarising are both completed the tool will show
 this as follows:
 
-<img src="docs/images/whats-your-sign.png" width="600" />
+<img src="images/whats-your-sign.png" width="600" />
 
-rtzo-wmei-anqk-rrpw
-2a7903a3-3248-4b0c-8c69-ac3438d42aa2
+[Release &#x2192;](release.md)

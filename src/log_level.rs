@@ -1,7 +1,7 @@
 use crate::context::Context;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_LOG_COLOR, ENV_VAR_DSH_CLI_LOG_LEVEL, ENV_VAR_DSH_CLI_LOG_LEVEL_API, ENV_VAR_DSH_CLI_LOG_STYLE};
 use crate::error::DshCliError;
-use crate::log_arguments::{LOG_LEVEL_API_ARGUMENT, LOG_LEVEL_ARGUMENT};
+use crate::global_options::{LOG_LEVEL_API_OPTION, LOG_LEVEL_OPTION};
 use crate::settings::Settings;
 use crate::style::{style_from, DshColor, DshStyle};
 use crate::{err, DshCliResult};
@@ -40,14 +40,14 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Ds
     &Context::get_style(ENV_VAR_DSH_CLI_LOG_STYLE, matches, &settings.log_style, DshStyle::Dim)?,
     &Context::get_color(ENV_VAR_DSH_CLI_LOG_COLOR, matches, &settings.log_color, DshColor::Red)?,
   );
-  let log_level_dsh = match matches.get_one::<LogLevel>(LOG_LEVEL_ARGUMENT) {
+  let log_level_dsh = match matches.get_one::<LogLevel>(LOG_LEVEL_OPTION) {
     Some(log_level_from_argument) => log_level_from_argument.clone(),
     None => match environment_variable(ENV_VAR_DSH_CLI_LOG_LEVEL, Some(matches))? {
       Some(log_level_from_env_var) => LogLevel::try_from(log_level_from_env_var.as_str())?,
       None => settings.log_level.clone().unwrap_or_default(),
     },
   };
-  let log_level_dsh_api = match matches.get_one::<LogLevel>(LOG_LEVEL_API_ARGUMENT) {
+  let log_level_dsh_api = match matches.get_one::<LogLevel>(LOG_LEVEL_API_OPTION) {
     Some(log_level_api_from_argument) => log_level_api_from_argument.clone(),
     None => match environment_variable(ENV_VAR_DSH_CLI_LOG_LEVEL_API, Some(matches))? {
       Some(log_level_api_from_env_var) => LogLevel::try_from(log_level_api_from_env_var.as_str())?,

@@ -1,6 +1,6 @@
 ## Platforms specification
 
-[&#x2190; Settings and targets](settings_targets.md)
+[&#x2190; Kafka proxy](proxy.md)
 
 If you need a different set of platform configurations,
 you can use the `DSH_API_PLATFORMS_FILE` environment variable to provide
@@ -14,19 +14,19 @@ include the default platforms in your platforms file.
 The default platforms file is defined in the `dsh_api` library crate.
 When you want to create your own platforms file you can use the default file as a starting point.
 
-```bash
+```shell
 > dsh platform export > my-platforms.json
 ```
 
 Open the file in your favorite editor and make the required changes,
 Then set the environment variable to point to the file and see the new platform configuration:
 
-```bash
+```shell
 > export DSH_API_PLATFORMS_FILE=my-platforms.json
 > dsh platform list
 ```
 
-See the github for the [`dsh_api`](https://github.com/kpn-dsh/dsh-api) for more information
+See [`dsh_api`](https://github.com/kpn-dsh/dsh-api) for more information
 about the platforms specifications.
 
 [Set up autocompletion &#x2192;](autocompletion.md)

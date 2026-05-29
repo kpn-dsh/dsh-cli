@@ -2,7 +2,7 @@
 
 [&#x2190; Platforms specification](platforms-specification.md)
 
-The `dsh` tool has a hidden argument `--generate-autocomplete-file`, which can be used
+The `dsh` tool has a hidden option `--generate-autocomplete-file`, which can be used
 to generate an autocompletion file for the following shells:
 
 * `bash` - Bourne-again shell
@@ -16,25 +16,25 @@ how to install the autocompletion file.
 
 ## Bourne-again shell
 
-```bash
+```shell
 > dsh --generate-autocomplete-file bash
 ```
 
 ## Elvish shell
 
-```bash
+```shell
 > dsh --generate-autocomplete-file elvish
 ```
 
 ## Fish shell
 
-```bash
+```shell
 > dsh --generate-autocomplete-file fish
 ```
 
 ## Microsoft Powershell
 
-```bash
+```shell
 > dsh --generate-autocomplete-file powershell
 ```
 
@@ -43,14 +43,14 @@ how to install the autocompletion file.
 Run `dsh` with the `--generate-autocomplete-file zsh` flag and redirect the result
 to an autocomplete file name `_dsh`.
 
-```bash
+```shell
 > dsh --generate-autocomplete-file zsh > _dsh
 ```
 
 Then copy the autocomplete file to your `zsh` autocomplete directory.
 Note that this most likely will require `sudo`.
 
-```bash
+```shell
 > mv _dsh /usr/local/share/zsh/site-functions/_dsh
 ```
 

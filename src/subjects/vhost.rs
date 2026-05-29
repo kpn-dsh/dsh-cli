@@ -86,6 +86,21 @@ struct VhostListValue {
   port_mapping: PortMapping,
 }
 
+static VHOST_LIST_LABELS: [VhostListLabel; 12] = [
+  VhostListLabel::Vhost,
+  VhostListLabel::Zone,
+  VhostListLabel::ServiceId,
+  VhostListLabel::Port,
+  VhostListLabel::Instances,
+  VhostListLabel::Auth,
+  VhostListLabel::Tenant,
+  VhostListLabel::Mode,
+  VhostListLabel::Paths,
+  VhostListLabel::Tls,
+  VhostListLabel::KafkaFlag,
+  VhostListLabel::Whitelist,
+];
+
 struct VhostList {}
 
 #[async_trait]
@@ -208,7 +223,7 @@ impl Label for VhostListLabel {
 impl SubjectFormatter<VhostListLabel> for VhostListValue {
   fn value(&self, label: &VhostListLabel, _target_id: &str) -> Value {
     match label {
-      VhostListLabel::Auth => Value::option(self.port_mapping.auth.clone().and_then(|auth| AuthString::from_str(&auth).ok())),
+      VhostListLabel::Auth => Value::some_or_hide(self.port_mapping.auth.clone().and_then(|auth| AuthString::from_str(&auth).ok())),
       VhostListLabel::KafkaFlag => {
         if self.kafka_flag {
           Value::plain("set")
@@ -217,34 +232,19 @@ impl SubjectFormatter<VhostListLabel> for VhostListValue {
         }
       }
       VhostListLabel::Instances => Value::plain(self.instances),
-      VhostListLabel::Mode => Value::option(self.port_mapping.mode.as_ref()),
+      VhostListLabel::Mode => Value::some_or_hide(self.port_mapping.mode.as_ref()),
       VhostListLabel::Paths => Value::plain(self.port_mapping.paths.iter().map(|path_spec| path_spec.to_string()).join(", ")),
       VhostListLabel::Port => Value::plain(&self.port),
-      VhostListLabel::_ServiceGroup => Value::option(self.port_mapping.service_group.as_ref()),
+      VhostListLabel::_ServiceGroup => Value::some_or_hide(self.port_mapping.service_group.as_ref()),
       VhostListLabel::ServiceId => Value::plain(&self.service_id),
-      VhostListLabel::Tenant => Value::option(self.tenant.as_ref()),
-      VhostListLabel::Tls => Value::option(self.port_mapping.tls),
+      VhostListLabel::Tenant => Value::some_or_hide(self.tenant.as_ref()),
+      VhostListLabel::Tls => Value::some_or_hide(self.port_mapping.tls),
       VhostListLabel::Vhost => Value::plain(&self.vhost),
-      VhostListLabel::Whitelist => Value::option(self.port_mapping.whitelist.as_ref()),
-      VhostListLabel::Zone => Value::option(self.zone.as_ref()),
+      VhostListLabel::Whitelist => Value::some_or_hide(self.port_mapping.whitelist.as_ref()),
+      VhostListLabel::Zone => Value::some_or_hide(self.zone.as_ref()),
     }
   }
 }
-
-static VHOST_LIST_LABELS: [VhostListLabel; 12] = [
-  VhostListLabel::Vhost,
-  VhostListLabel::Zone,
-  VhostListLabel::ServiceId,
-  VhostListLabel::Port,
-  VhostListLabel::Instances,
-  VhostListLabel::Auth,
-  VhostListLabel::Tenant,
-  VhostListLabel::Mode,
-  VhostListLabel::Paths,
-  VhostListLabel::Tls,
-  VhostListLabel::KafkaFlag,
-  VhostListLabel::Whitelist,
-];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum VhostLabel {
@@ -273,5 +273,3 @@ impl SubjectFormatter<VhostLabel> for Vhost {
     }
   }
 }
-
-pub(crate) static VHOST_LABELS: [VhostLabel; 2] = [VhostLabel::Target, VhostLabel::Value];

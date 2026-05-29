@@ -5,6 +5,7 @@ pub(crate) enum FlagType {
   _Actual,
   AllocationStatus,
   AllVersions,
+  Bundle,
   Certificates,
   Configuration,
   Errors,
@@ -16,7 +17,6 @@ pub(crate) enum FlagType {
   #[cfg(feature = "manage")]
   Stream,
   System,
-  Tasks,
   Usage,
   Value,
 }
@@ -27,6 +27,7 @@ impl FlagType {
       Self::_Actual => "actual-flag",
       Self::AllocationStatus => "status-flag",
       Self::AllVersions => "all-versions-flag",
+      Self::Bundle => "bundle-flag",
       Self::Certificates => "certificates-flag",
       Self::Configuration => "configuration-flag",
       Self::Errors => "erros-flag",
@@ -38,17 +39,17 @@ impl FlagType {
       #[cfg(feature = "manage")]
       Self::Stream => "stream-flag",
       Self::System => "system-flag",
-      Self::Tasks => "tasks-flag",
       Self::Usage => "usage-flag",
       Self::Value => "value-flag",
     }
   }
 
-  pub(crate) fn option(&self) -> &'static str {
+  fn flag(&self) -> &'static str {
     match &self {
       Self::_Actual => "actual",
       Self::AllocationStatus => "status",
       Self::AllVersions => "all-versions",
+      Self::Bundle => "bundle",
       Self::Certificates => "certificates",
       Self::Configuration => "configuration",
       Self::Errors => "errors",
@@ -60,7 +61,6 @@ impl FlagType {
       #[cfg(feature = "manage")]
       Self::Stream => "stream",
       Self::System => "system",
-      Self::Tasks => "tasks",
       Self::Usage => "usage",
       Self::Value => "value",
     }
@@ -72,6 +72,7 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     FlagType::_Actual => create_clap_flag(FlagType::_Actual, format!("Use the 'actual' {} configuration", subject), long_help),
     FlagType::AllocationStatus => create_clap_flag(FlagType::AllocationStatus, format!("Include the {}'s allocation status", subject), long_help),
     FlagType::AllVersions => create_clap_flag(FlagType::AllVersions, format!("List all {} versions", subject), long_help),
+    FlagType::Bundle => create_clap_flag(FlagType::Bundle, format!("List all {}s", subject), long_help),
     FlagType::Certificates => create_clap_flag(FlagType::Certificates, format!("Show {}s as certificates", subject), long_help),
     FlagType::Configuration => create_clap_flag(FlagType::Configuration, format!("Include the {}'s initial configuration", subject), long_help),
     FlagType::Errors => create_clap_flag(FlagType::Errors, format!("Check {}s and show errors", subject), long_help),
@@ -83,14 +84,13 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     #[cfg(feature = "manage")]
     FlagType::Stream => create_clap_flag(FlagType::Stream, format!("Include the {}'s stream", subject), long_help),
     FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s", subject), long_help),
-    FlagType::Tasks => create_clap_flag(FlagType::Tasks, format!("Include the {}'s tasks", subject), long_help),
     FlagType::Usage => create_clap_flag(FlagType::Usage, format!("Include the {}'s usages", subject), long_help),
     FlagType::Value => create_clap_flag(FlagType::Value, format!("Include the {}'s value", subject), long_help),
   }
 }
 
 fn create_clap_flag(flag_type: FlagType, help: String, long_help: Option<&str>) -> Arg {
-  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.option()).action(ArgAction::SetTrue).help(help);
+  let mut flag_arg = Arg::new(flag_type.id()).long(flag_type.flag()).action(ArgAction::SetTrue).help(help);
   if let Some(long_help) = long_help {
     flag_arg = flag_arg.long_help(long_help.to_string());
   }

@@ -4,15 +4,19 @@
 //! and certificates. The default root of this directory structure is `$HOME/.dsh_cli`,
 //! but this can be overridden via the environment variable `DSH_CLI_HOME`.
 //!
-//! ```
+//! ```text
 //! $HOME/.dsh_cli/
 //!  ├── targets/
 //!  │    ├── platform1/
 //!  │    │    ├── tenant1/
-//!  │    │    │    └── certificates/
-//!  │    │    │         ├── broker-ca.pem
-//!  │    │    │         ├── broker-client.key
-//!  │    │    │         └── broker-client.pem
+//!  │    │    │    └── bundles/
+//!  │    │    │         └── proxy1/
+//!  │    │    │              ├── ca.key
+//!  │    │    │              ├── ca.pem
+//!  │    │    │              ├── client.key
+//!  │    │    │              ├── client.pem
+//!  │    │    │              ├── server.key
+//!  │    │    │              └── server.key
 //!  │    │    ├── tenant2/
 //!  │    │    │     ...
 //!  │    │    └── refresh-token.encrypted
@@ -35,26 +39,31 @@
 //! variables and cannot be specified via the command line `--environment-variable` argument.
 
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
+use crate::proxy_bundles::{LocalCertificate, LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::settings::Settings;
-use crate::targets::{upsert_password_to_keyring, Target};
-use crate::{err, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
+use crate::{err, error_map, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::platform::DshPlatform;
 use homedir::my_home;
 use lazy_static::lazy_static;
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use std::fs;
-use std::io::ErrorKind;
+use std::fs::{read_dir, remove_dir_all, File, Permissions};
+use std::io::{ErrorKind, Write};
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-const _CERTIFICATES_SUBDIRECTORY: &str = "certificates";
+const PROXY_CERTIFICATE_BUNDLES_SUBDIRECTORY: &str = "bundles";
 const DEFAULT_SETTINGS_FILENAME: &str = "settings.toml";
 const DEFAULT_USER_DSH_CLI_DIRECTORY: &str = ".dsh_cli";
 const REFRESH_TOKEN_FILENAME: &str = "refresh-token.encrypted";
 const TARGETS_SUBDIRECTORY: &str = "targets";
 
-/// # Initialise the dsh directory
+const MODE_U_RW: u32 = 0o600;
+
+/// Initializes the dsh directory.
 ///
-/// This function initialises the dsh directory. If it does not already exist the directory
+/// This function initializes the dsh directory. If it does not already exist the directory
 /// will be created, together with required subdirectories.
 ///
 /// This function must be called before any function that depends on the dsh directory is called.
@@ -63,9 +72,9 @@ const TARGETS_SUBDIRECTORY: &str = "targets";
 /// See this modules doc comments for an explanation how the dsh directory location is
 /// determined.
 ///
-/// ## Returns
-/// * `Ok<()>` - Initialisation was successful.
-/// * `Err<DshCliError>` - Initialisation failed and the application must report the error and
+/// # Returns
+/// * `Ok<()>` - Initialization was successful.
+/// * `Err<DshCliError>` - Initialization failed and the application must report the error and
 ///   terminate.
 #[allow(clippy::single_element_loop)]
 pub(crate) fn init_dsh_directory() -> DshCliResult<()> {
@@ -82,7 +91,7 @@ pub(crate) fn init_dsh_directory() -> DshCliResult<()> {
           )
         }
       } else {
-        _ = &fs::create_dir_all(&dsh_directory)?;
+        fs::create_dir_all(&dsh_directory)?;
         info!("dsh directory {} created", dsh_directory.display());
         for dsh_subdirectory_name in [TARGETS_SUBDIRECTORY] {
           let dsh_subdirectory = dsh_directory.join(dsh_subdirectory_name);
@@ -97,13 +106,13 @@ pub(crate) fn init_dsh_directory() -> DshCliResult<()> {
   }
 }
 
-/// # Returns whether the dsh directory is supported
+/// Returns whether the dsh directory is supported.
 ///
 /// This function returns whether the dsh directory is available or not. If this directory does
 /// not exist the dsh tool will not be able to store any settings, but that might be the desired
 /// behavior in some use cases, e.g. in a CI/CD environment.
 ///
-/// ## Returns
+/// # Returns
 /// * `true` - A valid dsh directory is available.
 /// * `false` - No valid dsh directory available, either by configuration or by an earlier error.
 pub(crate) fn supports_dsh_directory() -> bool {
@@ -114,12 +123,12 @@ pub(crate) fn supports_dsh_directory() -> bool {
   }
 }
 
-/// # Delete stored refresh token
+/// Deletes stored refresh token.
 ///
-/// ## Parameters
+/// # Parameters
 /// * `platform` - Platform for which the token must be deleted.
 ///
-/// ## Returns
+/// # Returns
 /// * `Ok<true>` - Refresh token was deleted.
 /// * `Ok<false>` - Refresh token does not exist.
 /// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
@@ -139,12 +148,12 @@ pub(crate) fn delete_refresh_token(platform: &DshPlatform) -> DshCliResult<bool>
   }
 }
 
-/// Read stored refresh token
+/// Reads stored refresh token.
 ///
-/// ## Parameters
+/// # Parameters
 /// * `platform` - Platform for which the token is requested.
 ///
-/// ## Returns
+/// # Returns
 /// * `Ok<Some<String>>` - Refresh token.
 /// * `Ok<None>` - Refresh token does not exist.
 /// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
@@ -172,13 +181,13 @@ pub(crate) fn read_refresh_token(platform: &DshPlatform) -> DshCliResult<Option<
   }
 }
 
-/// Store refresh token
+/// Stores refresh token.
 ///
-/// ## Parameters
+/// # Parameters
 /// * `platform` - Platform for which the token must be stored.
 /// * `refresh_token` - Refresh token that must be stored.
 ///
-/// ## Returns
+/// # Returns
 /// * `Ok<()>` - If storing was successful.
 /// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
 pub(crate) fn write_refresh_token(platform: &DshPlatform, refresh_token: &str) -> DshCliResult<()> {
@@ -186,19 +195,300 @@ pub(crate) fn write_refresh_token(platform: &DshPlatform, refresh_token: &str) -
     Some(refresh_token_pathbuf) => {
       create_parent_directories(&refresh_token_pathbuf)?;
       debug!("write refresh token for platform '{}' to '{}'", platform, refresh_token_pathbuf.display());
-      fs::write(refresh_token_pathbuf, refresh_token)?;
+      write_with_mode(refresh_token_pathbuf, refresh_token, Some(MODE_U_RW))?;
       Ok(())
     }
     None => err!("dsh directory disabled, refresh token cannot be stored"),
   }
 }
 
-/// # Returns the settings file
+const CONFIG_FILENAME: &str = "bundle.toml";
+const CA_KEY_FILENAME: &str = "ca.key";
+const CA_CERTIFICATE_FILENAME: &str = "ca.pem";
+const CLIENT_KEY_FILENAME: &str = "client.key";
+const CLIENT_CERTIFICATE_FILENAME: &str = "client.pem";
+const SERVER_KEY_FILENAME: &str = "server.key";
+const SERVER_CERTIFICATE_FILENAME: &str = "server.pem";
+
+/// Checks whether stored proxy certificate bundle exists.
+///
+/// # Parameters
+/// * `platform` - Platform for which the proxy certificate bundle is requested.
+/// * `tenant` - Tenant for which the proxy certificate bundle is requested.
+/// * `proxy_bundle_id` - Proxy bundle id for the requested proxy certificate bundle.
+///
+/// # Returns
+/// * `Ok<true>` - Proxy certificate bundle exists.
+/// * `Ok<false>` - Proxy certificate bundle does not exist.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn proxy_certificate_bundle_exists(platform: &DshPlatform, tenant: &str, proxy_bundle_id: &str) -> DshCliResult<bool> {
+  match proxy_certificate_bundle_pathbuf(platform, tenant, proxy_bundle_id)? {
+    Some(certificate_bundle_directory_pathbuf) => fs::exists(certificate_bundle_directory_pathbuf).map_err(error_map!("{}")),
+    None => err!("dsh directory disabled, certificate bundle cannot be read"),
+  }
+}
+
+/// Deletes stored proxy certificate bundle.
+///
+/// # Parameters
+/// * `platform` - Platform for which the proxy certificate bundle will be deleted.
+/// * `tenant` - Tenant for which the proxy certificate bundle will be deleted.
+/// * `proxy_bundle_id` - Proxy prefix for the proxy certificate bundle that will be deleted.
+///
+/// # Returns
+/// * `Ok<(>` - Proxy certificate bundle successfully deleted.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn delete_proxy_certificate_bundle(platform: &DshPlatform, tenant: &str, proxy_bundle_id: &str) -> DshCliResult<()> {
+  match proxy_certificate_bundle_pathbuf(platform, tenant, proxy_bundle_id)? {
+    Some(certificate_bundle_directory_pathbuf) => {
+      remove_dir_all(&certificate_bundle_directory_pathbuf)?;
+      debug!("proxy certificate bundle '{}' deleted", certificate_bundle_directory_pathbuf.display());
+      Ok(())
+    }
+    None => err!("dsh directory disabled, proxy certificate bundle cannot be read"),
+  }
+}
+
+/// Reads stored proxy certificate bundle.
+///
+/// # Parameters
+/// * `platform` - Platform for which the proxy certificate bundle is requested.
+/// * `tenant` - Tenant for which the proxy certificate bundle is requested.
+/// * `proxy_bundle_id` - Proxy certificate bundle id for the requested proxy certificate bundle.
+///
+/// # Returns
+/// * `Ok<(String, String, String, ProxyCertificateBundleConfig)>` - Certificate bundle tuple
+///   consisting of:
+///   * Server certificate
+///   * Private key
+///   * CA certificate
+///   * Proxy certificate bundle configuration
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn read_proxy_certificate_bundle(platform: &DshPlatform, tenant: &str, proxy_bundle_id: &str) -> DshCliResult<(String, String, String, ProxyCertificateBundleConfig)> {
+  match proxy_certificate_bundle_pathbuf(platform, tenant, proxy_bundle_id)? {
+    Some(certificate_bundle_directory_pathbuf) => {
+      debug!("read proxy certificate bundle from '{}'", certificate_bundle_directory_pathbuf.display());
+
+      let mut config_file_path = certificate_bundle_directory_pathbuf.clone();
+      config_file_path.push(CONFIG_FILENAME);
+      let config = match read_and_deserialize_from_toml_file::<ProxyCertificateBundleConfig>(&config_file_path)? {
+        Some(config) => config,
+        None => return err!("proxy certificate bundle '{}' not found", certificate_bundle_directory_pathbuf.display()),
+      };
+      debug!("proxy certificate bundle configuration read from '{}'", config_file_path.display());
+      trace!("{:#?}'", config);
+
+      let mut server_certificate_file_path = certificate_bundle_directory_pathbuf.clone();
+      server_certificate_file_path.push(SERVER_CERTIFICATE_FILENAME);
+      let server_certificate = fs::read_to_string(&server_certificate_file_path)?;
+      debug!("server certificate read from '{}'", server_certificate_file_path.display());
+
+      let mut private_key_file_path = certificate_bundle_directory_pathbuf.clone();
+      private_key_file_path.push(SERVER_KEY_FILENAME);
+      let private_key = fs::read_to_string(&private_key_file_path)?;
+      debug!("private key read from '{}'", private_key_file_path.display());
+
+      let mut ca_certificate_key_file_path = certificate_bundle_directory_pathbuf.clone();
+      ca_certificate_key_file_path.push(CA_CERTIFICATE_FILENAME);
+      let ca_certificate = fs::read_to_string(&ca_certificate_key_file_path)?;
+      debug!("ca certificate read from '{}'", ca_certificate_key_file_path.display());
+
+      Ok((server_certificate, private_key, ca_certificate, config))
+    }
+    None => err!("dsh directory disabled, proxy certificate bundle cannot be read"),
+  }
+}
+
+/// Reads local certificate bundle file.
+///
+/// # Parameters
+/// * `directory_pathbuf` - Pathbuf for local certificate bundle directory.
+/// * `filename` - Filename in local certificate bundle directory.
+fn read_local_certificate_bundle_file(directory_pathbuf: &Path, filename: &str) -> DshCliResult<LocalCertificate> {
+  let mut file_path = directory_pathbuf.to_path_buf();
+  file_path.push(filename);
+  let local_certificate_bundle_file = fs::read_to_string(&file_path)?;
+  debug!("local certificate bundle file read from '{}'", file_path.display());
+  Ok(LocalCertificate { value: local_certificate_bundle_file, filename: file_path.display().to_string() })
+}
+
+/// Reads local certificate bundle configuration.
+///
+/// # Parameters
+/// * `directory_pathbuf` - Pathbuf for local certificate bundle directory.
+///
+/// # Returns
+/// `ProxyCertificateBundleConfig` - Proxy certificate bundle configuration.
+fn read_local_certificate_bundle_configuration(local_bundle_directory_pathbuf: &Path) -> DshCliResult<ProxyCertificateBundleConfig> {
+  let mut config_file_path = local_bundle_directory_pathbuf.to_path_buf();
+  config_file_path.push(CONFIG_FILENAME);
+  match read_and_deserialize_from_toml_file::<ProxyCertificateBundleConfig>(&config_file_path)? {
+    Some(configuration) => {
+      debug!("local certificate bundle configuration read from '{}'", config_file_path.display());
+      trace!("{:#?}'", configuration);
+      Ok(configuration)
+    }
+    None => err!("local certificate bundle configuration '{}' not found", config_file_path.display()),
+  }
+}
+
+/// Reads locally stored certificate bundle.
+///
+/// # Parameters
+/// * `platform` - Platform for which the local certificate bundle is requested.
+/// * `tenant` - Tenant for which the local certificate bundle is requested.
+/// * `proxy_bundle_id` - Proxy certificate bundle id for the requested local certificate bundle.
+///
+/// # Returns
+/// * `Ok<LocalCertificateBundle>` - Local certificate bundle.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn read_local_certificate_bundle(platform: &DshPlatform, tenant: &str, proxy_bundle_id: &str) -> DshCliResult<LocalCertificateBundle> {
+  match proxy_certificate_bundle_pathbuf(platform, tenant, proxy_bundle_id)? {
+    Some(certificate_bundle_directory_pathbuf) => {
+      debug!("read local certificate bundle from '{}'", certificate_bundle_directory_pathbuf.display());
+      Ok(LocalCertificateBundle {
+        configuration: (
+          read_local_certificate_bundle_configuration(&certificate_bundle_directory_pathbuf)?,
+          certificate_bundle_directory_pathbuf.display().to_string(),
+        ),
+        ca_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_KEY_FILENAME)?,
+        ca_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_CERTIFICATE_FILENAME)?,
+        client_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_KEY_FILENAME)?,
+        client_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_CERTIFICATE_FILENAME)?,
+        server_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_KEY_FILENAME)?,
+        server_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_CERTIFICATE_FILENAME)?,
+      })
+    }
+    None => err!("dsh directory disabled, proxy certificate bundle cannot be read"),
+  }
+}
+
+/// Lists stored proxy certificate bundle.
+///
+/// # Parameters
+/// * `platform` - Platform for which the proxy certificate bundle is requested.
+/// * `tenant` - Tenant for which the proxy certificate bundle is requested.
+///
+/// # Returns
+/// * `Ok<Vec<(String, ProxyCertificateBundleConfig, String)>>` - Certificate bundle consisting of:
+///   * Bundle name
+///   * Bundle configuration
+///   * Bundle directory
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn list_proxy_certificate_bundles(platform: &DshPlatform, tenant: &str) -> DshCliResult<Vec<(String, ProxyCertificateBundleConfig, String)>> {
+  match dsh_directory_pathbuf(&format!(
+    "{}/{}/{}/{}",
+    TARGETS_SUBDIRECTORY,
+    platform.name(),
+    tenant,
+    PROXY_CERTIFICATE_BUNDLES_SUBDIRECTORY
+  ))? {
+    Some(certificate_bundle_directory) => {
+      if certificate_bundle_directory.exists() {
+        debug!("read proxy certificate bundles from '{}'", certificate_bundle_directory.display());
+        let mut bundles: Vec<(String, ProxyCertificateBundleConfig, String)> = vec![];
+        read_dir(&certificate_bundle_directory)?.flatten().for_each(|entry| {
+          if entry.path().is_dir() {
+            let bundle_name = entry.file_name().display().to_string();
+            let mut bundle_config_pathbuf = entry.path().clone();
+            bundle_config_pathbuf.push(CONFIG_FILENAME);
+            match read_and_deserialize_from_toml_file::<ProxyCertificateBundleConfig>(&bundle_config_pathbuf) {
+              Ok(Some(config)) => {
+                debug!(
+                  "read proxy certificate bundle '{}' configuration from '{}'",
+                  bundle_name,
+                  bundle_config_pathbuf.display()
+                );
+                bundles.push((bundle_name, config, entry.path().display().to_string()))
+              }
+              Ok(None) => warn!("proxy certificate bundle configuration file '{}' not found", bundle_config_pathbuf.display()),
+              Err(_) => {}
+            }
+          } else {
+            warn!("'{}' is not a directory", certificate_bundle_directory.display());
+          }
+        });
+        Ok(bundles)
+      } else {
+        Ok(vec![])
+      }
+    }
+    None => err!("dsh directory disabled, proxy certificate bundles cannot be read"),
+  }
+}
+
+/// Stores proxy certificate bundle.
+///
+/// # Parameters
+/// * `platform` - Platform for which the proxy certificate bundle must be stored.
+/// * `tenant` - Tenant for which the proxy certificate bundle must be stored.
+/// * `proxy_bundle_id` - Proxy certificate bundle id prefix for the proxy certificate bundle.
+/// * `certificate_bundle` - Proxy certificate bundle that must be stored.
+///
+/// # Returns
+/// * `Ok<String>` - If storing was successful, the directory name where the bundle was stored
+///   will be returned.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn store_proxy_certificate_bundle(platform: &DshPlatform, tenant: &str, proxy_bundle_id: &str, certificate_bundle: &ProxyCertificateBundle) -> DshCliResult<String> {
+  match proxy_certificate_bundle_pathbuf(platform, tenant, proxy_bundle_id)? {
+    Some(proxy_certificate_bundle_directory_pathbuf) => {
+      let mut config_file_path = proxy_certificate_bundle_directory_pathbuf.clone();
+      config_file_path.push(CONFIG_FILENAME);
+      debug!("write proxy certificate bundle configuration file '{}'", config_file_path.display());
+      trace!("{:#?}", &certificate_bundle.config);
+      let serialized_config = toml::to_string(&certificate_bundle.config)?;
+      write_with_mode(config_file_path, &serialized_config, Some(MODE_U_RW))?;
+
+      let pems = vec![
+        (CA_CERTIFICATE_FILENAME, certificate_bundle.ca_certificate.certificate.pem(), Some(MODE_U_RW)),
+        (CA_KEY_FILENAME, certificate_bundle.ca_certificate.key_pair.serialize_pem(), Some(MODE_U_RW)),
+        (
+          CLIENT_CERTIFICATE_FILENAME,
+          certificate_bundle.client_certificate.certificate.pem(),
+          Some(MODE_U_RW),
+        ),
+        (CLIENT_KEY_FILENAME, certificate_bundle.client_certificate.key_pair.serialize_pem(), Some(MODE_U_RW)),
+        (
+          SERVER_CERTIFICATE_FILENAME,
+          certificate_bundle.server_certificate.certificate.pem(),
+          Some(MODE_U_RW),
+        ),
+        (SERVER_KEY_FILENAME, certificate_bundle.server_certificate.key_pair.serialize_pem(), Some(MODE_U_RW)),
+      ];
+      for (filename, pem, mode) in pems {
+        let mut file_path = proxy_certificate_bundle_directory_pathbuf.clone();
+        file_path.push(filename);
+        debug!("write proxy certificate bundle file '{}'", file_path.display());
+        write_with_mode(file_path, &pem, mode)?;
+      }
+      Ok(proxy_certificate_bundle_directory_pathbuf.display().to_string())
+    }
+    None => err!("dsh directory disabled, proxy certificate bundle cannot be stored"),
+  }
+}
+
+fn write_with_mode<T>(file_path: T, data: &str, mode: Option<u32>) -> DshCliResult<()>
+where
+  T: AsRef<Path>,
+{
+  create_parent_directories(file_path.as_ref())?;
+  let mut file = File::create(file_path)?;
+  file.write_all(data.as_bytes())?;
+  if let Some(mode) = mode {
+    #[cfg(target_family = "unix")]
+    file.set_permissions(Permissions::from_mode(mode))?;
+    #[cfg(not(target_family = "unix"))]
+    debug!("permissions on file '{}' can only be set on unix", file_path.display());
+  }
+  Ok(())
+}
+
+/// Returns the settings file.
 ///
 /// Create the [PathBuf] for the settings file. The file name will be
 /// "$HOME/.dsh_cli/settings.toml".
 ///
-/// ## Returns
+/// # Returns
 /// * `Ok<Some<PathBuf>>` - Pathbuf of the settings file.
 /// * `Ok<None>` - Dsh tool does not support storing state and settings.
 /// * `Err<DshCliError>` - Settings file could not be created.
@@ -229,158 +519,11 @@ pub(crate) fn write_settings(settings: Settings) -> DshCliResult<()> {
   }
 }
 
-/// # Delete target directory
+/// Returns the root dsh directory pathbuf.
 ///
-/// This function will delete a target directory (if it exists).
+/// This function returns a `PathBuf` pointing at the root dsh directory, if it is available.
 ///
-/// ## Parameters
-/// * `platform` - Target platform.
-/// * `tenant` - Target tenant name.
-///
-/// ## Returns
-/// * `Ok(())` - Indicates that deleting the target directory was successful.
-pub(crate) fn delete_target_directory(platform: &DshPlatform, tenant: &str) -> DshCliResult<bool> {
-  match target_directory_pathbuf(platform, tenant)? {
-    Some(target_directory) => {
-      if target_directory.exists() {
-        if target_directory.is_dir() {
-          fs::remove_dir_all(&target_directory)?;
-          debug!("target directory '{}' deleted", target_directory.display());
-          Ok(true)
-        } else {
-          err!("'{}' is not a directory", target_directory.display())
-        }
-      } else {
-        Ok(false)
-      }
-    }
-    None => err!("dsh directory disabled, target directory cannot be deleted"),
-  }
-}
-
-/// # Read target directory
-///
-/// This function will read the target parameters from the target directory (if it exists).
-/// The `password` field of the returned `Target` will always be `None`.
-///
-/// ## Parameters
-/// * `platform` - target platform
-/// * `tenant` - target tenant name
-///
-/// ## Returns
-/// * `Ok(Some(target))` - If the target directory exists a `Target` will be returned.
-/// * `Ok(None)` - If the target directory does not exist.
-/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
-pub(crate) fn read_target(platform: &DshPlatform, tenant: &str) -> DshCliResult<Option<Target>> {
-  match target_directory_pathbuf(platform, tenant)? {
-    Some(target_directory) => {
-      if target_directory.exists() {
-        if target_directory.is_dir() {
-          debug!("target read from target directory '{}'", target_directory.display());
-          Ok(Some(Target::new(platform.clone(), tenant.to_string(), None, vec![])))
-        } else {
-          err!("'{}' is not a target directory", target_directory.display())
-        }
-      } else {
-        debug!("target directory '{}' does not exist", target_directory.display());
-        Ok(None)
-      }
-    }
-    None => err!("dsh directory disabled, target cannot be read"),
-  }
-}
-
-/// # Create or update target
-///
-/// This function will create a target settings file if it does not already exist,
-/// or it will update it if it is already there.
-/// If the `Target` has a non-empty `password` field, the password will be stored in the keyring.
-/// Note that this function is not transaction safe in the sense that when
-/// upserting the settings file is successful but storing the password in the keyring is not,
-/// the settings file will not be rolled back.
-/// The function will return an `Err` in this case, describing the situation.
-/// If upserting the settings file fails, the password will not be stored in the keyring.
-///
-/// ## Parameters
-/// * `target` - target to create or update a settings file for
-///
-/// ## Returns
-/// * `Ok(())` - if the target's setting file was successfully created or updated
-/// * `Err(message)` - if an error occurred in either upserting the target's settings file
-///   or the password in the keyring
-pub(crate) fn upsert_target(target: &Target) -> DshCliResult<()> {
-  match target_directory_pathbuf(&target.platform, &target.tenant)? {
-    Some(target_directory_pathbuf) => {
-      let target_file = target_directory_pathbuf.join(format!("{}.{}.toml", &target.platform, &target.tenant));
-      serialize_and_write_to_toml_file(&target_file, target)?;
-      match target.password {
-        Some(ref password) => match upsert_password_to_keyring(password, &target.platform, &target.tenant) {
-          Ok(_) => {
-            debug!("target file '{}' and keyring upserted with target '{}'", target_file.display(), target);
-            Ok(())
-          }
-          Err(keyring_error) => {
-            warn!(
-              "target file '{}' upserted with target '{}', but keyring update failed ({})",
-              target_file.display(),
-              target,
-              keyring_error
-            );
-            Err(keyring_error)
-          }
-        },
-        None => {
-          warn!("target file '{}' upserted with target '{}', but password is empty", target_file.display(), target);
-          Ok(())
-        }
-      }
-    }
-    None => err!("dsh directory disabled, target cannot be upserted"),
-  }
-}
-
-/// # List target directories
-///
-/// This function will read the target parameters from the target directory (if it exists).
-/// The `password` field of the returned `Target` will always be `None`.
-///
-/// ## Parameters
-/// * `platform` - target platform
-/// * `tenant` - target tenant name
-///
-/// ## Returns
-/// * `Ok<Vec<(platform, directory)>>` - If the target directory exists a `Target` will be returned.
-/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
-pub(crate) fn list_targets() -> DshCliResult<Vec<(DshPlatform, String)>> {
-  match dsh_directory_pathbuf(TARGETS_SUBDIRECTORY)? {
-    Some(targets_directory) => {
-      let mut targets = vec![];
-      if targets_directory.exists() && targets_directory.is_dir() {
-        for target_directory_entry in targets_directory.read_dir()?.flatten() {
-          if let Ok(platform) = DshPlatform::try_from(target_directory_entry.file_name().to_string_lossy().to_string().as_str()) {
-            let platform_directory = targets_directory.join(platform.name());
-            if platform_directory.exists() && platform_directory.is_dir() {
-              for tenant_directory_entry in platform_directory.read_dir()?.flatten() {
-                if tenant_directory_entry.path().is_dir() {
-                  targets.push((platform.clone(), tenant_directory_entry.file_name().into_string().unwrap()))
-                }
-              }
-            }
-          }
-        }
-      }
-      targets.sort();
-      Ok(targets)
-    }
-    None => err!("dsh directory disabled, targets cannot be listed"),
-  }
-}
-
-/// # Returns the root dsh directory pathbuf
-///
-/// This function returns a `Pathbuf` pointing at the root dsh directory, if it is available.
-///
-/// ## Returns
+/// # Returns
 /// * `Ok<Some<PathBuf>>` - Pathbuf of the root dsh directory.
 /// * `Ok<None>` - Dsh tool does not support storing state and settings.
 /// * `Err<DshCliError>` - When the dsh directory could not be determined.
@@ -392,15 +535,15 @@ fn root_dsh_directory_pathbuf() -> DshCliResult<Option<PathBuf>> {
   }
 }
 
-/// # Returns dsh subdirectory pathbuf
+/// Returns dsh subdirectory pathbuf.
 ///
 /// This function returns a `Pathbuf` from the root dsh directory joined with the provided
 /// `subdirectory`.
 ///
-/// ## Parameters
+/// # Parameters
 /// * `subdirectory` - Requested subdirectory of the root dsh directory.
 ///
-/// ## Returns
+/// # Returns
 /// * `Ok<Some<PathBuf>>` - Pathbuf of the dsh directory.
 /// * `Ok<None>` - Dsh tool does not support storing state and settings.
 /// * `Err<DshCliError>` -  Dsh directory could not be determined.
@@ -408,15 +551,15 @@ pub(crate) fn dsh_directory_pathbuf(subdirectory: &str) -> DshCliResult<Option<P
   root_dsh_directory_pathbuf().map(|pathbuf| pathbuf.map(|root_directory| root_directory.join(subdirectory)))
 }
 
-/// Returns `PathBuf` for refresh token file
+/// Returns `PathBuf` for refresh token file.
 ///
 /// Return the [PathBuf] for a refresh token file for the provided `platform`. The filename will
 /// be "$HOME/.dsh_cli/targets/\[platform.name\]/refresh-token.encrypted".
 ///
-/// ## Parameters
+/// # Parameters
 /// * `platform` - Platform for which the [PathBuf] will be created.
 ///
-/// ## Returns
+/// # Returns
 /// * `Ok<Some<PathBuf>>` - Pathbuf of the refresh token file for `platform`.
 /// * `Ok<None>` - Dsh tool does not support storing state and settings.
 /// * `Err<DshCliError>` -  Ssh directory could not be determined.
@@ -424,23 +567,34 @@ fn refresh_token_pathbuf(platform: &DshPlatform) -> DshCliResult<Option<PathBuf>
   dsh_directory_pathbuf(&format!("{}/{}/{}", TARGETS_SUBDIRECTORY, platform.name(), REFRESH_TOKEN_FILENAME))
 }
 
-/// Returns `PathBuf` for target directory
+/// Returns `PathBuf` for proxy certificate bundle.
 ///
-/// Return the [PathBuf] for the target directory for the provided `platform` and `tenant`.
-/// The directory name will be "$HOME/.dsh_cli/targets/\[platform.name\]/\[target\]".
+/// Return the [PathBuf] for a certificate bundle directory for the provided `platform`, `tenant`
+/// and `bundle_name`. The directory name will be
 ///
-/// * `platform` - Target platform.
-/// * `tenant` - Target tenant name.
+/// $HOME/.dsh_cli/targets/\[platform.name\]/\[tenant\]/bundles/\[bundle_name\]
 ///
-/// ## Returns
-/// * `Ok<Some<PathBuf>>` - Pathbuf of the target directory for `platform` and `tenant`.
-/// * `Ok<PathBuf>` - Dsh tool does not support storing state and settings.
-/// * `Err<DshCliError>` -  Dsh directory could not be determined.
-fn target_directory_pathbuf(platform: &DshPlatform, tenant: &str) -> DshCliResult<Option<PathBuf>> {
-  dsh_directory_pathbuf(&format!("{}/{}/{}", TARGETS_SUBDIRECTORY, platform.name(), tenant))
+/// # Parameters
+/// * `platform` - Platform for which the [PathBuf] will be created.
+/// * `tenant` - Tenant for which the [PathBuf] will be created.
+/// * `bundle_name` - Name of the bundle for which the [PathBuf] will be created.
+///
+/// # Returns
+/// * `Ok<Some<PathBuf>>` - Pathbuf of the certificate bundle directory.
+/// * `Ok<None>` - Dsh tool does not support storing state and settings.
+/// * `Err<DshCliError>` -  Ssh directory could not be determined.
+fn proxy_certificate_bundle_pathbuf(platform: &DshPlatform, tenant: &str, bundle_name: &str) -> DshCliResult<Option<PathBuf>> {
+  dsh_directory_pathbuf(&format!(
+    "{}/{}/{}/{}/{}",
+    TARGETS_SUBDIRECTORY,
+    platform.name(),
+    tenant,
+    PROXY_CERTIFICATE_BUNDLES_SUBDIRECTORY,
+    bundle_name
+  ))
 }
 
-/// Create parent directory
+/// Creates parent directory.
 ///
 /// Create the parent directory or directories for the provided `path`. If the parent directory
 /// already exists, nothing will happen.
@@ -451,8 +605,11 @@ fn target_directory_pathbuf(platform: &DshPlatform, tenant: &str) -> DshCliResul
 /// # Returns
 /// * `Ok<()>` - Parent directory already exists or was successfully created.
 /// * `Err<DshCliError>` - Pasrent directory or directories could not be created.
-fn create_parent_directories(path: &Path) -> DshCliResult<()> {
-  match path.parent() {
+fn create_parent_directories<T>(path: T) -> DshCliResult<()>
+where
+  T: AsRef<Path>,
+{
+  match path.as_ref().parent() {
     Some(parent) => {
       if parent.exists() {
         if parent.is_dir() {
@@ -466,7 +623,7 @@ fn create_parent_directories(path: &Path) -> DshCliResult<()> {
         Ok(())
       }
     }
-    None => err!("'{}' has no parent", path.display()),
+    None => err!("'{}' has no parent", path.as_ref().display()),
   }
 }
 

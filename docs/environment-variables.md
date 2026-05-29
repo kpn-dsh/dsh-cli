@@ -1,6 +1,6 @@
 # Environment variables
 
-[&#x2190; User guide](user_guide.md)
+[&#x2190; Authentication and authorization](authentication-authorization.md)
 
 The `dsh` tool can be run entirely from the command line and
 all configurations and parameters can be specified via command line arguments.
@@ -9,23 +9,23 @@ it is much more convenient to make some settings persistent via environment vari
 
 The `dsh` tool can print a list of all used environment variables via the command:
 
-```bash
+```shell
 > dsh --env-vars
 ```
 
-An detailed explanation of an environment variable can be printed via the commands:
+A detailed explanation of an environment variable can be printed via the commands:
 
-```bash
+```shell
 > dsh --env-var DSH_CLI_DRY_RUN  # Explains environment variable "DSH_CLI_DRY_RUN"
 > dsh --env-var dry              # Explaines all variables that contain "dry" (case insensitive)
 ```
 
 Environment variables can be set in three ways:
 
-#### Shell command
+#### Shell command or shell script
 
-Typically, environment variables are set using shell commands. This makes them available for
-the lifetime of the shell, or until they are explicitly unset.
+Typically, environment variables are set using shell commands or shell scripts. This makes them
+available for the lifetime of the shell, or until they are explicitly unset.
 
 ```
 > export DSH_CLI_LOG_LEVEL=debug
@@ -55,8 +55,8 @@ Be sure that you do not use spaces around the `=` sign and that you do not use q
 the value.
 
 The dsh tool will check the current working directory for a file named `.dsh_cli.env` and if it
-exists it will set the environment variables defined in it. You can also specify another file via
-a command line argument:
+exists it will set the environment variables defined in it. You can also specify an alternative
+file via the command line argument:
 
 ```
 > dsh platforms --env-var-file my-settings.env
@@ -90,10 +90,10 @@ The following table describes all environment variables.
         <td>
             This environment variable specifies the authentication method that will be used
             to access the resource management api. The allowed values are <code>robot</code> and 
-            <code>single-sign-on</code> (<code>sso</code>). If this variable is not provided, the value from the 
-            settings file will be used, if it exists. Else, the default value will be 
-            <code>single-sign-on</code> when the cli tool is run interactive (<code>stdin</code> 
-            is a terminal) and <code>robot</code> if not.
+            <code>single-sign-on</code> (<code>sso</code>). If this variable is not provided, 
+            the value from the settings file will be used, if it exists. Else, the default value 
+            will be <code>single-sign-on</code> when the cli tool is run interactive 
+            (<code>stdin</code> is a terminal) and <code>robot</code> if not.
         </td>
     </tr>
     <tr valign="top">
@@ -176,6 +176,15 @@ The following table describes all environment variables.
             and the terminal's default will be used.
             The supported styles are: <code>normal</code> (no styling), <code>bold</code>, 
             <code>dim</code>, <code>italic</code>, <code>underline</code> and <code>reverse</code>.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_EXPIRATION</code></td>
+        <td> 
+            Use this environment variable to specify the number of days used to check if some 
+            resource is about to expire. If this variable is not set, the settings file will be 
+            checked for the <code>expiration</code> entry. Else the default value <code>30</code> 
+            will be used.
         </td>
     </tr>
     <tr valign="top">
@@ -283,21 +292,32 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_CLI_NO_ESCAPE</code><br/><code>NO_COLOR</code></td>
+        <td><code>DSH_CLI_NO_CSV_HEADERS</code></td>
         <td>
-            When either of these environment variables is set (to any value) 
-            the output will not contain any color or other escape sequences.
+            When this environment variables is set (to any value) 
+            csv output will not contain headers.
             This environment variable can be overridden via the 
-            <code>--no-color</code> or <code>--no-ansi</code> command line argument.
+            <code>--no-csv-headers</code> command line argument.
         </td>
     </tr>
     <tr valign="top">
-        <td><code>DSH_CLI_NO_HEADERS</code></td>
+        <td><code>DSH_CLI_NO_ESCAPE</code></td>
         <td>
             When this environment variables is set (to any value) 
-            the output will not contain headers.
+            the output will not contain any color or other escape sequences.
             This environment variable can be overridden via the 
-            <code>--no-headers</code> command line argument.
+            <code>--no-color</code> or <code>--no-ansi</code> command line argument.
+            Note that <code>NO_COLOR</code> is an alias for this environment variable.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_OUTPUT_DIRECTORY</code></td>
+        <td>
+            This environment variable specifies the directory where the output of a command will 
+            be written to. If this variable is not provided, the value from the settings file 
+            will be used. Else, the current working directory will be used. This environment 
+            variable can be overridden via the <code>--output-directory</code> command line 
+            argument.
         </td>
     </tr>
     <tr valign="top">
@@ -331,10 +351,10 @@ The following table describes all environment variables.
     <tr valign="top">
         <td><code>DSH_CLI_PASSWORD</code></td>
         <td>
-            This environment variable specifies the secret api token/password for the target 
-            tenant. Note that when the environment variable <code>DSH_CLI_PASSWORD_FILE</code> 
-            or the argument <code>--password-file</code> command line argument is provided,
-            this environment variable will never be used. 
+            This environment variable specifies the secret robot password for the robot 
+            authentication method. Note that when the environment variable
+            <code>DSH_CLI_PASSWORD_FILE</code> or the <code>--robot-password-file</code> 
+            command line argument is provided, this environment variable will not be used. 
             For better security, consider using one of these two options instead of 
             defining <code>DSH_CLI_PASSWORD</code>
         </td>
@@ -342,41 +362,40 @@ The following table describes all environment variables.
     <tr valign="top">
         <td><code>DSH_CLI_PASSWORD_FILE</code></td>
         <td>
-            This environment variable specifies a file containing the secret api 
-            token/password for the target tenant. 
-            Note that when the <code>--password-file</code> command line argument is provided,
-            this environment variable will not be used. 
+            This environment variable specifies a file containing the robot password for the 
+            robot authentication method. Note that when the <code>--password-file</code> 
+            command line argument is provided, this environment variable will not be used. 
         </td>
     </tr>
     <tr valign="top">
         <td><code>DSH_CLI_PLATFORM</code></td>
         <td>
-            Target platform on which the tenants environment lives.
-            The supported platforms are:
+            This environment variable specifies the target platform for which commands will be 
+            executed. The supported platforms are:
             <ul>
                 <li>
                     <code>np-aws-lz-dsh / nplz</code> - 
-                    staging platform for KPN internal tenants,
+                    Staging platform for KPN internal tenants,
                 </li>
                 <li>
                     <code>poc-aws-dsh / poc</code> - 
-                    staging platform for non KPN tenants,
+                    Staging platform for non KPN tenants,
                 </li>
                 <li>
                     <code>prod-aws-dsh / prod</code> - 
-                    production platform for non KPN tenants,
+                    Production platform for non KPN tenants,
                 </li>
                 <li>
                     <code>prod-aws-lz-dsh / prodlz</code> - 
-                    production platform for KPN internal tenants,
+                    Production platform for KPN internal tenants,
                 </li>
                 <li>
                     <code>prod-aws-lz-laas / prodls</code> - 
-                    production platform for logstash as a service,
+                    Production platform for logstash as a service,
                 </li>
                 <li>
                     <code>prod-azure-dsh / prodaz</code> - 
-                    production platform for non KPN tenants.
+                    Production platform for non KPN tenants.
                 </li>
             </ul>
             This environment variable can be overridden via the 
@@ -453,10 +472,29 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
+        <td><code>DSH_CLI_TARGET_COLOR</code></td>
+        <td>
+            This environment variable specifies the color to be used when printing target 
+            identifiers. If this variable is not set, the settings file will be checked for the 
+            <code>target-color</code> entry. Else the default color for the terminal will be used.
+            See environment variable <code>DSH_CLI_ERROR_COLOR</code> for the supported colors.
+        </td>
+    </tr>
+    <tr valign="top">
+        <td><code>DSH_CLI_TARGET_STYLE</code></td>
+        <td>
+            This environment variable specifies the styling to be used when printing target 
+            identifiers. If this variable is not set, the settings file will be checked for the 
+            <code>target-style</code> entry. Else the default value <code>normal</code> 
+            (no styling) will be used.
+            See environment variable <code>DSH_CLI_ERROR_STYLE</code> for the supported styles.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>DSH_CLI_TENANT</code></td>
-        <td>Tenant id for the target tenant. The target tenant is the tenant whose resources 
-            will be managed via the api.
-            This environment variable can be overridden via the 
+        <td>
+            This environment variable specifies the target tenant for which commands will be 
+            executed. This environment variable can be overridden via the 
             <code>--tenant</code> (or <code>-t</code>) command line argument.
         </td>
     </tr>
@@ -507,6 +545,16 @@ The following table describes all environment variables.
         </td>
     </tr>
     <tr valign="top">
+        <td><code>NO_COLOR</code></td>
+        <td>
+            When this environment variables is set (to any value) 
+            the output will not contain any color or other escape sequences.
+            This environment variable can be overridden via the 
+            <code>--no-color</code> or <code>--no-ansi</code> command line argument.
+            Note that <code>DSH_CLI_NO_ESCAPE</code> is an alias for this environment variable.
+        </td>
+    </tr>
+    <tr valign="top">
         <td><code>RUST_LOG</code></td>
         <td>
             You can configure the log levels and settings for the <code>dsh</code> tool entirely 
@@ -520,10 +568,10 @@ The following table describes all environment variables.
             <code>RUST_LOG</code> environment variable.
             Although the use of this variable is not recommended, 
             there might be situations when this can be useful.
-            See the crate's <code>github</code> repository for more information.
+            See the crate's <code>GitHub</code> repository for more information.
         </td>
     </tr>
 
 </table>
 
-[Settings and targets &#x2192;](settings_targets.md)
+[Settings and targets &#x2192;](settings-targets.md)

@@ -62,6 +62,8 @@ lazy_static! {
   static ref METRIC_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![METRIC_LIST_CAPABILITY.as_ref()];
 }
 
+static METRIC_USAGE_LABELS: [MetricUsageLabel; 4] = [MetricUsageLabel::Service, MetricUsageLabel::Instances, MetricUsageLabel::Path, MetricUsageLabel::Port];
+
 struct MetricList {}
 
 #[async_trait]
@@ -156,5 +158,3 @@ impl SubjectFormatter<MetricUsageLabel> for MetricUsage {
     }
   }
 }
-
-const METRIC_USAGE_LABELS: [MetricUsageLabel; 4] = [MetricUsageLabel::Service, MetricUsageLabel::Instances, MetricUsageLabel::Path, MetricUsageLabel::Port];

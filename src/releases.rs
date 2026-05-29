@@ -1,9 +1,11 @@
 use crate::directory::dsh_directory_pathbuf;
 use crate::{cli_error, err, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::version::Version;
+use log::{debug, trace};
 use openidconnect::reqwest::blocking::ClientBuilder;
 use openidconnect::reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
 use openidconnect::reqwest::redirect::Policy;
+use openidconnect::reqwest::Method;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::Greater;
 use std::io::Read;
@@ -11,7 +13,7 @@ use std::str::FromStr;
 use std::time::SystemTime;
 use tokio::task::spawn_blocking;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Release {
   pub(crate) html_url: String,
   pub(crate) id: u64,
@@ -29,13 +31,14 @@ pub(crate) struct Release {
   pub(crate) body: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct ReleaseAsset {
   pub(crate) url: String,
   pub(crate) name: String,
   pub(crate) content_type: String,
   pub(crate) state: String,
   pub(crate) size: u64,
+  pub(crate) download_count: u64,
   pub(crate) created_at: String,
   pub(crate) updated_at: String,
   pub(crate) browser_download_url: String,
@@ -45,10 +48,10 @@ pub(crate) struct ReleaseAsset {
 ///
 /// Return the latest release when it is newer than the current version.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `current_version` - Version number of the current application.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some(Release)` - When a newer release than the current version is available.
 /// * `None` - When the current version is the latest (or newer than the latest version).
 pub(crate) async fn newer_release(current_version: &Version) -> DshCliResult<Option<Release>> {
@@ -63,13 +66,13 @@ pub(crate) async fn newer_release(current_version: &Version) -> DshCliResult<Opt
 /// Returns newer release notification
 ///
 /// Return the latest release when it is newer than the current version, but only when the latest
-/// release information is not from the cache but from GitHub. This can be used to notify the
+/// release information is not from the cache but from `GitHub`. This can be used to notify the
 /// user that a newer release exists, but only once per day.
 ///
-/// # Parameters
+/// ## Parameters
 /// * `current_version` - Version number of the current application.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some(Release)` - When the user should be notified that there is a newer version.
 /// * `None` - No newer release is available or the user should not be notified.
 pub(crate) async fn newer_release_notification(current_version: &Version) -> Option<Release> {
@@ -89,11 +92,11 @@ const NUMBER_OF_SECONDS_IN_A_DAY: u64 = 24 * 60 * 60;
 
 /// Get the latest release of the tool
 ///
-/// # Returns
+/// ## Returns
 /// Tuple `(version, release, cached)` consisting of:
 /// * `version` - Version of the latest release.
 /// * `release` - Latest release.
-/// * `cached` - Whether the latest release information was cached or freshly retrieved fromGitHub.
+/// * `cached` - Whether the latest release information was cached or freshly retrieved from `GitHub`.
 async fn latest_release() -> DshCliResult<(Version, Release, bool)> {
   let (latest_release, cached) = if let Some((latest_release_from_file, modified)) = latest_release_from_file()? {
     if modified.elapsed()?.cmp(&core::time::Duration::from_secs(NUMBER_OF_SECONDS_IN_A_DAY)) == Greater {
@@ -129,7 +132,7 @@ fn write_latest_release_to_file(latest_release: &Release) -> DshCliResult<()> {
 
 /// Get stored latest release
 ///
-/// # Returns
+/// ## Returns
 /// * `Some((Release, SystemTime))` - When stored latest release information was found, it is
 ///   returned together with the timestamp when it was created.
 /// * `None` - No stored latest release information was found.
@@ -144,12 +147,12 @@ fn latest_release_from_file() -> DshCliResult<Option<(Release, SystemTime)>> {
   }
 }
 
-/// Get latest release from GitHub
+/// Get latest release from `GitHub`
 ///
 /// When the latest release is found, as a side effect it will be stored in the
 /// "latest-release.toml" file.
 ///
-/// # Returns
+/// ## Returns
 /// * `Some((Release, SystemTime))` - When stored latest release information was found, it is
 ///   returned together with the timestamp when it was created.
 /// * `None` - No stored latest release information was found.
@@ -170,20 +173,24 @@ async fn latest_release_from_github() -> DshCliResult<Option<Release>> {
 
 /// Get releases information from GitHub
 ///
-/// # Returns
-/// * `Vec<Release>` - Vector describing all releases of the application found at GitHub.
-async fn releases_from_github() -> DshCliResult<Vec<Release>> {
+/// ## Returns
+/// * `Vec<Release>` - Vector describing all releases of the application found at `GitHub`.
+pub(crate) async fn releases_from_github() -> DshCliResult<Vec<Release>> {
   spawn_blocking(move || {
     const DSH_CLI_RELEASES_ENDPOINT_USER_AGENT: &str = "kpn-dsh/dsh-cli";
     const DSH_CLI_RELEASES_ENDPOINT: &str = "https://api.github.com/repos/kpn-dsh/dsh-cli/releases";
     let mut headers = HeaderMap::new();
     headers.insert(USER_AGENT, HeaderValue::from_static(DSH_CLI_RELEASES_ENDPOINT_USER_AGENT));
     headers.insert(ACCEPT, HeaderValue::from_static("application/vnd.github+json"));
-    let http_client = ClientBuilder::new().redirect(Policy::none()).default_headers(headers).build()?;
-    let mut response = http_client.get(DSH_CLI_RELEASES_ENDPOINT).send()?;
+    let http_client = ClientBuilder::new().redirect(Policy::none()).build()?;
+    debug!("get {}", DSH_CLI_RELEASES_ENDPOINT);
+    let request = http_client.request(Method::GET, DSH_CLI_RELEASES_ENDPOINT).headers(headers);
+    trace!("{:#?}", request);
+    let mut response = request.send()?;
     let mut body = String::new();
     response.read_to_string(&mut body)?;
     let mut releases: Vec<Release> = serde_json::from_str(&body)?;
+    trace!("{:#?}", releases);
     for release in releases.iter_mut() {
       if let Some(version) = parse_version(&release.name) {
         release.version = Some(version);

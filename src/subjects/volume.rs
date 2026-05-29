@@ -1,12 +1,14 @@
 use crate::arguments::volume_id_argument;
-use crate::capability::{Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS,
+};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{ColumnAlignment, Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS_APPS, DEPENDANT_LABELS_LIST, DEPENDANT_LABELS_SERVICES};
@@ -65,10 +67,10 @@ lazy_static! {
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &VolumeCreate {}, "Create new volume")
       .set_long_about("Create a new volume.")
       .add_target_argument(volume_id_argument().required(true))
-      .add_extra_argument(size_flag())
+      .add_extra_argument(size_option())
   );
   static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &VolumeDelete {}, "Delete volume")
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &VolumeDelete {}, "Delete volume")
       .set_long_about("Delete a volume.")
       .add_target_argument(volume_id_argument().required(true))
   );
@@ -94,10 +96,10 @@ lazy_static! {
     vec![VOLUME_CREATE_CAPABILITY.as_ref(), VOLUME_DELETE_CAPABILITY.as_ref(), VOLUME_LIST_CAPABILITY.as_ref(), VOLUME_SHOW_CAPABILITY.as_ref()];
 }
 
-const SIZE_FLAG: &str = "size";
+const SIZE_OPTION: &str = "size";
 
-fn size_flag() -> Arg {
-  Arg::new(SIZE_FLAG)
+fn size_option() -> Arg {
+  Arg::new(SIZE_OPTION)
     .long("size")
     .action(ArgAction::Set)
     .value_parser(builder::RangedU64ValueParser::<i64>::new().range(1..))
@@ -116,7 +118,7 @@ impl CommandExecutor for VolumeCreate {
     if client.get_volume(&volume_id).await.is_ok() {
       return err!("volume '{}' already exists", volume_id);
     }
-    let size_gi_b: i64 = match matches.get_one::<i64>(SIZE_FLAG) {
+    let size_gi_b: i64 = match matches.get_one::<i64>(SIZE_OPTION) {
       Some(size) => *size,
       None => {
         let line = context.read_single_line("enter size in gigabytes")?;
@@ -147,6 +149,11 @@ impl CommandExecutor for VolumeDelete {
     if client.get_volume(&volume_id).await.is_err() {
       return err!("volume '{}' does not exists", volume_id);
     }
+    let (_, volume_dependants) = client.volume_with_dependants(&volume_id).await?;
+    if context.dependencies_warning("volume", volume_dependants, &volume_id) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, volume '{}' not deleted", volume_id));
+      return Ok(());
+    }
     if context.confirmed(format!("delete volume '{}'?", volume_id))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, volume not deleted");
@@ -164,6 +171,8 @@ impl CommandExecutor for VolumeDelete {
     Requirements::standard_with_api()
   }
 }
+
+pub(crate) static VOLUME_LABELS: [VolumeLabel; 2] = [VolumeLabel::Target, VolumeLabel::Size];
 
 struct VolumeList {}
 
@@ -276,6 +285,8 @@ impl CommandExecutor for VolumeListUsage {
   }
 }
 
+static VOLUME_STATUS_LABELS: [VolumeLabel; 4] = [VolumeLabel::Target, VolumeLabel::Size, VolumeLabel::ConfigurationSize, VolumeLabel::ActualSize];
+
 struct VolumeShow {}
 
 #[async_trait]
@@ -382,6 +393,13 @@ impl Label for VolumeLabel {
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
   }
+
+  fn column_alignment(&self) -> ColumnAlignment {
+    match self {
+      Self::ActualSize | Self::ConfigurationSize | Self::Size => ColumnAlignment::Right,
+      _ => ColumnAlignment::default(),
+    }
+  }
 }
 
 impl SubjectFormatter<VolumeLabel> for Volume {
@@ -389,7 +407,7 @@ impl SubjectFormatter<VolumeLabel> for Volume {
     match label {
       VolumeLabel::Target => Value::target(target_id),
       VolumeLabel::Size => Value::plain(self.size_gi_b),
-      _ => Value::empty(),
+      _ => Value::not_applicable(),
     }
   }
 }
@@ -404,7 +422,3 @@ impl SubjectFormatter<VolumeLabel> for VolumeStatus {
     }
   }
 }
-
-pub(crate) static VOLUME_LABELS: [VolumeLabel; 2] = [VolumeLabel::Target, VolumeLabel::Size];
-
-static VOLUME_STATUS_LABELS: [VolumeLabel; 4] = [VolumeLabel::Target, VolumeLabel::Size, VolumeLabel::ConfigurationSize, VolumeLabel::ActualSize];

@@ -4,6 +4,51 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-29
+
+### Added
+
+* Proxy capabilities
+    * Capability to create proxy certificate bundle.
+    * Delete resource when undeploying proxy.
+    * Proxy example code generation.
+    * Kafka proxy ACL groups.
+    * Include certificate and secrets with proxy details.
+* Robot capabilities
+    * Capability to store robot secrets in keyring.
+    * Capability to copy robot secret from secret store to keyring
+    * Capability to renew the robot secret.
+* Descriptions for publish and release steps.
+* Task capabilities.
+* Open monitoring for specific task.
+* Dependency check when deleting or updating buckets, secrets, topics and volumes.
+* Capability to list `GitHub` releases.
+* Option to set number of days for upcoming expiration check.
+* Warning that volume content will not be preserved when restarting a service that uses volumes.
+* Output directory can be specified.
+* License check.
+* Alias `d` for `delete` capability.
+* `README.md` file to `tests` directory.
+
+### Changed
+
+* Empty fields are hidden.
+* Show allocation status for secrets.
+* Updated `dsh-api` dependency to version `0.10.0`.
+* Removed the `target` capabilities.
+* Improved `GitHub` documentation
+* Directory structure for docs.
+* Changed configuration for robot authentication.
+* Resolved some technical debt.
+* Moved task capabilities to separate subject.
+* Restricted permissions on local files.
+* Default verbosity level set to `medium`.
+* Default warning color to `Magenta`.
+* Login still possible when dry-run is enabled.
+* Platform list shows public and private domains.
+* Some columns are right aligned.
+* Removed `examples` directory.
+
 ## [0.9.0] - 2026-03-05
 
 ### Added
@@ -22,7 +67,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Show platform parameters in different categories.
 * Improved error handling and logging.
 * Improved rendering of timestamps.
-* Changed rust version to `1.86`.
+* Changed Rust version to `1.86`.
 * Set dependencies to latest versions.
 
 ## [0.8.1] - 2026-01-15

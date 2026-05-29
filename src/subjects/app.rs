@@ -13,14 +13,15 @@ use crate::formatters::{hashmap_to_table, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::modifier_flags::ModifierFlagType;
 use crate::subject::{Requirements, Subject};
-use crate::subjects::bucket::BUCKET_LABELS;
+use crate::subjects::bucket::BucketLabel;
 use crate::subjects::certificate::CERTIFICATE_LABELS_SHOW;
 use crate::subjects::manifest::ManifestExplain;
 use crate::subjects::service::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
-use crate::subjects::vhost::VHOST_LABELS;
+use crate::subjects::vhost::VhostLabel;
 use crate::subjects::volume::VOLUME_LABELS;
-use crate::{cli_error, err, get_target_platform, get_target_tenant, DshCliResult};
+use crate::target_tenant::get_target_tenant;
+use crate::{cli_error, err, get_target_platform, DshCliResult};
 use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
@@ -128,6 +129,9 @@ lazy_static! {
   ];
 }
 
+static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
+  [AppCatalogAppConfigurationLabel::Name, AppCatalogAppConfigurationLabel::ManifestUrn, AppCatalogAppConfigurationLabel::Stopped, AppCatalogAppConfigurationLabel::Configuration];
+
 struct AppDeploy {}
 
 #[async_trait]
@@ -228,7 +232,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
         Ok(parameter.clone())
       } else {
         err!(
-          "property {} has illegal value \"{}\", should be one of {}",
+          "property '{}' has illegal value \"{}\", should be one of {}",
           property_name,
           parameter,
           enumeration
@@ -244,7 +248,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
           Ok(parameter.clone())
         } else {
           err!(
-            "dns-zone property {} has illegal value \"{}\", should be \"private\" or \"public\"",
+            "dns-zone property '{}' has illegal value \"{}\", should be \"private\" or \"public\"",
             property_name,
             parameter
           )
@@ -256,7 +260,7 @@ fn validate_parameter(parameter: &String, property_name: &str, property: &Proper
         }
         match NUMBER_REGEX.captures(parameter) {
           Some(_) => Ok(parameter.clone()),
-          None => err!("property {} has illegal value \"{}\", should be a number", property_name, parameter),
+          None => err!("property '{}' has illegal value \"{}\", should be a number", property_name, parameter),
         }
       }
       PropertyKind::String => Ok(parameter.clone()),
@@ -276,6 +280,8 @@ fn parse_app_parameter(app_parameter: &str) -> DshCliResult<(String, String)> {
     None => err!("illegal app parameter {}", app_parameter),
   }
 }
+
+static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
 
 struct AppList {}
 
@@ -374,6 +380,9 @@ impl CommandExecutor for AppOpen {
   }
 }
 
+static BUCKET_LABELS: [BucketLabel; 3] = [BucketLabel::Target, BucketLabel::Encrypted, BucketLabel::Versioned];
+static VHOST_LABELS: [VhostLabel; 2] = [VhostLabel::Target, VhostLabel::Value];
+
 struct AppShow {}
 
 #[async_trait]
@@ -387,7 +396,6 @@ impl CommandExecutor for AppShow {
     context.print_allocation_status(&allocation_status, APP_SUBJECT_TARGET);
     let app = app_catalog_app?;
     UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, context).print(&app, None)?;
-    // UnitFormatter::new(app_id, &APP_CATALOG_APP_LABELS, Some("app id"), context).print(&app, None)?;
     for (resource_name, resource) in &app.resources {
       match resource {
         AppCatalogAppResourcesValue::Application(service) => {
@@ -504,8 +512,6 @@ impl SubjectFormatter<AppCatalogAppLabel> for AppCatalogApp {
   }
 }
 
-static APP_CATALOG_APP_LABELS: [AppCatalogAppLabel; 3] = [AppCatalogAppLabel::Target, AppCatalogAppLabel::ManifestUrn, AppCatalogAppLabel::Configuration];
-
 #[derive(Eq, Hash, PartialEq, Serialize)]
 enum AppCatalogAppConfigurationLabel {
   Configuration,
@@ -539,9 +545,6 @@ impl SubjectFormatter<AppCatalogAppConfigurationLabel> for AppCatalogAppConfigur
     }
   }
 }
-
-static APP_CATALOG_APP_CONFIGURATION_LABELS: [AppCatalogAppConfigurationLabel; 4] =
-  [AppCatalogAppConfigurationLabel::Name, AppCatalogAppConfigurationLabel::ManifestUrn, AppCatalogAppConfigurationLabel::Stopped, AppCatalogAppConfigurationLabel::Configuration];
 
 const DEPLOY_LONG_ABOUT: &str = "Deploy an app from the app catalog. \
   The app to deploy must be identified by the app manifest identifier and version. \

@@ -1,9 +1,9 @@
-use crate::arguments::{platform_name_argument, tenant_name_argument};
+use crate::argument_parsers::RangedValueParser;
 use crate::authentication::AuthenticationMethod;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{BrowserMethod, Context};
-use crate::directory::{get_settings, read_target};
+use crate::directory::get_settings;
 use crate::environment_variables::get_configured_environment_variables;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -13,8 +13,8 @@ use crate::log_level::LogLevel;
 use crate::settings::{upsert_settings, Settings};
 use crate::style::{DshColor, DshStyle};
 use crate::subject::{Requirements, Subject};
-use crate::subjects::target::{get_platform_argument_or_prompt, get_tenant_argument_or_prompt};
-use crate::targets::get_target_password_from_keyring;
+use crate::target_platform::{get_target_platform_explicit, platform_name_argument};
+use crate::target_tenant::{get_target_tenant_explicit, tenant_name_argument};
 use crate::verbosity::Verbosity;
 use crate::{err, plain, DshCliResult};
 use async_trait::async_trait;
@@ -24,6 +24,7 @@ use dsh_api::platform::DshPlatform;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::fmt::Display;
+use std::path::PathBuf;
 
 struct SettingSubject {}
 
@@ -67,6 +68,7 @@ const SETTING_DEFAULT_TENANT: &str = "default-tenant";
 const SETTING_DRY_RUN: &str = "dry-run";
 const SETTING_ERROR_COLOR: &str = "error-color";
 const SETTING_ERROR_STYLE: &str = "error-style";
+const SETTING_EXPIRATION: &str = "expiration";
 const SETTING_LABEL_COLOR: &str = "label-color";
 const SETTING_LABEL_STYLE: &str = "label-style";
 const SETTING_LOG_COLOR: &str = "log-color";
@@ -77,6 +79,7 @@ const SETTING_MATCHING_COLOR: &str = "matching-color";
 const SETTING_MATCHING_STYLE: &str = "matching-style";
 const SETTING_NO_CSV_HEADERS: &str = "no-csv-headers";
 const SETTING_NO_ESCAPE: &str = "no-escape";
+const SETTING_OUTPUT_DIRECTORY: &str = "output-directory";
 const SETTING_OUTPUT_FORMAT: &str = "output-format";
 const SETTING_QUIET: &str = "quiet";
 const SETTING_SHOW_EXECUTION_TIME: &str = "show-execution-time";
@@ -159,6 +162,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Styling to be used when printing error messages"),
+    Command::new(SETTING_EXPIRATION)
+      .arg(
+        Arg::new(SETTING_EXPIRATION)
+          .action(ArgAction::Set)
+          .value_parser(RangedValueParser::<u64>::new(0, 10000))
+          .required(required),
+      )
+      .about("Number of days used to check if some resource is about to expire"),
     Command::new(SETTING_LABEL_COLOR)
       .arg(
         Arg::new(SETTING_LABEL_COLOR)
@@ -225,6 +236,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
       .about("Styling to be used when printing matching results for the find functions"),
     Command::new(SETTING_NO_CSV_HEADERS).about("Disables headers in csv output"),
     Command::new(SETTING_NO_ESCAPE).about("Inhibits any color or other ansi escape sequences"),
+    Command::new(SETTING_OUTPUT_DIRECTORY)
+      .arg(
+        Arg::new(SETTING_OUTPUT_DIRECTORY)
+          .action(ArgAction::Set)
+          .value_parser(builder::PathBufValueParser::new())
+          .required(required),
+      )
+      .about("Default/preferred output directory"),
     Command::new(SETTING_OUTPUT_FORMAT)
       .arg(
         Arg::new(SETTING_OUTPUT_FORMAT)
@@ -354,14 +373,8 @@ struct SettingDefault {}
 impl CommandExecutor for SettingDefault {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("set default platform and tenant");
-    let platform = get_platform_argument_or_prompt(matches)?;
-    let tenant = get_tenant_argument_or_prompt(matches)?;
-    if read_target(&platform, &tenant)?.is_none() {
-      return err!("target '{}@{}' does not exist", tenant, platform);
-    };
-    if get_target_password_from_keyring(&platform, &tenant)?.is_none() {
-      return err!("keyring contains no password for target '{}@{}'", tenant, platform);
-    }
+    let platform = get_target_platform_explicit(matches)?;
+    let tenant = get_target_tenant_explicit(matches)?;
     upsert_settings(|settings| Ok(Settings { default_platform: Some(platform.to_string()), ..settings }))?;
     context.print_outcome(format!("default platform set to {}", platform));
     upsert_settings(|settings| Ok(Settings { default_tenant: Some(tenant.to_string()), ..settings }))?;
@@ -373,6 +386,47 @@ impl CommandExecutor for SettingDefault {
     Requirements::standard_without_api()
   }
 }
+
+static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [EnvironmentVariableLabel::Variable, EnvironmentVariableLabel::Value];
+static SETTING_LABELS: [SettingLabel; 37] = [
+  SettingLabel::Authentication,
+  SettingLabel::Browser,
+  SettingLabel::CsvQuote,
+  SettingLabel::CsvSeparator,
+  SettingLabel::DefaultPlatform,
+  SettingLabel::DefaultTenant,
+  SettingLabel::DryRun,
+  SettingLabel::ErrorColor,
+  SettingLabel::ErrorStyle,
+  SettingLabel::Expiration,
+  SettingLabel::FileName,
+  SettingLabel::LabelColor,
+  SettingLabel::LabelStyle,
+  SettingLabel::LogLevel,
+  SettingLabel::LogLevelApi,
+  SettingLabel::LogColor,
+  SettingLabel::LogStyle,
+  SettingLabel::MatchingColor,
+  SettingLabel::MatchingStyle,
+  SettingLabel::NoCsvHeaders,
+  SettingLabel::NoEscape,
+  SettingLabel::OutputDirectory,
+  SettingLabel::OutputFormat,
+  SettingLabel::Quiet,
+  SettingLabel::ShowExecutionTime,
+  SettingLabel::StderrColor,
+  SettingLabel::StderrStyle,
+  SettingLabel::StdoutColor,
+  SettingLabel::StdoutStyle,
+  SettingLabel::SuppressExitStatus,
+  SettingLabel::Target,
+  SettingLabel::TargetColor,
+  SettingLabel::TargetStyle,
+  SettingLabel::TerminalWidth,
+  SettingLabel::Verbosity,
+  SettingLabel::WarningColor,
+  SettingLabel::WarningStyle,
+];
 
 struct SettingList {}
 
@@ -474,6 +528,9 @@ impl CommandExecutor for SettingSet {
       SETTING_ERROR_STYLE => {
         upsert_settings(move |settings| Ok(Settings { error_style: get_some(SETTING_ERROR_STYLE, matches, context)?, ..settings }))?;
       }
+      SETTING_EXPIRATION => {
+        upsert_settings(move |settings| Ok(Settings { expiration: get_some(SETTING_EXPIRATION, matches, context)?, ..settings }))?;
+      }
       SETTING_LABEL_COLOR => {
         upsert_settings(move |settings| Ok(Settings { label_color: get_some(SETTING_LABEL_COLOR, matches, context)?, ..settings }))?;
       }
@@ -505,6 +562,17 @@ impl CommandExecutor for SettingSet {
       SETTING_NO_ESCAPE => {
         upsert_settings(|settings| Ok(Settings { no_escape: Some(true), ..settings }))?;
         context.print_outcome("no escape mode enabled");
+      }
+      SETTING_OUTPUT_DIRECTORY => {
+        let output_directory = match matches.get_one::<PathBuf>(SETTING_OUTPUT_DIRECTORY) {
+          Some(one) => {
+            let cloned = one.clone();
+            context.print_outcome(format!("{} set to {}", SETTING_OUTPUT_DIRECTORY, &cloned.display()));
+            Ok(Some(cloned))
+          }
+          None => err!("{}", SETTING_OUTPUT_DIRECTORY),
+        }?;
+        upsert_settings(move |settings| Ok(Settings { output_directory, ..settings }))?;
       }
       SETTING_OUTPUT_FORMAT => {
         upsert_settings(move |settings| Ok(Settings { output_format: get_some(SETTING_OUTPUT_FORMAT, matches, context)?, ..settings }))?;
@@ -610,6 +678,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(|settings| Ok(Settings { error_style: None, ..settings }))?;
         context.print_outcome("error style unset");
       }
+      SETTING_EXPIRATION => {
+        upsert_settings(|settings| Ok(Settings { expiration: None, ..settings }))?;
+        context.print_outcome("expiration days unset");
+      }
       SETTING_LABEL_COLOR => {
         upsert_settings(|settings| Ok(Settings { label_color: None, ..settings }))?;
         context.print_outcome("label color unset");
@@ -649,6 +721,10 @@ impl CommandExecutor for SettingUnset {
       SETTING_NO_ESCAPE => {
         upsert_settings(|settings| Ok(Settings { no_escape: None, ..settings }))?;
         context.print_outcome("no escape mode disabled");
+      }
+      SETTING_OUTPUT_DIRECTORY => {
+        upsert_settings(|settings| Ok(Settings { output_directory: None, ..settings }))?;
+        context.print_outcome("output directory unset");
       }
       SETTING_OUTPUT_FORMAT => {
         upsert_settings(|settings| Ok(Settings { output_format: None, ..settings }))?;
@@ -727,6 +803,7 @@ enum SettingLabel {
   DryRun,
   ErrorColor,
   ErrorStyle,
+  Expiration,
   FileName,
   LabelColor,
   LabelStyle,
@@ -738,6 +815,7 @@ enum SettingLabel {
   MatchingStyle,
   NoCsvHeaders,
   NoEscape,
+  OutputDirectory,
   OutputFormat,
   Quiet,
   ShowExecutionTime,
@@ -767,6 +845,7 @@ impl Label for SettingLabel {
       Self::DryRun => SETTING_DRY_RUN,
       Self::ErrorColor => SETTING_ERROR_COLOR,
       Self::ErrorStyle => SETTING_ERROR_STYLE,
+      Self::Expiration => SETTING_EXPIRATION,
       Self::FileName => "settings file name",
       Self::LabelColor => SETTING_LABEL_COLOR,
       Self::LabelStyle => SETTING_LABEL_STYLE,
@@ -778,6 +857,7 @@ impl Label for SettingLabel {
       Self::MatchingStyle => SETTING_MATCHING_STYLE,
       Self::NoCsvHeaders => SETTING_NO_CSV_HEADERS,
       Self::NoEscape => SETTING_NO_ESCAPE,
+      Self::OutputDirectory => SETTING_OUTPUT_DIRECTORY,
       Self::OutputFormat => SETTING_OUTPUT_FORMAT,
       Self::Quiet => SETTING_QUIET,
       Self::ShowExecutionTime => SETTING_SHOW_EXECUTION_TIME,
@@ -804,85 +884,49 @@ impl Label for SettingLabel {
 impl SubjectFormatter<SettingLabel> for Settings {
   fn value(&self, label: &SettingLabel, target_id: &str) -> Value {
     match label {
-      SettingLabel::Authentication => Value::option(self.authentication.as_ref()),
-      SettingLabel::Browser => Value::option(self.browser.as_ref()),
-      SettingLabel::CsvQuote => Value::option(self.csv_quote),
-      SettingLabel::CsvSeparator => Value::option(self.csv_separator.clone()),
+      SettingLabel::Authentication => Value::some_or_empty(self.authentication.as_ref()),
+      SettingLabel::Browser => Value::some_or_empty(self.browser.as_ref()),
+      SettingLabel::CsvQuote => Value::some_or_empty(self.csv_quote),
+      SettingLabel::CsvSeparator => Value::some_or_empty(self.csv_separator.clone()),
       SettingLabel::DefaultPlatform => match self.default_platform.clone().map(|platform| DshPlatform::try_from(platform.as_str())) {
         Some(Ok(platform)) => plain!("{} / {}", platform.name(), platform.alias()),
         _ => Value::empty(),
       },
-      SettingLabel::DefaultTenant => Value::option(self.default_tenant.clone()),
-      SettingLabel::DryRun => Value::option(self.dry_run),
-      SettingLabel::ErrorColor => Value::option(self.error_color.as_ref()),
-      SettingLabel::ErrorStyle => Value::option(self.error_style.as_ref()),
-      SettingLabel::FileName => Value::option(self.file_name.clone()),
-      SettingLabel::LabelColor => Value::option(self.label_color.as_ref()),
-      SettingLabel::LabelStyle => Value::option(self.label_style.as_ref()),
-      SettingLabel::LogColor => Value::option(self.log_color.as_ref()),
-      SettingLabel::LogLevel => Value::option(self.log_level.as_ref()),
-      SettingLabel::LogLevelApi => Value::option(self.log_level_api.as_ref()),
-      SettingLabel::LogStyle => Value::option(self.log_style.as_ref()),
-      SettingLabel::MatchingColor => Value::option(self.matching_color.as_ref()),
-      SettingLabel::MatchingStyle => Value::option(self.matching_style.as_ref()),
-      SettingLabel::NoCsvHeaders => Value::option(self.no_csv_headers),
-      SettingLabel::NoEscape => Value::option(self.no_escape),
-      SettingLabel::OutputFormat => Value::option(self.output_format.as_ref()),
-      SettingLabel::Quiet => Value::option(self.quiet),
-      SettingLabel::ShowExecutionTime => Value::option(self.show_execution_time),
-      SettingLabel::StderrColor => Value::option(self.stderr_color.as_ref()),
-      SettingLabel::StderrStyle => Value::option(self.stderr_style.as_ref()),
-      SettingLabel::StdoutColor => Value::option(self.stdout_color.as_ref()),
-      SettingLabel::StdoutStyle => Value::option(self.stdout_style.as_ref()),
-      SettingLabel::SuppressExitStatus => Value::option(self.suppress_exit_status),
+      SettingLabel::DefaultTenant => Value::some_or_empty(self.default_tenant.clone()),
+      SettingLabel::DryRun => Value::some_or_empty(self.dry_run),
+      SettingLabel::ErrorColor => Value::some_or_empty(self.error_color.as_ref()),
+      SettingLabel::ErrorStyle => Value::some_or_empty(self.error_style.as_ref()),
+      SettingLabel::Expiration => Value::some_or_empty(self.expiration.as_ref()),
+      SettingLabel::FileName => Value::some_or_empty(self.file_name.clone()),
+      SettingLabel::LabelColor => Value::some_or_empty(self.label_color.as_ref()),
+      SettingLabel::LabelStyle => Value::some_or_empty(self.label_style.as_ref()),
+      SettingLabel::LogColor => Value::some_or_empty(self.log_color.as_ref()),
+      SettingLabel::LogLevel => Value::some_or_empty(self.log_level.as_ref()),
+      SettingLabel::LogLevelApi => Value::some_or_empty(self.log_level_api.as_ref()),
+      SettingLabel::LogStyle => Value::some_or_empty(self.log_style.as_ref()),
+      SettingLabel::MatchingColor => Value::some_or_empty(self.matching_color.as_ref()),
+      SettingLabel::MatchingStyle => Value::some_or_empty(self.matching_style.as_ref()),
+      SettingLabel::NoCsvHeaders => Value::some_or_empty(self.no_csv_headers),
+      SettingLabel::NoEscape => Value::some_or_empty(self.no_escape),
+      SettingLabel::OutputDirectory => Value::some_or_empty(self.output_directory.clone().map(|output_directory| output_directory.display().to_string())),
+      SettingLabel::OutputFormat => Value::some_or_empty(self.output_format.as_ref()),
+      SettingLabel::Quiet => Value::some_or_empty(self.quiet),
+      SettingLabel::ShowExecutionTime => Value::some_or_empty(self.show_execution_time),
+      SettingLabel::StderrColor => Value::some_or_empty(self.stderr_color.as_ref()),
+      SettingLabel::StderrStyle => Value::some_or_empty(self.stderr_style.as_ref()),
+      SettingLabel::StdoutColor => Value::some_or_empty(self.stdout_color.as_ref()),
+      SettingLabel::StdoutStyle => Value::some_or_empty(self.stdout_style.as_ref()),
+      SettingLabel::SuppressExitStatus => Value::some_or_empty(self.suppress_exit_status),
       SettingLabel::Target => Value::target(target_id),
-      SettingLabel::TargetColor => Value::option(self.target_color.as_ref()),
-      SettingLabel::TargetStyle => Value::option(self.target_style.as_ref()),
-      SettingLabel::TerminalWidth => Value::option(self.terminal_width),
-      SettingLabel::Verbosity => Value::option(self.verbosity.as_ref()),
-      SettingLabel::WarningColor => Value::option(self.warning_color.as_ref()),
-      SettingLabel::WarningStyle => Value::option(self.warning_style.as_ref()),
+      SettingLabel::TargetColor => Value::some_or_empty(self.target_color.as_ref()),
+      SettingLabel::TargetStyle => Value::some_or_empty(self.target_style.as_ref()),
+      SettingLabel::TerminalWidth => Value::some_or_empty(self.terminal_width),
+      SettingLabel::Verbosity => Value::some_or_empty(self.verbosity.as_ref()),
+      SettingLabel::WarningColor => Value::some_or_empty(self.warning_color.as_ref()),
+      SettingLabel::WarningStyle => Value::some_or_empty(self.warning_style.as_ref()),
     }
   }
 }
-
-static SETTING_LABELS: [SettingLabel; 35] = [
-  SettingLabel::Authentication,
-  SettingLabel::Browser,
-  SettingLabel::CsvQuote,
-  SettingLabel::CsvSeparator,
-  SettingLabel::DefaultPlatform,
-  SettingLabel::DefaultTenant,
-  SettingLabel::DryRun,
-  SettingLabel::ErrorColor,
-  SettingLabel::ErrorStyle,
-  SettingLabel::FileName,
-  SettingLabel::LabelColor,
-  SettingLabel::LabelStyle,
-  SettingLabel::LogLevel,
-  SettingLabel::LogLevelApi,
-  SettingLabel::LogColor,
-  SettingLabel::LogStyle,
-  SettingLabel::MatchingColor,
-  SettingLabel::MatchingStyle,
-  SettingLabel::NoCsvHeaders,
-  SettingLabel::NoEscape,
-  SettingLabel::OutputFormat,
-  SettingLabel::Quiet,
-  SettingLabel::ShowExecutionTime,
-  SettingLabel::StderrColor,
-  SettingLabel::StderrStyle,
-  SettingLabel::StdoutColor,
-  SettingLabel::StdoutStyle,
-  SettingLabel::SuppressExitStatus,
-  SettingLabel::Target,
-  SettingLabel::TargetColor,
-  SettingLabel::TargetStyle,
-  SettingLabel::TerminalWidth,
-  SettingLabel::Verbosity,
-  SettingLabel::WarningColor,
-  SettingLabel::WarningStyle,
-];
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 enum EnvironmentVariableLabel {
@@ -902,5 +946,3 @@ impl Label for EnvironmentVariableLabel {
     matches!(self, Self::Variable)
   }
 }
-
-static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [EnvironmentVariableLabel::Variable, EnvironmentVariableLabel::Value];

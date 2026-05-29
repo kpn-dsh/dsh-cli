@@ -2,16 +2,16 @@ use crate::authentication::AuthenticationMethod;
 use crate::environment_variables::{
   environment_variable, is_environment_variable_specified, ENV_VAR_DSH_CLI_AUTHENTICATION, ENV_VAR_DSH_CLI_BROWSER, ENV_VAR_DSH_CLI_CSV_QUOTE, ENV_VAR_DSH_CLI_CSV_SEPARATOR,
   ENV_VAR_DSH_CLI_DRY_RUN, ENV_VAR_DSH_CLI_ERROR_COLOR, ENV_VAR_DSH_CLI_ERROR_STYLE, ENV_VAR_DSH_CLI_LABEL_COLOR, ENV_VAR_DSH_CLI_LABEL_STYLE, ENV_VAR_DSH_CLI_MATCHING_COLOR,
-  ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_CSV_HEADERS, ENV_VAR_DSH_CLI_NO_ESCAPE, ENV_VAR_DSH_CLI_OUTPUT_FORMAT, ENV_VAR_DSH_CLI_QUIET,
-  ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, ENV_VAR_DSH_CLI_STDERR_COLOR, ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR, ENV_VAR_DSH_CLI_STDOUT_STYLE,
-  ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TARGET_COLOR, ENV_VAR_DSH_CLI_TARGET_STYLE, ENV_VAR_DSH_CLI_TERMINAL_WIDTH, ENV_VAR_DSH_CLI_VERBOSITY,
-  ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
+  ENV_VAR_DSH_CLI_MATCHING_STYLE, ENV_VAR_DSH_CLI_NO_CSV_HEADERS, ENV_VAR_DSH_CLI_NO_ESCAPE, ENV_VAR_DSH_CLI_OUTPUT_DIRECTORY, ENV_VAR_DSH_CLI_OUTPUT_FORMAT,
+  ENV_VAR_DSH_CLI_QUIET, ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, ENV_VAR_DSH_CLI_STDERR_COLOR, ENV_VAR_DSH_CLI_STDERR_STYLE, ENV_VAR_DSH_CLI_STDOUT_COLOR,
+  ENV_VAR_DSH_CLI_STDOUT_STYLE, ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, ENV_VAR_DSH_CLI_TARGET_COLOR, ENV_VAR_DSH_CLI_TARGET_STYLE, ENV_VAR_DSH_CLI_TERMINAL_WIDTH,
+  ENV_VAR_DSH_CLI_VERBOSITY, ENV_VAR_DSH_CLI_WARNING_COLOR, ENV_VAR_DSH_CLI_WARNING_STYLE, ENV_VAR_NO_COLOR,
 };
 use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
-use crate::global_arguments::{
-  AUTHENTICATION_ARGUMENT, BROWSER_ARGUMENT, DRY_RUN_ARGUMENT, FORCE_ARGUMENT, NO_CSV_HEADERS_ARGUMENT, NO_ESCAPE_ARGUMENT, OUTPUT_FORMAT_ARGUMENT, QUIET_ARGUMENT,
-  SHOW_EXECUTION_TIME_ARGUMENT, SUPPRESS_EXIT_STATUS_ARGUMENT, TERMINAL_WIDTH_ARGUMENT, VERBOSITY_ARGUMENT,
+use crate::global_options::{
+  AUTHENTICATION_OPTION, BROWSER_OPTION, DRY_RUN_FLAG, FORCE_FLAG, NO_CSV_HEADERS_FLAG, NO_ESCAPE_FLAG, OUTPUT_DIRECTORY_OPTION, OUTPUT_FORMAT_OPTION, QUIET_FLAG,
+  SHOW_EXECUTION_TIME_FLAG, SUPPRESS_EXIT_STATUS_FLAG, TERMINAL_WIDTH_OPTION, VERBOSITY_OPTION,
 };
 use crate::settings::Settings;
 use crate::style::{apply_default_warning_style, style_from, DshColor, DshStyle};
@@ -24,6 +24,7 @@ use dsh_api::error::DshApiResult;
 use dsh_api::query_processor::Part;
 use dsh_api::query_processor::Part::{Matching, NonMatching};
 use dsh_api::types::AllocationStatus;
+use dsh_api::Dependant;
 use getch_rs::{Getch, Key};
 use itertools::Itertools;
 use log::debug;
@@ -32,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::{stderr, stdin, stdout, IsTerminal, Write};
+use std::path::PathBuf;
 use std::process;
 use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
@@ -86,6 +88,7 @@ pub(crate) struct Context {
   label_style: Style,
   matching_style: Style,
   no_csv_headers: bool,
+  output_directory: Option<PathBuf>,
   output_format_specification: Option<OutputFormat>,
   quiet: bool,
   settings: Settings,
@@ -141,6 +144,9 @@ impl Debug for Context {
     builder.field("label_style", &style_to_string(&self.label_style));
     builder.field("matching_style", &style_to_string(&self.matching_style));
     builder.field("no_csv_headers", &self.no_csv_headers);
+    if let Some(output_directory) = &self.output_directory {
+      builder.field("output_directory", output_directory);
+    }
     if let Some(output_format_specification) = &self.output_format_specification {
       builder.field("output_format_specification", output_format_specification);
     }
@@ -213,19 +219,24 @@ impl Context {
       &Self::get_color(ENV_VAR_DSH_CLI_TARGET_COLOR, matches, &settings.target_color, DshColor::Blue)?,
     );
     let warning_style = style_from(
-      &Self::get_style(ENV_VAR_DSH_CLI_WARNING_STYLE, matches, &settings.warning_style, DshStyle::Bold)?,
-      &Self::get_color(ENV_VAR_DSH_CLI_WARNING_COLOR, matches, &settings.warning_color, DshColor::Blue)?,
+      &Self::get_style(ENV_VAR_DSH_CLI_WARNING_STYLE, matches, &settings.warning_style, DshStyle::Normal)?,
+      &Self::get_color(ENV_VAR_DSH_CLI_WARNING_COLOR, matches, &settings.warning_color, DshColor::Magenta)?,
     );
     let quiet = Self::get_quiet(matches, &settings);
-    let force = Self::get_force(matches, &settings);
+    let force = Self::get_force(matches);
     let suppress_exit_status = Self::get_suppress_exit_status(matches, &settings);
+    let output_directory = Self::get_output_directory(matches, &settings)?;
     let output_format_specification = Self::get_output_format_specification(matches, &settings)?;
     let show_execution_time = Self::get_show_execution_time(matches, &settings);
     let verbosity = Self::get_verbosity(matches, &settings)?;
     let no_csv_headers = Self::get_no_csv_headers(matches, &settings);
     let terminal_width = Self::get_terminal_width(matches, &settings)?;
     if dry_run && verbosity >= Verbosity::Medium {
-      eprintln!("dry-run mode enabled");
+      if stderr_no_escape {
+        eprintln!("dry-run mode enabled")
+      } else {
+        eprintln!("{}dry-run mode enabled{:#}", warning_style, warning_style)
+      }
     }
     Ok(Context {
       authentication_method,
@@ -238,6 +249,7 @@ impl Context {
       label_style,
       matching_style,
       no_csv_headers,
+      output_directory,
       output_format_specification,
       quiet,
       settings,
@@ -282,6 +294,10 @@ impl Context {
     self.dry_run
   }
 
+  pub(crate) fn quiet(&self) -> bool {
+    self.quiet
+  }
+
   pub(crate) fn settings(&self) -> &Settings {
     &self.settings
   }
@@ -298,6 +314,10 @@ impl Context {
     self.terminal_width
   }
 
+  pub(crate) fn verbosity(&self) -> &Verbosity {
+    &self.verbosity
+  }
+
   /// Gets authentication method
   ///
   /// 1. Try command line argument --authentication
@@ -306,7 +326,7 @@ impl Context {
   /// 1. If stdin is a terminal, default to `AuthenticationMethod::SingleSignOn`
   /// 1. Else default to `AuthenticationMethod::Robot`
   fn get_authentication_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> DshCliResult<AuthenticationMethod> {
-    match matches.get_one::<AuthenticationMethod>(AUTHENTICATION_ARGUMENT) {
+    match matches.get_one::<AuthenticationMethod>(AUTHENTICATION_OPTION) {
       Some(authentication_argument) => Ok(authentication_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_AUTHENTICATION, Some(matches))? {
         Some(authentication_env_var) => AuthenticationMethod::try_from(authentication_env_var.as_str()),
@@ -332,7 +352,7 @@ impl Context {
   /// 1. If stdin is a terminal, default to `BrowserMethod::Open`
   /// 1. Else default to `BrowserMethod::Instruct`
   fn get_browser_method(matches: &ArgMatches, settings: &Settings, stdin_is_terminal: bool) -> DshCliResult<BrowserMethod> {
-    match matches.get_one::<BrowserMethod>(BROWSER_ARGUMENT) {
+    match matches.get_one::<BrowserMethod>(BROWSER_OPTION) {
       Some(browser_argument) => Ok(browser_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_BROWSER, Some(matches))? {
         Some(browser_env_var) => BrowserMethod::try_from(browser_env_var.as_str()),
@@ -357,10 +377,11 @@ impl Context {
   /// 1. When not run from a terminal confirmation is always false.
   pub(crate) fn confirmed(&self, prompt: impl Display) -> DshCliResult<bool> {
     if self.force {
-      self.eprintln(format!("{}, confirmed by --force option", prompt));
+      self.stdout_println(format!("{}", prompt));
+      self.warning_println("confirmed by --force option");
       Ok(true)
     } else if self.stdin_is_terminal {
-      self.eprint(format!("{} [y/N]", prompt));
+      self.print(format!("{} [y/N]", prompt));
       let _ = stdout().lock().flush();
       match Getch::new().getch() {
         Ok(key) => match key {
@@ -436,15 +457,15 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_dry_run(matches: &ArgMatches, settings: &Settings) -> bool {
-    if matches.get_flag(DRY_RUN_ARGUMENT) {
-      debug!("dry run mode enabled (argument)");
+    if matches.get_flag(DRY_RUN_FLAG) {
+      debug!("dry run mode enabled (from command line flag)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      debug!("dry run mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
+      debug!("dry run mode enabled (from environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
       true
     } else if let Some(dry_run) = settings.dry_run {
       if dry_run {
-        debug!("dry run mode enabled (settings)");
+        debug!("dry run mode enabled (from settings file)");
       }
       dry_run
     } else {
@@ -455,21 +476,11 @@ impl Context {
   /// Gets force context value
   ///
   /// 1. Try flag `--force`
-  /// 1. Try if environment variable `DSH_CLI_FORCE` exists
-  /// 1. Try settings file
   /// 1. Default to `false`
-  fn get_force(matches: &ArgMatches, settings: &Settings) -> bool {
-    if matches.get_flag(FORCE_ARGUMENT) {
-      debug!("force mode enabled (argument)");
+  fn get_force(matches: &ArgMatches) -> bool {
+    if matches.get_flag(FORCE_FLAG) {
+      debug!("force mode enabled (from command line flag)");
       true
-    } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_DRY_RUN, matches) {
-      debug!("force mode enabled (environment variable '{}')", ENV_VAR_DSH_CLI_DRY_RUN);
-      true
-    } else if let Some(dry_run) = settings.dry_run {
-      if dry_run {
-        debug!("force mode enabled (settings)");
-      }
-      dry_run
     } else {
       false
     }
@@ -482,15 +493,18 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_suppress_exit_status(matches: &ArgMatches, settings: &Settings) -> bool {
-    if matches.get_flag(SUPPRESS_EXIT_STATUS_ARGUMENT) {
-      debug!("suppress exit status enabled (argument)");
+    if matches.get_flag(SUPPRESS_EXIT_STATUS_FLAG) {
+      debug!("suppress exit status enabled (from command line flag)");
       true
     } else if is_environment_variable_specified(ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS, matches) {
-      debug!("suppress exit status enabled (environment variable '{}')", ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS);
+      debug!(
+        "suppress exit status enabled (from environment variable '{}')",
+        ENV_VAR_DSH_CLI_SUPPRESS_EXIT_STATUS
+      );
       true
     } else if let Some(suppress_exit_status) = settings.suppress_exit_status {
       if suppress_exit_status {
-        debug!("suppress exit status enabled (settings)");
+        debug!("suppress exit status enabled (from settings file)");
       }
       suppress_exit_status
     } else {
@@ -536,7 +550,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_no_escape(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(NO_ESCAPE_ARGUMENT)
+    matches.get_flag(NO_ESCAPE_FLAG)
       || is_environment_variable_specified(ENV_VAR_NO_COLOR, matches)
       || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_ESCAPE, matches)
       || settings.no_escape.unwrap_or(false)
@@ -549,7 +563,26 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_no_csv_headers(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(NO_CSV_HEADERS_ARGUMENT) || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_CSV_HEADERS, matches) || settings.no_csv_headers.unwrap_or(false)
+    matches.get_flag(NO_CSV_HEADERS_FLAG) || is_environment_variable_specified(ENV_VAR_DSH_CLI_NO_CSV_HEADERS, matches) || settings.no_csv_headers.unwrap_or(false)
+  }
+
+  /// Gets output directory
+  ///
+  /// 1. Try flag `--output-directory`
+  /// 1. Try environment variable `DSH_CLI_OUTPUT_DIRECTORY`
+  /// 1. Try settings file
+  /// 1. Else `None` will be returned
+  fn get_output_directory(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<PathBuf>> {
+    match matches.get_one::<PathBuf>(OUTPUT_DIRECTORY_OPTION) {
+      Some(output_directory_argument) => Ok(Some(output_directory_argument.to_owned())),
+      None => match environment_variable(ENV_VAR_DSH_CLI_OUTPUT_DIRECTORY, Some(matches))? {
+        Some(output_directory_env_var) => Ok(Some(PathBuf::from(output_directory_env_var.as_str()))),
+        None => match settings.output_directory.clone() {
+          Some(output_directory_from_settings) => Ok(Some(output_directory_from_settings)),
+          None => Ok(None),
+        },
+      },
+    }
   }
 
   /// Gets output format specification
@@ -559,7 +592,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Else default to `None`
   fn get_output_format_specification(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<OutputFormat>> {
-    match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_ARGUMENT) {
+    match matches.get_one::<OutputFormat>(OUTPUT_FORMAT_OPTION) {
       Some(output_format_argument) => Ok(Some(output_format_argument.to_owned())),
       None => match environment_variable(ENV_VAR_DSH_CLI_OUTPUT_FORMAT, Some(matches))? {
         Some(output_format_env_var) => OutputFormat::try_from(output_format_env_var.as_str())
@@ -571,6 +604,11 @@ impl Context {
         },
       },
     }
+  }
+
+  /// Gets output directory
+  pub(crate) fn output_directory(&self) -> Option<PathBuf> {
+    self.output_directory.clone()
   }
 
   /// Gets output_format context value
@@ -594,7 +632,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_quiet(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(QUIET_ARGUMENT) || is_environment_variable_specified(ENV_VAR_DSH_CLI_QUIET, matches) || settings.quiet.unwrap_or(false)
+    matches.get_flag(QUIET_FLAG) || is_environment_variable_specified(ENV_VAR_DSH_CLI_QUIET, matches) || settings.quiet.unwrap_or(false)
   }
 
   /// Gets show_execution_time context value
@@ -604,9 +642,7 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `false`
   fn get_show_execution_time(matches: &ArgMatches, settings: &Settings) -> bool {
-    matches.get_flag(SHOW_EXECUTION_TIME_ARGUMENT)
-      || is_environment_variable_specified(ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, matches)
-      || settings.show_execution_time.unwrap_or(false)
+    matches.get_flag(SHOW_EXECUTION_TIME_FLAG) || is_environment_variable_specified(ENV_VAR_DSH_CLI_SHOW_EXECUTION_TIME, matches) || settings.show_execution_time.unwrap_or(false)
   }
 
   /// Gets terminal width context value
@@ -616,14 +652,14 @@ impl Context {
   /// 1. Try settings file
   /// 1. If stdout is a terminal use actual terminal width, else default to `None`
   fn get_terminal_width(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Option<usize>> {
-    match matches.get_one::<usize>(TERMINAL_WIDTH_ARGUMENT) {
+    match matches.get_one::<usize>(TERMINAL_WIDTH_OPTION) {
       Some(terminal_width_argument) => Ok(Some(terminal_width_argument.to_owned())),
       None => match environment_variable(ENV_VAR_DSH_CLI_TERMINAL_WIDTH, Some(matches))? {
         Some(terminal_width_env_var) => match terminal_width_env_var.parse::<usize>() {
           Ok(terminal_width) => {
             if terminal_width < 40 {
               err!(
-                "terminal width in environment variable {} must be greater than or equal to 40",
+                "terminal width in environment variable '{}' must be greater than or equal to 40",
                 ENV_VAR_DSH_CLI_TERMINAL_WIDTH
               )
             } else {
@@ -660,13 +696,13 @@ impl Context {
   /// 1. Try settings file
   /// 1. Default to `Verbosity::Low`
   fn get_verbosity(matches: &ArgMatches, settings: &Settings) -> DshCliResult<Verbosity> {
-    match matches.get_one::<Verbosity>(VERBOSITY_ARGUMENT) {
+    match matches.get_one::<Verbosity>(VERBOSITY_OPTION) {
       Some(verbosity_argument) => Ok(verbosity_argument.to_owned()),
       None => match environment_variable(ENV_VAR_DSH_CLI_VERBOSITY, Some(matches))? {
         Some(verbosity_env_var) => Verbosity::try_from(verbosity_env_var.as_str()).map_err(error_append!("error in environment variable {}: ", ENV_VAR_DSH_CLI_VERBOSITY)),
         None => match settings.verbosity.clone() {
           Some(verbosity_from_settings) => Ok(verbosity_from_settings),
-          None => Ok(Verbosity::Low),
+          None => Ok(Verbosity::Medium),
         },
       },
     }
@@ -675,24 +711,24 @@ impl Context {
   /// Open the provided url in the system browser
   pub(crate) fn open_url(&self, url: impl AsRef<OsStr> + Display, opening_target: impl Display) {
     if self.dry_run() {
-      self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
+      self.print_warning(format!("dry-run mode, opening '{}' canceled", opening_target));
       self.print_warning(format!("{}", url));
     } else {
       match self.browser_method() {
         BrowserMethod::Instruct => {
           self.print_explanation(format!("opening {}", opening_target));
           self.print_explanation("open url in your browser:");
-          self.print(format!("{}", url));
+          self.println(format!("{}", url));
         }
         BrowserMethod::Open => match open::that(&url) {
           Ok(()) => {
             self.print_explanation(format!("opening {}", opening_target));
           }
           Err(error) => {
-            self.print_error(format!("could not open {} in your browser", opening_target));
+            self.print_error(format!("could not open '{}' in your browser", opening_target));
             debug!("{}", error);
             self.print_explanation("open url in your browser:");
-            self.print(format!("{}", url));
+            self.println(format!("{}", url));
           }
         },
       }
@@ -704,7 +740,7 @@ impl Context {
     Instant::now()
   }
 
-  /// # Prints plain text output to stdout
+  /// # Prints plain text output to stdout without newline
   ///
   /// This method is used to print the output of the `dsh` tool to the standard output device.
   /// If `quiet` is `true`, nothing will be printed.
@@ -712,7 +748,19 @@ impl Context {
   /// depending on how the `dsh` tool was run from a shell or script.
   pub(crate) fn print<T: Display>(&self, output: T) {
     if !self.quiet {
-      self.println(output)
+      self.stdout_print(output)
+    }
+  }
+
+  /// # Prints plain text output to stdout
+  ///
+  /// This method is used to print the output of the `dsh` tool to the standard output device.
+  /// If `quiet` is `true`, nothing will be printed.
+  /// This standard output device can either be a tty, a pipe or an output file,
+  /// depending on how the `dsh` tool was run from a shell or script.
+  pub(crate) fn println<T: Display>(&self, output: T) {
+    if !self.quiet {
+      self.stdout_println(output)
     }
   }
 
@@ -728,26 +776,26 @@ impl Context {
       match self.output_format(default_output_format) {
         Csv => self.print_warning("csv output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Json => match serde_json::to_string_pretty(&output) {
-          Ok(json) => self.println(json),
+          Ok(json) => self.stdout_println(json),
           Err(_) => self.print_error("serializing to json failed"),
         },
         OutputFormat::JsonCompact => match serde_json::to_string(&output) {
-          Ok(json) => self.println(json),
+          Ok(json) => self.stdout_println(json),
           Err(_) => self.print_error("serializing to json failed"),
         },
         OutputFormat::Plain => self.print_warning("plain output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Quiet => (),
         OutputFormat::Table | OutputFormat::TableNoBorder => self.print_warning("table output is not supported here, use --output-format json|toml|yaml"),
         OutputFormat::Toml => match toml::ser::to_string_pretty(&output) {
-          Ok(toml) => self.println(toml),
+          Ok(toml) => self.stdout_println(toml),
           Err(_) => self.print_error("serializing to toml failed"),
         },
         OutputFormat::TomlCompact => match toml::ser::to_string(&output) {
-          Ok(toml) => self.println(toml),
+          Ok(toml) => self.stdout_println(toml),
           Err(_) => self.print_error("serializing to toml failed"),
         },
         OutputFormat::Yaml => match serde_yaml::to_string(&output) {
-          Ok(yaml) => self.println(yaml),
+          Ok(yaml) => self.stdout_println(yaml),
           Err(_) => self.print_error("serializing to yaml failed"),
         },
       }
@@ -760,7 +808,7 @@ impl Context {
   /// The prompt is only printed when stderr is a terminal.
   pub(crate) fn print_progress_step(&self) {
     if !self.quiet && self.stderr_is_terminal {
-      self.eprint(".");
+      self.stderr_print(".");
     }
   }
 
@@ -773,7 +821,7 @@ impl Context {
   /// since it would make no sense for a pipe or output file.
   pub(crate) fn print_prompt<T: Display>(&self, prompt: T) {
     if !self.quiet && self.stderr_is_terminal {
-      self.eprint(prompt);
+      self.stdout_print(prompt);
     }
   }
 
@@ -791,7 +839,7 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => self.eprintln(outcome),
+        Verbosity::Medium | Verbosity::High => self.stderr_println(outcome),
       }
     }
   }
@@ -838,7 +886,7 @@ impl Context {
     if !self.quiet {
       match self.verbosity {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => self.eprintln(explanation),
+        Verbosity::Medium | Verbosity::High => self.stderr_println(explanation),
       }
     }
   }
@@ -861,7 +909,7 @@ impl Context {
         Ok(allocation_status) => {
           if allocation_status.provisioned {
             if self.verbosity == Verbosity::High {
-              self.eprintln(format!("{} is provisioned", subject));
+              self.stderr_println(format!("{} is provisioned", subject));
             }
           } else {
             match self.verbosity {
@@ -878,7 +926,7 @@ impl Context {
           }
           if let Some(derived_from) = &allocation_status.derived_from {
             match self.verbosity {
-              Verbosity::Medium | Verbosity::High => self.eprintln(format!("derived from '{}'", derived_from)),
+              Verbosity::Medium | Verbosity::High => self.stderr_println(format!("derived from '{}'", derived_from)),
               _ => {}
             }
           }
@@ -919,7 +967,7 @@ impl Context {
         if !self.quiet {
           match self.verbosity {
             Verbosity::Off | Verbosity::Low | Verbosity::Medium => (),
-            Verbosity::High => self.eprintln(format!("target {}", dsh_api_client.tenant())),
+            Verbosity::High => self.stderr_println(format!("target {}", dsh_api_client.tenant())),
           }
         }
       }
@@ -936,7 +984,7 @@ impl Context {
   /// a pipe or an output file.
   pub(crate) fn print_execution_time(&self, start_instant: Instant) {
     if !self.quiet && self.show_execution_time {
-      self.eprintln(format!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis()));
+      self.stderr_println(format!("execution took {} milliseconds", Instant::now().duration_since(start_instant).as_millis()));
     }
   }
 
@@ -1132,7 +1180,7 @@ impl Context {
   ///
   /// If `stderr_no_escape` is not set, the `stderr_style` will be applied to the provided string,
   /// and it will be post-fixed with an escape sequence to reset the `stderr_style`.
-  fn eprint<T: Display>(&self, text: T) {
+  fn stderr_print<T: Display>(&self, text: T) {
     if self.stderr_no_escape {
       eprint!("{}", text)
     } else {
@@ -1143,8 +1191,8 @@ impl Context {
   /// Print a text to stderr
   ///
   /// If `stderr_no_escape` is not set, the `error_style` will be applied to the provided string,
-  /// and it will be post-fixed with an escape sequence to set the `stderr_style`.
-  fn eprintln<T: Display>(&self, text: T) {
+  /// and it will be post-fixed with an escape sequence to reset the `stderr_style`.
+  fn stderr_println<T: Display>(&self, text: T) {
     if self.stderr_no_escape {
       eprintln!("{}", text)
     } else {
@@ -1152,15 +1200,112 @@ impl Context {
     }
   }
 
+  /// Print a warning to stderr without newline
+  ///
+  /// If `stderr_no_escape` is not set, the `warning_style` will be applied to the provided
+  /// string, and it will be post-fixed with an escape sequence to reset the `warning_style`.
+  fn _warning_print<T: Display>(&self, text: T) {
+    if self.stderr_no_escape {
+      eprint!("{}", text)
+    } else {
+      eprint!("{}{}{:#}", self.warning_style, text, self.warning_style)
+    }
+  }
+
+  /// Print a warning to stderr
+  ///
+  /// If `stderr_no_escape` is not set, the `warning_style` will be applied to the provided
+  /// string, and it will be post-fixed with an escape sequence to reset the `warning_style`.
+  fn warning_println<T: Display>(&self, text: T) {
+    if self.stderr_no_escape {
+      eprintln!("{}", text)
+    } else {
+      eprintln!("{}{}{:#}", self.warning_style, text, self.warning_style)
+    }
+  }
+
+  /// Print a text to stdout without newline
+  ///
+  /// If `stdout_no_escape` is not set, the `stdout_style` will be applied to the provided string,
+  /// and it will be post-fixed with an escape sequence to reset the `stdout_style`.
+  fn stdout_print<T: Display>(&self, text: T) {
+    if self.stdout_no_escape {
+      print!("{}", text)
+    } else {
+      print!("{}{}{:#}", self.stdout_style, text, self.stdout_style)
+    }
+  }
+
   /// Print a text to stdout
   ///
   /// If `stdout_no_escape` is not set, the `stdout_style` will be applied to the provided string,
   /// and it will be post-fixed with an escape sequence to reset the `stdout_style`.
-  fn println<T: Display>(&self, text: T) {
+  fn stdout_println<T: Display>(&self, text: T) {
     if self.stdout_no_escape {
       println!("{}", text)
     } else {
       println!("{}{}{:#}", self.stdout_style, text, self.stdout_style)
+    }
+  }
+
+  pub(crate) fn dependencies_warning<T>(&self, subject: &str, dependants: Vec<Dependant<T>>, subject_id: &str) -> bool {
+    if let Some((apps, services, certificates, proxies, trifoniuses)) = Self::dependant_ids::<_>(dependants) {
+      self.print_warning(format!("{} '{}' has dependants", subject, subject_id));
+      if !apps.is_empty() {
+        self.print_warning("dependant apps:");
+        for app in apps {
+          self.print_warning(format!("  {}", app));
+        }
+      }
+      if !services.is_empty() {
+        self.print_warning("dependant services:");
+        for service in services {
+          self.print_warning(format!("  {}", service));
+        }
+      }
+      if !certificates.is_empty() {
+        self.print_warning("dependant certificates:");
+        for certificate in certificates {
+          self.print_warning(format!("  {}", certificate));
+        }
+      }
+      if !proxies.is_empty() {
+        self.print_warning("dependant proxies:");
+        for proxy in proxies {
+          self.print_warning(format!("  {}", proxy));
+        }
+      }
+      if !trifoniuses.is_empty() {
+        self.print_warning("dependant trifonius:");
+        for trifonius in trifoniuses {
+          self.print_warning(format!("  {}", trifonius));
+        }
+      }
+      true
+    } else {
+      false
+    }
+  }
+
+  fn dependant_ids<T>(dependants: Vec<Dependant<T>>) -> Option<(Vec<String>, Vec<String>, Vec<String>, Vec<String>, Vec<String>)> {
+    if dependants.is_empty() {
+      None
+    } else {
+      let mut apps = vec![];
+      let mut applications = vec![];
+      let mut certificates = vec![];
+      let mut proxies = vec![];
+      let mut trifoniuses = vec![];
+      for dependant in dependants {
+        match dependant {
+          Dependant::App { app } => apps.push(app.app_id),
+          Dependant::Application { application } => applications.push(application.application_id),
+          Dependant::Certificate { certificate } => certificates.push(certificate.certificate_id),
+          Dependant::Proxy { proxy } => proxies.push(proxy.proxy_id),
+          Dependant::Trifonius { trifonius } => trifoniuses.push(trifonius.trifonius_id),
+        }
+      }
+      Some((apps, applications, certificates, proxies, trifoniuses))
     }
   }
 }

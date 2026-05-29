@@ -70,6 +70,7 @@ fn get_system_hash() -> DshCliResult<Sha256> {
   match my_home() {
     Ok(Some(user_home_directory)) => match fs::read_dir(user_home_directory) {
       Ok(dir) => {
+        // TODO Exclude DSH_CLI_HOME
         let mut representations: Vec<String> = dir.into_iter().map(|dir_entry| entry_representation(&dir_entry?)).collect::<Result<Vec<_>, _>>()?;
         representations.sort();
         let mut hasher = Sha256::new();

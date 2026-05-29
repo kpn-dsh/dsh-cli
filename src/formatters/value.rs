@@ -1,29 +1,33 @@
 use crate::context::Context;
+use crate::subjects::certificate::format_distinguished_name;
 use chrono::{DateTime, Days, Utc};
 
 #[derive(Clone, Debug)]
 pub(crate) enum Value {
+  DistinguishedName(String),
   Empty,
   Error(String),
+  Hide,
   Ignore(String),
   NotApplicable,
   Plain(String),
   Secret,
   Target(String),
+  Todo,
   Unreachable,
   Warn(String),
 }
 
-/// Creates a `Value::PLain` with a formatted string.
+/// Creates a `Value::Plain` with a formatted string.
 ///
 /// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// let id = "my-id";
 /// let plain_value = plain!("id:{}", id);
 /// assert!(matches!(plain_value, Value::Plain { .. }));
-/// assert_eq!(plain_value.to_undecorated_string, "id:my-id"));
+/// assert_eq!(plain_value.to_undecorated_string, "id:my-id");
 /// ```
 #[macro_export]
 macro_rules! plain {
@@ -37,11 +41,11 @@ macro_rules! plain {
 /// The arguments for the `err!` macro are the same as the arguments for the [`format!`] macro.
 ///
 /// # Examples
-/// ```
+/// ```rust
 /// let id = "my-id";
 /// let warn_value = warn!("{} not found", id);
 /// assert!(matches!(warn_value, Value::Warn { .. }));
-/// assert_eq!(warn_value.to_undecorated_string, "my-id not found"));
+/// assert_eq!(warn_value.to_undecorated_string, "my-id not found");
 /// ```
 #[macro_export]
 macro_rules! warn {
@@ -51,7 +55,7 @@ macro_rules! warn {
 }
 
 impl Value {
-  /// Create `Value` representing date/time
+  /// Create `Value` representing date/time.
   ///
   /// # Parameters
   /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
@@ -63,7 +67,7 @@ impl Value {
     Self::plain(datetime)
   }
 
-  /// Create `Value` representing date/time with expiration check
+  /// Create `Value` representing date/time with expiration check.
   ///
   /// # Parameters
   /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
@@ -93,7 +97,7 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing date/time with not-before check
+  /// Create `Value` representing date/time with not-before check.
   ///
   /// # Parameters
   /// * `datetime` - References a `DateTime<Utc>` struct representing the date/time.
@@ -109,7 +113,21 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing an empty value
+  /// Create `Value` representing a distinguished name.
+  ///
+  /// # Parameters
+  /// * `distinguished_name` - Can be converted into a `String` representing the distinguished name.
+  ///
+  /// # Returns
+  /// * `Value::DistinguishedName`
+  pub(crate) fn distinguished_name<T>(distinguished_name: T) -> Self
+  where
+    T: Into<String>,
+  {
+    Self::DistinguishedName(distinguished_name.into())
+  }
+
+  /// Create `Value` representing an empty value.
   ///
   /// # Returns
   /// * `Value::Empty`
@@ -117,7 +135,7 @@ impl Value {
     Self::Empty
   }
 
-  /// Create `Value` representing an error
+  /// Create `Value` representing an error.
   ///
   /// # Returns
   /// * `Value::Error` - Represents an error message.
@@ -128,7 +146,15 @@ impl Value {
     Self::Error(value.to_string())
   }
 
-  /// Create `Value` representing a value that should be ignored
+  /// Create `Value` representing a hidden value.
+  ///
+  /// # Returns
+  /// * `Value::Hide`
+  pub(crate) fn hide() -> Self {
+    Self::Hide
+  }
+
+  /// Create `Value` representing a value that should be ignored.
   ///
   /// # Returns
   /// * `Value::Ignore` - Represents an ignore message.
@@ -139,7 +165,7 @@ impl Value {
     Self::Ignore(value.to_string())
   }
 
-  /// Create `Value` representing a value that is not applicable
+  /// Create `Value` representing a value that is not applicable.
   ///
   /// # Returns
   /// * `Value::NotApplicable`
@@ -147,7 +173,7 @@ impl Value {
     Self::NotApplicable
   }
 
-  /// Create `Value` representing a value that might be correct or not
+  /// Create `Value` representing a value that might be correct or not.
   ///
   /// # Parameters
   /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
@@ -167,25 +193,43 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing an optional value
+  /// Create `Value` representing a value that might be correct or not.
   ///
   /// # Parameters
-  /// * `value` - `Option<T>` that represents the optional value.
+  /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
   ///
   /// # Returns
-  /// * `Value::Plain(value)` - When `value` is present.
-  /// * `Value::Empty` - When `value` is `None`.
-  pub(crate) fn option<T>(value: Option<T>) -> Self
+  /// * `Value::Plain(value)` - When `value` is `Ok`.
+  /// * `Value::Empty` - When `value` is an `Err`.
+  pub(crate) fn ok_or_empty<T, E>(value: Result<T, E>) -> Self
   where
     T: ToString,
   {
     match value {
-      Some(v) => Self::plain(v.to_string()),
-      None => Self::empty(),
+      Ok(v) => Self::plain(v.to_string()),
+      Err(_) => Self::empty(),
     }
   }
 
-  /// Create `Value` representing a plain value
+  /// Create `Value` representing a value that might be correct or not.
+  ///
+  /// # Parameters
+  /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
+  ///
+  /// # Returns
+  /// * `Value::Plain(value)` - When `value` is `Ok`.
+  /// * `Value::Hide` - When `value` is an `Err`.
+  pub(crate) fn ok_or_hide<T, E>(value: Result<T, E>) -> Self
+  where
+    T: ToString,
+  {
+    match value {
+      Ok(v) => Self::plain(v.to_string()),
+      Err(_) => Self::hide(),
+    }
+  }
+
+  /// Create `Value` representing a plain value.
   ///
   /// # Parameters
   /// * `value` - Value.
@@ -199,7 +243,26 @@ impl Value {
     Self::Plain(value.to_string())
   }
 
-  /// Create `Value` representing a secret
+  /// Create `Value` representing a result value.
+  ///
+  /// # Parameters
+  /// * `value` - `Result<T, E>` that represents the value that might be incorrect.
+  ///
+  /// # Returns
+  /// * `Value::Plain(value)` - When `value` is `Ok`.
+  /// * `Value::Error(message)` - When `value` is an `Err`.
+  pub(crate) fn result<T, E>(value: Result<T, E>) -> Self
+  where
+    T: ToString,
+    E: ToString,
+  {
+    match value {
+      Ok(v) => Self::plain(v.to_string()),
+      Err(e) => Self::error(e.to_string()),
+    }
+  }
+
+  /// Create `Value` representing a secret.
   ///
   /// # Returns
   /// * `Value::Secret` - Represents the secret.
@@ -207,7 +270,7 @@ impl Value {
     Self::Secret
   }
 
-  /// Create `Value` representing an optional value with default
+  /// Create `Value` representing an optional value with default.
   ///
   /// # Parameters
   /// * `value` - `Option<T>` that represents the optional value.
@@ -227,7 +290,43 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a target
+  /// Create `Value` representing an optional value.
+  ///
+  /// # Parameters
+  /// * `value` - `Option<T>` that represents the optional value.
+  ///
+  /// # Returns
+  /// * `Value::Plain(value)` - When `value` is present.
+  /// * `Value::Empty` - When `value` is `None`.
+  pub(crate) fn some_or_empty<T>(value: Option<T>) -> Self
+  where
+    T: ToString,
+  {
+    match value {
+      Some(v) => Self::plain(v.to_string()),
+      None => Self::empty(),
+    }
+  }
+
+  /// Create `Value` representing a value or hide.
+  ///
+  /// # Parameters
+  /// * `value` - `Option<T>` that represents the optional value.
+  ///
+  /// # Returns
+  /// * `Value::Plain(value)` - When `value` is `Some`.
+  /// * `Value::Hide` - When `value` is `None`.
+  pub(crate) fn some_or_hide<T>(value: Option<T>) -> Self
+  where
+    T: ToString,
+  {
+    match value {
+      Some(v) => Self::plain(v.to_string()),
+      None => Self::hide(),
+    }
+  }
+
+  /// Create `Value` representing a target.
   ///
   /// # Parameters
   /// * `value` - Target value which identifies something.
@@ -241,7 +340,7 @@ impl Value {
     Self::Target(value.to_string())
   }
 
-  /// Create `Value` representing a timestamp
+  /// Create `Value` representing a timestamp.
   ///
   /// # Parameters
   /// * `timestamp` - Timestamp in seconds since epoch.
@@ -255,7 +354,7 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing timestamp with expiration check
+  /// Create `Value` representing timestamp with expiration check.
   ///
   /// # Parameters
   /// * `timestamp` - Timestamp in seconds since epoch.
@@ -273,7 +372,7 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing timestamp with not-before check
+  /// Create `Value` representing timestamp with not-before check.
   ///
   /// # Parameters
   /// * `timestamp` - Timestamp in seconds since epoch.
@@ -288,7 +387,15 @@ impl Value {
     }
   }
 
-  /// Create `Value` representing a program flow error
+  /// Create `Value` representing an unimplemented state.
+  ///
+  /// # Returns
+  /// * `Value::Todo`
+  pub(crate) fn todo() -> Self {
+    Self::Todo
+  }
+
+  /// Create `Value` representing a program flow error.
   ///
   /// # Returns
   /// * `Value::Unreachable`
@@ -296,7 +403,7 @@ impl Value {
     Self::Unreachable
   }
 
-  /// Create `Value` representing a warning
+  /// Create `Value` representing a warning.
   ///
   /// # Returns
   /// * `Value::Warn` - Represents a warning message.
@@ -311,13 +418,16 @@ impl Value {
 
   pub(crate) fn to_decorated_string(&self, context: &Context) -> String {
     match self {
+      Self::DistinguishedName(value) => context.apply_stdout_style(format_distinguished_name(value)),
       Self::Empty => "".to_string(),
       Self::Error(value) => context.apply_error_style(value),
+      Self::Hide => "".to_string(),
       Self::Ignore(value) => context.apply_ignore_style(value),
       Self::NotApplicable => context.apply_ignore_style("n.a."),
       Self::Plain(value) => context.apply_stdout_style(value),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => context.apply_target_style(value),
+      Self::Todo => context.apply_error_style("TODO"),
       Self::Unreachable => context.apply_error_style("unreachable"),
       Self::Warn(value) => context.apply_warning_style(value),
     }
@@ -325,13 +435,16 @@ impl Value {
 
   pub(crate) fn to_undecorated_string(&self) -> String {
     match self {
+      Self::DistinguishedName(value) => format_distinguished_name(value),
       Self::Empty => "".to_string(),
       Self::Error(value) => value.to_string(),
+      Self::Hide => "".to_string(),
       Self::Ignore(value) => value.to_string(),
       Self::NotApplicable => "".to_string(),
       Self::Plain(value) => value.to_string(),
       Self::Secret => Self::REDACTED_SECRET.to_string(),
       Self::Target(value) => value.to_string(),
+      Self::Todo => "TODO".to_string(),
       Self::Unreachable => "unreachable".to_string(),
       Self::Warn(value) => value.to_string(),
     }

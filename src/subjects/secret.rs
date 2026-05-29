@@ -1,7 +1,7 @@
 use crate::arguments::secret_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, COPY_COMMAND, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS,
-  UPDATE_COMMAND,
+  Capability, CommandExecutor, COPY_COMMAND, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND,
+  SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -12,6 +12,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::Value;
 use crate::formatters::{Label, OutputFormat, SubjectFormatter};
+use crate::global_options::{expiration_option, get_expiration_days};
 use crate::issues::{Issue, IssueLabel, Severity};
 use crate::modifier_flags::ModifierFlagType;
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
@@ -83,7 +84,7 @@ lazy_static! {
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );
   static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &SecretDelete {}, "Delete secret")
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &SecretDelete {}, "Delete secret")
       .set_long_about("Delete a secret.")
       .add_target_argument(secret_id_argument().required(true))
   );
@@ -100,6 +101,7 @@ lazy_static! {
         (FlagType::System, &SecretListSystem {}, None),
         (FlagType::Usage, &SecretListUsage {}, None)
       ])
+      .add_extra_argument(expiration_option())
   );
   static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &SecretShow {}, "Show secret details")
@@ -111,6 +113,7 @@ lazy_static! {
       .add_command_executor(FlagType::Usage, &SecretShowUsage {}, Some("Show where the secret is used".to_string()))
       .add_command_executor(FlagType::Value, &SecretShowValue {}, Some("Show the secret value".to_string()))
       .add_target_argument(secret_id_argument().required(true))
+      .add_extra_argument(expiration_option())
   );
   static ref SECRET_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &SecretUpdate {}, "Update secret")
@@ -127,8 +130,6 @@ lazy_static! {
     SECRET_UPDATE_CAPABILITY.as_ref()
   ];
 }
-
-const EXPIRATION_CHECK_DAYS: Option<u64> = Some(30);
 
 struct SecretCopy {}
 
@@ -221,6 +222,10 @@ impl CommandExecutor for SecretDelete {
     if client.get_secret_configuration(&secret_name).await.is_err() {
       return err!("secret '{}' does not exist", secret_name);
     }
+    if context.dependencies_warning("secret", client.secret_dependants(&secret_name).await?, &secret_name) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, secret '{}' not deleted", secret_name));
+      return Ok(());
+    }
     if context.confirmed(format!("delete secret '{}'?", secret_name))? {
       if context.dry_run() {
         context.print_warning("dry-run mode, secret not deleted");
@@ -239,18 +244,35 @@ impl CommandExecutor for SecretDelete {
   }
 }
 
+static SECRET_LABELS_LIST: [SecretLabel; 10] = [
+  SecretLabel::SecretName,
+  SecretLabel::System,
+  SecretLabel::Kind,
+  SecretLabel::FormatKind,
+  SecretLabel::Size,
+  SecretLabel::Description,
+  SecretLabel::NotBefore,
+  SecretLabel::NotAfter,
+  SecretLabel::Provisioned,
+  SecretLabel::Notifications,
+];
+
 struct SecretList {}
 
 #[async_trait]
 impl CommandExecutor for SecretList {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
     for (secret_name, secret_id, secret_metadata, allocation_status, _dependants) in secrets.into_iter() {
-      formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, allocation_status.clone()));
+      formatter.push_target_id_value_owned(
+        secret_name.clone(),
+        (secret_id.clone(), secret_metadata, Some(expiration_days), allocation_status.clone()),
+      );
     }
     formatter.print(None)?;
     Ok(())
@@ -282,19 +304,22 @@ impl CommandExecutor for SecretListAllocationStatus {
   }
 }
 
+static CERTIFICATE_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Subject, SecretLabel::NotAfter, SecretLabel::Issuer, SecretLabel::Label];
+
 struct SecretListCertificates {}
 
 #[async_trait]
 impl CommandExecutor for SecretListCertificates {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that contain certificates");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&CERTIFICATE_LABELS_LIST, context);
     for (secret_name, _, secret_metadata, _, _) in secrets_with_metadata {
       if matches!(secret_metadata, SecretMetadata::Certificate { .. }) {
-        formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
+        formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata, Some(expiration_days)));
       }
     }
     formatter.print(None)?;
@@ -310,9 +335,9 @@ struct SecretListErrors {}
 
 #[async_trait]
 impl CommandExecutor for SecretListErrors {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that have errors");
-    list_issues(client, context, true).await?
+    list_issues(client, matches, context, true).await?
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -345,9 +370,9 @@ struct SecretListIssues {}
 
 #[async_trait]
 impl CommandExecutor for SecretListIssues {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that have potential issues");
-    list_issues(client, context, false).await?
+    list_issues(client, matches, context, false).await?
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -355,15 +380,17 @@ impl CommandExecutor for SecretListIssues {
   }
 }
 
-async fn list_issues(client: &DshApiClient, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
-  pub(crate) static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
-    [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::SubjectDescription, IssueLabel::IssueDetails];
+static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
+  [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::SubjectDescription, IssueLabel::IssueDetails];
+
+async fn list_issues(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
+  let expiration_days = get_expiration_days(matches, context.settings())?;
   let start_instant = context.now();
   let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;
   context.print_execution_time(start_instant);
   let secrets_issues: Vec<(String, SecretMetadata, Vec<Issue>)> = secrets
     .iter()
-    .flat_map(|secret_tuple| has_issues(secret_tuple, EXPIRATION_CHECK_DAYS, only_errors).map(|issues| (secret_tuple.0.clone(), secret_tuple.2.clone(), issues)))
+    .flat_map(|secret_tuple| has_issues(secret_tuple, Some(expiration_days), only_errors).map(|issues| (secret_tuple.0.clone(), secret_tuple.2.clone(), issues)))
     .collect_vec();
   let mut formatter = ListFormatter::new_override_target_id_label(&SECRET_LIST_ISSUES_LABELS_LIST, "secret id", context);
   for (secret_name, secret_metadata, issues) in secrets_issues.into_iter() {
@@ -375,19 +402,22 @@ async fn list_issues(client: &DshApiClient, context: &Context, only_errors: bool
   Ok(Ok(()))
 }
 
+static KEY_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Private, SecretLabel::Size, SecretLabel::Kind, SecretLabel::Label];
+
 struct SecretListKeys {}
 
 #[async_trait]
 impl CommandExecutor for SecretListKeys {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that contain private of public keys");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&KEY_LABELS_LIST, context);
     for (secret_name, _, secret_metadata, _, _) in secrets_with_metadata {
       if let SecretMetadata::Pki { .. } = &secret_metadata {
-        formatter.push_target_id_value_owned(secret_name.clone(), secret_metadata);
+        formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata, Some(expiration_days)));
       }
     }
     formatter.print(None)?;
@@ -399,19 +429,22 @@ impl CommandExecutor for SecretListKeys {
   }
 }
 
+static SYSTEM_LABELS_LIST: [SecretLabel; 4] = [SecretLabel::SecretName, SecretLabel::SecretId, SecretLabel::FormatKind, SecretLabel::Size];
+
 struct SecretListSystem {}
 
 #[async_trait]
 impl CommandExecutor for SecretListSystem {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all system secret ids");
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SYSTEM_LABELS_LIST, context);
     for (secret_name, secret_id, secret_metadata, _, _) in secrets_with_metadata {
       if secret_id.is_some() {
-        formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, None));
+        formatter.push_target_id_value_owned(secret_name.clone(), (secret_id.clone(), secret_metadata, Some(expiration_days), None));
       }
     }
     formatter.print(None)?;
@@ -451,17 +484,45 @@ impl CommandExecutor for SecretListUsage {
   }
 }
 
+static SECRET_LABELS_SHOW: [SecretLabel; 16] = [
+  SecretLabel::SecretName,
+  SecretLabel::SecretId,
+  SecretLabel::System,
+  SecretLabel::Kind,
+  SecretLabel::FormatKind,
+  SecretLabel::Size,
+  SecretLabel::Description,
+  SecretLabel::NotBefore,
+  SecretLabel::NotAfter,
+  SecretLabel::Provisioned,
+  SecretLabel::Notifications,
+  SecretLabel::DerivedFrom,
+  SecretLabel::Subject,
+  SecretLabel::Issuer,
+  SecretLabel::CaChain,
+  SecretLabel::SerialNumber,
+];
+
 struct SecretShow {}
 
 #[async_trait]
 impl CommandExecutor for SecretShow {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let (secret_name, secret_id) = normalize_secret_name(target.unwrap_or_else(|| unreachable!()));
+    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let (secret_value, allocation_status) = join!(client.get_secret(&secret_name), client.get_secret_status(&secret_name));
     context.print_execution_time(start_instant);
     context.print_allocation_status(&allocation_status, SECRET_SUBJECT_TARGET);
-    _ = UnitFormatter::new(&secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_id.clone(), secret_metadata(&secret_value?), allocation_status.clone().ok()), None);
+    _ = UnitFormatter::new(&secret_name, &SECRET_LABELS_SHOW, context).print(
+      &(
+        secret_id.clone(),
+        secret_metadata(&secret_value?),
+        Some(expiration_days),
+        allocation_status.clone().ok(),
+      ),
+      None,
+    );
     Ok(())
   }
 
@@ -529,12 +590,12 @@ impl CommandExecutor for SecretShowValue {
     let secret = client.get_secret(&secret_name).await?;
     context.print_execution_time(start_instant);
     context.print_explanation(format!("show the value of secret '{}'", secret_name));
-    context.print(secret);
+    context.println(secret);
     Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
+    Requirements::new(false, None, true)
   }
 }
 
@@ -549,6 +610,10 @@ impl CommandExecutor for SecretUpdate {
     }
     if client.get_secret(&secret_name).await.is_err() {
       return err!("secret '{}' does not exist", secret_name);
+    }
+    if context.dependencies_warning("secret", client.secret_dependants(&secret_name).await?, &secret_name) && !context.confirmed("do you want to continue?")? {
+      context.print_outcome(format!("cancelled, secret '{}' not updated", secret_name));
+      return Ok(());
     }
     if context.stdin_is_terminal() {
       if matches.get_flag(ModifierFlagType::MultiLine.id()) {
@@ -587,7 +652,7 @@ impl CommandExecutor for SecretUpdate {
   }
 }
 
-/// Get secret with metadata
+/// Gets secret with metadata.
 ///
 /// Gets the secret value and optional allocation status. The value will be converted to a
 /// `SecretMetadata` struct. Note that system secrets do not have an allocation status.
@@ -622,7 +687,7 @@ pub(crate) async fn secret_with_metadata(secret_name: String, client: &DshApiCli
   }
 }
 
-/// Get all secrets with metadata and allocation status
+/// Gets all secrets with metadata and allocation status.
 ///
 /// # Returns
 /// List of tuples, each consisting of:
@@ -643,7 +708,7 @@ pub(crate) async fn secrets_with_metadata(
   )
 }
 
-/// Check if a secret has issues
+/// Check if a secret has issues.
 ///
 /// # Parameters
 /// * `secret_tuple` - Tuple of secret parameters, consisting of
@@ -722,8 +787,8 @@ impl SubjectFormatter<IssueLabel> for (SecretMetadata, Issue) {
     match label {
       IssueLabel::IssueDetails => issue.value(label, target_id),
       IssueLabel::IssueKind => issue.value(label, target_id),
-      IssueLabel::SubjectDescription => Value::option(secret_metadata.value_description()),
-      IssueLabel::SubjectKind => Value::option(secret_metadata.kind()),
+      IssueLabel::SubjectDescription => Value::some_or_hide(secret_metadata.value_description()),
+      IssueLabel::SubjectKind => Value::some_or_hide(secret_metadata.kind()),
       IssueLabel::Target => Value::target(target_id),
       IssueLabel::DependencyName => Value::not_applicable(),
       IssueLabel::DependencySubject => Value::not_applicable(),
@@ -734,22 +799,24 @@ impl SubjectFormatter<IssueLabel> for (SecretMetadata, Issue) {
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum SecretLabel {
+  CaChain,
+  DerivedFrom,
   Description,
-  Expires,
-  _Format,
+  Format,
   FormatKind,
   Issuer,
   Kind,
   Label,
-  _NotBefore,
+  NotBefore,
   NotAfter,
   Notifications,
-  _NumberOfEntries,
+  NumberOfEntries,
   Private,
+  Provisioned,
   SecretId,
   SecretName,
+  SerialNumber,
   Size,
-  Status,
   Subject,
   System,
 }
@@ -757,22 +824,24 @@ pub(crate) enum SecretLabel {
 impl Label for SecretLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::CaChain => "ca chain",
+      Self::DerivedFrom => "derived from",
       Self::Description => "description",
-      Self::Expires => "expires",
-      Self::_Format => "format",
-      Self::FormatKind => "format",
+      Self::Format => "format",
+      Self::FormatKind => "format kind",
       Self::Issuer => "issuer",
       Self::Kind => "kind",
       Self::Label => "label",
       Self::Notifications => "notifications",
-      Self::_NotBefore => "not before",
+      Self::NotBefore => "not before",
       Self::NotAfter => "not after",
-      Self::_NumberOfEntries => "entries",
+      Self::NumberOfEntries => "entries",
       Self::Private => "private",
+      Self::Provisioned => "provisioned",
       Self::SecretId => "secret id",
       Self::SecretName => "secret name",
+      Self::SerialNumber => "serial number",
       Self::Size => "size",
-      Self::Status => "status",
       Self::Subject => "subject",
       Self::System => "system",
     }
@@ -783,118 +852,104 @@ impl Label for SecretLabel {
   }
 }
 
-impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<AllocationStatus>) {
+/// * `Option<String>` - Secret id.
+/// * `SecretMetadata` - Secret metadata.
+/// * `Option<u64>` - Expiration days.
+/// * `AllocationStatus` - Secret allocation status.
+impl SubjectFormatter<SecretLabel> for (Option<String>, SecretMetadata, Option<u64>, Option<AllocationStatus>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
-    let (secret_id, secret_metadata, allocation_status) = self;
+    let (secret_id, secret_metadata, expiration_days, allocation_status) = self;
     match label {
+      SecretLabel::DerivedFrom => match allocation_status.clone().and_then(|allocation_status| allocation_status.derived_from) {
+        Some(derived_from) => Value::plain(derived_from),
+        None => Value::hide(),
+      },
       SecretLabel::Notifications => match allocation_status {
-        Some(allocation_status) => Value::warn(allocation_status.notifications.iter().map(|notification| notification.to_string()).join("\n")),
-        None => Value::empty(),
+        Some(allocation_status) if !allocation_status.notifications.is_empty() => {
+          Value::warn(allocation_status.notifications.iter().map(|notification| notification.to_string()).join("\n"))
+        }
+        _ => Value::hide(),
+      },
+      SecretLabel::Provisioned => match allocation_status {
+        Some(allocation_status) => {
+          if allocation_status.provisioned {
+            Value::plain("yes")
+          } else {
+            Value::plain("no")
+          }
+        }
+        None => Value::hide(),
       },
       SecretLabel::SecretId => match secret_id {
         Some(secret_id) => Value::target(secret_id),
-        None => Value::empty(),
+        None => Value::hide(),
       },
       SecretLabel::SecretName => Value::target(target_id),
-      SecretLabel::Status => match allocation_status {
-        Some(allocation_status) => {
-          if allocation_status.provisioned {
-            Value::empty()
-          } else {
-            Value::error("not provisioned")
-          }
-        }
-        None => Value::empty(),
-      },
       SecretLabel::System => {
         if secret_id.is_some() {
           Value::plain("yes")
         } else {
-          Value::empty()
+          Value::plain("no")
         }
       }
-      _ => secret_metadata.value(label, target_id),
+      _ => (secret_metadata.clone(), *expiration_days).value(label, target_id),
     }
   }
 }
 
-impl SubjectFormatter<SecretLabel> for SecretMetadata {
+/// * `SecretMetadata` - Secret metadata.
+/// * `Option<u64>` - Expiration days.
+impl SubjectFormatter<SecretLabel> for (SecretMetadata, Option<u64>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
+    let (secret_metadata, expiration_days) = self;
     match label {
-      SecretLabel::Description => match self.kind() {
-        Some("error") => Value::error(self.additional_info().map(|info| info.to_string()).unwrap_or_default()),
-        _ => Value::option(self.additional_info()),
+      SecretLabel::CaChain => match secret_metadata {
+        SecretMetadata::Certificate { chain, .. } => Value::plain(chain.join("\n")),
+        _ => Value::hide(),
       },
-      SecretLabel::Expires => match self.not_after() {
-        Some(not_after) => Value::timestamp_seconds_expired(not_after as i64, EXPIRATION_CHECK_DAYS),
-        None => Value::empty(),
+      SecretLabel::Description => match secret_metadata.kind() {
+        Some("error") => Value::error(secret_metadata.additional_info().map(|info| info.to_string()).unwrap_or_default()),
+        _ => Value::some_or_hide(secret_metadata.additional_info()),
       },
-      SecretLabel::_Format => Value::plain(self.format()),
-      SecretLabel::FormatKind => Value::option(self.format_kind()),
-      SecretLabel::Issuer => match self {
-        SecretMetadata::Certificate { issuer, .. } => Value::plain(issuer),
-        _ => Value::not_applicable(),
+      SecretLabel::Format => Value::plain(secret_metadata.format()),
+      SecretLabel::FormatKind => Value::some_or_hide(secret_metadata.format_kind()),
+      SecretLabel::Issuer => match secret_metadata {
+        SecretMetadata::Certificate { issuer, .. } => Value::distinguished_name(issuer),
+        _ => Value::hide(),
       },
-      SecretLabel::Kind => match self.kind() {
+      SecretLabel::Kind => match secret_metadata.kind() {
         Some("error") => Value::error("ERROR"),
-        _ => Value::option(self.kind()),
+        _ => Value::some_or_hide(secret_metadata.kind()),
       },
-      SecretLabel::Label => match self {
+      SecretLabel::Label => match secret_metadata {
         SecretMetadata::Certificate { label, .. } => Value::plain(label),
         SecretMetadata::Pki { labels, .. } => Value::plain(labels.join("/")),
-        _ => Value::not_applicable(),
+        _ => Value::hide(),
       },
-      SecretLabel::_NotBefore => match self {
-        SecretMetadata::Certificate { not_before, .. } => Value::plain(not_before),
-        _ => Value::not_applicable(),
+      SecretLabel::NotBefore => match secret_metadata {
+        SecretMetadata::Certificate { not_before, .. } => Value::timestamp_seconds_not_before(*not_before as i64),
+        _ => Value::hide(),
       },
-      SecretLabel::NotAfter => match self {
-        SecretMetadata::Certificate { not_after, .. } => Value::timestamp_seconds_expired(*not_after as i64, EXPIRATION_CHECK_DAYS),
-        _ => Value::not_applicable(),
+      SecretLabel::NotAfter => match secret_metadata {
+        SecretMetadata::Certificate { not_after, .. } => Value::timestamp_seconds_expired(*not_after as i64, *expiration_days),
+        _ => Value::hide(),
       },
-      SecretLabel::_NumberOfEntries => Value::option(self.number_of_entries()),
-      SecretLabel::Private => match self {
+      SecretLabel::NumberOfEntries => Value::some_or_hide(secret_metadata.number_of_entries()),
+      SecretLabel::Private => match secret_metadata {
         SecretMetadata::Pki { private, .. } => Value::plain(if *private { "private" } else { "public" }),
-        _ => Value::not_applicable(),
+        _ => Value::hide(),
       },
       SecretLabel::SecretName => Value::target(target_id),
-      SecretLabel::Size => Value::option(self.secret_size()),
-      SecretLabel::Subject => match self {
-        SecretMetadata::Certificate { subject, .. } => Value::plain(subject),
-        _ => Value::not_applicable(),
+      SecretLabel::SerialNumber => match secret_metadata {
+        SecretMetadata::Certificate { serial_number, .. } => Value::plain(serial_number),
+        _ => Value::hide(),
       },
-      _ => Value::not_applicable(),
+      SecretLabel::Size => Value::some_or_hide(secret_metadata.secret_size()),
+      SecretLabel::Subject => match secret_metadata {
+        SecretMetadata::Certificate { subject, .. } => Value::distinguished_name(subject),
+        _ => Value::hide(),
+      },
+      _ => Value::unreachable(),
     }
   }
 }
-
-static CERTIFICATE_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Subject, SecretLabel::NotAfter, SecretLabel::Issuer, SecretLabel::Label];
-
-static KEY_LABELS_LIST: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Private, SecretLabel::Size, SecretLabel::Kind, SecretLabel::Label];
-
-static SYSTEM_LABELS_LIST: [SecretLabel; 4] = [SecretLabel::SecretName, SecretLabel::SecretId, SecretLabel::FormatKind, SecretLabel::Size];
-
-pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 9] = [
-  SecretLabel::SecretName,
-  SecretLabel::System,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::Expires,
-  SecretLabel::Status,
-  SecretLabel::Notifications,
-];
-
-pub(crate) static SECRET_LABELS_SHOW: [SecretLabel; 10] = [
-  SecretLabel::SecretName,
-  SecretLabel::SecretId,
-  SecretLabel::System,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::Expires,
-  SecretLabel::Status,
-  SecretLabel::Notifications,
-];

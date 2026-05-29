@@ -1,6 +1,6 @@
 use crate::context::Context;
-use crate::formatters::OutputFormat;
 use crate::formatters::{Label, SubjectFormatter};
+use crate::formatters::{OutputFormat, Value};
 use crate::{err, error_map, DshCliResult};
 use itertools::Itertools;
 use serde::Serialize;
@@ -54,7 +54,7 @@ where
 
   fn print_csv<V: SubjectFormatter<L>>(&self, value: &V) -> DshCliResult<()> {
     if !self.context.no_csv_headers() {
-      self.context.print(
+      self.context.println(
         self
           .labels
           .iter()
@@ -63,7 +63,7 @@ where
           .join(self.context.csv_separator().as_str()),
       );
     }
-    self.context.print(
+    self.context.println(
       self
         .labels
         .iter()
@@ -76,31 +76,31 @@ where
 
   fn print_json<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
     let json = serde_json::to_string_pretty(value).map_err(error_map!("could not convert value to json ({})"))?;
-    self.context.print(json);
+    self.context.println(json);
     Ok(())
   }
 
   fn print_json_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
     let json = serde_json::to_string(value).map_err(error_map!("could not convert value to compact json ({})"))?;
-    self.context.print(json);
+    self.context.println(json);
     Ok(())
   }
 
   fn print_toml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
     let toml = toml::to_string_pretty(value).map_err(error_map!("could not convert value to compact toml ({})"))?;
-    self.context.print(toml);
+    self.context.println(toml);
     Ok(())
   }
 
   fn print_toml_compact<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
     let toml = toml::to_string(value).map_err(error_map!("could not convert value to compact toml ({})"))?;
-    self.context.print(toml);
+    self.context.println(toml);
     Ok(())
   }
 
   fn print_yaml<V: SubjectFormatter<L> + Serialize>(&self, value: &V) -> DshCliResult<()> {
     let yaml = serde_yaml::to_string(value).map_err(error_map!("could not convert value to yaml ({})"))?;
-    self.context.print(yaml);
+    self.context.println(yaml);
     Ok(())
   }
 
@@ -108,7 +108,7 @@ where
     let mut table = self.create_table(value);
     table.with(Padding::new(1, 1, 0, 0));
     table.with(Style::sharp());
-    self.context.print(table.to_string());
+    self.context.println(table.to_string());
     Ok(())
   }
 
@@ -116,7 +116,7 @@ where
     let mut table = self.create_table(value);
     table.with(Padding::new(0, 2, 0, 0));
     table.with(Style::empty());
-    self.context.print(table.to_string());
+    self.context.println(table.to_string());
     Ok(())
   }
 
@@ -131,14 +131,17 @@ where
     tabled_builder.push_record([self.context.apply_target_label_style(target_label), self.context.apply_target_style(self.target_id.as_str())]);
     for label in self.labels {
       if !label.is_target_label() && label.as_str_for_unit() != target_label {
-        let value = value.value(label, self.target_id.as_str()).to_decorated_string(self.context);
-        let split_value = value.split("\n").collect_vec();
-        let mut value_iterator = split_value.iter();
-        if let Some(first_line) = value_iterator.next() {
-          tabled_builder.push_record([self.context.apply_label_style(label.as_str_for_unit()), first_line.to_string()]);
-        }
-        for next_line in value_iterator {
-          tabled_builder.push_record(["", next_line]);
+        let value = value.value(label, self.target_id.as_str());
+        if !matches!(value, Value::Hide) {
+          let decorated_string = value.to_decorated_string(self.context);
+          let split_value = decorated_string.split("\n").collect_vec();
+          let mut value_iterator = split_value.iter();
+          if let Some(first_line) = value_iterator.next() {
+            tabled_builder.push_record([self.context.apply_label_style(label.as_str_for_unit()), first_line.to_string()]);
+          }
+          for next_line in value_iterator {
+            tabled_builder.push_record(["", next_line]);
+          }
         }
       }
     }

@@ -11,6 +11,7 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Debug;
+use std::path::PathBuf;
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub(crate) struct Settings {
@@ -32,6 +33,8 @@ pub(crate) struct Settings {
   pub(crate) error_color: Option<DshColor>,
   #[serde(rename = "error-style", skip_serializing_if = "Option::is_none")]
   pub(crate) error_style: Option<DshStyle>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) expiration: Option<u64>,
   #[serde(rename = "label-color", skip_serializing_if = "Option::is_none")]
   pub(crate) label_color: Option<DshColor>,
   #[serde(rename = "label-style", skip_serializing_if = "Option::is_none")]
@@ -52,6 +55,8 @@ pub(crate) struct Settings {
   pub(crate) no_csv_headers: Option<bool>,
   #[serde(rename = "no-escape", skip_serializing_if = "Option::is_none")]
   pub(crate) no_escape: Option<bool>,
+  #[serde(rename = "output-directory", skip_serializing_if = "Option::is_none")]
+  pub(crate) output_directory: Option<PathBuf>,
   #[serde(rename = "output-format", skip_serializing_if = "Option::is_none")]
   pub(crate) output_format: Option<OutputFormat>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -153,6 +158,9 @@ impl Debug for Settings {
     if let Some(error_style) = &self.error_style {
       builder.field("error_style", error_style);
     }
+    if let Some(expiration) = &self.expiration {
+      builder.field("expiration", expiration);
+    }
     if let Some(label_color) = &self.label_color {
       builder.field("label_color", label_color);
     }
@@ -182,6 +190,9 @@ impl Debug for Settings {
     }
     if let Some(no_escape) = &self.no_escape {
       builder.field("no_escape", no_escape);
+    }
+    if let Some(output_directory) = &self.output_directory {
+      builder.field("output_directory", output_directory);
     }
     if let Some(output_format) = &self.output_format {
       builder.field("output_format", output_format);

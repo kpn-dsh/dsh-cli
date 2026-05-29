@@ -32,7 +32,7 @@ pub(crate) enum AuthenticationMethod {
   /// Use the robot account to authenticate and authorize
   #[serde(rename = "robot")]
   Robot,
-  /// Use single sign on to authenticate and authorize
+  /// Use single-sign-on to authenticate and authorize
   #[serde(rename = "sso")]
   #[value(alias("sso"))]
   SingleSignOn,
@@ -67,7 +67,7 @@ impl Default for AuthenticationMethod {
 
 /// Get access token using stored refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform`
 ///
 /// Returns
@@ -92,7 +92,7 @@ pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Opti
 
 /// Let the user log in
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform`
 /// * `context`
 ///
@@ -110,8 +110,8 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
         debug!("get access token from stored refresh token: {}", access_token_jwt);
         trace!("{:#}", access_token_jwt);
         match &access_token_jwt.payload.preferred_username {
-          Some(preferred_username) => context.print(format!("you are already logged in as {}", preferred_username)),
-          None => context.print("you are already logged in"),
+          Some(preferred_username) => context.println(format!("you are already logged in as '{}'", preferred_username)),
+          None => context.println("you are already logged in"),
         }
         print_authorizations(&context, &access_token_jwt);
         Ok(())
@@ -122,8 +122,8 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
           let _ = write_refresh_token(&platform, &encrypted_refresh_token);
           let access_token_jwt = DshJwt::from_str(access_token.secret())?;
           match &access_token_jwt.payload.preferred_username {
-            Some(preferred_username) => context.print(format!("you are logged in as {}", preferred_username)),
-            None => context.print("you are logged in"),
+            Some(preferred_username) => context.println(format!("you are logged in as '{}'", preferred_username)),
+            None => context.println("you are logged in"),
           }
           print_authorizations(&context, &access_token_jwt);
           Ok(())
@@ -135,29 +135,16 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
   .await?
 }
 
-fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
-  match &access_token_jwt.authorized_tenants() {
-    Some(authorized_tenants) => {
-      if !authorized_tenants.is_empty() {
-        context.print(format!("authorized tenants: {}", authorized_tenants.join(", ")));
-      } else {
-        context.print("you are not authorized for tenants");
-      }
-    }
-    None => context.print_warning("json web token does not provide authorized tenants"),
-  }
-}
-
 /// Let the user log out
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform`
 /// * `context`
 ///
 /// Returns
 /// * `Ok(())` - Log out was successful.
 pub(crate) async fn logout(platform: DshPlatform, context: Context) -> DshCliResult<()> {
-  context.print_explanation(format!("logout from platform {}", platform));
+  context.print_explanation(format!("logout from platform '{}'", platform));
   spawn_blocking(move || {
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
     let provider_metadata_response = http_client.get(format!("{}/.well-known/openid-configuration", platform.issuer_endpoint())).send()?;
@@ -167,7 +154,7 @@ pub(crate) async fn logout(platform: DshPlatform, context: Context) -> DshCliRes
       match json_value.get("end_session_endpoint") {
         Some(end_session_endpoint) => match end_session_endpoint.as_str() {
           Some(endpoint) => {
-            context.open_url(endpoint, format!("logout page for platform {}", platform));
+            context.open_url(endpoint, format!("logout page for platform '{}'", platform));
             Ok(())
           }
           None => err!("response from provider metadata request has illegal format"),
@@ -179,6 +166,19 @@ pub(crate) async fn logout(platform: DshPlatform, context: Context) -> DshCliRes
     }
   })
   .await?
+}
+
+fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
+  match &access_token_jwt.authorized_tenants() {
+    Some(authorized_tenants) => {
+      if !authorized_tenants.is_empty() {
+        context.println(format!("authorized tenants: {}", authorized_tenants.join(", ")));
+      } else {
+        context.println("you are not authorized for tenants");
+      }
+    }
+    None => context.print_warning("json web token does not provide authorized tenants"),
+  }
 }
 
 /// Get access tokens for all current authentications
@@ -213,7 +213,7 @@ fn client_id(platform: &DshPlatform) -> ClientId {
 /// * Get access token and new refresh token
 /// * Replace old refresh token with new refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `provider_metadata` - Device provider metadata.
 /// * `platform` - Platform.
 /// * `http_client` - Http client (blocking).
@@ -272,7 +272,7 @@ fn trace_token_payload(kind: &str, token: &str) {
 
 /// Get access token and exchanged refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `provider_metadata` - Device provider metadata.
 /// * `platform` - Platform.
 /// * `refresh_token` - Previous refresh token which will be replaced by a new one.
@@ -345,45 +345,41 @@ fn get_openid_client(provider_metadata: &DeviceProviderMetadata, client_id: &Cli
 
 /// Open login page in the system browser
 fn open_login_page(response: &DeviceAuthorizationResponse<EmptyExtraDeviceAuthorizationFields>, platform: &DshPlatform, context: &Context) {
-  if context.dry_run() {
-    context.print_warning(format!("dry-run mode, login page for platform {} not opened", platform));
-  } else {
-    match context.browser_method() {
-      BrowserMethod::Instruct => {
-        context.print_explanation(format!(
-          "open login page for platform {} in your browser and enter the provided user code",
-          platform
-        ));
-        context.print(format!("login page: {}", response.verification_uri()));
-        context.print(format!("user code: {}", response.user_code().secret()));
-      }
-      BrowserMethod::Open => match response.verification_uri_complete() {
-        Some(verification_uri) => match open::that(verification_uri.secret()) {
-          Ok(()) => {
-            context.print(format!("opening login page for platform {}", platform));
-          }
-          Err(_) => {
-            context.print_error("could not open your browser");
-            context.print_explanation(format!(
-              "open login page for platform {} in your browser and enter the provided user code",
-              platform
-            ));
-            context.print(format!("login page: {}", response.verification_uri()));
-            context.print(format!("user code: {}", response.user_code().secret()));
-          }
-        },
-        None => unreachable!(),
-      },
+  match context.browser_method() {
+    BrowserMethod::Instruct => {
+      context.print_explanation(format!(
+        "open login page for platform '{}' in your browser and enter the provided user code",
+        platform
+      ));
+      context.println(format!("login page: {}", response.verification_uri()));
+      context.println(format!("user code: {}", response.user_code().secret()));
     }
+    BrowserMethod::Open => match response.verification_uri_complete() {
+      Some(verification_uri) => match open::that(verification_uri.secret()) {
+        Ok(()) => {
+          context.println(format!("opening login page for platform '{}'", platform));
+        }
+        Err(_) => {
+          context.print_error("could not open your browser");
+          context.print_explanation(format!(
+            "open login page for platform '{}' in your browser and enter the provided user code",
+            platform
+          ));
+          context.println(format!("login page: {}", response.verification_uri()));
+          context.println(format!("user code: {}", response.user_code().secret()));
+        }
+      },
+      None => unreachable!(),
+    },
   }
 }
 
 /// Get stored refresh token
 ///
-/// # Parameters
+/// ## Parameters
 /// * `platform` - Platform for which the token is requested.
 ///
-/// # Returns
+/// ## Returns
 /// `Some(RefreshToken)`
 /// `None`
 pub(crate) fn get_stored_refresh_token(platform: &DshPlatform) -> DshCliResult<Option<RefreshToken>> {

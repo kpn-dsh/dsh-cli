@@ -1,7 +1,7 @@
 use crate::arguments::managed_tenant_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND, SHOW_COMMAND,
-  SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND,
+  SHOW_COMMAND, SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -12,11 +12,11 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
-use crate::limits_flags::{
-  certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
-  stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_FLAG, CONSUMER_RATE_FLAG, CPU_FLAG, KAFKA_ACL_GROUP_COUNT_FLAG,
-  MEM_FLAG, PARTITION_COUNT_FLAG, PRODUCER_RATE_FLAG, REQUEST_RATE_FLAG, SECRET_COUNT_FLAG, STREAM_READ_FLAG, STREAM_RW_FLAG, STREAM_WRITE_FLAG, TOPIC_COUNT_FLAG, TRACING_FLAG,
-  VPN_FLAG,
+use crate::limits_options::{
+  certificate_count_flag, consumer_rate_flag, cpu_flag, kafka_acl_group_count_flag, mem_flag, partition_count_flag, producer_rate_flag, request_rate_flag, secret_count_flag,
+  stream_read_flag, stream_rw_flag, stream_write_flag, topic_count_flag, tracing_flag, vpn_flag, CERTIFICATE_COUNT_OPTION, CONSUMER_RATE_OPTION, CPU_OPTION,
+  KAFKA_ACL_GROUP_COUNT_OPTION, MEM_OPTION, PARTITION_COUNT_OPTION, PRODUCER_RATE_OPTION, REQUEST_RATE_OPTION, SECRET_COUNT_OPTION, STREAM_READ_OPTION, STREAM_RW_OPTION,
+  STREAM_WRITE_OPTION, TOPIC_COUNT_OPTION, TRACING_OPTION, VPN_OPTION,
 };
 use crate::subject::{Requirements, Subject};
 use crate::{err, DshCliResult};
@@ -51,7 +51,7 @@ lazy_static! {
       .add_extra_argument(vpn_flag())
   );
   static ref TENANT_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &TenantDelete {}, "Delete managed tenant")
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &TenantDelete {}, "Delete managed tenant")
       .set_long_about("Delete a managed tenant and its configuration.")
       .add_target_argument(managed_tenant_argument().required(true))
   );
@@ -97,7 +97,7 @@ lazy_static! {
       .add_extra_argument(certificate_count_flag())
       .add_extra_argument(consumer_rate_flag())
       .add_extra_argument(cpu_flag())
-      .add_extra_argument(kafka_acl_group_flag())
+      .add_extra_argument(kafka_acl_group_count_flag())
       .add_extra_argument(mem_flag())
       .add_extra_argument(partition_count_flag())
       .add_extra_argument(producer_rate_flag())
@@ -155,8 +155,8 @@ impl CommandExecutor for TenantCreate {
     if client.get_tenant_configuration(&tenant_id).await.is_ok() {
       return err!("managed tenant '{}' already exists", tenant_id);
     }
-    let enable_tracing = matches.get_one::<bool>(TRACING_FLAG);
-    let enable_vpn = matches.get_one::<bool>(VPN_FLAG);
+    let enable_tracing = matches.get_one::<bool>(TRACING_OPTION);
+    let enable_vpn = matches.get_one::<bool>(VPN_OPTION);
     context.print_explanation(format!("create new managed tenant '{}'", tenant_id));
     let mut services = vec![
       // Monitoring service is mandatory.
@@ -233,6 +233,24 @@ impl CommandExecutor for TenantGrant {
   }
 }
 
+static TENANT_LABELS: [TenantLabel; 15] = [
+  TenantLabel::Tenant,
+  TenantLabel::Manager,
+  TenantLabel::Monitoring,
+  TenantLabel::Tracing,
+  TenantLabel::Vpn,
+  TenantLabel::CertificateCount,
+  TenantLabel::ConsumerRate,
+  TenantLabel::Cpu,
+  TenantLabel::KafkaAclGroupCount,
+  TenantLabel::Mem,
+  TenantLabel::PartitionCount,
+  TenantLabel::ProducerRate,
+  TenantLabel::RequestRate,
+  TenantLabel::SecretCount,
+  TenantLabel::TopicCount,
+];
+
 struct TenantListAll {}
 
 #[async_trait]
@@ -287,6 +305,16 @@ impl CommandExecutor for TenantListIds {
     Requirements::standard_with_api()
   }
 }
+
+static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
+  StreamAccessLabel::Tenant,
+  StreamAccessLabel::StreamId,
+  StreamAccessLabel::StreamKind,
+  StreamAccessLabel::ReadAccess,
+  StreamAccessLabel::WriteAccess,
+  StreamAccessLabel::Partitions,
+  StreamAccessLabel::ReplicationFactor,
+];
 
 struct TenantListStreams {}
 
@@ -369,6 +397,15 @@ impl CommandExecutor for TenantShow {
   }
 }
 
+static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
+  StreamAccessLabel::StreamId,
+  StreamAccessLabel::StreamKind,
+  StreamAccessLabel::ReadAccess,
+  StreamAccessLabel::WriteAccess,
+  StreamAccessLabel::Partitions,
+  StreamAccessLabel::ReplicationFactor,
+];
+
 struct TenantShowStreams {}
 
 #[async_trait]
@@ -395,8 +432,8 @@ struct TenantUpdateLimit {}
 impl CommandExecutor for TenantUpdateLimit {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let tenant_id = target.unwrap_or_else(|| unreachable!());
-    let enable_tracing_argument = matches.get_one::<bool>(TRACING_FLAG);
-    let enable_vpn_argument = matches.get_one::<bool>(VPN_FLAG);
+    let enable_tracing_argument = matches.get_one::<bool>(TRACING_OPTION);
+    let enable_vpn_argument = matches.get_one::<bool>(VPN_OPTION);
     let tenant_limits_from_arguments = tenant_limits_try_from_matches(matches)?;
 
     match (
@@ -495,11 +532,11 @@ impl CommandExecutor for TenantUpdateLimit {
 }
 
 fn get_managed_stream_id(matches: &ArgMatches, managing_tenant: &str) -> DshCliResult<(ManagedStreamId, AccessRights)> {
-  Ok(match matches.get_one::<String>(STREAM_READ_FLAG) {
+  Ok(match matches.get_one::<String>(STREAM_READ_OPTION) {
     Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Read),
-    None => match matches.get_one::<String>(STREAM_RW_FLAG) {
+    None => match matches.get_one::<String>(STREAM_RW_OPTION) {
       Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::ReadWrite),
-      None => match matches.get_one::<String>(STREAM_WRITE_FLAG) {
+      None => match matches.get_one::<String>(STREAM_WRITE_OPTION) {
         Some(stream) => (managed_stream_id(stream, managing_tenant)?, AccessRights::Write),
         None => unreachable!(),
       },
@@ -517,9 +554,9 @@ fn managed_stream_id(stream_argument: &str, managing_tenant: &str) -> DshCliResu
 
 fn tenant_limits_try_from_matches(matches: &ArgMatches) -> DshCliResult<TenantLimits> {
   Ok(TenantLimits {
-    certificate_count: matches.get_one::<NonZeroU64>(CERTIFICATE_COUNT_FLAG).cloned(),
-    consumer_rate: matches.get_one::<i64>(CONSUMER_RATE_FLAG).cloned(),
-    cpu: match matches.get_one::<f64>(CPU_FLAG).cloned() {
+    certificate_count: matches.get_one::<NonZeroU64>(CERTIFICATE_COUNT_OPTION).cloned(),
+    consumer_rate: matches.get_one::<i64>(CONSUMER_RATE_OPTION).cloned(),
+    cpu: match matches.get_one::<f64>(CPU_OPTION).cloned() {
       Some(cpus) => {
         if (0.01..=16.0).contains(&cpus) {
           Some(cpus)
@@ -529,13 +566,13 @@ fn tenant_limits_try_from_matches(matches: &ArgMatches) -> DshCliResult<TenantLi
       }
       None => None,
     },
-    kafka_acl_group_count: matches.get_one::<i64>(KAFKA_ACL_GROUP_COUNT_FLAG).cloned(),
-    mem: matches.get_one::<NonZeroU64>(MEM_FLAG).cloned(),
-    partition_count: matches.get_one::<NonZeroU64>(PARTITION_COUNT_FLAG).cloned(),
-    producer_rate: matches.get_one::<i64>(PRODUCER_RATE_FLAG).cloned(),
-    request_rate: matches.get_one::<NonZeroU64>(REQUEST_RATE_FLAG).cloned(),
-    secret_count: matches.get_one::<NonZeroU64>(SECRET_COUNT_FLAG).cloned(),
-    topic_count: matches.get_one::<NonZeroU64>(TOPIC_COUNT_FLAG).cloned(),
+    kafka_acl_group_count: matches.get_one::<i64>(KAFKA_ACL_GROUP_COUNT_OPTION).cloned(),
+    mem: matches.get_one::<NonZeroU64>(MEM_OPTION).cloned(),
+    partition_count: matches.get_one::<NonZeroU64>(PARTITION_COUNT_OPTION).cloned(),
+    producer_rate: matches.get_one::<i64>(PRODUCER_RATE_OPTION).cloned(),
+    request_rate: matches.get_one::<NonZeroU64>(REQUEST_RATE_OPTION).cloned(),
+    secret_count: matches.get_one::<NonZeroU64>(SECRET_COUNT_OPTION).cloned(),
+    topic_count: matches.get_one::<NonZeroU64>(TOPIC_COUNT_OPTION).cloned(),
   })
 }
 
@@ -607,39 +644,21 @@ impl Label for TenantLabel {
 impl SubjectFormatter<TenantLabel> for TenantLimits {
   fn value(&self, label: &TenantLabel, target_id: &str) -> Value {
     match label {
-      TenantLabel::CertificateCount => Value::option(self.certificate_count),
-      TenantLabel::ConsumerRate => Value::option(self.consumer_rate),
-      TenantLabel::Cpu => Value::option(self.cpu),
-      TenantLabel::KafkaAclGroupCount => Value::option(self.kafka_acl_group_count),
-      TenantLabel::Mem => Value::option(self.mem),
-      TenantLabel::PartitionCount => Value::option(self.partition_count),
-      TenantLabel::ProducerRate => Value::option(self.producer_rate),
-      TenantLabel::RequestRate => Value::option(self.request_rate),
-      TenantLabel::SecretCount => Value::option(self.secret_count),
+      TenantLabel::CertificateCount => Value::some_or_hide(self.certificate_count),
+      TenantLabel::ConsumerRate => Value::some_or_hide(self.consumer_rate),
+      TenantLabel::Cpu => Value::some_or_hide(self.cpu),
+      TenantLabel::KafkaAclGroupCount => Value::some_or_hide(self.kafka_acl_group_count),
+      TenantLabel::Mem => Value::some_or_hide(self.mem),
+      TenantLabel::PartitionCount => Value::some_or_hide(self.partition_count),
+      TenantLabel::ProducerRate => Value::some_or_hide(self.producer_rate),
+      TenantLabel::RequestRate => Value::some_or_hide(self.request_rate),
+      TenantLabel::SecretCount => Value::some_or_hide(self.secret_count),
       TenantLabel::Tenant => Value::target(target_id),
-      TenantLabel::TopicCount => Value::option(self.topic_count),
+      TenantLabel::TopicCount => Value::some_or_hide(self.topic_count),
       _ => unreachable!(),
     }
   }
 }
-
-static TENANT_LABELS: [TenantLabel; 15] = [
-  TenantLabel::Tenant,
-  TenantLabel::Manager,
-  TenantLabel::Monitoring,
-  TenantLabel::Tracing,
-  TenantLabel::Vpn,
-  TenantLabel::CertificateCount,
-  TenantLabel::ConsumerRate,
-  TenantLabel::Cpu,
-  TenantLabel::KafkaAclGroupCount,
-  TenantLabel::Mem,
-  TenantLabel::PartitionCount,
-  TenantLabel::ProducerRate,
-  TenantLabel::RequestRate,
-  TenantLabel::SecretCount,
-  TenantLabel::TopicCount,
-];
 
 impl SubjectFormatter<TenantLabel> for ManagedTenant {
   fn value(&self, label: &TenantLabel, _target_id: &str) -> Value {
@@ -710,7 +729,7 @@ impl SubjectFormatter<StreamAccessLabel> for (&ManagedStreamId, &str, bool, bool
           Value::plain("denied")
         }
       }
-      _ => Value::empty(),
+      _ => Value::not_applicable(),
     }
   }
 }
@@ -749,25 +768,6 @@ impl SubjectFormatter<StreamAccessLabel> for (ManagedStreamId, Stream, AccessRig
     }
   }
 }
-
-static STREAM_ACCESS_LABELS: [StreamAccessLabel; 6] = [
-  StreamAccessLabel::StreamId,
-  StreamAccessLabel::StreamKind,
-  StreamAccessLabel::ReadAccess,
-  StreamAccessLabel::WriteAccess,
-  StreamAccessLabel::Partitions,
-  StreamAccessLabel::ReplicationFactor,
-];
-
-static LIST_STREAM_ACCESS_LABELS: [StreamAccessLabel; 7] = [
-  StreamAccessLabel::Tenant,
-  StreamAccessLabel::StreamId,
-  StreamAccessLabel::StreamKind,
-  StreamAccessLabel::ReadAccess,
-  StreamAccessLabel::WriteAccess,
-  StreamAccessLabel::Partitions,
-  StreamAccessLabel::ReplicationFactor,
-];
 
 fn service_enabled(managed_tenant: &ManagedTenant, name: ManagedTenantServicesName) -> String {
   managed_tenant

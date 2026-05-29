@@ -1,9 +1,12 @@
 #!/bin/bash
 
-export APP_NON_EXISTING=non_existing_app
+export ACLGROUP_UNDER_TEST=cli-test
+export ACLGROUP_NON_EXISTING=non-existing-aclgroup
+export APP_NON_EXISTING=non-existing-app
 export APP_UNDER_TEST=eavesdropper
-export BUCKET_UNDER_TEST=schema-registry
-export CERTIFICATE_UNDER_TEST=broker
+export BUCKET_NON_EXISTING=non-existing-bucket
+export BUCKET_UNDER_TEST=cli-test
+export CERTIFICATE_UNDER_TEST=cli-test-certificate
 export ENV_VALUE_UNDER_TEST=info
 export ENV_VALUE_UNDER_TEST_REGEX="dsh"
 export ENV_VAR_QUERY_UNDER_TEST=password
@@ -13,19 +16,22 @@ export IMAGE_UNDER_TEST_REGEX=registry
 export MANIFEST_UNDER_TEST=kpn/eavesdropper
 export MANIFEST_UNDER_TEST_VERSION=0.10.0
 export PLATFORM_UNDER_TEST=nplz
-export PROXY_UNDER_TEST=broker
+export PROXY_NON_EXISTING=non-existing-proxy
+export PROXY_UNDER_TEST=cli-test
 export SECRET_NON_EXISTING=non-existing-secret
-export SECRET_NAME_UNDER_TEST=broker-ca-cert
+export SECRET_NAME_UNDER_TEST=cli-test
 export SYSTEM_SECRET_ID_UNDER_TEST="\!rest-api-client"
 export SYSTEM_SECRET_NAME_UNDER_TEST=system/rest-api-client
+export SERVICE_NON_EXISTING=non-existing-service
 export SERVICE_UNDER_TEST=keyring-dev
+export SERVICE_TASK_UNDER_TEST=58b9fc6c48-z9t46-00000000
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
-export TOPIC_UNDER_TEST=reference-implementation-avro
+export TOPIC_UNDER_TEST=cli-test
 export VENDOR_UNDER_TEST=kpn
 export VHOST_UNDER_TEST=greenbox-dev
 export VOLUME_NON_EXISTING=non-existing-volume
-export VOLUME_UNDER_TEST=github-action-runner-home
+export VOLUME_UNDER_TEST=cli-test
 
 export SAFE_COMMANDS=(
   "--env-vars"
@@ -34,7 +40,19 @@ export SAFE_COMMANDS=(
   "-h"
   "--help"
   "--version"
+  "--releases"
   #  "--generate-autocomplete-file zsh"
+
+  "aclgroup create $ACLGROUP_NON_EXISTING --force --dry-run"
+  "aclgroup create $ACLGROUP_NON_EXISTING --force --dry-run"
+  "aclgroup delete $ACLGROUP_UNDER_TEST --force --dry-run"
+  "aclgroup grant $ACLGROUP_UNDER_TEST --force --read-topic $TOPIC_UNDER_TEST --write-topic $TOPIC_UNDER_TEST --dry-run"
+  "aclgroup list"
+  "aclgroup l"
+  "aclgroup show $ACLGROUP_UNDER_TEST"
+  "aclgroup s $ACLGROUP_UNDER_TEST"
+  "aclgroup revoke $ACLGROUP_UNDER_TEST --force --read-topic $TOPIC_UNDER_TEST --write-topic $TOPIC_UNDER_TEST --dry-run"
+  "aclgroups"
 
   "api delete secret-configuration $SECRET_NAME_UNDER_TEST --force --dry-run"
   "api get secret $SECRET_NAME_UNDER_TEST"
@@ -46,28 +64,47 @@ export SAFE_COMMANDS=(
   "app explain $MANIFEST_UNDER_TEST"
   "app explain $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "app list"
+  "app l"
   "app list --ids"
   "app list --output-format table-no-border"
   "app show $APP_UNDER_TEST"
   "app show $APP_UNDER_TEST --output-format table-no-border"
   "app undeploy $APP_UNDER_TEST --force --dry-run"
+  "apps"
 
+  "bucket create $BUCKET_NON_EXISTING --dry-run"
+  "bucket c $BUCKET_NON_EXISTING --dry-run"
+  "bucket delete $BUCKET_UNDER_TEST --force --dry-run"
+  "bucket d $BUCKET_UNDER_TEST --force --dry-run"
   "bucket list"
+  "bucket l"
   "bucket list --ids"
   "bucket show $BUCKET_UNDER_TEST"
+  "bucket s $BUCKET_UNDER_TEST"
+  "buckets"
+  "bs"
 
+  "certificate delete $CERTIFICATE_UNDER_TEST --force --dry-run"
+  "certificate d $CERTIFICATE_UNDER_TEST --force --dry-run"
   "certificate list"
+  "certificate l"
+  "certificate list --expiration 200"
   "certificate list --configuration"
   "certificate list --errors"
   "certificate list --ids"
   "certificate list --issues"
   "certificate list --status"
   "certificate list --usage"
+  "certificate show $CERTIFICATE_UNDER_TEST"
+  "certificate s $CERTIFICATE_UNDER_TEST"
   "certificate show $CERTIFICATE_UNDER_TEST --status"
   "certificate show $CERTIFICATE_UNDER_TEST --usage"
-  "certificate show $CERTIFICATE_UNDER_TEST"
+  "certificate show $CERTIFICATE_UNDER_TEST --expiration 200"
+  "certificates"
+  "cs"
 
   "env find $ENV_VALUE_UNDER_TEST"
+  "env f $ENV_VALUE_UNDER_TEST"
   "env find $ENV_VALUE_UNDER_TEST --started"
   "env find $ENV_VALUE_UNDER_TEST --stopped"
   "env find $ENV_VALUE_UNDER_TEST_REGEX --regex"
@@ -80,37 +117,50 @@ export SAFE_COMMANDS=(
   "image find $IMAGE_UNDER_TEST --started"
   "image find $IMAGE_UNDER_TEST --stopped"
   "image find $IMAGE_UNDER_TEST"
+  "image f $IMAGE_UNDER_TEST"
   "image find $IMAGE_UNDER_TEST_REGEX --regex --started"
   "image find $IMAGE_UNDER_TEST_REGEX --regex --stopped"
   "image find $IMAGE_UNDER_TEST_REGEX --regex"
   "image list --started"
   "image list --stopped"
   "image list"
+  "image l"
+  "images"
+  "is"
 
   "manifest explain $MANIFEST_UNDER_TEST"
   "manifest explain $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "manifest export $MANIFEST_UNDER_TEST"
   "manifest export $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "manifest list"
+  "manifest l"
   "manifest list --all-versions"
   "manifest list --ids"
   "manifest show $MANIFEST_UNDER_TEST"
+  "manifest s $MANIFEST_UNDER_TEST"
   "manifest show $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION"
   "manifest show $MANIFEST_UNDER_TEST --complete"
   "manifest show $MANIFEST_UNDER_TEST $MANIFEST_UNDER_TEST_VERSION --complete"
+  "manifests"
 
   "metric list --started"
   "metric list --stopped"
   "metric list"
+  "metrics"
+
+  "nodepool list"
+  "nodepool l"
 
   "platform export"
   "platform list"
+  "platform l"
   "platform open app $APP_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open app $APP_UNDER_TEST --dry-run"
   "platform open console --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open console --dry-run"
   "platform open monitoring --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open monitoring --dry-run"
+  "platform open service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST --dry-run"
   "platform open service $SERVICE_UNDER_TEST --dry-run"
   "platform open swagger --platform $PLATFORM_UNDER_TEST --dry-run"
@@ -129,24 +179,53 @@ export SAFE_COMMANDS=(
   "platform show --vhost $VHOST_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST"
   "platform show"
+  "platforms"
+  "ps"
 
+  "proxy code $PROXY_UNDER_TEST python --force --dry-run"
+  "proxy code $PROXY_UNDER_TEST rust --force --dry-run"
+  "proxy create $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
+  "proxy c $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
+  "proxy delete $PROXY_UNDER_TEST --force --dry-run"
+  "proxy d $PROXY_UNDER_TEST --force --dry-run"
+  "proxy list --bundle"
   "proxy list --ids"
   "proxy list"
+  "proxy show $PROXY_UNDER_TEST --expiration 200"
   "proxy show $PROXY_UNDER_TEST"
+  "proxy s $PROXY_UNDER_TEST"
+  "proxy show --bundle $PROXY_UNDER_TEST --expiration 200"
+  "proxy show --bundle $PROXY_UNDER_TEST"
+  "proxy undeploy $PROXY_UNDER_TEST --force --dry-run"
+  "proxys"
+
+  "robot copy $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST"
+  "robot import $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST --force"
+  "robot list"
+  "robot l"
+  "robot set $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST --dry-run --authentication sso < /dev/null"
+  "robot unset $PLATFORM_UNDER_TEST $TENANT_UNDER_TEST --force --dry-run"
+  "robots"
 
   "secret copy $SECRET_NAME_UNDER_TEST"
   "secret create $SECRET_NON_EXISTING --dry-run --authentication sso < /dev/null"
+  "secret c $SECRET_NON_EXISTING --dry-run --authentication sso < /dev/null"
   "secret delete $SECRET_NAME_UNDER_TEST --force --dry-run"
+  "secret d $SECRET_NAME_UNDER_TEST --force --dry-run"
   "secret list"
+  "secret l"
   "secret list --certificates"
+  "secret list --certificates --expiration 200"
   "secret list --errors"
   "secret list --ids"
   "secret list --issues"
+  "secret list --issues --expiration 200"
   "secret list --keys"
   "secret list --status"
   "secret list --system"
   "secret list --usage"
   "secret show $SECRET_NAME_UNDER_TEST"
+  "secret s $SECRET_NAME_UNDER_TEST"
   "secret show $SECRET_NAME_UNDER_TEST --status"
   "secret show $SECRET_NAME_UNDER_TEST --usage"
   "secret show $SECRET_NAME_UNDER_TEST --value > /dev/null"
@@ -162,36 +241,48 @@ export SAFE_COMMANDS=(
   "secret show broker-ca-key"
   "secret show kda-test"
   "secret update $SECRET_NAME_UNDER_TEST --dry-run --authentication sso < /dev/null"
+  "secrets"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
+  "service d $SERVICE_UNDER_TEST --force --dry-run"
+  "service export $SERVICE_UNDER_TEST"
   "service export $SERVICE_UNDER_TEST -o json"
   "service list --ids"
   "service list --started"
   "service list --status"
   "service list --stopped"
-  "service list --tasks"
   "service list"
+  "service l"
   "service restart $SERVICE_UNDER_TEST --force --dry-run"
   "service show $SERVICE_UNDER_TEST --status"
-  "service show $SERVICE_UNDER_TEST --tasks"
   "service show $SERVICE_UNDER_TEST"
+  "service s $SERVICE_UNDER_TEST"
   "service start $SERVICE_UNDER_TEST --force --dry-run"
   "service start $SERVICE_UNDER_TEST --force --instances 2 --dry-run"
   "service stop $SERVICE_UNDER_TEST --force --dry-run"
   "service update $SERVICE_UNDER_TEST --cpus 1 --instances 1 --mem 32 --force --dry-run"
+  "services"
+  "ss"
 
   "setting list"
+  "setting l"
+  "setting set no-escape --dry-run"
+  "setting unset no-escape --dry-run"
+  "settings"
 
-  "target list"
+  "task list $SERVICE_UNDER_TEST"
+  "task l $SERVICE_UNDER_TEST"
+  "task show $SERVICE_UNDER_TEST"
+  "task s $SERVICE_UNDER_TEST"
+  "task show $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
 
   "token copy --dry-run"
   "token fetch"
   "token show"
+  "token s"
   "token show --output-format json"
   "token show --output-format json-compact"
   "token show --complete"
-  "token show --complete --output-format json"
-  "token show --complete --output-format json-compact"
 
   "topic create $TOPIC_NON_EXISTING --dry-run"
   "topic create $TOPIC_NON_EXISTING --cleanup-policy compact --dry-run"
@@ -203,29 +294,41 @@ export SAFE_COMMANDS=(
   "topic create $TOPIC_NON_EXISTING --retention-bytes 1000 --dry-run"
   "topic create $TOPIC_NON_EXISTING --retention-ms 3600000 --dry-run"
   "topic create $TOPIC_NON_EXISTING --segment-bytes 52428800 --dry-run"
+  "topic delete $TOPIC_UNDER_TEST --force --dry-run"
+  "topic d $TOPIC_UNDER_TEST --force --dry-run"
   "topic list --ids"
   "topic list --status"
   "topic list --usage"
   "topic list"
+  "topic l"
   "topic show $TOPIC_UNDER_TEST --properties"
   "topic show $TOPIC_UNDER_TEST --status"
   "topic show $TOPIC_UNDER_TEST --usage"
   "topic show $TOPIC_UNDER_TEST"
+  "topic s $TOPIC_UNDER_TEST"
+  "topics"
+  "ts"
 
   "vhost list"
+  "vhost l"
   "vhost list --started"
   "vhost list --stopped"
   "vhost list --started --stopped"
   "vhost list --usage"
+  "vhosts"
+  "vs"
 
   "volume create $VOLUME_NON_EXISTING --size 2 --dry-run"
   "volume delete $VOLUME_UNDER_TEST --force --dry-run"
+  "volume d $VOLUME_UNDER_TEST --force --dry-run"
   "volume list --configuration"
   "volume list --ids"
   "volume list --status"
   "volume list --usage"
   "volume list"
+  "volume l"
   "volume show $VOLUME_UNDER_TEST --status"
   "volume show $VOLUME_UNDER_TEST --usage"
   "volume show $VOLUME_UNDER_TEST"
+  "volumes"
 )

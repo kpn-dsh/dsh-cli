@@ -15,6 +15,15 @@ pub(crate) mod value;
 
 pub(crate) use value::Value;
 
+#[derive(Default)]
+pub(crate) enum ColumnAlignment {
+  _Center,
+  #[default]
+  Default,
+  _Left,
+  Right,
+}
+
 /// # Defines behavior of labels
 ///
 /// Adds capabilities to a type that defines its behavior as a label.
@@ -56,11 +65,22 @@ pub(crate) trait Label: Eq + Hash + PartialEq + Serialize {
   /// If a target label does not make sense or is undefined for the label type,
   /// `false` must be returned.
   ///
-  /// # Returns
+  /// ## Returns
   /// * `false` - target label does not make sense or is not defined for this `Label` type
   /// * `true` - if `self` is the target label for this label type.
   ///   Only one value can return `true`.
   fn is_target_label(&self) -> bool;
+
+  /// # Indicates how a column for this label should be aligned
+  ///
+  /// The default implementation returns `ColumnAlignment::Default`, which results in columns
+  /// to be left aligned by default. This function is only relevant for a `ListFormatter`.
+  ///
+  /// ## Returns
+  /// * `ColumnAlignment` - Column alignment.
+  fn column_alignment(&self) -> ColumnAlignment {
+    ColumnAlignment::default()
+  }
 }
 
 /// # Defines how a data type will be formatted
@@ -129,7 +149,7 @@ where
     if label.is_target_label() {
       Value::target(target_id)
     } else {
-      Value::option(self.get(label))
+      Value::some_or_empty(self.get(label))
     }
   }
 }
@@ -356,7 +376,7 @@ pub(crate) fn vec_to_table<K: AsRef<str>, V: AsRef<str>>(rows: &[(K, Vec<V>)]) -
 /// formatted as a string representing the number of seconds since unix epoch. If the value is
 /// out of range an error string will be returned.
 ///
-/// # Parameters
+/// ## Parameters
 /// `timestamp` - Timestamp in seconds since unix epoch.
 pub(crate) fn timestamp_to_string(timestamp: i64) -> String {
   match DateTime::from_timestamp_secs(timestamp) {

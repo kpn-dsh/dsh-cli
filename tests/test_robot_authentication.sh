@@ -1,22 +1,22 @@
 #!/bin/bash
 set -e
 
-# This script will test various methods for getting the target platform, tenant and password.
+# This script will test various methods for getting the target platform, tenant and password for robot authentication.
 
 PUT=np-aws-lz-dsh
 TUT=greenbox-dev
-PFUT="../$PUT.$TUT.pwd"
-DUT=.dsh_cli_under_test
+PFUT="$(dirname "$0")/$PUT.$TUT.pwd"
+DUT="$(dirname "$0")/.dsh_cli_under_test"
 
 # For this test to run the following is expected:
 #
 # * Tenant $TUT exists at platform $PUT
-# * Password file $PFUT exists and contains the password for tenant $TUT at platform $PUT
-# * You will be asked to enter your keychain password (use "Always Allow" or you'll have to provide it multiple times)
+# * Password file $PFUT exists in the tests directory and contains the robot password for tenant $TUT at platform $PUT
+# * You will be asked to enter your keyring password (use "Always Allow" or you'll have to provide it multiple times)
 
 PUT_NA=prod-azure-dsh
 TUT_NE=nope
-PFUT_NAE="../$PUT_NA.nope.pwd"
+PFUT_NAE="$(dirname "$0")/$PUT_NA.nope.pwd"
 PWUT_NE=nope
 
 export DSH_CLI_OUTPUT_FORMAT=quiet
@@ -45,17 +45,15 @@ function set_default_tenant {
   echo "default-tenant = \"$1\"" >> "$DUT/settings.toml"
 }
 
-function create_target {
-  dsh --suppress-exit-status target create "$1" "$2" < "../$1.$2.pwd"
-}
-
 echo "target platform from argument"
 set_environment
 set_default_platform $PUT_NA
 export DSH_CLI_PLATFORM=$PUT_NA
 dsh service list --platform $PUT --tenant $TUT --password-file $PFUT
 export DSH_CLI_HOME=
-dsh service list --platform $PUT --tenant $TUT --password-file $PFUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --tenant $TUT --password-file $PFUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "target platform from environment variable"
 set_environment
@@ -63,12 +61,16 @@ set_default_platform $PUT_NA
 export DSH_CLI_PLATFORM=$PUT
 dsh service list --tenant $TUT --password-file $PFUT
 export DSH_CLI_HOME=
-dsh service list --tenant $TUT --password-file $PFUT
+CMD=$(echo "dsh service list --authentication robot --tenant $TUT --password-file $PFUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "target platform from settings"
 set_environment
 set_default_platform $PUT
-dsh service list --tenant $TUT --password-file $PFUT
+CMD=$(echo "dsh service list --authentication robot --tenant $TUT --password-file $PFUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "target tenant from argument"
 set_environment
@@ -76,7 +78,9 @@ set_default_tenant $TUT_NE
 export DSH_CLI_TENANT=$TUT_NE
 dsh service list --platform $PUT --tenant $TUT --password-file $PFUT
 export DSH_CLI_HOME=
-dsh service list --platform $PUT --tenant $TUT --password-file $PFUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --tenant $TUT --password-file $PFUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "target tenant from environment variable"
 set_environment
@@ -84,41 +88,48 @@ set_default_tenant $TUT_NE
 export DSH_CLI_TENANT=$TUT
 dsh service list --platform $PUT --password-file $PFUT
 export DSH_CLI_HOME=
-dsh service list --platform $PUT --password-file $PFUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --password-file $PFUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "target tenant from settings"
 set_environment
 set_default_tenant $TUT
-dsh service list --platform $PUT --password-file $PFUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --password-file $PFUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "password from password file argument"
 set_environment
 export DSH_CLI_PASSWORD=$PWUT_NE
 export DSH_CLI_PASSWORD_FILE=$PFUT_NAE
-create_target $PUT $TUT $PFUT_NAE
-dsh service list --platform $PUT --tenant $TUT --password-file $PFUT
 export DSH_CLI_HOME=
-dsh service list --platform $PUT --tenant $TUT --password-file $PFUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --tenant $TUT --password-file $PFUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "password from password file environment variable"
 set_environment
 export DSH_CLI_PASSWORD=$PWUT_NE
 export DSH_CLI_PASSWORD_FILE=$PFUT
-create_target $PUT $TUT $PFUT_NAE
 dsh service list --platform $PUT --tenant $TUT
 export DSH_CLI_HOME=
-dsh service list --platform $PUT --tenant $TUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --tenant $TUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "password from password environment variable"
 set_environment
 PASSWORD="$(cat $PFUT)"
 export DSH_CLI_PASSWORD=$PASSWORD
-create_target $PUT $TUT $PFUT_NAE
 dsh service list --platform $PUT --tenant $TUT
 export DSH_CLI_HOME=
-dsh service list --platform $PUT --tenant $TUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --tenant $TUT" | envsubst)
+echo "$CMD"
+eval "$CMD"
 
 echo "password from keyring"
 set_environment
-create_target $PUT $TUT $PFUT
-dsh service list --platform $PUT --tenant $TUT
+CMD=$(echo "dsh service list --authentication robot --platform $PUT --tenant $TUT" | envsubst)
+echo "$CMD"
+eval "$CMD"

@@ -119,7 +119,7 @@ impl CommandExecutor for TokenFetch {
     let start_instant = context.now();
     let raw_token = client.raw_token().await.map_err(error_map!("could not retrieve token: {}"))?;
     context.print_execution_time(start_instant);
-    context.print(raw_token);
+    context.println(raw_token);
     Ok(())
   }
 
@@ -127,6 +127,45 @@ impl CommandExecutor for TokenFetch {
     Requirements::standard_with_api()
   }
 }
+
+static TOKEN_HEADER_LABELS_LIST: [TokenLabel; 3] = [TokenLabel::HeaderTyp, TokenLabel::HeaderAlg, TokenLabel::HeaderKid];
+static TOKEN_PAYLOAD_LABELS_LIST_DSH: [TokenLabel; 17] = [
+  TokenLabel::DshAuthenticatedTenants,
+  TokenLabel::DshAuthenticationTime,
+  TokenLabel::DshAuthorizedParty,
+  TokenLabel::DshClientAddress,
+  TokenLabel::DshClientHost,
+  TokenLabel::DshClientId,
+  TokenLabel::DshEmail,
+  TokenLabel::DshEmailVerified,
+  TokenLabel::DshExpiresIn,
+  TokenLabel::DshFamilyName,
+  TokenLabel::DshGivenName,
+  TokenLabel::DshName,
+  TokenLabel::DshPermissions,
+  TokenLabel::DshPreferredUsername,
+  TokenLabel::DshScope,
+  TokenLabel::DshSessionId,
+  TokenLabel::DshTokenType,
+];
+static TOKEN_PAYLOAD_LABELS_LIST_RFC7519: [TokenLabel; 7] =
+  [TokenLabel::Rfc7519Aud, TokenLabel::Rfc7519Exp, TokenLabel::Rfc7519Iat, TokenLabel::Rfc7519Iss, TokenLabel::Rfc7519Jti, TokenLabel::Rfc7519Nbf, TokenLabel::Rfc7519Sub];
+static TOKEN_PAYLOAD_LABELS_LIST_CONCISE: [TokenLabel; 14] = [
+  TokenLabel::Rfc7519Aud,
+  TokenLabel::Rfc7519Exp,
+  TokenLabel::Rfc7519Iat,
+  TokenLabel::Rfc7519Iss,
+  TokenLabel::Rfc7519Jti,
+  TokenLabel::Rfc7519Nbf,
+  TokenLabel::Rfc7519Sub,
+  TokenLabel::DshClientId,
+  TokenLabel::DshAuthenticatedTenants,
+  TokenLabel::DshAuthenticationTime,
+  TokenLabel::DshAuthorizedParty,
+  TokenLabel::DshExpiresIn,
+  TokenLabel::DshScope,
+  TokenLabel::DshTokenType,
+];
 
 struct TokenShow {}
 
@@ -303,7 +342,7 @@ impl SubjectFormatter<TokenLabel> for DshJwtHeader {
   fn value(&self, label: &TokenLabel, _: &str) -> FormatterValue {
     match label {
       TokenLabel::HeaderAlg => Value::plain(&self.algorithm),
-      TokenLabel::HeaderKid => Value::option(self.kid.as_ref()),
+      TokenLabel::HeaderKid => Value::some_or_hide(self.kid.as_ref()),
       TokenLabel::HeaderTyp => Value::plain(&self.typ),
       _ => Value::not_applicable(),
     }
@@ -313,73 +352,31 @@ impl SubjectFormatter<TokenLabel> for DshJwtHeader {
 impl SubjectFormatter<TokenLabel> for DshJwtPayload {
   fn value(&self, label: &TokenLabel, _: &str) -> FormatterValue {
     match label {
-      TokenLabel::DshAuthenticatedTenants => Value::option(self.authenticated_tenants().ok().map(|tenants| tenants.join(", "))),
+      TokenLabel::DshAuthenticatedTenants => Value::some_or_hide(self.authenticated_tenants().ok().map(|tenants| tenants.join(", "))),
       TokenLabel::DshAuthenticationTime => self.authentication_time.map(Value::timestamp_seconds).unwrap_or_default(),
-      TokenLabel::DshAuthorizedParty => Value::option(self.authorized_party.as_ref()),
-      TokenLabel::DshClientAddress => Value::option(self.client_address.as_ref()),
-      TokenLabel::DshClientHost => Value::option(self.client_host.as_ref()),
-      TokenLabel::DshClientId => Value::option(self.client_id.as_ref()),
-      TokenLabel::DshEmail => Value::option(self.email.as_ref()),
-      TokenLabel::DshEmailVerified => Value::option(self.email_verified.map(|verified| verified.to_string())),
-      TokenLabel::DshExpiresIn => Value::option(self.expires_in()),
-      TokenLabel::DshFamilyName => Value::option(self.family_name.as_ref()),
-      TokenLabel::DshGivenName => Value::option(self.given_name.as_ref()),
-      TokenLabel::DshName => Value::option(self.name.as_ref()),
-      TokenLabel::DshPermissions => Value::option(self.dsh_permission_representations.as_ref().map(|permissions| permissions.iter().join("\n"))),
-      TokenLabel::DshPreferredUsername => Value::option(self.preferred_username.as_ref()),
-      TokenLabel::DshScope => Value::option(self.scope.as_ref()),
-      TokenLabel::DshSessionId => Value::option(self.session_id.as_ref()),
-      TokenLabel::DshTokenType => Value::option(self.token_type.as_ref()),
-      TokenLabel::Rfc7519Aud => Value::option(self.audience.as_ref()),
+      TokenLabel::DshAuthorizedParty => Value::some_or_hide(self.authorized_party.as_ref()),
+      TokenLabel::DshClientAddress => Value::some_or_hide(self.client_address.as_ref()),
+      TokenLabel::DshClientHost => Value::some_or_hide(self.client_host.as_ref()),
+      TokenLabel::DshClientId => Value::some_or_hide(self.client_id.as_ref()),
+      TokenLabel::DshEmail => Value::some_or_hide(self.email.as_ref()),
+      TokenLabel::DshEmailVerified => Value::some_or_hide(self.email_verified.map(|verified| verified.to_string())),
+      TokenLabel::DshExpiresIn => Value::some_or_hide(self.expires_in()),
+      TokenLabel::DshFamilyName => Value::some_or_hide(self.family_name.as_ref()),
+      TokenLabel::DshGivenName => Value::some_or_hide(self.given_name.as_ref()),
+      TokenLabel::DshName => Value::some_or_hide(self.name.as_ref()),
+      TokenLabel::DshPermissions => Value::some_or_hide(self.dsh_permission_representations.as_ref().map(|permissions| permissions.iter().join("\n"))),
+      TokenLabel::DshPreferredUsername => Value::some_or_hide(self.preferred_username.as_ref()),
+      TokenLabel::DshScope => Value::some_or_hide(self.scope.as_ref()),
+      TokenLabel::DshSessionId => Value::some_or_hide(self.session_id.as_ref()),
+      TokenLabel::DshTokenType => Value::some_or_hide(self.token_type.as_ref()),
+      TokenLabel::Rfc7519Aud => Value::some_or_hide(self.audience.as_ref()),
       TokenLabel::Rfc7519Exp => self.expiration_time.map(Value::timestamp_seconds).unwrap_or_default(),
       TokenLabel::Rfc7519Iat => self.issued_at.map(Value::timestamp_seconds).unwrap_or_default(),
-      TokenLabel::Rfc7519Iss => Value::option(self.issuer.as_ref()),
-      TokenLabel::Rfc7519Jti => Value::option(self.jwt_id.as_ref()),
+      TokenLabel::Rfc7519Iss => Value::some_or_hide(self.issuer.as_ref()),
+      TokenLabel::Rfc7519Jti => Value::some_or_hide(self.jwt_id.as_ref()),
       TokenLabel::Rfc7519Nbf => self.not_before.map(Value::timestamp_seconds_not_before).unwrap_or_default(),
-      TokenLabel::Rfc7519Sub => Value::option(self.subject.as_ref()),
+      TokenLabel::Rfc7519Sub => Value::some_or_hide(self.subject.as_ref()),
       _ => Value::not_applicable(),
     }
   }
 }
-
-static TOKEN_HEADER_LABELS_LIST: [TokenLabel; 3] = [TokenLabel::HeaderTyp, TokenLabel::HeaderAlg, TokenLabel::HeaderKid];
-
-static TOKEN_PAYLOAD_LABELS_LIST_DSH: [TokenLabel; 17] = [
-  TokenLabel::DshAuthenticatedTenants,
-  TokenLabel::DshAuthenticationTime,
-  TokenLabel::DshAuthorizedParty,
-  TokenLabel::DshClientAddress,
-  TokenLabel::DshClientHost,
-  TokenLabel::DshClientId,
-  TokenLabel::DshEmail,
-  TokenLabel::DshEmailVerified,
-  TokenLabel::DshExpiresIn,
-  TokenLabel::DshFamilyName,
-  TokenLabel::DshGivenName,
-  TokenLabel::DshName,
-  TokenLabel::DshPermissions,
-  TokenLabel::DshPreferredUsername,
-  TokenLabel::DshScope,
-  TokenLabel::DshSessionId,
-  TokenLabel::DshTokenType,
-];
-
-static TOKEN_PAYLOAD_LABELS_LIST_RFC7519: [TokenLabel; 7] =
-  [TokenLabel::Rfc7519Aud, TokenLabel::Rfc7519Exp, TokenLabel::Rfc7519Iat, TokenLabel::Rfc7519Iss, TokenLabel::Rfc7519Jti, TokenLabel::Rfc7519Nbf, TokenLabel::Rfc7519Sub];
-
-static TOKEN_PAYLOAD_LABELS_LIST_CONCISE: [TokenLabel; 14] = [
-  TokenLabel::Rfc7519Aud,
-  TokenLabel::Rfc7519Exp,
-  TokenLabel::Rfc7519Iat,
-  TokenLabel::Rfc7519Iss,
-  TokenLabel::Rfc7519Jti,
-  TokenLabel::Rfc7519Nbf,
-  TokenLabel::Rfc7519Sub,
-  TokenLabel::DshClientId,
-  TokenLabel::DshAuthenticatedTenants,
-  TokenLabel::DshAuthenticationTime,
-  TokenLabel::DshAuthorizedParty,
-  TokenLabel::DshExpiresIn,
-  TokenLabel::DshScope,
-  TokenLabel::DshTokenType,
-];

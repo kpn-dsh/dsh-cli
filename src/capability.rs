@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 
+pub(crate) const CODE_COMMAND: &str = "code";
 pub(crate) const COPY_COMMAND: &str = "copy";
 pub(crate) const CREATE_COMMAND: &str = "create";
 pub(crate) const CREATE_COMMAND_ALIAS: &str = "c";
@@ -12,6 +13,7 @@ pub(crate) const DEFAULT_COMMAND: &str = "default";
 pub(crate) const DEFAULT_COMMAND_ALIAS: &str = "d";
 pub(crate) const DEPLOY_COMMAND: &str = "deploy";
 pub(crate) const DELETE_COMMAND: &str = "delete";
+pub(crate) const DELETE_COMMAND_ALIAS: &str = "d";
 pub(crate) const DUPLICATE_COMMAND: &str = "duplicate";
 pub(crate) const EDIT_COMMAND: &str = "edit";
 pub(crate) const EXPLAIN_COMMAND: &str = "explain";
@@ -19,14 +21,13 @@ pub(crate) const EXPORT_COMMAND: &str = "export";
 pub(crate) const FETCH_COMMAND: &str = "fetch";
 pub(crate) const FIND_COMMAND: &str = "find";
 pub(crate) const FIND_COMMAND_ALIAS: &str = "f";
-#[cfg(feature = "manage")]
 pub(crate) const GRANT_COMMAND: &str = "grant";
+pub(crate) const IMPORT_COMMAND: &str = "import";
 pub(crate) const LIST_COMMAND: &str = "list";
 pub(crate) const LIST_COMMAND_ALIAS: &str = "l";
 pub(crate) const OPEN_COMMAND: &str = "open";
 pub(crate) const OPEN_COMMAND_ALIAS: &str = "o";
 pub(crate) const RESTART_COMMAND: &str = "restart";
-#[cfg(feature = "manage")]
 pub(crate) const REVOKE_COMMAND: &str = "revoke";
 pub(crate) const SET_COMMAND: &str = "set";
 pub(crate) const SHOW_COMMAND: &str = "show";
@@ -61,6 +62,14 @@ pub(crate) trait Capability {
   async fn execute_capability_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()>;
 }
 
+/// Execute command with client
+///
+/// ## Parameters
+/// * `argument`
+/// * `sub_argument`
+/// * `matches`
+/// * `dsh_api_client`
+/// * `context`
 #[async_trait]
 pub(crate) trait CommandExecutor {
   #[allow(unused_variables)]
@@ -75,6 +84,13 @@ pub(crate) trait CommandExecutor {
     unreachable!()
   }
 
+  /// Execute command without client
+  ///
+  /// ## Parameters
+  /// * `argument`
+  /// * `sub_argument`
+  /// * `matches`
+  /// * `context`
   #[allow(unused_variables)]
   async fn execute_without_client(&self, argument: Option<String>, sub_argument: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     unreachable!()

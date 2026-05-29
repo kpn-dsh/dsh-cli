@@ -1,8 +1,8 @@
 use crate::argument_parsers::RangedValueParser;
 use crate::arguments::service_id_argument;
 use crate::capability::{
-  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS,
-  OPEN_COMMAND, OPEN_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
+  Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, DUPLICATE_COMMAND, EDIT_COMMAND, EXPORT_COMMAND, LIST_COMMAND,
+  LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, RESTART_COMMAND, SHOW_COMMAND, SHOW_COMMAND_ALIAS, START_COMMAND, STOP_COMMAND, UPDATE_COMMAND,
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -12,18 +12,17 @@ use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
-use crate::formatters::{hashmap_to_table, Label, SubjectFormatter};
+use crate::formatters::{hashmap_to_table, ColumnAlignment, Label, SubjectFormatter};
 use crate::formatters::{OutputFormat, Value};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::DEFAULT_ALLOCATION_STATUS_LABELS;
-use crate::{edit_configuration, err, get_target_platform, get_target_tenant, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
+use crate::target_tenant::get_target_tenant;
+use crate::{edit_configuration, err, get_target_platform, include_started_stopped, read_single_line, DshCliResult, COMMAND_OPTIONS_HEADING};
 use async_trait::async_trait;
-use chrono::DateTime;
 use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::parse::ImageString;
 use dsh_api::types::{Application, ApplicationSecret, TaskState};
-use dsh_api::types::{Task, TaskStatus};
 use dsh_api::vhost::VhostString;
 use futures::future::try_join_all;
 use futures::join;
@@ -50,7 +49,7 @@ lazy_static! {
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
-    CapabilityBuilder::new(DELETE_COMMAND, None, &ServiceDelete {}, "Delete service")
+    CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &ServiceDelete {}, "Delete service")
       .set_long_about("Deletes a service from the DSH platform.")
       .add_target_argument(service_id_argument().required(true))
   );
@@ -80,7 +79,6 @@ lazy_static! {
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &ServiceListAllocationStatus {}, None),
         (FlagType::Ids, &ServiceListIds {}, None),
-        (FlagType::Tasks, &ServiceListTasks {}, None),
       ])
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("List all started services.".to_string())),
@@ -100,17 +98,14 @@ lazy_static! {
   static ref SERVICE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ServiceShow {}, "Show service configuration")
       .set_long_about("Show the configuration of a DSH service.")
-      .add_command_executors(vec![
-        (FlagType::AllocationStatus, &ServiceShowAllocationStatus {}, None),
-        (FlagType::Tasks, &ServiceShowTasks {}, None),
-      ])
+      .add_command_executors(vec![(FlagType::AllocationStatus, &ServiceShowAllocationStatus {}, None),])
       .add_target_argument(service_id_argument().required(true))
   );
   static ref SERVICE_START_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(START_COMMAND, None, &ServiceStart {}, "Start service")
       .set_long_about("Start a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(instances_flag().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(instances_option().help_heading(COMMAND_OPTIONS_HEADING))
   );
   static ref SERVICE_STOP_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
     CapabilityBuilder::new(STOP_COMMAND, None, &ServiceStop {}, "Stop service")
@@ -121,9 +116,9 @@ lazy_static! {
     CapabilityBuilder::new(UPDATE_COMMAND, None, &ServiceUpdate {}, "Update service")
       .set_long_about("Update a DSH service.")
       .add_target_argument(service_id_argument().required(true))
-      .add_extra_argument(cpus_flag().help_heading(COMMAND_OPTIONS_HEADING))
-      .add_extra_argument(instances_flag().help_heading(COMMAND_OPTIONS_HEADING))
-      .add_extra_argument(mem_flag().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(cpus_option().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(instances_option().help_heading(COMMAND_OPTIONS_HEADING))
+      .add_extra_argument(mem_option().help_heading(COMMAND_OPTIONS_HEADING))
   );
   static ref SERVICE_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> = vec![
     SERVICE_CREATE_CAPABILITY.as_ref(),
@@ -178,11 +173,11 @@ impl Subject for ServiceSubject {
   }
 }
 
-const CPUS_FLAG: &str = "cpus";
+pub(crate) const CPUS_OPTION: &str = "cpus";
 
-fn cpus_flag() -> Arg {
-  Arg::new(CPUS_FLAG)
-    .long(CPUS_FLAG)
+pub(crate) fn cpus_option() -> Arg {
+  Arg::new(CPUS_OPTION)
+    .long(CPUS_OPTION)
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<f64>::new(0.01, 16.0))
     .value_name("CPUS")
@@ -195,10 +190,10 @@ fn cpus_flag() -> Arg {
     )
 }
 
-const INSTANCES_FLAG: &str = "instances";
+pub(crate) const INSTANCES_OPTION: &str = "instances";
 
-fn instances_flag() -> Arg {
-  Arg::new(INSTANCES_FLAG)
+pub(crate) fn instances_option() -> Arg {
+  Arg::new(INSTANCES_OPTION)
     .long("instances")
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<u64>::with_lower(0))
@@ -210,11 +205,11 @@ fn instances_flag() -> Arg {
     )
 }
 
-const MEM_FLAG: &str = "mem";
+pub(crate) const MEM_OPTION: &str = "mem";
 
-fn mem_flag() -> Arg {
-  Arg::new(MEM_FLAG)
-    .long(MEM_FLAG)
+pub(crate) fn mem_option() -> Arg {
+  Arg::new(MEM_OPTION)
+    .long(MEM_OPTION)
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<u64>::new(1, 131072))
     .value_name("MEM")
@@ -390,6 +385,17 @@ impl CommandExecutor for ServiceExport {
   }
 }
 
+static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
+  ServiceLabel::Target,
+  ServiceLabel::NeedsToken,
+  ServiceLabel::Instances,
+  ServiceLabel::Cpus,
+  ServiceLabel::Mem,
+  ServiceLabel::ExposedPorts,
+  ServiceLabel::Metrics,
+  ServiceLabel::Image,
+];
+
 struct ServiceListAll {}
 
 #[async_trait]
@@ -452,43 +458,6 @@ impl CommandExecutor for ServiceListIds {
     let mut formatter = IdsFormatter::new("service id", context);
     formatter.push_target_ids(ids.as_slice());
     formatter.print(Some(OutputFormat::Plain))?;
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
-  }
-}
-
-struct ServiceListTasks {}
-
-#[async_trait]
-impl CommandExecutor for ServiceListTasks {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    fn tasks_to_string(tasks: Vec<String>) -> String {
-      if tasks.len() <= 4 {
-        tasks.iter().map(|t| t.to_string()).collect_vec().join(", ")
-      } else {
-        format!(
-          "{}, plus {} more",
-          tasks.iter().take(4).map(|t| t.to_string()).collect_vec().join(", "),
-          tasks.len() - 4,
-        )
-      }
-    }
-    context.print_explanation("list all services with their tasks");
-    let start_instant = context.now();
-    let services_with_tasks = client.get_task_ids().await?;
-    let tasks: Vec<Vec<String>> = try_join_all(services_with_tasks.iter().map(|service_id| client.get_task_appid_ids(service_id))).await?;
-    context.print_execution_time(start_instant);
-    let service_id_tasks_pairs: Vec<(String, String)> = services_with_tasks
-      .iter()
-      .zip(tasks)
-      .map(|(id, tasks)| (id.to_string(), tasks_to_string(tasks)))
-      .collect_vec();
-    let mut formatter: ListFormatter<ServiceLabel, (String, String)> = ListFormatter::new(&[ServiceLabel::Target, ServiceLabel::Tasks], context);
-    formatter.push_values(&service_id_tasks_pairs);
-    formatter.print_non_serializable(None)?;
     Ok(())
   }
 
@@ -563,6 +532,8 @@ impl CommandExecutor for ServiceRestart {
         let instances = configuration.instances;
         if instances == 0 {
           context.print_warning(format!("service '{}' not started", service_id));
+        } else if !configuration.volumes.is_empty() && !context.confirmed("volume content will not be preserved, do you want to continue?")? {
+          context.print_warning("cancelled, service not restarted");
         } else if context.dry_run() {
           context.print_warning("dry-run mode, service not restarted");
         } else {
@@ -616,6 +587,28 @@ impl CommandExecutor for ServiceRestart {
   }
 }
 
+pub(crate) static SERVICE_LABELS_SHOW: [ServiceLabel; 19] = [
+  ServiceLabel::Target,
+  ServiceLabel::NeedsToken,
+  ServiceLabel::Instances,
+  ServiceLabel::Cpus,
+  ServiceLabel::Mem,
+  ServiceLabel::ExposedPorts,
+  ServiceLabel::Volumes,
+  ServiceLabel::Metrics,
+  ServiceLabel::NodepoolFeatures,
+  ServiceLabel::Image,
+  ServiceLabel::HealthCheck,
+  ServiceLabel::ReadableStreams,
+  ServiceLabel::WritableStreams,
+  ServiceLabel::Secrets,
+  ServiceLabel::SingleInstance,
+  ServiceLabel::SpreadGroup,
+  ServiceLabel::Topics,
+  ServiceLabel::User,
+  ServiceLabel::Env,
+];
+
 struct ServiceShow {}
 
 #[async_trait]
@@ -653,43 +646,13 @@ impl CommandExecutor for ServiceShowAllocationStatus {
   }
 }
 
-struct ServiceShowTasks {}
-
-#[async_trait]
-impl CommandExecutor for ServiceShowTasks {
-  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    fn timestamp(task_status: &TaskStatus) -> i64 {
-      match task_status.actual {
-        None => 0,
-        Some(ref task) => task.staged_at.timestamp_millis(),
-      }
-    }
-    let service_id = target.unwrap_or_else(|| unreachable!());
-    context.print_explanation(format!("show all tasks for service '{}'", service_id));
-    let start_instant = context.now();
-    let task_ids = client.get_task_appid_ids(&service_id).await?;
-    let task_statuses = try_join_all(task_ids.iter().map(|task_id| client.get_task(&service_id, task_id))).await?;
-    context.print_execution_time(start_instant);
-    let mut tasks: Vec<(String, TaskStatus)> = task_ids.into_iter().zip(task_statuses).collect();
-    tasks.sort_by(|(_, task_a), (_, task_b)| timestamp(task_b).cmp(&timestamp(task_a)));
-    let mut formatter = ListFormatter::new(&TASK_LABELS_LIST, context);
-    formatter.push_target_id_value_pairs(tasks.as_slice());
-    formatter.print(None)?;
-    Ok(())
-  }
-
-  fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_with_api()
-  }
-}
-
 struct ServiceStart {}
 
 #[async_trait]
 impl CommandExecutor for ServiceStart {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    let instances: u64 = matches.get_one::<u64>(INSTANCES_FLAG).cloned().unwrap_or(1);
+    let instances: u64 = matches.get_one::<u64>(INSTANCES_OPTION).cloned().unwrap_or(1);
     if instances == 1 {
       context.print_explanation(format!("start service '{}'", service_id));
     } else {
@@ -761,7 +724,7 @@ struct ServiceUpdate {}
 impl CommandExecutor for ServiceUpdate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let service_id = target.unwrap_or_else(|| unreachable!());
-    let cpus: Option<f64> = match matches.get_one::<f64>(CPUS_FLAG).cloned() {
+    let cpus: Option<f64> = match matches.get_one::<f64>(CPUS_OPTION).cloned() {
       Some(cpus) => {
         if cpus >= 0.1 {
           Some(cpus)
@@ -771,8 +734,8 @@ impl CommandExecutor for ServiceUpdate {
       }
       None => None,
     };
-    let instances = matches.get_one::<u64>(INSTANCES_FLAG).cloned();
-    let mem = matches.get_one::<u64>(MEM_FLAG).cloned();
+    let instances = matches.get_one::<u64>(INSTANCES_OPTION).cloned();
+    let mem = matches.get_one::<u64>(MEM_OPTION).cloned();
     match client.get_application_configuration(&service_id).await {
       Ok(mut configuration) => {
         if cpus.is_some() || instances.is_some() || mem.is_some() {
@@ -844,7 +807,6 @@ pub(crate) enum ServiceLabel {
   SingleInstance,
   SpreadGroup,
   Target,
-  Tasks,
   Topics,
   User,
   Volumes,
@@ -869,7 +831,6 @@ impl Label for ServiceLabel {
       Self::Secrets => "secrets",
       Self::SingleInstance => "single instance",
       Self::SpreadGroup => "spread group",
-      Self::Tasks => "tasks",
       Self::Topics => "topics",
       Self::User => "user",
       Self::Volumes => "volumes",
@@ -894,7 +855,6 @@ impl Label for ServiceLabel {
       Self::SingleInstance => "single",
       Self::SpreadGroup => "spread group",
       Self::Target => "service id",
-      Self::Tasks => "tasks",
       Self::Topics => "topics",
       Self::User => "user",
       Self::Volumes => "volumes",
@@ -905,6 +865,13 @@ impl Label for ServiceLabel {
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Target)
   }
+
+  fn column_alignment(&self) -> ColumnAlignment {
+    match self {
+      Self::Mem => ColumnAlignment::Right,
+      _ => ColumnAlignment::default(),
+    }
+  }
 }
 
 impl SubjectFormatter<ServiceLabel> for Application {
@@ -912,53 +879,88 @@ impl SubjectFormatter<ServiceLabel> for Application {
     match label {
       ServiceLabel::Cpus => Value::plain(self.cpus),
       ServiceLabel::Env => Value::plain(hashmap_to_table(&self.env)),
-      ServiceLabel::ExposedPorts => Value::plain(
-        self
-          .exposed_ports
-          .iter()
-          .map(|(port, port_mapping)| {
-            format!(
-              "{} : {}",
-              port,
-              VhostString::try_from(port_mapping).map(|vhost_string| vhost_string.to_string()).unwrap_or_default()
-            )
-          })
-          .collect_vec()
-          .join("\n"),
-      ),
-      ServiceLabel::HealthCheck => Value::option(self.health_check.clone()),
+      ServiceLabel::ExposedPorts => {
+        if self.exposed_ports.is_empty() {
+          Value::hide()
+        } else {
+          Value::plain(
+            self
+              .exposed_ports
+              .iter()
+              .map(|(port, port_mapping)| {
+                format!(
+                  "{} : {}",
+                  port,
+                  VhostString::try_from(port_mapping).map(|vhost_string| vhost_string.to_string()).unwrap_or_default()
+                )
+              })
+              .collect_vec()
+              .join("\n"),
+          )
+        }
+      }
+      ServiceLabel::HealthCheck => Value::some_or_hide(self.health_check.clone()),
       ServiceLabel::Image => Value::plain(ImageString::from(self.image.as_str())),
       ServiceLabel::Instances => Value::plain(self.instances),
       ServiceLabel::Mem => Value::plain(self.mem),
-      ServiceLabel::Metrics => Value::option(self.metrics.clone().map(|ref metrics| format!("{}:{}", metrics.port, metrics.path))),
+      ServiceLabel::Metrics => Value::some_or_hide(self.metrics.clone().map(|ref metrics| format!("{}:{}", metrics.port, metrics.path))),
       ServiceLabel::NeedsToken => Value::plain(self.needs_token),
-      ServiceLabel::NodepoolFeatures => Value::option(self.node_features.clone()),
-      ServiceLabel::ReadableStreams => Value::plain(
-        self
-          .readable_streams
-          .clone()
-          .into_iter()
-          .map(|readable_stream| readable_stream.to_string())
-          .collect_vec()
-          .join(", "),
-      ),
-      ServiceLabel::Secrets => Value::plain(secrets_to_table(&self.secrets)),
+      ServiceLabel::NodepoolFeatures => Value::some_or_hide(self.node_features.clone()),
+      ServiceLabel::ReadableStreams => {
+        if self.readable_streams.is_empty() {
+          Value::hide()
+        } else {
+          Value::plain(
+            self
+              .readable_streams
+              .clone()
+              .into_iter()
+              .map(|readable_stream| readable_stream.to_string())
+              .collect_vec()
+              .join("\n"),
+          )
+        }
+      }
+      ServiceLabel::Secrets => {
+        if self.secrets.is_empty() {
+          Value::hide()
+        } else {
+          Value::plain(secrets_to_table(&self.secrets))
+        }
+      }
       ServiceLabel::SingleInstance => Value::plain(self.single_instance),
-      ServiceLabel::SpreadGroup => Value::option(self.spread_group.clone()),
+      ServiceLabel::SpreadGroup => Value::some_or_hide(self.spread_group.clone()),
       ServiceLabel::Target => Value::target(target_id),
-      ServiceLabel::Tasks => Value::empty(),
-      ServiceLabel::Topics => Value::plain(self.topics.clone().into_iter().map(|topic| topic.to_string()).collect_vec().join(", ")),
+      ServiceLabel::Topics => {
+        if self.topics.is_empty() {
+          Value::hide()
+        } else {
+          Value::plain(self.topics.clone().into_iter().map(|topic| topic.to_string()).collect_vec().join("\n"))
+        }
+      }
       ServiceLabel::User => Value::plain(&self.user),
-      ServiceLabel::Volumes => Value::plain(self.volumes.keys().map(|key| key.to_string()).collect_vec().join(",")),
-      ServiceLabel::WritableStreams => Value::plain(
-        self
-          .writable_streams
-          .clone()
-          .into_iter()
-          .map(|writable_stream| writable_stream.to_string())
-          .collect_vec()
-          .join(", "),
-      ),
+      ServiceLabel::Volumes => {
+        if self.volumes.is_empty() {
+          Value::hide()
+        } else {
+          Value::plain(self.volumes.keys().map(|key| key.to_string()).collect_vec().join("\n"))
+        }
+      }
+      ServiceLabel::WritableStreams => {
+        if self.writable_streams.is_empty() {
+          Value::hide()
+        } else {
+          Value::plain(
+            self
+              .writable_streams
+              .clone()
+              .into_iter()
+              .map(|writable_stream| writable_stream.to_string())
+              .collect_vec()
+              .join("\n"),
+          )
+        }
+      }
     }
   }
 }
@@ -979,109 +981,3 @@ fn secrets_to_table(secrets: &[ApplicationSecret]) -> String {
     .collect::<HashMap<_, _>>();
   hashmap_to_table(&m)
 }
-
-static SERVICE_LABELS_LIST: [ServiceLabel; 8] = [
-  ServiceLabel::Target,
-  ServiceLabel::NeedsToken,
-  ServiceLabel::Instances,
-  ServiceLabel::Cpus,
-  ServiceLabel::Mem,
-  ServiceLabel::ExposedPorts,
-  ServiceLabel::Metrics,
-  ServiceLabel::Image,
-];
-
-pub(crate) static SERVICE_LABELS_SHOW: [ServiceLabel; 19] = [
-  ServiceLabel::Target,
-  ServiceLabel::NeedsToken,
-  ServiceLabel::Instances,
-  ServiceLabel::Cpus,
-  ServiceLabel::Mem,
-  ServiceLabel::ExposedPorts,
-  ServiceLabel::Volumes,
-  ServiceLabel::Metrics,
-  ServiceLabel::NodepoolFeatures,
-  ServiceLabel::Image,
-  ServiceLabel::HealthCheck,
-  ServiceLabel::ReadableStreams,
-  ServiceLabel::WritableStreams,
-  ServiceLabel::Secrets,
-  ServiceLabel::SingleInstance,
-  ServiceLabel::SpreadGroup,
-  ServiceLabel::Topics,
-  ServiceLabel::User,
-  ServiceLabel::Env,
-];
-
-#[derive(Eq, Hash, PartialEq, Serialize)]
-enum TaskLabel {
-  Healthy,
-  HostIpAddress,
-  _LastestLog,
-  LastUpdateAt,
-  StagedAt,
-  StartedAt,
-  State,
-  StoppedAt,
-  Target,
-}
-
-impl Label for TaskLabel {
-  fn as_str(&self) -> &str {
-    match self {
-      Self::Healthy => "healthy",
-      Self::HostIpAddress => "host ip address",
-      Self::_LastestLog => "latest log",
-      Self::LastUpdateAt => "last update",
-      Self::StagedAt => "staged",
-      Self::StartedAt => "started",
-      Self::State => "state",
-      Self::StoppedAt => "stopped",
-      Self::Target => "task id",
-    }
-  }
-
-  fn as_str_for_list(&self) -> &str {
-    match self {
-      Self::Healthy => "healthy",
-      Self::HostIpAddress => "host",
-      Self::_LastestLog => "log",
-      Self::LastUpdateAt => "update",
-      Self::StagedAt => "staged",
-      Self::StartedAt => "started",
-      Self::State => "state",
-      Self::StoppedAt => "stopped",
-      Self::Target => "task id",
-    }
-  }
-
-  fn is_target_label(&self) -> bool {
-    matches!(self, Self::Target)
-  }
-}
-
-impl SubjectFormatter<TaskLabel> for TaskStatus {
-  fn value(&self, label: &TaskLabel, target_id: &str) -> Value {
-    let task: Option<Task> = match self.actual.clone() {
-      Some(actual) => Some(actual),
-      None => self.configuration.clone(),
-    };
-    match task {
-      Some(task) => match label {
-        TaskLabel::Healthy => Value::option(task.healthy),
-        TaskLabel::HostIpAddress => Value::plain(task.host),
-        TaskLabel::_LastestLog => Value::option(task.logs),
-        TaskLabel::LastUpdateAt => Value::option(task.last_update.and_then(|update| DateTime::from_timestamp_millis(update).map(|ts| ts.to_string()))),
-        TaskLabel::StagedAt => Value::plain(task.staged_at),
-        TaskLabel::StartedAt => Value::plain(task.started_at),
-        TaskLabel::State => Value::plain(task.state),
-        TaskLabel::StoppedAt => Value::option(task.stopped_at),
-        TaskLabel::Target => Value::plain(target_id),
-      },
-      None => Value::empty(),
-    }
-  }
-}
-
-static TASK_LABELS_LIST: [TaskLabel; 8] =
-  [TaskLabel::StartedAt, TaskLabel::State, TaskLabel::Healthy, TaskLabel::Target, TaskLabel::HostIpAddress, TaskLabel::LastUpdateAt, TaskLabel::StagedAt, TaskLabel::StoppedAt];
