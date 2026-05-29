@@ -68,4 +68,4 @@ the platform is stored in the file `refresh-token.encrypted` in the platform dir
 Note that all directories are created only when needed, e.g. when the user logged in via
 single-sign-on or when a proxy was created.
 
-[Platforms specification &#x2192;](platforms-specification.md)
+[Kafka proxy &#x2192;](proxy.md)

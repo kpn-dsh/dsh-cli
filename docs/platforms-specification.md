@@ -1,6 +1,6 @@
 ## Platforms specification
 
-[&#x2190; Settings and targets](settings-targets.md)
+[&#x2190; Kafka proxy](proxy.md)
 
 If you need a different set of platform configurations,
 you can use the `DSH_API_PLATFORMS_FILE` environment variable to provide

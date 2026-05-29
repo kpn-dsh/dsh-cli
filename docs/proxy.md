@@ -1,5 +1,7 @@
 # Proxy
 
+[&#x2190; Settings and targets](settings-targets.md)
+
 This page describes how the `dsh` tool can be used to connect to a Kafka topic on the DSH platform
 via a Kafka proxy. Kafka proxies are a powerful feature of the DSH platform, but they are hard
 to set up properly. Using the `dsh` tool this becomes must easier.
@@ -192,8 +194,9 @@ acl group name: my-aclgroup
 ```
 
 We entered `my-aclgroup` as the ACL group name. Deploying the proxy and generating example
-code are the same as for the case without ACL groups, but before you run the code examples you
+code are the same as for the case without ACL groups, but before you can run the code examples you
 first have to create and configurae the ACL group.
 
 ### Create and configure ACL group
 
+[Platforms specification &#x2192;](platforms-specification.md)

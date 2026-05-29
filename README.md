@@ -63,6 +63,7 @@ the executable is included in your `PATH` variable and that you set the execute 
 * [Authentication and authorization](docs/authentication-authorization.md)
 * [Environment variables](docs/environment-variables.md)
 * [Settings and targets](docs/settings-targets.md)
+* [Kafka proxy](docs/proxy.md)
 * [Platforms specification](docs/platforms-specification.md)
 * [Set up autocompletion](docs/autocompletion.md)
 * [Developers](docs/developers.md)
