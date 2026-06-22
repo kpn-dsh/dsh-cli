@@ -202,13 +202,14 @@ pub(crate) fn write_refresh_token(platform: &DshPlatform, refresh_token: &str) -
   }
 }
 
-const CONFIG_FILENAME: &str = "bundle.toml";
 const CA_KEY_FILENAME: &str = "ca.key";
-const CA_CERTIFICATE_FILENAME: &str = "ca.pem";
-const CLIENT_KEY_FILENAME: &str = "client.key";
-const CLIENT_CERTIFICATE_FILENAME: &str = "client.pem";
-const SERVER_KEY_FILENAME: &str = "server.key";
+const CONFIG_FILENAME: &str = "bundle.toml";
 const SERVER_CERTIFICATE_FILENAME: &str = "server.pem";
+const SERVER_KEY_FILENAME: &str = "server.key";
+
+pub(crate) const CA_CERTIFICATE_FILENAME: &str = "ca.pem";
+pub(crate) const CLIENT_CERTIFICATE_FILENAME: &str = "client.pem";
+pub(crate) const CLIENT_KEY_FILENAME: &str = "client.key";
 
 /// Checks whether stored proxy certificate bundle exists.
 ///

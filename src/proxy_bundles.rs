@@ -134,17 +134,21 @@ impl ProxyCertificateBundleConfig {
 
   pub(crate) fn dns_entries(&self) -> DshCliResult<Vec<String>> {
     let mut dns_entries: Vec<String> = vec![];
+    for index in 0..self.effective_number_of_dns_entries() {
+      dns_entries.push(self.platform.proxy_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), index)?);
+    }
     if self.enable_schema_store {
-      for index in 0..usize::min(self.number_of_dns_records, 9) {
-        dns_entries.push(self.platform.proxy_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), index)?);
-      }
       dns_entries.push(self.platform.proxy_schema_store_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone())?);
-    } else {
-      for index in 0..self.number_of_dns_records {
-        dns_entries.push(self.platform.proxy_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), index)?);
-      }
     }
     Ok(dns_entries)
+  }
+
+  pub(crate) fn effective_number_of_dns_entries(&self) -> usize {
+    if self.enable_schema_store {
+      usize::min(self.number_of_dns_records, 9)
+    } else {
+      self.number_of_dns_records
+    }
   }
 
   pub(crate) fn group_id(&self, index: usize) -> String {
