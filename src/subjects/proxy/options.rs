@@ -1,4 +1,4 @@
-use crate::code::{LANGUAGE_PYTHON, LANGUAGE_RUST};
+use crate::code::{LANGUAGE_JSON, LANGUAGE_PYTHON, LANGUAGE_RUST};
 use crate::context::Context;
 use crate::{err, DshCliResult};
 use clap::builder::PossibleValue;
@@ -111,6 +111,7 @@ pub(crate) fn language_argument() -> Arg {
   Arg::new(LANGUAGE_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(builder::PossibleValuesParser::new(vec![
+      PossibleValue::new(LANGUAGE_JSON),
       PossibleValue::new(LANGUAGE_PYTHON),
       PossibleValue::new(LANGUAGE_RUST),
     ]))

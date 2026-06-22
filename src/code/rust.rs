@@ -5,7 +5,7 @@ use crate::DshCliResult;
 use std::fs;
 use std::fs::{create_dir_all, exists, remove_dir_all};
 
-pub(crate) fn generate_rust_example_code(bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str, context: &Context) -> DshCliResult<String> {
+pub(crate) fn generate_rust_example_code(bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str, context: &Context) -> DshCliResult<Option<String>> {
   let example_directory = example_directory(LANGUAGE_RUST, bundle_configuration, context);
   create_dir_all(&example_directory)?;
   context.print_outcome(format!("created directory '{}'", example_directory));
@@ -18,27 +18,27 @@ pub(crate) fn generate_rust_example_code(bundle_configuration: &ProxyCertificate
   create_dir_all(&bin_directory)?;
   context.print_outcome(format!("created directory '{}'", bin_directory));
 
-  let cargo_toml = apply_template(CARGO_TOML_TEMPLATE_CTRLC, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory)?;
+  let cargo_toml = apply_template(CARGO_TOML_TEMPLATE_CTRLC, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory, "")?;
   let cargo_toml_filename = format!("{}/Cargo.toml", example_directory);
   fs::write(&cargo_toml_filename, &cargo_toml)?;
   context.print_outcome(format!("created file '{}'", cargo_toml_filename));
 
-  let rust_main_rs = apply_template(MAIN_RS_TEMPLATE_LIST_TOPICS, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory)?;
+  let rust_main_rs = apply_template(MAIN_RS_TEMPLATE_LIST_TOPICS, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory, "  ")?;
   let rust_main_rs_filename = format!("{}/src/main.rs", example_directory);
   fs::write(&rust_main_rs_filename, &rust_main_rs)?;
   context.print_outcome(format!("created file '{}'", rust_main_rs_filename));
 
-  let rust_consumer_rs = apply_template(MAIN_RS_TEMPLATE_CONSUMER, EXAMPLE_CONSUMER, bundle_configuration, bundle_directory)?;
+  let rust_consumer_rs = apply_template(MAIN_RS_TEMPLATE_CONSUMER, EXAMPLE_CONSUMER, bundle_configuration, bundle_directory, "  ")?;
   let rust_consumer_rs_filename = format!("{}/src/bin/consumer.rs", example_directory);
   fs::write(&rust_consumer_rs_filename, &rust_consumer_rs)?;
   context.print_outcome(format!("created file '{}'", rust_consumer_rs_filename));
 
-  let rust_producer_rs = apply_template(MAIN_RS_TEMPLATE_PRODUCER, EXAMPLE_PRODUCER, bundle_configuration, bundle_directory)?;
+  let rust_producer_rs = apply_template(MAIN_RS_TEMPLATE_PRODUCER, EXAMPLE_PRODUCER, bundle_configuration, bundle_directory, "  ")?;
   let rust_producer_rs_filename = format!("{}/src/bin/producer.rs", example_directory);
   fs::write(&rust_producer_rs_filename, &rust_producer_rs)?;
   context.print_outcome(format!("created file '{}'", rust_producer_rs_filename));
 
-  Ok(example_directory)
+  Ok(Some(example_directory))
 }
 
 pub(crate) fn rust_example_code_exists(bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<bool> {
@@ -74,7 +74,8 @@ const PKI_DIRECTORY: &str = "{{bundle-directory}}";
 const CLIENT_ID: &str = "{{client-id}}";
 const GROUP_ID: &str = "{{group-id}}";
 const BROKERS: [&str; 3] = [
-{{brokers}}];
+{{brokers}}
+];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   // Allow handling of ctrl-c
@@ -119,7 +120,8 @@ const PKI_DIRECTORY: &str = "{{bundle-directory}}";
 const CLIENT_ID: &str = "{{client-id}}";
 const GROUP_ID: &str = "{{group-id}}";
 const BROKERS: [&str; 3] = [
-{{brokers}}];
+{{brokers}}
+];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut kafka_client_config = ClientConfig::new();
@@ -164,7 +166,8 @@ use std::{process, thread};
 const PKI_DIRECTORY: &str = "{{bundle-directory}}";
 const CLIENT_ID: &str = "{{client-id}}";
 const BROKERS: [&str; 3] = [
-{{brokers}}];
+{{brokers}}
+];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   // Allow handling of ctrl-c

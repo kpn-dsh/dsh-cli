@@ -182,6 +182,8 @@ export SAFE_COMMANDS=(
   "platforms"
   "ps"
 
+  "proxy code $PROXY_UNDER_TEST --configuration"
+  "proxy code $PROXY_UNDER_TEST json --force --dry-run"
   "proxy code $PROXY_UNDER_TEST python --force --dry-run"
   "proxy code $PROXY_UNDER_TEST rust --force --dry-run"
   "proxy create $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
