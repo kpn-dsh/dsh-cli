@@ -1,3 +1,4 @@
+use crate::directory::{CA_CERTIFICATE_FILENAME, CLIENT_CERTIFICATE_FILENAME, CLIENT_KEY_FILENAME};
 use crate::formatters::Value;
 use crate::formatters::{ColumnAlignment, Label, SubjectFormatter};
 use crate::proxy_bundles::ProxyCertificateBundleConfig;
@@ -107,20 +108,27 @@ impl SubjectFormatter<KafkaProxyLabel> for KafkaProxy {
     }
   }
 }
+
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum BundleLabel {
   AclGroupName,
+  Brokers,
   BundleDirectory,
   BundleName,
   CaCommonName,
+  ClientId,
   DnsEntries,
   GroupId,
   NumberOfDsnRecords,
+  PkiCaCertificateFilename,
+  PkiClientCertificateFilename,
+  PkiClientKeyFilename,
   Platform,
   PlatformDomain,
   ProxyCommonName,
   ProxyName,
   SchemaStore,
+  SchemaStoreEndpoint,
   Tenant,
   VhostZone,
 }
@@ -129,17 +137,23 @@ impl Label for BundleLabel {
   fn as_str(&self) -> &str {
     match self {
       Self::AclGroupName => "acl group name",
-      Self::BundleDirectory => "directory",
+      Self::Brokers => "brokers",
+      Self::BundleDirectory => "bundle directory",
       Self::BundleName => "bundle",
       Self::CaCommonName => "ca common name",
+      Self::ClientId => "client id",
       Self::DnsEntries => "dns entries",
       Self::GroupId => "group id",
       Self::NumberOfDsnRecords => "records",
+      Self::PkiCaCertificateFilename => "ca certificate file",
+      Self::PkiClientCertificateFilename => "client certificate file",
+      Self::PkiClientKeyFilename => "client key file",
       Self::Platform => "platform",
       Self::PlatformDomain => "platform domain",
       Self::ProxyCommonName => "proxy common name",
       Self::ProxyName => "proxy name",
       Self::SchemaStore => "schema store",
+      Self::SchemaStoreEndpoint => "schema store endpoint",
       Self::Tenant => "tenant",
       Self::VhostZone => "vhost zone",
     }
@@ -164,12 +178,21 @@ impl SubjectFormatter<BundleLabel> for ProxyCertificateBundleConfig {
   fn value(&self, label: &BundleLabel, target_id: &str) -> Value {
     match label {
       BundleLabel::AclGroupName => Value::some_or_hide(self.acl_group_name.clone()),
-      BundleLabel::BundleDirectory => Value::unreachable(),
+      BundleLabel::Brokers => Value::result(
+        self
+          .platform
+          .tenant_proxy_bootstrap_servers(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), self.effective_number_of_dns_entries())
+          .map(|servers| servers.join("\n")),
+      ),
       BundleLabel::BundleName => Value::target(target_id),
       BundleLabel::CaCommonName => Value::plain(&self.ca_common_name),
+      BundleLabel::ClientId => Value::plain(self.client_id()),
       BundleLabel::DnsEntries => Value::result(self.dns_entries().map(|dns_entry| dns_entry.join("\n"))),
       BundleLabel::GroupId => Value::plain(self.group_id(1)),
       BundleLabel::NumberOfDsnRecords => Value::plain(self.number_of_dns_records),
+      BundleLabel::PkiCaCertificateFilename => Value::plain(CA_CERTIFICATE_FILENAME),
+      BundleLabel::PkiClientCertificateFilename => Value::plain(CLIENT_CERTIFICATE_FILENAME),
+      BundleLabel::PkiClientKeyFilename => Value::plain(CLIENT_KEY_FILENAME),
       BundleLabel::Platform => Value::target(&self.platform),
       BundleLabel::PlatformDomain => Value::result(self.domain_from_platform()),
       BundleLabel::ProxyCommonName => Value::result(self.common_name()),
@@ -181,8 +204,16 @@ impl SubjectFormatter<BundleLabel> for ProxyCertificateBundleConfig {
           Value::plain("disabled")
         }
       }
+      BundleLabel::SchemaStoreEndpoint => {
+        if self.enable_schema_store {
+          Value::result(self.platform.proxy_schema_store_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone()))
+        } else {
+          Value::hide()
+        }
+      }
       BundleLabel::Tenant => Value::target(&self.tenant),
       BundleLabel::VhostZone => Value::plain(&self.vhost_zone),
+      _ => Value::unreachable(),
     }
   }
 }

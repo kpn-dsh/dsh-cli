@@ -44,6 +44,16 @@ static BUNDLE_LABELS_CREATE: [BundleLabel; 10] = [
   BundleLabel::AclGroupName,
   BundleLabel::NumberOfDsnRecords,
 ];
+static BUNDLE_LABELS_CODE_CONFIGURATION: [BundleLabel; 8] = [
+  BundleLabel::ClientId,
+  BundleLabel::GroupId,
+  BundleLabel::BundleDirectory,
+  BundleLabel::PkiCaCertificateFilename,
+  BundleLabel::PkiClientCertificateFilename,
+  BundleLabel::PkiClientKeyFilename,
+  BundleLabel::Brokers,
+  BundleLabel::SchemaStoreEndpoint,
+];
 
 pub(crate) struct BundleCode {}
 
@@ -53,9 +63,11 @@ impl CommandExecutor for BundleCode {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant = get_target_tenant(matches, context.settings())?;
     let bundle_id = target.unwrap_or_else(|| unreachable!());
-    let language = matches.get_one::<String>(LANGUAGE_ARGUMENT).unwrap_or_else(|| unreachable!());
-
-    let (bundle_configuration, directory) = match read_local_certificate_bundle(&platform, &tenant, &bundle_id) {
+    let language = match matches.get_one::<String>(LANGUAGE_ARGUMENT) {
+      Some(language) => language,
+      None => return err!("language argument missing"),
+    };
+    let (bundle_configuration, bundle_directory) = match read_local_certificate_bundle(&platform, &tenant, &bundle_id) {
       Ok(LocalCertificateBundle { configuration, .. }) => configuration,
       Err(_) => return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant),
     };
@@ -78,13 +90,36 @@ impl CommandExecutor for BundleCode {
     if context.dry_run() {
       context.print_warning("dry-run mode, no code generated");
     } else {
-      let example_directory = generate_example_code(language, &bundle_configuration, &directory, context)?;
-      context.print_outcome(format!(
-        "{} code for bundle '{}' generated in directory '{}'",
-        language, bundle_id, example_directory
-      ));
+      match generate_example_code(language, &bundle_configuration, &bundle_directory, context)? {
+        Some(example_directory) => context.print_outcome(format!(
+          "{} code for bundle '{}' generated in directory '{}'",
+          language, bundle_id, example_directory
+        )),
+        None => context.print_outcome(format!("{} code for bundle '{}' generated", language, bundle_id)),
+      }
     }
     Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
+  }
+}
+
+pub(crate) struct BundleCodeConfiguration {}
+
+#[async_trait]
+impl CommandExecutor for BundleCodeConfiguration {
+  async fn execute_without_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant = get_target_tenant(matches, context.settings())?;
+    let bundle_id = target.unwrap_or_else(|| unreachable!());
+    let (bundle_configuration, bundle_directory) = match read_local_certificate_bundle(&platform, &tenant, &bundle_id) {
+      Ok(LocalCertificateBundle { configuration, .. }) => configuration,
+      Err(_) => return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant),
+    };
+    context.print_explanation(format!("listing configuration values for bundle '{}' for '{}@{}'", bundle_id, platform, tenant));
+    UnitFormatter::new(&bundle_id, &BUNDLE_LABELS_CODE_CONFIGURATION, context).print(&(bundle_configuration, bundle_directory), None)
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {

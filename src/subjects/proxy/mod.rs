@@ -13,7 +13,7 @@ use crate::flags::FlagType;
 use crate::global_options::expiration_option;
 use crate::subject::Subject;
 use crate::subjects::aclgroup::options::acl_group_name_option;
-use crate::subjects::proxy::bundle_capabilities::{BundleCode, BundleCreate, BundleDelete, BundleList, BundleShow};
+use crate::subjects::proxy::bundle_capabilities::{BundleCode, BundleCodeConfiguration, BundleCreate, BundleDelete, BundleList, BundleShow};
 use crate::subjects::proxy::options::{ca_common_name_option, enable_schema_store_option, language_argument, number_of_dns_records_option, vhost_zone_option};
 use crate::subjects::proxy::proxy_capabilities::{ProxyDeploy, ProxyList, ProxyListIds, ProxyShow, ProxyUndeploy};
 use crate::subjects::service::{cpus_option, instances_option, mem_option};
@@ -79,9 +79,11 @@ static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = L
   Box::new(
     CapabilityBuilder::new(CODE_COMMAND, None, &BundleCode {}, "Generate example client code")
       .add_target_argument(proxy_id_argument().required(true))
-      .add_target_argument(language_argument().required(true)),
+      .add_target_argument(language_argument())
+      .add_command_executor(FlagType::Configuration, &BundleCodeConfiguration {}, None),
   )
 });
+
 static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(
