@@ -60,14 +60,14 @@ fn apply_template(template: &str, example: &str, bundle_configuration: &ProxyCer
     .map(|broker| format!("  \"{}\",\n", broker))
     .collect_vec()
     .join("");
-  let rust_rs = template.replace(BROKERS_PLACEHOLDER, &brokers);
-  let rust_rs = rust_rs.replace(BUNDLE_DIRECTORY_PLACEHOLDER, bundle_directory);
-  let rust_rs = rust_rs.replace(CLIENT_ID_PLACEHOLDER, &bundle_configuration.client_id());
-  let rust_rs = rust_rs.replace(EXAMPLE_PLACEHOLDER, example);
-  let rust_rs = rust_rs.replace(GROUP_ID_PLACEHOLDER, &bundle_configuration.group_id(1));
-  let rust_rs = rust_rs.replace(PROXY_NAME_PLACEHOLDER, &bundle_configuration.proxy_name);
-  let rust_rs = rust_rs.replace(TENANT_PLACEHOLDER, &bundle_configuration.tenant);
-  Ok(rust_rs)
+  let applied = template.replace(BROKERS_PLACEHOLDER, &brokers);
+  let applied = applied.replace(BUNDLE_DIRECTORY_PLACEHOLDER, bundle_directory);
+  let applied = applied.replace(CLIENT_ID_PLACEHOLDER, &bundle_configuration.client_id());
+  let applied = applied.replace(EXAMPLE_PLACEHOLDER, example);
+  let applied = applied.replace(GROUP_ID_PLACEHOLDER, &bundle_configuration.group_id(1));
+  let applied = applied.replace(PROXY_NAME_PLACEHOLDER, &bundle_configuration.proxy_name);
+  let applied = applied.replace(TENANT_PLACEHOLDER, &bundle_configuration.tenant);
+  Ok(applied)
 }
 
 /// Get example directory name
