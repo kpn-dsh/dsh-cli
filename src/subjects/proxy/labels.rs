@@ -181,7 +181,7 @@ impl SubjectFormatter<BundleLabel> for ProxyCertificateBundleConfig {
       BundleLabel::Brokers => Value::result(
         self
           .platform
-          .tenant_proxy_bootstrap_servers(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), self.effective_number_of_dns_entries())
+          .tenant_proxy_bootstrap_servers(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), 3)
           .map(|servers| servers.join("\n")),
       ),
       BundleLabel::BundleName => Value::target(target_id),
