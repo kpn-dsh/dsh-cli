@@ -169,57 +169,56 @@ const brokers = [
 let producerInterval = 0;
 
 async function main() {
-    // Allow handling of ctrl-c
-    process.on('SIGTERM', () => handle_termination('SIGTERM'));
-    process.on('SIGINT', () => handle_termination('SIGINT'));
+  // Allow handling of ctrl-c
+  process.on('SIGTERM', () => handle_termination('SIGTERM'));
+  process.on('SIGINT', () => handle_termination('SIGINT'));
 
-    let topic = process.argv[2];
-    if (!topic) {
-        console.error("missing topic argument");
-    }
+  let topic = process.argv[2];
+  if (!topic) {
+    console.error("missing topic argument");
+  }
 
-    const kafkaConfig = {
-        kafkaJS: {
-            clientId,
-            brokers,
-            ssl: true,
-            logLevel: logLevel.ERROR
-        },
-        "ssl.ca.location": pkiDirectory + "/ca.pem",
-        "ssl.certificate.location": pkiDirectory + "/client.pem",
-        "ssl.key.location": pkiDirectory + "/client.key"
+  const kafkaConfig = {
+    kafkaJS: {
+      clientId,
+      brokers,
+      ssl: true,
+      logLevel: logLevel.ERROR
+    },
+    "ssl.ca.location": pkiDirectory + "/ca.pem",
+    "ssl.certificate.location": pkiDirectory + "/client.pem",
+    "ssl.key.location": pkiDirectory + "/client.key"
+  };
+
+  const kafka = new Kafka(kafkaConfig);
+  let producer = kafka.producer({
+    kafkaJS: {}
+  });
+  await producer.connect();
+
+  producerInterval = setInterval(async () => {
+    const key = "{{proxy-name}}-{{example}}-javascript: " + Math.round(new Date().getTime() / 1000);
+    const message = {
+      key,
+      value: "payload",
     };
-
-    const kafka = new Kafka(kafkaConfig);
-    let producer = kafka.producer({
-        kafkaJS: {}
+    await producer.send({
+      topic,
+      messages: [message],
     });
-    await producer.connect();
-
-    producerInterval = setInterval(async () => {
-        const key = "{{proxy-name}}-{{example}}-javascript: " + Math.round(new Date().getTime() / 1000);
-        await producer.send({
-            topic,
-            messages: [
-                {
-                    key,
-                    value: "payload",
-                },
-            ],
-        });
-        console.log(key);
-    }, 1000)
+    console.log(key);
+  }, 1000)
 }
 
 function handle_termination(signal) {
-    console.log(signal);
-    if (producerInterval) {
-        clearInterval(producerInterval);
-    }
-    process.exit();
+  console.log(signal);
+  if (producerInterval) {
+    clearInterval(producerInterval);
+  }
+  process.exit();
 }
 
 if (require.main === module) {
-    main().catch(console.error);
+  main().catch(console.error);
 }
 "#;
