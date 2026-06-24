@@ -151,9 +151,9 @@ If you are curious, you can also check the installed certificate and secrets:
 
 Now that we have a running proxy, we want to use it to connect to a Kafka cluster on the DSH
 platform. The easiest way to do this is to let the `dsh` tool create a code example and run it.
-At this time code examples can be generated for the `Python` and `Rust` programming languages.
-The next version of the tool will support more languages (`Go`, `Java`, `Javascript/Typescript`
-and `Scala` are on the roadmap).
+At this time code examples can be generated for the `JavaScript`, `Python` and `Rust` programming
+languages. The next version of the tool will support more languages (`Go`, `Java`, `Scala` and
+`TypeScript` are on the roadmap).
 
 For each supported programming language there are (will be) three different examples generated:
 
@@ -169,10 +169,33 @@ For each supported programming language there are (will be) three different exam
   record to a topic each second, with the timestamp as record key.</dd>
 </dl>
 
-Select one of the supported programming language to generate code examples:
+Select one of the supported programming languages to generate code examples:
 
-* [Python code example](code-examples/python.md)
-* [Rust code example](code-examples/rust.md)
+* [`JavaScript` code example](code-examples/javascript.md)
+* [`JSON` containing Kafka client properties](code-examples/kafka-client-json.md)
+* [`Python` code example](code-examples/python.md)
+* [`Rust` code example](code-examples/rust.md)
+
+If you're favorite programming language is not available or if you prefer to write your own code
+you can list the required Kafka client properties by typing:
+
+```shell
+> dsh proxy code my-proxy --configuration
+listing Kafka client property values for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
+┌─────────────────────────┬───────────────────────────────────────────────────────────────────────────┐
+│ target id               │ my-proxy                                                                  │
+├─────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+│ client id               │ my-tenant                                                                 │
+│ group id                │ my-tenant_my-proxy_1                                                      │
+│ bundle directory        │ /Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy │
+│ ca certificate file     │ ca.pem                                                                    │
+│ client certificate file │ client.pem                                                                │
+│ client key file         │ client.key                                                                │
+│ brokers                 │ my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091                │
+│                         │ my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091                │
+│                         │ my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091                │
+└─────────────────────────┴───────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Proxy with ACL groups
 
@@ -224,31 +247,31 @@ list all proxy acl groups
 ```
 
 Next we need to grant read and write access to the topic we want to access. Again we will use the
-topic `scratch.example.my-tenant`. In the `aclgroup grant` command we only have to provide the
+topic `scratch.my-topic.my-tenant`. In the `aclgroup grant` command we only have to provide the
 topic name. The `scratch` part and the tenant name are implicit if we use the `--read-topic`
 or `--write-topic` grant command.
 
 ```shell
-> dsh aclgroup grant my-aclgroup --read-topic example
+> dsh aclgroup grant my-aclgroup --read-topic my-topic
 ...
-> dsh aclgroup grant my-aclgroup --write-topic example
+> dsh aclgroup grant my-aclgroup --write-topic my-topic
 ...
 > dsh aclgroups
 list all proxy acl groups
-┌─────────────┬─────────┬───────┬──────────┬──────────┐
-│ acl group   │ stream  │ kind  │ readable │ writable │
-├─────────────┼─────────┼───────┼──────────┼──────────┤
-│ my-aclgroup │ example │ topic │ true     │ true     │
-└─────────────┴─────────┴───────┴──────────┴──────────┘
+┌─────────────┬──────────┬───────┬──────────┬──────────┐
+│ acl group   │ stream   │ kind  │ readable │ writable │
+├─────────────┼──────────┼───────┼──────────┼──────────┤
+│ my-aclgroup │ my-topic │ topic │ true     │ true     │
+└─────────────┴──────────┴───────┴──────────┴──────────┘
 ```
 
 We now have an ACL group called `my-aclgroup` which grants read and write access to the topic
-`scratch.example.my-topic`. If we list the topics to which we have read access again, we can see
+`scratch.my-topic.my-tenant`. If we list the topics to which we have read access again, we can see
 that we succeeded.
 
 ```shell
 (.venv) my-acl-proxy-example-python> python my-acl-proxy-list-topics.py
-scratch.example.greenbox-dev (1)
+scratch.my-topic.my-tenant
 ```
 
 [Platforms specification &#x2192;](platforms-specification.md)

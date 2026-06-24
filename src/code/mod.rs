@@ -1,3 +1,4 @@
+use crate::code::javascript::{delete_javascript_example_code, generate_javascript_example_code, javascript_example_code_exists};
 use crate::code::json::{delete_json_configuration, generate_json_configuration, json_configuration_exists};
 use crate::code::python::{delete_python_example_code, generate_python_example_code, python_example_code_exists};
 use crate::code::rust::{delete_rust_example_code, generate_rust_example_code, rust_example_code_exists};
@@ -6,10 +7,12 @@ use crate::proxy_bundles::ProxyCertificateBundleConfig;
 use crate::{err, DshCliResult};
 use itertools::Itertools;
 
+pub(crate) mod javascript;
 pub(crate) mod json;
 pub(crate) mod python;
 pub(crate) mod rust;
 
+pub(crate) const LANGUAGE_JAVASCRIPT: &str = "javascript";
 pub(crate) const LANGUAGE_JSON: &str = "json";
 pub(crate) const LANGUAGE_PYTHON: &str = "python";
 pub(crate) const LANGUAGE_RUST: &str = "rust";
@@ -25,6 +28,7 @@ pub(crate) fn generate_example_code(
   context: &Context,
 ) -> DshCliResult<Option<String>> {
   match language {
+    LANGUAGE_JAVASCRIPT => generate_javascript_example_code(bundle_configuration, bundle_directory, context),
     LANGUAGE_JSON => generate_json_configuration(bundle_configuration, bundle_directory, context),
     LANGUAGE_PYTHON => generate_python_example_code(bundle_configuration, bundle_directory, context),
     LANGUAGE_RUST => generate_rust_example_code(bundle_configuration, bundle_directory, context),
@@ -34,7 +38,8 @@ pub(crate) fn generate_example_code(
 
 pub(crate) fn example_code_exists(language: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<bool> {
   match language {
-    LANGUAGE_JSON => json_configuration_exists(bundle_configuration),
+    LANGUAGE_JAVASCRIPT => javascript_example_code_exists(bundle_configuration, context),
+    LANGUAGE_JSON => json_configuration_exists(bundle_configuration, context),
     LANGUAGE_PYTHON => python_example_code_exists(bundle_configuration, context),
     LANGUAGE_RUST => rust_example_code_exists(bundle_configuration, context),
     _ => err!("unrecognized language '{}'", language),
@@ -43,6 +48,7 @@ pub(crate) fn example_code_exists(language: &str, bundle_configuration: &ProxyCe
 
 pub(crate) fn delete_example_code(language: &str, bundle_configuration: &ProxyCertificateBundleConfig, context: &Context) -> DshCliResult<()> {
   match language {
+    LANGUAGE_JAVASCRIPT => delete_javascript_example_code(bundle_configuration, context),
     LANGUAGE_JSON => delete_json_configuration(bundle_configuration, context),
     LANGUAGE_PYTHON => delete_python_example_code(bundle_configuration, context),
     LANGUAGE_RUST => delete_rust_example_code(bundle_configuration, context),
@@ -66,7 +72,7 @@ fn apply_template(template: &str, example: &str, bundle_configuration: &ProxyCer
       &bundle_configuration.tenant,
       &bundle_configuration.proxy_name,
       bundle_configuration.vhost_zone.clone(),
-      bundle_configuration.effective_number_of_dns_entries(),
+      3,
     )?
     .iter()
     .map(|broker| format!("{}\"{}\"", prefix, broker))
