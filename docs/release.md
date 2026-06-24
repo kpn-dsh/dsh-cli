@@ -85,10 +85,6 @@ total 87072
 ...
 ```
 
-For the binaries to be able to run on other machines than the machine it was build on,
-the binaries need to be codesigned and notarized. See
-[Codesign and notarize for macOS](code-signing-macos.md) for the required steps.
-
 ### Windows
 
 To be done...
