@@ -1,5 +1,10 @@
 # `Python` code example
 
+> It is assumed that you have a recent version of `Python` and its `pip` package manager
+> installed.   
+> The generated code has a dependency on the
+> [Confluent Python Client for Apache Kafka](https://docs.confluent.io/kafka-clients/python/current/overview.html).
+
 We will create the example code for the `Python` programming language with the following command:
 
 ```shell
@@ -12,7 +17,7 @@ python code for bundle 'my-proxy' generated in directory 'my-proxy-example-pytho
 ```
 
 As is shown in the output, the example is generated in a newly created directory which contains
-three Python scripts named `my-proxy-consumer.py`, `my-proxy-list-topics.py` and
+three `Python` scripts named `my-proxy-consumer.py`, `my-proxy-list-topics.py` and
 `my-proxy-producer.py`. Click below to see the generated code.
 
 <details>
@@ -185,16 +190,16 @@ read access to.
 ```shell
 > python my-proxy-list-topics.py
 ...
-scratch.example.greenbox-dev (1)
+scratch.my-topic.my-tenant
 ...
 ```
 
 Now we can run the scripts and send and receive messages to and from a Kafka topic.
-In the example below we use topic `scratch.example.my-tenant`. First we will produce some records.
+In the example below we use topic `scratch.my-topic.my-tenant`. First we will produce some records.
 Use `ctrl-c` to stop the program.
 
 ```shell
-(.venv) my-proxy-example-python> python my-proxy-producer.py scratch.example.my-tenant
+(.venv) my-proxy-example-python> python my-proxy-producer.py scratch.my-topic.my-tenant
 my-proxy-producer-python: 1780045672
 my-proxy-producer-python: 1780045674
 my-proxy-producer-python: 1780045675
@@ -206,7 +211,7 @@ my-proxy-producer-python: 1780045677
 Next we will consume records from the topic. Again, use `ctrl-c` to stop the program.
 
 ```shell
-(.venv) my-proxy-example-python> python my-proxy-consumer.py scratch.example.my-tenant
+(.venv) my-proxy-example-python> python my-proxy-consumer.py scratch.my-topic.my-tenant
 0:2729 my-proxy-producer-python: 1780045672
 0:2730 my-proxy-producer-python: 1780045674
 0:2731 my-proxy-producer-python: 1780045675
@@ -214,3 +219,5 @@ Next we will consume records from the topic. Again, use `ctrl-c` to stop the pro
 0:2733 my-proxy-producer-python: 1780045677
 ^Cinterrupted
 ```
+
+[&#x2190; Kafka proxy](../proxy.md)

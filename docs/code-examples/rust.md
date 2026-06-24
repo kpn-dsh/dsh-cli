@@ -1,5 +1,9 @@
 # `Rust` code example
 
+> It is assumed that you have a recent version of `Rust` and its `cargo` package manager
+> installed.  
+> The generated code has a dependency on the [rust-rdkafka](https://crates.io/crates/rdkafka) crate.
+
 For this example we will create example code for the `Rust` programming language:
 
 ```shell
@@ -224,15 +228,15 @@ read access to.
 ```shell
 > target/debug/my-proxy-list-topic
 ...
-scratch.example.my-tenant (1)
+scratch.my-topic.my-tenant
 ...
 ```
 
 Then we will send messages to a Kafka topic. In the example below we use topic
-`scratch.example.my-tenant`. Use `ctrl-c` to stop the program.
+`scratch.my-topic.my-tenant`. Use `ctrl-c` to stop the program.
 
 ```shell
-> target/debug/producer scratch.example.my-tenant
+> target/debug/producer scratch.my-topic.my-tenant
 my-proxy-producer-rust: 1780047895
 my-proxy-producer-rust: 1780047896
 my-proxy-producer-rust: 1780047897
@@ -243,10 +247,12 @@ my-proxy-producer-rust: 1780047898
 Next we will consume records from the same topic. Again, use `ctrl-c` to stop the program.
 
 ```shell
-> target/debug/consumer scratch.example.my-tenant
+> target/debug/consumer scratch.my-topic.my-tenant
 0:2808 my-proxy-producer-rust: 1780047895
 0:2809 my-proxy-producer-rust: 1780047896
 0:2810 my-proxy-producer-rust: 1780047897
 0:2811 my-proxy-producer-rust: 1780047898
 ^C
 ```
+
+[&#x2190; Kafka proxy](../proxy.md)
