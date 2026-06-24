@@ -9,6 +9,7 @@
 /certificates/
 /demo/
 /ignore/
+/node_modules/
 /output/
 /target
 /tests/.dsh_cli/
