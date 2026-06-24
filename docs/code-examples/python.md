@@ -11,17 +11,18 @@ We will create the example code for the `Python` programming language with the f
 > dsh proxy code my-proxy python
 generating python example for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
 created directory 'my-proxy-example-python'
-created file 'my-proxy-example-python/my-proxy-consumer.py'
-created file 'my-proxy-example-python/my-proxy-producer.py'
+created file 'my-proxy-example-python/consumer.py'
+created file 'my-proxy-example-python/list-topics.py'
+created file 'my-proxy-example-python/producer.py'
 python code for bundle 'my-proxy' generated in directory 'my-proxy-example-python'
 ```
 
 As is shown in the output, the example is generated in a newly created directory which contains
-three `Python` scripts named `my-proxy-consumer.py`, `my-proxy-list-topics.py` and
-`my-proxy-producer.py`. Click below to see the generated code.
+three `Python` scripts named `consumer.py`, `list-topics.py` and `producer.py`. Click below to
+see the generated code.
 
 <details>
-<summary><code>my-proxy-consumer.py</code></summary>
+<summary><code>consumer.py</code></summary>
 
 ```python
 from confluent_kafka import Consumer
@@ -82,7 +83,7 @@ if __name__ == "__main__":
 </details>
 
 <details>
-<summary><code>my-proxy-list-topics.py</code></summary>
+<summary><code>list-topics.py</code></summary>
 
 ```python
 from confluent_kafka.admin import AdminClient
@@ -119,7 +120,7 @@ if __name__ == "__main__":
 </details>
 
 <details>
-<summary><code>my-proxy-producer.py</code></summary>
+<summary><code>producer.py</code></summary>
 
 ```python
 from confluent_kafka import Producer
@@ -188,7 +189,7 @@ Now finally we are able to run the executables. First we will list all Kafka top
 read access to.
 
 ```shell
-> python my-proxy-list-topics.py
+> python list-topics.py
 ...
 scratch.my-topic.my-tenant
 ...
@@ -199,7 +200,7 @@ In the example below we use topic `scratch.my-topic.my-tenant`. First we will pr
 Use `ctrl-c` to stop the program.
 
 ```shell
-(.venv) my-proxy-example-python> python my-proxy-producer.py scratch.my-topic.my-tenant
+(.venv) my-proxy-example-python> python producer.py scratch.my-topic.my-tenant
 my-proxy-producer-python: 1780045672
 my-proxy-producer-python: 1780045674
 my-proxy-producer-python: 1780045675
@@ -211,7 +212,7 @@ my-proxy-producer-python: 1780045677
 Next we will consume records from the topic. Again, use `ctrl-c` to stop the program.
 
 ```shell
-(.venv) my-proxy-example-python> python my-proxy-consumer.py scratch.my-topic.my-tenant
+(.venv) my-proxy-example-python> python consumer.py scratch.my-topic.my-tenant
 0:2729 my-proxy-producer-python: 1780045672
 0:2730 my-proxy-producer-python: 1780045674
 0:2731 my-proxy-producer-python: 1780045675

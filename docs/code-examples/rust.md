@@ -28,7 +28,7 @@ which contains a `Cargo.toml` manifest, a `src/main.rs` binary module and two ad
 
 ```toml
 [package]
-name = "my-proxy-list-topic"
+name = "list-topics"
 version = "0.1.0"
 edition = "2024"
 
@@ -226,7 +226,7 @@ Now we are able to run the executables. First we will list all Kafka topics that
 read access to.
 
 ```shell
-> target/debug/my-proxy-list-topic
+> target/debug/list-topics
 ...
 scratch.my-topic.my-tenant
 ...

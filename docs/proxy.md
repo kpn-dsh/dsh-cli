@@ -161,7 +161,7 @@ For each supported programming language there are (will be) three different exam
   <dt><code>consumer</code></dt>
   <dd>Will create a client that connects to the Kafka cluster as a consumer, subscribes
   to a topic and prints the keys of the records that it receives from the topic.</dd>
-  <dt><code>list-topic</code></dt>
+  <dt><code>list-topics</code></dt>
   <dd>Will will create a client that connects to the Kafka cluster as an admin or consumer and 
   lists all topics that the client can read from.</dd>
   <dt><code>producer</code></dt>

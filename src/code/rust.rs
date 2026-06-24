@@ -53,7 +53,7 @@ pub(crate) fn delete_rust_example_code(bundle_configuration: &ProxyCertificateBu
 }
 
 const CARGO_TOML_TEMPLATE: &str = r#"[package]
-name = "{{proxy-name}}-{{example}}"
+name = "{{example}}"
 version = "0.1.0"
 edition = "2024"
 
