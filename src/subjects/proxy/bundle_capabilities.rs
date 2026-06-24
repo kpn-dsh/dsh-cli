@@ -118,7 +118,10 @@ impl CommandExecutor for BundleCodeConfiguration {
       Ok(LocalCertificateBundle { configuration, .. }) => configuration,
       Err(_) => return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant),
     };
-    context.print_explanation(format!("listing configuration values for bundle '{}' for '{}@{}'", bundle_id, platform, tenant));
+    context.print_explanation(format!(
+      "listing Kafka client property values for bundle '{}' for '{}@{}'",
+      bundle_id, platform, tenant
+    ));
     UnitFormatter::new(&bundle_id, &BUNDLE_LABELS_CODE_CONFIGURATION, context).print(&(bundle_configuration, bundle_directory), None)
   }
 
