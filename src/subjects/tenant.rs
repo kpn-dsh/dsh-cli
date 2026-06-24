@@ -1,4 +1,5 @@
 use crate::arguments::managed_tenant_argument;
+use crate::authentication::AuthenticationMethod;
 use crate::capability::{
   Capability, CommandExecutor, CREATE_COMMAND, CREATE_COMMAND_ALIAS, DELETE_COMMAND, DELETE_COMMAND_ALIAS, GRANT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, REVOKE_COMMAND,
   SHOW_COMMAND, SHOW_COMMAND_ALIAS, UPDATE_COMMAND,
@@ -174,6 +175,12 @@ impl CommandExecutor for TenantCreate {
     } else {
       client.put_tenant_configuration(&tenant_id, &managed_tenant).await?;
       context.print_outcome(format!("tenant '{}' created", tenant_id));
+      match context.authentication_method() {
+        AuthenticationMethod::Robot => context.print_warning("note that the created tenant will not be available immediately"),
+        AuthenticationMethod::SingleSignOn => {
+          context.print_warning("note that the created tenant will not be available immediately and that you will have to login again in order to be authorized for it")
+        }
+      }
     }
     Ok(())
   }
