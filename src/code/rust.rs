@@ -18,25 +18,25 @@ pub(crate) fn generate_rust_example_code(bundle_configuration: &ProxyCertificate
   create_dir_all(&bin_directory)?;
   context.print_outcome(format!("created directory '{}'", bin_directory));
 
-  let cargo_toml = apply_template(CARGO_TOML_TEMPLATE_CTRLC, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory, "")?;
+  let cargo_toml = apply_template(CARGO_TOML_TEMPLATE, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory, "")?;
   let cargo_toml_filename = format!("{}/Cargo.toml", example_directory);
   fs::write(&cargo_toml_filename, &cargo_toml)?;
   context.print_outcome(format!("created file '{}'", cargo_toml_filename));
 
-  let rust_main_rs = apply_template(MAIN_RS_TEMPLATE_LIST_TOPICS, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory, "  ")?;
-  let rust_main_rs_filename = format!("{}/src/main.rs", example_directory);
-  fs::write(&rust_main_rs_filename, &rust_main_rs)?;
-  context.print_outcome(format!("created file '{}'", rust_main_rs_filename));
+  let main_rs = apply_template(MAIN_RS_TEMPLATE_LIST_TOPICS, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory, "  ")?;
+  let main_rs_filename = format!("{}/src/main.rs", example_directory);
+  fs::write(&main_rs_filename, &main_rs)?;
+  context.print_outcome(format!("created file '{}'", main_rs_filename));
 
-  let rust_consumer_rs = apply_template(MAIN_RS_TEMPLATE_CONSUMER, EXAMPLE_CONSUMER, bundle_configuration, bundle_directory, "  ")?;
-  let rust_consumer_rs_filename = format!("{}/src/bin/consumer.rs", example_directory);
-  fs::write(&rust_consumer_rs_filename, &rust_consumer_rs)?;
-  context.print_outcome(format!("created file '{}'", rust_consumer_rs_filename));
+  let consumer_rs = apply_template(BIN_CONSUMER_RS_TEMPLATE, EXAMPLE_CONSUMER, bundle_configuration, bundle_directory, "  ")?;
+  let consumer_rs_filename = format!("{}/src/bin/consumer.rs", example_directory);
+  fs::write(&consumer_rs_filename, &consumer_rs)?;
+  context.print_outcome(format!("created file '{}'", consumer_rs_filename));
 
-  let rust_producer_rs = apply_template(MAIN_RS_TEMPLATE_PRODUCER, EXAMPLE_PRODUCER, bundle_configuration, bundle_directory, "  ")?;
-  let rust_producer_rs_filename = format!("{}/src/bin/producer.rs", example_directory);
-  fs::write(&rust_producer_rs_filename, &rust_producer_rs)?;
-  context.print_outcome(format!("created file '{}'", rust_producer_rs_filename));
+  let producer_rs = apply_template(BIN_PRODUCER_RS_TEMPLATE, EXAMPLE_PRODUCER, bundle_configuration, bundle_directory, "  ")?;
+  let producer_rs_filename = format!("{}/src/bin/producer.rs", example_directory);
+  fs::write(&producer_rs_filename, &producer_rs)?;
+  context.print_outcome(format!("created file '{}'", producer_rs_filename));
 
   Ok(Some(example_directory))
 }
@@ -52,7 +52,7 @@ pub(crate) fn delete_rust_example_code(bundle_configuration: &ProxyCertificateBu
   Ok(())
 }
 
-const CARGO_TOML_TEMPLATE_CTRLC: &str = r#"[package]
+const CARGO_TOML_TEMPLATE: &str = r#"[package]
 name = "{{proxy-name}}-{{example}}"
 version = "0.1.0"
 edition = "2024"
@@ -62,7 +62,7 @@ ctrlc = "3"
 rdkafka = { version = "0.39", features = ["ssl-vendored"], default-features = false }
 "#;
 
-const MAIN_RS_TEMPLATE_CONSUMER: &str = r#"use ctrlc::set_handler;
+const BIN_CONSUMER_RS_TEMPLATE: &str = r#"use ctrlc::set_handler;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 "#;
 
-const MAIN_RS_TEMPLATE_PRODUCER: &str = r#"use ctrlc::set_handler;
+const BIN_PRODUCER_RS_TEMPLATE: &str = r#"use ctrlc::set_handler;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{BaseProducer, BaseRecord};
 use std::env::args;

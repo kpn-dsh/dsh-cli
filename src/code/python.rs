@@ -11,17 +11,17 @@ pub(crate) fn generate_python_example_code(bundle_configuration: &ProxyCertifica
   context.print_outcome(format!("created directory '{}'", example_directory));
 
   let python_consumer = apply_template(PYTHON_TEMPLATE_CONSUMER, EXAMPLE_CONSUMER, bundle_configuration, bundle_directory, "    ")?;
-  let python_consumer_filename = format!("{}/{}-{}.py", example_directory, bundle_configuration.proxy_name, EXAMPLE_CONSUMER);
+  let python_consumer_filename = format!("{}/{}.py", example_directory, EXAMPLE_CONSUMER);
   fs::write(&python_consumer_filename, &python_consumer)?;
   context.print_outcome(format!("created file '{}'", python_consumer_filename));
 
   let python_list_topics = apply_template(PYTHON_TEMPLATE_LIST_TOPICS, EXAMPLE_LIST_TOPICS, bundle_configuration, bundle_directory, "    ")?;
-  let python_list_topics_filename = format!("{}/{}-{}.py", example_directory, bundle_configuration.proxy_name, EXAMPLE_LIST_TOPICS);
+  let python_list_topics_filename = format!("{}/{}.py", example_directory, EXAMPLE_LIST_TOPICS);
   fs::write(&python_list_topics_filename, &python_list_topics)?;
   context.print_outcome(format!("created file '{}'", python_list_topics_filename));
 
   let python_producer = apply_template(PYTHON_TEMPLATE_PRODUCER, EXAMPLE_PRODUCER, bundle_configuration, bundle_directory, "    ")?;
-  let python_producer_filename = format!("{}/{}-{}.py", example_directory, bundle_configuration.proxy_name, EXAMPLE_PRODUCER);
+  let python_producer_filename = format!("{}/{}.py", example_directory, EXAMPLE_PRODUCER);
   fs::write(&python_producer_filename, &python_producer)?;
   context.print_outcome(format!("created file '{}'", python_producer_filename));
 
