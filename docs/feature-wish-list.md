@@ -2,4 +2,5 @@
 
 * Health check capability.
 * Deploy and undeploy capabilities wait/poll for result.
-* Add api environment variables to the --env-vars option
+* Add api environment variables to the --env-vars option.
+* Read-only feature.
