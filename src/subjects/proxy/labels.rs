@@ -1,7 +1,7 @@
+use crate::bundle::ProxyCertificateBundleConfig;
 use crate::directory::{CA_CERTIFICATE_FILENAME, CLIENT_CERTIFICATE_FILENAME, CLIENT_KEY_FILENAME};
 use crate::formatters::Value;
 use crate::formatters::{ColumnAlignment, Label, SubjectFormatter};
-use crate::proxy_bundles::ProxyCertificateBundleConfig;
 use dsh_api::types::KafkaProxy;
 use itertools::Itertools;
 use serde::Serialize;

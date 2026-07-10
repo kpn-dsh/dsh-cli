@@ -1,6 +1,6 @@
+use crate::bundle::ProxyCertificateBundleConfig;
 use crate::code::{apply_template, example_directory, EXAMPLE_CONSUMER, EXAMPLE_LIST_TOPICS, EXAMPLE_PRODUCER, LANGUAGE_JAVASCRIPT};
 use crate::context::Context;
-use crate::proxy_bundles::ProxyCertificateBundleConfig;
 use crate::DshCliResult;
 use std::fs;
 use std::fs::{create_dir_all, exists, remove_dir_all};
@@ -86,11 +86,7 @@ async function main() {
 
   const kafka = new Kafka(kafkaConfig);
   let consumer = kafka.consumer({
-    kafkaJS: {
-      groupId,
-      sessionTimeout: 30000,
-      heartbeatInterval: 3000,
-    }
+    kafkaJS: { groupId }
   });
   await consumer.connect();
   await consumer.subscribe({topic: topic});
@@ -137,11 +133,7 @@ async function main() {
 
   const kafka = new Kafka(kafkaConfig);
   let consumer = kafka.consumer({
-    kafkaJS: {
-      groupId,
-      sessionTimeout: 30000,
-      heartbeatInterval: 3000,
-    }
+    kafkaJS: { groupId }
   });
   await consumer.connect();
   let admin = consumer.dependentAdmin();

@@ -1,4 +1,5 @@
 use crate::arguments::certificate_id_argument;
+use crate::bundle::DshCertificate;
 use crate::capability::{Capability, CommandExecutor, DELETE_COMMAND, DELETE_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
@@ -11,7 +12,6 @@ use crate::formatters::{hashmap_to_table, vec_to_table, OutputFormat, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::global_options::{expiration_option, get_expiration_days};
 use crate::issues::{Issue, IssueDescription, IssueLabel, Severity};
-use crate::proxy_bundles::DshCertificate;
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::{Requirements, Subject};
 use crate::subjects::secret::{secrets_with_metadata, SecretLabel};
@@ -76,7 +76,7 @@ impl Subject for CertificateSubject {
   }
 }
 
-static CERTIFICATE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static CERTIFICATE_DELETE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(
       DELETE_COMMAND,
@@ -87,7 +87,7 @@ static CERTIFICATE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync
     .add_target_argument(certificate_id_argument().required(true)),
   )
 });
-static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &CertificateList {}, "List certificates")
       .set_long_about("Lists all available certificates.")
@@ -102,7 +102,7 @@ static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>
       ]),
   )
 });
-static CERTIFICATE_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static CERTIFICATE_SHOW_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &CertificateShow {}, "Show certificate configuration")
       .add_command_executors(vec![
@@ -616,7 +616,7 @@ fn dn_type_name(dn_type: &DnType) -> &'static str {
 /// * `Some(Vec<IssueDescription>)` - List of tuples describing the issues found
 ///   (at least one).
 /// * `None` - No issues where found.
-fn has_issues(certificate_status: DshApiResult<CertificateStatus>, secrets: &[SecretTuple], days: Option<u64>, only_errors: bool) -> Option<Vec<IssueDescription>> {
+fn has_issues(certificate_status: DshApiResult<CertificateStatus>, secrets: &[SecretTuple], days: Option<u64>, only_errors: bool) -> Option<Vec<IssueDescription<'_>>> {
   let certificate_status = match certificate_status {
     Ok(certificate_status) => certificate_status,
     Err(_) => return Some(vec![(None, Issue::Unexpected { message: "could not get certificate status".to_string() })]),

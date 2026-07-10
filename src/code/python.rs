@@ -1,6 +1,6 @@
+use crate::bundle::ProxyCertificateBundleConfig;
 use crate::code::{apply_template, example_directory, EXAMPLE_CONSUMER, EXAMPLE_LIST_TOPICS, EXAMPLE_PRODUCER, LANGUAGE_PYTHON};
 use crate::context::Context;
-use crate::proxy_bundles::ProxyCertificateBundleConfig;
 use crate::DshCliResult;
 use std::fs;
 use std::fs::{create_dir_all, exists, remove_dir_all};

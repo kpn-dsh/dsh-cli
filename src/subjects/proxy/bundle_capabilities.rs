@@ -1,3 +1,4 @@
+use crate::bundle::{LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::capability::CommandExecutor;
 use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
@@ -7,7 +8,6 @@ use crate::directory::{
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::global_options::get_expiration_days;
-use crate::proxy_bundles::{LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::secret_metadata::secret_metadata;
 use crate::subject::Requirements;
 use crate::subjects::aclgroup::options::ACL_GROUP_NAME_OPTION;

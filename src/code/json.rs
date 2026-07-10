@@ -1,6 +1,6 @@
+use crate::bundle::ProxyCertificateBundleConfig;
 use crate::code::apply_template;
 use crate::context::Context;
-use crate::proxy_bundles::ProxyCertificateBundleConfig;
 use crate::DshCliResult;
 use std::fs;
 use std::fs::{exists, remove_file};

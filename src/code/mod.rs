@@ -1,9 +1,9 @@
+use crate::bundle::ProxyCertificateBundleConfig;
 use crate::code::javascript::{delete_javascript_example_code, generate_javascript_example_code, javascript_example_code_exists};
 use crate::code::json::{delete_json_configuration, generate_json_configuration, json_configuration_exists};
 use crate::code::python::{delete_python_example_code, generate_python_example_code, python_example_code_exists};
 use crate::code::rust::{delete_rust_example_code, generate_rust_example_code, rust_example_code_exists};
 use crate::context::Context;
-use crate::proxy_bundles::ProxyCertificateBundleConfig;
 use crate::{err, DshCliResult};
 use itertools::Itertools;
 
