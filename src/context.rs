@@ -39,10 +39,11 @@ use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
 use OutputFormat::Csv;
 
-#[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
+#[derive(clap::ValueEnum, Eq, Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) enum BrowserMethod {
   /// User will be instructed to open the browser
   #[serde(rename = "instruct")]
+  #[default]
   Instruct,
   /// Tool will try to open the browser automatically
   #[serde(rename = "open")]
@@ -67,12 +68,6 @@ impl Display for BrowserMethod {
       Self::Instruct => write!(f, "instruct"),
       Self::Open => write!(f, "open"),
     }
-  }
-}
-
-impl Default for BrowserMethod {
-  fn default() -> Self {
-    Self::Instruct
   }
 }
 
@@ -934,10 +929,8 @@ impl Context {
         Err(error) => {
           debug!("could not get allocation status for {} ({})", subject, error);
           match self.verbosity {
-            Verbosity::Low | Verbosity::Medium | Verbosity::High => {
-              if self.verbosity == Verbosity::High {
-                self.eprintln_warning(format!("could not get allocation status for {}", subject));
-              }
+            Verbosity::Low | Verbosity::Medium | Verbosity::High if self.verbosity == Verbosity::High => {
+              self.eprintln_warning(format!("could not get allocation status for {}", subject));
             }
             _ => {}
           }

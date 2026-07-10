@@ -75,7 +75,7 @@ impl Subject for AppSubject {
 }
 
 lazy_static! {
-  static ref APP_DEPLOY_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref APP_DEPLOY_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DEPLOY_COMMAND, None, &AppDeploy {}, "Deploy app")
       .set_long_about(DEPLOY_LONG_ABOUT)
       .add_target_argument(manifest_id_argument().required(true))
@@ -84,7 +84,7 @@ lazy_static! {
       .add_extra_argument(app_parameter_argument())
       .add_modifier_flag(ModifierFlagType::ImplicitDefaults, None)
   );
-  static ref APP_EXPLAIN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref APP_EXPLAIN_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EXPLAIN_COMMAND, None, &ManifestExplain {}, "Explain manifest configuration")
       .set_long_about(
         "Explain an app manifest from the app catalog. This explanation will describe all \
@@ -96,7 +96,7 @@ lazy_static! {
       .add_target_argument(manifest_id_argument().required(true))
       .add_target_argument(manifest_version_argument())
   );
-  static ref APP_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref APP_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &AppList {}, "List deployed apps")
       .set_long_about(
         "Lists all apps deployed from the DSH app catalog. If the --ids option is provided \
@@ -104,17 +104,17 @@ lazy_static! {
       )
       .add_command_executor(FlagType::Ids, &AppListIds {}, None)
   );
-  static ref APP_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref APP_OPEN_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), &AppOpen {}, "Open app vhost")
       .set_long_about("Open the vhost of an app deployed from the DSH app catalog.")
       .add_target_argument(app_id_argument().required(true))
   );
-  static ref APP_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref APP_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &AppShow {}, "Show deployed app configuration")
       .set_long_about("Show the configuration of an app deployed from the DSH app catalog.")
       .add_target_argument(app_id_argument().required(true))
   );
-  static ref APP_UNDEPLOY_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref APP_UNDEPLOY_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(UNDEPLOY_COMMAND, None, &AppUndeploy {}, "Undeploy app")
       .set_long_about("Undeploy an app.")
       .add_target_argument(app_id_argument().required(true))

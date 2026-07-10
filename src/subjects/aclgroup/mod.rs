@@ -74,7 +74,7 @@ impl Subject for AclGroupSubject {
   }
 }
 
-static ACL_GROUP_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ACL_GROUP_CREATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &AclGroupCreate {}, "Create proxy ACL group on dsh")
       .set_long_about(
@@ -91,12 +91,12 @@ static ACL_GROUP_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>
       .add_extra_argument(write_topic_option()),
   )
 });
-static ACL_GROUP_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ACL_GROUP_DELETE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &AclGroupDelete {}, "Delete Kafka ACL group").add_target_argument(acl_group_name_argument().required(true)),
   )
 });
-static ACL_GROUP_GRANT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ACL_GROUP_GRANT_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(GRANT_COMMAND, None, &AclGroupGrant {}, "Grant stream access to a proxy ACL group")
       .add_target_argument(acl_group_name_argument().required(true))
@@ -108,20 +108,20 @@ static ACL_GROUP_GRANT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>>
       .add_extra_argument(write_topic_option()),
   )
 });
-static ACL_GROUP_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ACL_GROUP_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &AclGroupList {}, "List DSH Kafka proxy ACL groups")
       .set_long_about("Lists all Kafka proxy ACL groups configured on the DSH.")
       .add_command_executor(FlagType::Ids, &AclGroupListIds {}, None),
   )
 });
-static ACL_GROUP_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ACL_GROUP_SHOW_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &AclGroupShow {}, "Show Kafka proxy ACL group configuration")
       .add_target_argument(acl_group_name_argument().required(true)),
   )
 });
-static ACL_GROUP_REVOKE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ACL_GROUP_REVOKE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(REVOKE_COMMAND, None, &AclGroupRevoke {}, "Revoke stream access from a proxy ACL group")
       .add_target_argument(acl_group_name_argument().required(true))
@@ -192,7 +192,6 @@ struct AclGroupDelete {}
 impl CommandExecutor for AclGroupDelete {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     let acl_group_name = target.unwrap_or_else(|| unreachable!());
-
     match client.get_aclgroup_configuration(&acl_group_name).await {
       Ok(acl_group) => {
         list_streams(&acl_group_name, &acl_group, context)?;
@@ -452,7 +451,7 @@ fn get_streams<'a>(readable_streams: &'a Vec<KafkaAclGroupTopic>, writable_strea
     .iter()
     .map(|((name, kind), (readable, writable))| (*name, *kind, *readable, *writable))
     .collect_vec();
-  vec.sort_by(|(name_a, _, _, _), (name_b, _, _, _)| name_a.cmp(name_b));
+  vec.sort_by_key(|(name, _, _, _)| *name);
   vec
 }
 

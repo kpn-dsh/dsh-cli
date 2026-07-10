@@ -71,15 +71,15 @@ impl Subject for PlatformSubject {
 }
 
 lazy_static! {
-  static ref PLATFORM_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref PLATFORM_EXPORT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EXPORT_COMMAND, None, &PlatformExport {}, "Export default platform configuration").set_long_about(
       "Export the default platform configuration json file from the dsh-api library. \
         This file can be used as a starting point when platform customization is required."
     )
   );
-  static ref PLATFORM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+  static ref PLATFORM_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> =
     Box::new(CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &PLatformList {}, "List platforms").set_long_about("Lists all dsh platforms."));
-  static ref PLATFORM_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref PLATFORM_OPEN_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), &PlatformOpen {}, "Open console or web application")
       .set_long_about("Open the DSH console, monitoring page or the web application for the tenant or a service.")
       .add_subcommands(vec![
@@ -100,7 +100,7 @@ lazy_static! {
         Command::new(OPEN_TRACING).about("Open the tracing application for the target platform")
       ])
   );
-  static ref PLATFORM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref PLATFORM_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &PlatformShow {}, "Show platform data")
       .set_long_about("Show platform data.")
       .add_extra_arguments(vec![

@@ -59,7 +59,7 @@ impl Subject for VhostSubject {
 }
 
 lazy_static! {
-  static ref VHOST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref VHOST_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &VhostList {}, "List used vhosts")
       .set_long_about(
         "List vhosts that have been configured in one or more services. Vhosts that are \

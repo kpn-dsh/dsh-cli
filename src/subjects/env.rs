@@ -57,7 +57,7 @@ impl Subject for EnvSubject {
 }
 
 lazy_static! {
-  static ref ENV_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref ENV_FIND_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), &EnvFind {}, "Find environment variable values")
       .set_long_about("Find values in environment variables in the configurations of services and apps deployed on the DSH.")
       .add_filter_flags(vec![
@@ -92,7 +92,7 @@ impl CommandExecutor for EnvFind {
     let services = &client.get_application_configuration_map().await?;
     context.print_execution_time(start_instant);
     let mut service_pairs = services.iter().collect_vec();
-    service_pairs.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
+    service_pairs.sort_by_key(|(service_id, _)| *service_id);
     let mut matching_services: Vec<(String, HashMap<ServiceEnvLabel, String>)> = vec![];
     for (service_id, service) in service_pairs {
       if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {

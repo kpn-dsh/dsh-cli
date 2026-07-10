@@ -75,7 +75,7 @@ pub(crate) static PROXY_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Se
   ]
 });
 
-static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static BUNDLE_CODE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(CODE_COMMAND, None, &BundleCode {}, "Generate example client code")
       .add_target_argument(proxy_id_argument().required(true))
@@ -84,7 +84,7 @@ static BUNDLE_CODE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = L
   )
 });
 
-static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(
       CREATE_COMMAND,
@@ -100,7 +100,7 @@ static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> =
     .add_extra_argument(vhost_zone_option()),
   )
 });
-static BUNDLE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static BUNDLE_DELETE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(
       DELETE_COMMAND,
@@ -111,7 +111,7 @@ static BUNDLE_DELETE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> =
     .add_target_argument(proxy_id_argument().required(true)),
   )
 });
-static PROXY_BUNDLE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static PROXY_BUNDLE_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ProxyList {}, "List dsh proxies")
       .set_long_about("Lists all Kafka proxies used by the services and apps on the DSH.")
@@ -119,7 +119,7 @@ static PROXY_BUNDLE_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)
       .add_command_executor(FlagType::Ids, &ProxyListIds {}, None),
   )
 });
-static PROXY_BUNDLE_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static PROXY_BUNDLE_SHOW_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ProxyShow {}, "Show Kafka proxy configuration")
       .add_target_argument(proxy_id_argument().required(true))
@@ -127,7 +127,7 @@ static PROXY_BUNDLE_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)
       .add_extra_argument(expiration_option()),
   )
 });
-static PROXY_DEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static PROXY_DEPLOY_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(DEPLOY_COMMAND, None, &ProxyDeploy {}, "Deploy local proxy on dsh")
       .set_long_about("Deploy a Kafka proxy.")
@@ -137,7 +137,7 @@ static PROXY_DEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = 
       .add_extra_argument(mem_option().help_heading(COMMAND_OPTIONS_HEADING)),
   )
 });
-pub(crate) static PROXY_UNDEPLOY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+pub(crate) static PROXY_UNDEPLOY_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(UNDEPLOY_COMMAND, None, &ProxyUndeploy {}, "Undeploy proxy from dsh")
       .set_long_about("Undeploy a Kafka proxy.")

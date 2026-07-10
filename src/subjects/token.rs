@@ -58,11 +58,11 @@ impl Subject for TokenSubject {
 }
 
 lazy_static! {
-  static ref TOKEN_COPY_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+  static ref TOKEN_COPY_CAPABILITY: Box<dyn Capability + Send + Sync> =
     Box::new(CapabilityBuilder::new(COPY_COMMAND, None, &TokenCopy {}, "Copy token to clipboard").set_long_about("Fetch a DSH API token and copy it to the clipboard."));
-  static ref TOKEN_FETCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+  static ref TOKEN_FETCH_CAPABILITY: Box<dyn Capability + Send + Sync> =
     Box::new(CapabilityBuilder::new(FETCH_COMMAND, None, &TokenFetch {}, "Fetch token").set_long_about("Fetch a DSH API token."));
-  static ref TOKEN_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TOKEN_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TokenShow {}, "Show token payload")
       .set_long_about("Fetch a DSH API token and show its payload contents.")
       .add_filter_flag(FilterFlagType::Complete, Some("Include header contents.".to_string()))

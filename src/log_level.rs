@@ -13,13 +13,14 @@ use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::io::{stdout, IsTerminal};
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(clap::ValueEnum, Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum LogLevel {
   /// No logging will be printed
   #[serde(rename = "off")]
   Off,
   /// Only errors will be logged
   #[serde(rename = "error")]
+  #[default]
   Error,
   /// Warnings and errors will be logged
   #[serde(rename = "warn")]
@@ -112,12 +113,6 @@ impl From<LogLevel> for LevelFilter {
       LogLevel::Debug => LevelFilter::Debug,
       LogLevel::Trace => LevelFilter::Trace,
     }
-  }
-}
-
-impl Default for LogLevel {
-  fn default() -> Self {
-    Self::Error
   }
 }
 

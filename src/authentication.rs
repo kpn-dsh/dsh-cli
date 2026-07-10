@@ -27,10 +27,11 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use tokio::task::spawn_blocking;
 
-#[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
+#[derive(clap::ValueEnum, Eq, Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) enum AuthenticationMethod {
   /// Use the robot account to authenticate and authorize
   #[serde(rename = "robot")]
+  #[default]
   Robot,
   /// Use single-sign-on to authenticate and authorize
   #[serde(rename = "sso")]
@@ -56,12 +57,6 @@ impl Display for AuthenticationMethod {
       Self::Robot => write!(f, "robot"),
       Self::SingleSignOn => write!(f, "single-sign-on"),
     }
-  }
-}
-
-impl Default for AuthenticationMethod {
-  fn default() -> Self {
-    Self::Robot
   }
 }
 

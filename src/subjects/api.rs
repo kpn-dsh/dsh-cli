@@ -61,13 +61,13 @@ impl Subject for ApiSubject {
 
 #[cfg(feature = "manage")]
 lazy_static! {
-  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
-  static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
-  static ref API_HEAD_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(HEAD_COMMAND, HEAD_ABOUT, HEAD_LONG_ABOUT, &ApiHead {});
-  static ref API_PATCH_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PATCH_COMMAND, PATCH_ABOUT, PATCH_LONG_ABOUT, &ApiPatch {});
-  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
-  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
-  static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(CapabilityBuilder::new(
+  static ref API_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
+  static ref API_GET_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
+  static ref API_HEAD_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(HEAD_COMMAND, HEAD_ABOUT, HEAD_LONG_ABOUT, &ApiHead {});
+  static ref API_PATCH_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(PATCH_COMMAND, PATCH_ABOUT, PATCH_LONG_ABOUT, &ApiPatch {});
+  static ref API_POST_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
+  static ref API_PUT_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
+  static ref API_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(CapabilityBuilder::new(
     SHOW_COMMAND,
     Some(SHOW_COMMAND_ALIAS),
     &ApiShow {},
@@ -86,11 +86,11 @@ lazy_static! {
 
 #[cfg(not(feature = "manage"))]
 lazy_static! {
-  static ref API_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
-  static ref API_GET_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
-  static ref API_POST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
-  static ref API_PUT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
-  static ref API_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(CapabilityBuilder::new(
+  static ref API_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
+  static ref API_GET_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
+  static ref API_POST_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
+  static ref API_PUT_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
+  static ref API_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(CapabilityBuilder::new(
     SHOW_COMMAND,
     Some(SHOW_COMMAND_ALIAS),
     &ApiShow {},
@@ -135,7 +135,7 @@ fn create_generic_capability<'a>(
   about: &str,
   long_about: &str,
   command_executor: &'a (dyn CommandExecutor + Send + Sync),
-) -> Box<(dyn Capability + Send + Sync + 'a)> {
+) -> Box<dyn Capability + Send + Sync + 'a> {
   let subcommands = method_descriptors(method)
     .iter()
     .map(|(selector, method_descriptor)| create_generic_capability_selector_command(method, selector, method_descriptor))
@@ -230,17 +230,17 @@ fn create_long_about(method_command: &str, method_descriptor: &MethodDescriptor,
             )
           } else {
             format!(
-          "Requires string data representing a {}. This string data can either be piped from another application, redirected from a file or provided by the user interactively. {}",
-          body_type, response_string
-        )
+              "Requires string data representing a {}. This string data can either be piped from another application, redirected from a file or provided by the user interactively. {}",
+              body_type, response_string
+            )
           }
         })
         .unwrap_or(response_string),
     ),
   ]
-  .iter()
-  .flatten()
-  .join("\n")
+    .iter()
+    .flatten()
+    .join("\n")
 }
 
 struct ApiDelete {}

@@ -43,33 +43,33 @@ lazy_static! {
 }
 
 lazy_static! {
-  static ref SERVICE_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_CREATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &ServiceCreate {}, "Create service")
       .set_long_about("Create a new service.")
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &ServiceDelete {}, "Delete service")
       .set_long_about("Deletes a service from the DSH platform.")
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_DUPLICATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_DUPLICATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DUPLICATE_COMMAND, None, &ServiceDuplicate {}, "Duplicate service configuration")
       .set_long_about("Duplicate a service configuration and update it using your default editor.")
       .add_target_argument(service_id_argument().required(true))
       .add_extra_argument(Arg::new("verbatim-flag").long("verbatim").action(ArgAction::SetTrue).help("Verbatim duplicate"))
   );
-  static ref SERVICE_EDIT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_EDIT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EDIT_COMMAND, None, &ServiceEdit {}, "Edit service configuration")
       .set_long_about("Edit the service configuration using your default editor.")
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_EXPORT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EXPORT_COMMAND, None, &ServiceExport {}, "Export service configuration")
       .set_long_about("Export the service configuration file.")
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ServiceListAll {}, "List services")
       .set_long_about(
         "Lists all DSH services. \
@@ -85,34 +85,34 @@ lazy_static! {
         (FilterFlagType::Stopped, Some("List all stopped services.".to_string()))
       ])
   );
-  static ref SERVICE_OPEN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_OPEN_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), &ServiceOpen {}, "Open service vhost")
       .set_long_about("Open the vhost of a DSH service.")
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_RESTART_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_RESTART_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(RESTART_COMMAND, None, &ServiceRestart {}, "Restart service")
       .set_long_about("Restarts an already running service.")
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ServiceShow {}, "Show service configuration")
       .set_long_about("Show the configuration of a DSH service.")
       .add_command_executors(vec![(FlagType::AllocationStatus, &ServiceShowAllocationStatus {}, None),])
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_START_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_START_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(START_COMMAND, None, &ServiceStart {}, "Start service")
       .set_long_about("Start a DSH service.")
       .add_target_argument(service_id_argument().required(true))
       .add_extra_argument(instances_option().help_heading(COMMAND_OPTIONS_HEADING))
   );
-  static ref SERVICE_STOP_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_STOP_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(STOP_COMMAND, None, &ServiceStop {}, "Stop service")
       .set_long_about("Stop a running DSH service, by setting the number of instances to 0.")
       .add_target_argument(service_id_argument().required(true))
   );
-  static ref SERVICE_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SERVICE_UPDATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &ServiceUpdate {}, "Update service")
       .set_long_about("Update a DSH service.")
       .add_target_argument(service_id_argument().required(true))

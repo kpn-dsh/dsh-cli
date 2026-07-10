@@ -54,7 +54,7 @@ impl Subject for MetricSubject {
 }
 
 lazy_static! {
-  static ref METRIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref METRIC_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &MetricList {}, "List exported metrics")
       .set_long_about("List all services/apps that have metrics export configured.")
       .add_filter_flags(vec![(FilterFlagType::Started, None), (FilterFlagType::Stopped, None)])
@@ -99,7 +99,7 @@ impl CommandExecutor for MetricList {
 
 fn metrics_usage_from_services(services: &HashMap<String, Application>, include_started: bool, include_stopped: bool) -> Vec<MetricUsage> {
   let mut services = services.iter().collect_vec();
-  services.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
+  services.sort_by_key(|(service_id, _)| *service_id);
   let mut metric_uage: Vec<MetricUsage> = vec![];
   for (service_id, service) in services {
     if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) {

@@ -116,7 +116,7 @@ pub(crate) fn get_configured_environment_variables() -> Vec<(&'static str, Strin
       }
     }
   }
-  environment_variables.sort_by(|(env_var_a, _), (env_var_b, _)| env_var_a.cmp(env_var_b));
+  environment_variables.sort_by_key(|(env_var, _)| *env_var);
   environment_variables
 }
 

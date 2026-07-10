@@ -2,9 +2,10 @@ use crate::context::Context;
 use crate::subjects::certificate::format_distinguished_name;
 use chrono::{DateTime, Days, Utc};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) enum Value {
   DistinguishedName(String),
+  #[default]
   Empty,
   Error(String),
   Hide,
@@ -448,11 +449,5 @@ impl Value {
       Self::Unreachable => "unreachable".to_string(),
       Self::Warn(value) => value.to_string(),
     }
-  }
-}
-
-impl Default for Value {
-  fn default() -> Self {
-    Self::Empty
   }
 }

@@ -59,7 +59,7 @@ impl Subject for ImageSubject {
 }
 
 lazy_static! {
-  static ref IMAGE_FIND_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref IMAGE_FIND_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(FIND_COMMAND, Some(FIND_COMMAND_ALIAS), &ImageFind {}, "Find used images")
       .set_long_about("Find all services and/or apps that use a given Harbor image.")
       .add_filter_flags(vec![
@@ -69,7 +69,7 @@ lazy_static! {
       .add_target_argument(query_argument(None).required(true))
       .add_modifier_flag(ModifierFlagType::Regex, None)
   );
-  static ref IMAGE_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref IMAGE_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ImageListAll {}, "List images")
       .set_long_about(
         "Lists all images that are deployed in at least one service. \
@@ -137,7 +137,7 @@ static IMAGE_USAGE_LABELS: [ImageUsageLabel; 8] = [
 fn list_images(services: HashMap<String, Application>, query_processor: &dyn QueryProcessor, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
   let (include_started, include_stopped) = include_started_stopped(matches);
   let mut services = services.iter().collect_vec();
-  services.sort_by(|(service_id_a, _), (service_id_b, _)| service_id_a.cmp(service_id_b));
+  services.sort_by_key(|(service_id, _)| *service_id);
   let mut images: HashMap<String, Vec<ImageUsage>> = HashMap::new();
   for (service_id, service) in services {
     if (service.instances > 0 && include_started) || (service.instances == 0 && include_stopped) && !service.image.is_empty() {

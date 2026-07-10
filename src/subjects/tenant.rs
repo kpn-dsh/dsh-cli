@@ -44,19 +44,19 @@ lazy_static! {
 }
 
 lazy_static! {
-  static ref TENANT_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_CREATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TenantCreate {}, "Create managed tenant")
       .set_long_about("Create a configured managed tenant.")
       .add_target_argument(managed_tenant_argument().required(true))
       .add_extra_argument(tracing_flag())
       .add_extra_argument(vpn_flag())
   );
-  static ref TENANT_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &TenantDelete {}, "Delete managed tenant")
       .set_long_about("Delete a managed tenant and its configuration.")
       .add_target_argument(managed_tenant_argument().required(true))
   );
-  static ref TENANT_GRANT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_GRANT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(GRANT_COMMAND, None, &TenantGrant {}, "Grant access rights")
       .set_long_about(
         "Grant a managed tenant read and/or write access rights to restricted resources \
@@ -67,14 +67,14 @@ lazy_static! {
       .add_extra_argument(stream_write_flag("Grant"))
       .add_extra_argument(stream_rw_flag("Grant"))
   );
-  static ref TENANT_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TenantListAll {}, "List managed tenants")
       .set_long_about("Lists all managed tenants.")
       .add_target_argument(managed_tenant_argument())
       .add_command_executor(FlagType::Ids, &TenantListIds {}, None)
       .add_command_executor(FlagType::Stream, &TenantListStreams {}, None)
   );
-  static ref TENANT_REVOKE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_REVOKE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(REVOKE_COMMAND, None, &TenantRevoke {}, "Revoke access rights")
       .set_long_about(
         "Revoke read and/or write access rights to restricted resources \
@@ -85,13 +85,13 @@ lazy_static! {
       .add_extra_argument(stream_write_flag("Revoke"))
       .add_extra_argument(stream_rw_flag("Revoke"))
   );
-  static ref TENANT_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TenantShow {}, "Show managed tenant configuration")
       .set_long_about("Show the configuration of a managed tenant.")
       .add_target_argument(managed_tenant_argument().required(true))
       .add_command_executor(FlagType::Stream, &TenantShowStreams {}, None)
   );
-  static ref TENANT_UPDATE_LIMIT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TENANT_UPDATE_LIMIT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &TenantUpdateLimit {}, "Update managed tenant limits")
       .set_long_about("Update the limits of a managed tenant.")
       .add_target_argument(managed_tenant_argument().required(true))

@@ -294,7 +294,7 @@ pub(crate) fn hashmap_to_table<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K
     .collect_vec();
   match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => {
-      key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
+      key_value_length_pairs.sort_by_key(|(key, _, _)| *key);
       key_value_length_pairs
         .into_iter()
         .map(|(key, values, key_length)| {
@@ -323,7 +323,7 @@ pub(crate) fn hashmap_to_vec<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, 
     .collect_vec();
   match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => {
-      key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
+      key_value_length_pairs.sort_by_key(|(key, _, _)| *key);
       key_value_length_pairs
         .into_iter()
         .map(|(key, values, key_length)| {

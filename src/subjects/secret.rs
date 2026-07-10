@@ -75,20 +75,20 @@ impl Subject for SecretSubject {
 }
 
 lazy_static! {
-  static ref SECRET_COPY_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+  static ref SECRET_COPY_CAPABILITY: Box<dyn Capability + Send + Sync> =
     Box::new(CapabilityBuilder::new(COPY_COMMAND, None, &SecretCopy {}, "Copy secret to clipboard").add_target_argument(secret_id_argument().required(true)));
-  static ref SECRET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SECRET_CREATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &SecretCreate {}, "Create new secret")
       .set_long_about("Create a new secret.")
       .add_target_argument(secret_id_argument().required(true))
       .add_modifier_flag(ModifierFlagType::MultiLine, None),
   );
-  static ref SECRET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SECRET_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &SecretDelete {}, "Delete secret")
       .set_long_about("Delete a secret.")
       .add_target_argument(secret_id_argument().required(true))
   );
-  static ref SECRET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SECRET_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &SecretList {}, "List secrets")
       .set_long_about("Lists all secrets used by the services and apps on the DSH.")
       .add_command_executors(vec![
@@ -103,7 +103,7 @@ lazy_static! {
       ])
       .add_extra_argument(expiration_option())
   );
-  static ref SECRET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SECRET_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &SecretShow {}, "Show secret details")
       .add_command_executor(
         FlagType::AllocationStatus,
@@ -115,7 +115,7 @@ lazy_static! {
       .add_target_argument(secret_id_argument().required(true))
       .add_extra_argument(expiration_option())
   );
-  static ref SECRET_UPDATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SECRET_UPDATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &SecretUpdate {}, "Update secret")
       .set_long_about("Update a secret.")
       .add_target_argument(secret_id_argument().required(true))

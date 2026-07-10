@@ -79,7 +79,7 @@ const CREATE_INTERNAL_FLAG: &str = "create-internal-flag";
 const CREATE_PUBLIC_FLAG: &str = "create-public-flag";
 
 lazy_static! {
-  static ref STREAM_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref STREAM_CREATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &StreamCreate {}, "Create stream")
       .add_extra_argument(
         Arg::new(CREATE_INTERNAL_FLAG)
@@ -111,12 +111,12 @@ lazy_static! {
       ])
       .set_long_about("Create an internal or public managed stream.")
   );
-  static ref STREAM_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref STREAM_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &StreamDelete {}, "Delete managed stream")
       .set_long_about("Delete an internal or public managed stream.")
       .add_target_argument(managed_stream_argument().required(true))
   );
-  static ref STREAM_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref STREAM_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &StreamListAll {}, "List streams")
       .set_long_about("Lists all available internal and public managed streams.")
       .add_filter_flags(vec![
@@ -125,7 +125,7 @@ lazy_static! {
       ])
       .add_command_executor(FlagType::Ids, &StreamListIds {}, None)
   );
-  static ref STREAM_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref STREAM_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &StreamShow {}, "Show managed stream configuration")
       .add_target_argument(managed_stream_argument().required(true))
   );

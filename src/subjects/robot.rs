@@ -68,7 +68,7 @@ impl Subject for RobotSubject {
   }
 }
 
-static ROBOT_COPY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ROBOT_COPY_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(COPY_COMMAND, None, &RobotCopy {}, "Copy robot secret from local keyring to clipboard")
       .add_target_argument(platform_name_argument().required(true))
@@ -76,7 +76,7 @@ static ROBOT_COPY_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = La
   )
 });
 
-static ROBOT_IMPORT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ROBOT_IMPORT_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(IMPORT_COMMAND, None, &RobotImport {}, "Import the robot secret from the platform secret store")
       .add_target_argument(platform_name_argument().required(true))
@@ -88,7 +88,7 @@ static ROBOT_IMPORT_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = 
   )
 });
 
-static ROBOT_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ROBOT_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(CapabilityBuilder::new(
     LIST_COMMAND,
     Some(LIST_COMMAND_ALIAS),
@@ -97,7 +97,7 @@ static ROBOT_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = La
   ))
 });
 
-static ROBOT_SET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ROBOT_SET_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(SET_COMMAND, None, &RobotSet {}, "Store a robot secret into local keyring")
       .add_target_argument(platform_name_argument().required(true))
@@ -105,7 +105,7 @@ static ROBOT_SET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = Laz
   )
 });
 
-static ROBOT_UNSET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ROBOT_UNSET_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(UNSET_COMMAND, None, &RobotUnset {}, "Remove robot secret from local keyring")
       .add_target_argument(platform_name_argument().required(true))
@@ -114,7 +114,7 @@ static ROBOT_UNSET_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = L
 });
 
 #[cfg(feature = "robot")]
-static ROBOT_UPDATE_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static ROBOT_UPDATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &RobotUpdate {}, "Request a new robot secret")
       .add_target_argument(platform_name_argument().required(true))

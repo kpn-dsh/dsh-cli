@@ -3,10 +3,11 @@ use crate::error::DshCliError;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(clap::ValueEnum, Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum Verbosity {
   /// No logging will be printed
   #[serde(rename = "off")]
+  #[default]
   Off = 1,
   /// Lowest verbosity level, only error messages will be printed
   #[serde(rename = "low")]
@@ -17,12 +18,6 @@ pub(crate) enum Verbosity {
   /// Highest verbosity level, all info will be printed
   #[serde(rename = "high")]
   High = 4,
-}
-
-impl Default for Verbosity {
-  fn default() -> Self {
-    Self::Off
-  }
 }
 
 impl TryFrom<&str> for Verbosity {

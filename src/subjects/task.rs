@@ -61,11 +61,11 @@ impl Subject for TaskSubject {
   }
 }
 
-static TASK_LIST_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static TASK_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TaskList {}, "List all tasks for a service").add_target_argument(service_id_argument().required(true)))
 });
 
-static TASK_OPEN_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static TASK_OPEN_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(
       OPEN_COMMAND,
@@ -78,7 +78,7 @@ static TASK_OPEN_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = Laz
   )
 });
 
-static TASK_SHOW_CAPABILITY: LazyLock<Box<(dyn Capability + Send + Sync)>> = LazyLock::new(|| {
+static TASK_SHOW_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TaskShow {}, "Show the task details")
       .add_target_argument(service_id_argument().required(true))

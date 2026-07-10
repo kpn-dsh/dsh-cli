@@ -56,12 +56,12 @@ impl Subject for NodepoolSubject {
 }
 
 lazy_static! {
-  static ref NODE_POOL_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref NODE_POOL_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &NodepoolList {}, "List node pools")
       .set_long_about("Lists all available node pools.")
       .add_command_executors(vec![(FlagType::Ids, &NodepoolListIds {}, None), (FlagType::Usage, &NodepoolListUsage {}, None)])
   );
-  static ref NODE_POOL_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref NODE_POOL_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &NodepoolShow {}, "Show node pool configuration")
       .add_command_executor(FlagType::Usage, &NodepoolShowUsage {}, None)
       .add_target_argument(nodepool_id_argument().required(true))

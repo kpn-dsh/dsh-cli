@@ -62,7 +62,7 @@ impl Subject for ManifestSubject {
 }
 
 lazy_static! {
-  static ref MANIFEST_EXPLAIN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_EXPLAIN_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EXPLAIN_COMMAND, None, &ManifestExplain {}, "Explain manifest configuration")
       .set_long_about(
         "Explains the app catalog manifest, including the short and long description \
@@ -72,7 +72,7 @@ lazy_static! {
       .add_target_argument(manifest_id_argument().required(true))
       .add_target_argument(manifest_version_argument())
   );
-  static ref MANIFEST_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_EXPORT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EXPORT_COMMAND, None, &ManifestExport {}, "Export manifest")
       .set_long_about(
         "Exports the app catalog manifest file. When the <VERSION> argument is not provided the \
@@ -81,7 +81,7 @@ lazy_static! {
       .add_target_argument(manifest_id_argument().required(true))
       .add_target_argument(manifest_version_argument())
   );
-  static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ManifestListLatest {}, "List manifests")
       .set_long_about(
         "Lists all manifest files from the app catalog. Only the latest final versions are \
@@ -97,7 +97,7 @@ lazy_static! {
       .add_command_executor(FlagType::Ids, &ManifestListIds {}, Some("List only the manifest identifiers.".to_string()))
       .add_filter_flag(FilterFlagType::Draft, Some("Include draft versions of the manifests.".to_string()))
   );
-  static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ManifestShow {}, "Show manifest configuration")
       .set_long_about(
         "Shows parameters in the app catalog manifest like name, description, \

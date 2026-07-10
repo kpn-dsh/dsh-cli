@@ -63,18 +63,18 @@ impl Subject for VolumeSubject {
 }
 
 lazy_static! {
-  static ref VOLUME_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref VOLUME_CREATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &VolumeCreate {}, "Create new volume")
       .set_long_about("Create a new volume.")
       .add_target_argument(volume_id_argument().required(true))
       .add_extra_argument(size_option())
   );
-  static ref VOLUME_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref VOLUME_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &VolumeDelete {}, "Delete volume")
       .set_long_about("Delete a volume.")
       .add_target_argument(volume_id_argument().required(true))
   );
-  static ref VOLUME_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref VOLUME_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &VolumeList {}, "List volumes")
       .set_long_about("Lists all available volumes.")
       .add_command_executors(vec![
@@ -84,7 +84,7 @@ lazy_static! {
         (FlagType::Usage, &VolumeListUsage {}, None)
       ])
   );
-  static ref VOLUME_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref VOLUME_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &VolumeShow {}, "Show secret configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &VolumeShowAllocationStatus {}, None),
