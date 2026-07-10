@@ -1,7 +1,8 @@
+pub(crate) mod proxy;
+
+use crate::bundle::proxy::ProxyCertificateBundleConfig;
 use crate::error::DshCliError;
 use crate::DshCliResult;
-use dsh_api::platform::{deserialize_platform, serialize_platform};
-use dsh_api::platform::{DshPlatform, VhostZone};
 use rcgen::{
   Certificate as RcgenCertificate, CertificateParams, CertificateSigningRequestParams, DistinguishedName, DnType, DnValue::PrintableString, ExtendedKeyUsagePurpose, IsCa, KeyPair,
   KeyUsagePurpose, RsaKeySize,
@@ -28,36 +29,6 @@ pub(crate) struct Validation {
   pub subject_type: Option<String>,
 }
 
-/// Contains configuration for proxy certificate bundle.
-///
-/// * `ca_common_name` - Certificate authority common name.
-/// * `enable_schema_store` - Indicates whether a schema store dns record must be
-///   included.
-/// * `kafka_acl_group` - Optional configuration for Kafka ACL group.
-/// * `number_of_dns_records` - Number of dns records.
-/// * `platform` - Platform.
-/// * `proxy_name` - Proxy name.
-/// * `tenant: String` - Tenant.
-/// * `vhost_zone` - Public or private.
-#[derive(Clone, Deserialize, Serialize)]
-pub(crate) struct ProxyCertificateBundleConfig {
-  #[serde(rename = "acl-group-name", skip_serializing_if = "Option::is_none")]
-  pub(crate) acl_group_name: Option<String>,
-  #[serde(rename = "ca-common-name")]
-  pub(crate) ca_common_name: String,
-  #[serde(rename = "enable-schema-store")]
-  pub(crate) enable_schema_store: bool,
-  #[serde(rename = "number_of_dns_records")]
-  pub(crate) number_of_dns_records: usize,
-  #[serde(deserialize_with = "deserialize_platform", serialize_with = "serialize_platform")]
-  pub(crate) platform: DshPlatform,
-  #[serde(rename = "proxy-name")]
-  pub(crate) proxy_name: String,
-  pub(crate) tenant: String,
-  #[serde(rename = "vhost-zone")]
-  pub(crate) vhost_zone: VhostZone,
-}
-
 /// Contains certificate and key-pair.
 ///
 /// * `certificate: Certificate`
@@ -65,20 +36,6 @@ pub(crate) struct ProxyCertificateBundleConfig {
 pub(crate) struct DshCertificate {
   pub certificate: RcgenCertificate,
   pub key_pair: KeyPair,
-}
-
-/// Contains proxy certificate bundle and configuration.
-///
-/// * `config: ProxyCertificateBundleConfig`
-/// * `ca_certificate: DshCertificate`
-/// * `client_certificate: DshCertificate`
-/// * `server_certificate: DshCertificate`
-#[derive(Debug)]
-pub(crate) struct ProxyCertificateBundle {
-  pub config: ProxyCertificateBundleConfig,
-  pub ca_certificate: DshCertificate,
-  pub client_certificate: DshCertificate,
-  pub server_certificate: DshCertificate,
 }
 
 pub(crate) struct LocalCertificateBundle {
@@ -94,80 +51,6 @@ pub(crate) struct LocalCertificateBundle {
 pub(crate) struct LocalCertificate {
   pub(crate) value: String,
   pub(crate) filename: String,
-}
-
-impl Debug for ProxyCertificateBundleConfig {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    let mut builder = f.debug_struct("DshCertificateConfig");
-    builder.field("acl_group_name", &self.acl_group_name);
-    builder.field("ca_common_name", &self.ca_common_name);
-    builder.field("enable_schema_store", &self.enable_schema_store);
-    builder.field("number_of_dns_records", &self.number_of_dns_records);
-    builder.field("platform", &self.platform.name());
-    builder.field("proxy_name", &self.proxy_name);
-    builder.field("tenant", &self.tenant);
-    builder.field("vhost_zone", &self.vhost_zone);
-    builder.finish()
-  }
-}
-
-impl ProxyCertificateBundleConfig {
-  pub(crate) fn client_id(&self) -> String {
-    self.tenant.clone()
-  }
-
-  // Make sure that the CN has the same value as the first SAN so that we don't 'waste' a DNS
-  // record on a unique name.
-  pub(crate) fn common_name(&self) -> DshCliResult<String> {
-    Ok(self.platform.proxy_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), 0)?)
-  }
-
-  pub(crate) fn domain_from_platform(&self) -> DshCliResult<String> {
-    match self.vhost_zone {
-      VhostZone::Private => match &self.platform.private_domain() {
-        Some(private_domain) => Ok(private_domain.to_string()),
-        None => Err(DshCliError::Configuration(format!("platform '{}' does not support private vhosts", &self.platform))),
-      },
-      VhostZone::Public => Ok(self.platform.public_domain().to_string()),
-    }
-  }
-
-  pub(crate) fn dns_entries(&self) -> DshCliResult<Vec<String>> {
-    let mut dns_entries: Vec<String> = vec![];
-    for index in 0..self.effective_number_of_dns_entries() {
-      dns_entries.push(self.platform.proxy_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), index)?);
-    }
-    if self.enable_schema_store {
-      dns_entries.push(self.platform.proxy_schema_store_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone())?);
-    }
-    Ok(dns_entries)
-  }
-
-  pub(crate) fn effective_number_of_dns_entries(&self) -> usize {
-    if self.enable_schema_store {
-      usize::min(self.number_of_dns_records, 9)
-    } else {
-      self.number_of_dns_records
-    }
-  }
-
-  pub(crate) fn group_id(&self, index: usize) -> String {
-    match &self.acl_group_name {
-      Some(acl_group_name) => self.platform.proxy_consumer_group_acl(&self.tenant, &self.proxy_name, acl_group_name, index),
-      None => self.platform.proxy_consumer_group(&self.tenant, &self.proxy_name, index),
-    }
-  }
-}
-
-impl TryFrom<ProxyCertificateBundleConfig> for ProxyCertificateBundle {
-  type Error = DshCliError;
-
-  fn try_from(config: ProxyCertificateBundleConfig) -> DshCliResult<Self> {
-    let ca_certificate = generate_ca_certificate(&config)?;
-    let client_certificate = generate_client_certificate(&config, &ca_certificate)?;
-    let server_certificate = generate_server_certificate(&config, &ca_certificate)?;
-    Ok(ProxyCertificateBundle { config, ca_certificate, client_certificate, server_certificate })
-  }
 }
 
 impl Debug for DshCertificate {
@@ -193,9 +76,9 @@ impl Debug for DshCertificate {
 /// # Parameters
 /// * `config` - Proxy certificate bundle configuration:
 ///   * `common_name`
-fn generate_ca_certificate(config: &ProxyCertificateBundleConfig) -> DshCliResult<DshCertificate> {
-  let distinguished_name = kpn_distinguished_name(&config.ca_common_name, None);
-  let mut params: CertificateParams = CertificateParams::new(vec![config.ca_common_name.clone()])?;
+fn generate_ca_certificate(ca_common_name: impl ToString) -> DshCliResult<DshCertificate> {
+  let distinguished_name = kpn_distinguished_name(ca_common_name.to_string(), None);
+  let mut params: CertificateParams = CertificateParams::new(vec![ca_common_name.to_string()])?;
   params.is_ca = IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
   params.distinguished_name = distinguished_name;
   (params.not_before, params.not_after) = not_before_not_after(365);
@@ -227,10 +110,10 @@ fn generate_ca_certificate(config: &ProxyCertificateBundleConfig) -> DshCliResul
 ///   * `config.client_id`
 ///   * `config.organizational_unit_name`
 /// * `ca_certificate` - Certificate authority certificate used to sign the generated certificate.
-fn generate_client_certificate(config: &ProxyCertificateBundleConfig, ca_certificate: &DshCertificate) -> DshCliResult<DshCertificate> {
+fn generate_client_certificate(common_name: &str, acl_group_name: Option<String>, ca_certificate: &DshCertificate) -> DshCliResult<DshCertificate> {
   let not_before_not_after = not_before_not_after(365);
   let mut params: CertificateParams = CertificateParams::new(vec![])?;
-  params.distinguished_name = kpn_distinguished_name(&config.client_id(), config.acl_group_name.clone());
+  params.distinguished_name = kpn_distinguished_name(common_name, acl_group_name);
   (params.not_before, params.not_after) = not_before_not_after;
   params.key_usages = vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment, KeyUsagePurpose::KeyAgreement];
   params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
@@ -297,10 +180,10 @@ const KPN_COUNTRY_NAME: &str = "NL";
 /// # Parameters
 /// * `common_name`
 /// * `organizational_unit_name`
-fn kpn_distinguished_name(common_name: &str, organizational_unit_name: Option<String>) -> DistinguishedName {
+fn kpn_distinguished_name(common_name: impl ToString, organizational_unit_name: Option<String>) -> DistinguishedName {
   let mut distinguished_name = DistinguishedName::new();
 
-  distinguished_name.push(DnType::CommonName, common_name);
+  distinguished_name.push(DnType::CommonName, common_name.to_string());
   distinguished_name.push(DnType::OrganizationName, KPN_ORGANIZATION_NAME);
   if let Some(organizational_unit_name) = organizational_unit_name {
     distinguished_name.push(DnType::OrganizationalUnitName, organizational_unit_name);
@@ -350,11 +233,11 @@ fn test2() -> Result<(), Box<dyn std::error::Error>> {
     params.serialize_request(&key_pair).unwrap()
   }
 
-  let platform = DshPlatform::new("nplz");
+  let platform = dsh_api::platform::DshPlatform::new("nplz");
   let acl_group_name = None;
   let proxy_name = "my-proxy".to_string();
   let tenant = "my-tenant".to_string();
-  let vhost_zone = VhostZone::Public;
+  let vhost_zone = dsh_api::platform::VhostZone::Public;
   let ca_common_name = platform.proxy_common_name(&proxy_name, &tenant, vhost_zone.clone())?;
 
   let config = ProxyCertificateBundleConfig { acl_group_name, ca_common_name, enable_schema_store: false, number_of_dns_records: 3, platform, proxy_name, tenant, vhost_zone };

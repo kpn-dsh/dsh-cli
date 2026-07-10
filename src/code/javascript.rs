@@ -1,4 +1,4 @@
-use crate::bundle::ProxyCertificateBundleConfig;
+use crate::bundle::proxy::ProxyCertificateBundleConfig;
 use crate::code::{apply_template, example_directory, EXAMPLE_CONSUMER, EXAMPLE_LIST_TOPICS, EXAMPLE_PRODUCER, LANGUAGE_JAVASCRIPT};
 use crate::context::Context;
 use crate::DshCliResult;

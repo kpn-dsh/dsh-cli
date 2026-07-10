@@ -38,7 +38,9 @@
 //! Note that the environment variables `DSH_CLI_HOME` and `HOME` must be regular environment
 //! variables and cannot be specified via the command line `--environment-variable` argument.
 
-use crate::bundle::{LocalCertificate, LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
+use crate::bundle::proxy::ProxyCertificateBundle;
+use crate::bundle::proxy::ProxyCertificateBundleConfig;
+use crate::bundle::{LocalCertificate, LocalCertificateBundle};
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
 use crate::settings::Settings;
 use crate::{err, error_map, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};

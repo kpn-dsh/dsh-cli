@@ -1,4 +1,6 @@
-use crate::bundle::{LocalCertificateBundle, ProxyCertificateBundle, ProxyCertificateBundleConfig};
+use crate::bundle::proxy::ProxyCertificateBundle;
+use crate::bundle::proxy::ProxyCertificateBundleConfig;
+use crate::bundle::LocalCertificateBundle;
 use crate::capability::CommandExecutor;
 use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
