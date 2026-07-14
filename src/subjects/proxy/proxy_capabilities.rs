@@ -9,7 +9,8 @@ use crate::formatters::OutputFormat;
 use crate::global_options::get_expiration_days;
 use crate::secret_metadata::{secret_metadata, SecretMetadata};
 use crate::subject::Requirements;
-use crate::subjects::certificate::{CertificateLabel, CERTIFICATE_LABELS_SHOW};
+use crate::subjects::certificate::capabilities::CERTIFICATE_LABELS_SHOW;
+use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::proxy::labels::KafkaProxyLabel;
 use crate::subjects::proxy::PROXY_SUBJECT_TARGET;
 use crate::subjects::secret::SecretLabel;
@@ -269,7 +270,11 @@ impl CommandExecutor for ProxyShow {
         UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, context).print(&proxy, None)?;
         let mut secret_names: Vec<String> = vec![proxy.secret_name_ca_chain];
         if let Some(actual_certificate) = &certificate_status.actual {
-          UnitFormatter::new(proxy.certificate, &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days)), None)?;
+          let validated_dns = actual_certificate
+            .dns_names
+            .first()
+            .and_then(|first_dns| client.platform().validate_vhost_domain(first_dns).ok());
+          UnitFormatter::new(proxy.certificate, &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days), validated_dns), None)?;
           secret_names.push(actual_certificate.key_secret.clone());
           secret_names.push(actual_certificate.cert_chain_secret.clone());
           if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
