@@ -1,6 +1,5 @@
-use crate::bundle::proxy::ProxyCertificateBundle;
 use crate::bundle::proxy::ProxyCertificateBundleConfig;
-use crate::bundle::LocalCertificateBundle;
+use crate::bundle::proxy::{LocalProxyCertificateBundle, ProxyCertificateBundle};
 use crate::capability::CommandExecutor;
 use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
@@ -13,7 +12,7 @@ use crate::global_options::get_expiration_days;
 use crate::secret_metadata::secret_metadata;
 use crate::subject::Requirements;
 use crate::subjects::aclgroup::options::ACL_GROUP_NAME_OPTION;
-use crate::subjects::certificate::CertificateLabel;
+use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::proxy::labels::BundleLabel;
 use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone, ENABLE_SCHEMA_STORE_OPTION, LANGUAGE_ARGUMENT};
 use crate::subjects::secret::SecretLabel;
@@ -70,7 +69,7 @@ impl CommandExecutor for BundleCode {
       None => return err!("language argument missing"),
     };
     let (bundle_configuration, bundle_directory) = match read_local_certificate_bundle(&platform, &tenant, &bundle_id) {
-      Ok(LocalCertificateBundle { configuration, .. }) => configuration,
+      Ok(LocalProxyCertificateBundle { configuration, .. }) => configuration,
       Err(_) => return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant),
     };
 
@@ -117,7 +116,7 @@ impl CommandExecutor for BundleCodeConfiguration {
     let tenant = get_target_tenant(matches, context.settings())?;
     let bundle_id = target.unwrap_or_else(|| unreachable!());
     let (bundle_configuration, bundle_directory) = match read_local_certificate_bundle(&platform, &tenant, &bundle_id) {
-      Ok(LocalCertificateBundle { configuration, .. }) => configuration,
+      Ok(LocalProxyCertificateBundle { configuration, .. }) => configuration,
       Err(_) => return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant),
     };
     context.print_explanation(format!(

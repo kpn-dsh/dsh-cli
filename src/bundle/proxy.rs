@@ -50,6 +50,21 @@ pub(crate) struct ProxyCertificateBundle {
   pub server_certificate: DshCertificate,
 }
 
+pub(crate) struct LocalProxyCertificateBundle {
+  pub(crate) configuration: (ProxyCertificateBundleConfig, String),
+  pub(crate) ca_key: LocalProxyCertificate,
+  pub(crate) ca_pem: LocalProxyCertificate,
+  pub(crate) client_key: LocalProxyCertificate,
+  pub(crate) client_pem: LocalProxyCertificate,
+  pub(crate) server_key: LocalProxyCertificate,
+  pub(crate) server_pem: LocalProxyCertificate,
+}
+
+pub(crate) struct LocalProxyCertificate {
+  pub(crate) value: String,
+  pub(crate) filename: String,
+}
+
 impl ProxyCertificateBundleConfig {
   pub(crate) fn client_id(&self) -> String {
     self.tenant.clone()
@@ -100,7 +115,7 @@ impl ProxyCertificateBundleConfig {
 
 impl Debug for ProxyCertificateBundleConfig {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    let mut builder = f.debug_struct("DshCertificateConfig");
+    let mut builder = f.debug_struct("ProxyCertificateBundleConfig");
     builder.field("acl_group_name", &self.acl_group_name);
     builder.field("ca_common_name", &self.ca_common_name);
     builder.field("enable_schema_store", &self.enable_schema_store);
@@ -118,8 +133,8 @@ impl TryFrom<ProxyCertificateBundleConfig> for ProxyCertificateBundle {
 
   fn try_from(config: ProxyCertificateBundleConfig) -> DshCliResult<Self> {
     let ca_certificate = generate_ca_certificate(&config.ca_common_name)?;
-    let client_certificate = generate_client_certificate(&config.client_id(), config.acl_group_name.clone(), &ca_certificate)?;
-    let server_certificate = generate_server_certificate(&config, &ca_certificate)?;
+    let client_certificate = generate_client_certificate(config.client_id(), config.acl_group_name.clone(), &ca_certificate)?;
+    let server_certificate = generate_server_certificate(&config.common_name()?, config.dns_entries()?, &ca_certificate)?;
     Ok(ProxyCertificateBundle { config, ca_certificate, client_certificate, server_certificate })
   }
 }
