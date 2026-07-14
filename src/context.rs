@@ -125,7 +125,7 @@ fn style_to_string(style: &Style) -> String {
 
 impl Debug for Context {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut builder = f.debug_struct("Settings");
+    let mut builder = f.debug_struct("Context");
     builder.field("authentication_method", &self.authentication_method);
     builder.field("browser_method", &self.browser_method);
 
