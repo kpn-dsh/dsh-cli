@@ -289,7 +289,7 @@ impl SubjectFormatter<TaskLabel> for TaskStatus {
         TaskLabel::LastestLog => Value::some_or_hide(task.logs),
         TaskLabel::LastUpdateAt => Value::some_or_hide(task.last_update.and_then(|update| DateTime::from_timestamp_millis(update).map(|ts| ts.to_string()))),
         TaskLabel::StagedAt => Value::plain(task.staged_at),
-        TaskLabel::StartedAt => Value::plain(task.started_at),
+        TaskLabel::StartedAt => Value::some_or_hide(task.started_at),
         TaskLabel::State => Value::plain(task.state),
         TaskLabel::StoppedAt => Value::some_or_hide(task.stopped_at),
         TaskLabel::Target => Value::plain(target_id),

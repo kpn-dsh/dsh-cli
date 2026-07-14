@@ -140,7 +140,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.0").unwrap());
+static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.1").unwrap());
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
 const OUTPUT_OPTIONS_HEADING: &str = "Output options";
