@@ -110,7 +110,7 @@ impl SubjectFormatter<KafkaProxyLabel> for KafkaProxy {
 }
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
-pub(crate) enum BundleLabel {
+pub(crate) enum ProxyBundleLabel {
   AclGroupName,
   Brokers,
   BundleDirectory,
@@ -133,7 +133,7 @@ pub(crate) enum BundleLabel {
   VhostZone,
 }
 
-impl Label for BundleLabel {
+impl Label for ProxyBundleLabel {
   fn as_str(&self) -> &str {
     match self {
       Self::AclGroupName => "acl group name",
@@ -160,59 +160,59 @@ impl Label for BundleLabel {
   }
 
   fn is_target_label(&self) -> bool {
-    matches!(self, BundleLabel::BundleName)
+    matches!(self, ProxyBundleLabel::BundleName)
   }
 }
 
-impl SubjectFormatter<BundleLabel> for (ProxyCertificateBundleConfig, String) {
-  fn value(&self, label: &BundleLabel, target_id: &str) -> Value {
+impl SubjectFormatter<ProxyBundleLabel> for (ProxyCertificateBundleConfig, String) {
+  fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
     let (config, directory) = self;
     match label {
-      BundleLabel::BundleDirectory => Value::plain(directory),
+      ProxyBundleLabel::BundleDirectory => Value::plain(directory),
       _ => config.value(label, target_id),
     }
   }
 }
 
-impl SubjectFormatter<BundleLabel> for ProxyCertificateBundleConfig {
-  fn value(&self, label: &BundleLabel, target_id: &str) -> Value {
+impl SubjectFormatter<ProxyBundleLabel> for ProxyCertificateBundleConfig {
+  fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
     match label {
-      BundleLabel::AclGroupName => Value::some_or_hide(self.acl_group_name.clone()),
-      BundleLabel::Brokers => Value::result(
+      ProxyBundleLabel::AclGroupName => Value::some_or_hide(self.acl_group_name.clone()),
+      ProxyBundleLabel::Brokers => Value::result(
         self
           .platform
           .tenant_proxy_bootstrap_servers(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), 3)
           .map(|servers| servers.join("\n")),
       ),
-      BundleLabel::BundleName => Value::target(target_id),
-      BundleLabel::CaCommonName => Value::plain(&self.ca_common_name),
-      BundleLabel::ClientId => Value::plain(self.client_id()),
-      BundleLabel::DnsEntries => Value::result(self.dns_entries().map(|dns_entry| dns_entry.join("\n"))),
-      BundleLabel::GroupId => Value::plain(self.group_id(1)),
-      BundleLabel::NumberOfDsnRecords => Value::plain(self.number_of_dns_records),
-      BundleLabel::PkiCaCertificateFilename => Value::plain(CA_CERTIFICATE_FILENAME),
-      BundleLabel::PkiClientCertificateFilename => Value::plain(CLIENT_CERTIFICATE_FILENAME),
-      BundleLabel::PkiClientKeyFilename => Value::plain(CLIENT_KEY_FILENAME),
-      BundleLabel::Platform => Value::target(&self.platform),
-      BundleLabel::PlatformDomain => Value::result(self.domain_from_platform()),
-      BundleLabel::ProxyCommonName => Value::result(self.common_name()),
-      BundleLabel::ProxyName => Value::target(&self.proxy_name),
-      BundleLabel::SchemaStore => {
+      ProxyBundleLabel::BundleName => Value::target(target_id),
+      ProxyBundleLabel::CaCommonName => Value::plain(&self.ca_common_name),
+      ProxyBundleLabel::ClientId => Value::plain(self.client_id()),
+      ProxyBundleLabel::DnsEntries => Value::result(self.dns_entries().map(|dns_entry| dns_entry.join("\n"))),
+      ProxyBundleLabel::GroupId => Value::plain(self.group_id(1)),
+      ProxyBundleLabel::NumberOfDsnRecords => Value::plain(self.number_of_dns_records),
+      ProxyBundleLabel::PkiCaCertificateFilename => Value::plain(CA_CERTIFICATE_FILENAME),
+      ProxyBundleLabel::PkiClientCertificateFilename => Value::plain(CLIENT_CERTIFICATE_FILENAME),
+      ProxyBundleLabel::PkiClientKeyFilename => Value::plain(CLIENT_KEY_FILENAME),
+      ProxyBundleLabel::Platform => Value::target(&self.platform),
+      ProxyBundleLabel::PlatformDomain => Value::result(self.domain_from_platform()),
+      ProxyBundleLabel::ProxyCommonName => Value::result(self.common_name()),
+      ProxyBundleLabel::ProxyName => Value::target(&self.proxy_name),
+      ProxyBundleLabel::SchemaStore => {
         if self.enable_schema_store {
           Value::plain("enabled")
         } else {
           Value::plain("disabled")
         }
       }
-      BundleLabel::SchemaStoreEndpoint => {
+      ProxyBundleLabel::SchemaStoreEndpoint => {
         if self.enable_schema_store {
           Value::result(self.platform.proxy_schema_store_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone()))
         } else {
           Value::hide()
         }
       }
-      BundleLabel::Tenant => Value::target(&self.tenant),
-      BundleLabel::VhostZone => Value::plain(&self.vhost_zone),
+      ProxyBundleLabel::Tenant => Value::target(&self.tenant),
+      ProxyBundleLabel::VhostZone => Value::plain(&self.vhost_zone),
       _ => Value::unreachable(),
     }
   }

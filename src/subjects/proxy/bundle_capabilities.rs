@@ -4,7 +4,7 @@ use crate::capability::CommandExecutor;
 use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
 use crate::directory::{
-  delete_proxy_certificate_bundle, list_proxy_certificate_bundles, proxy_certificate_bundle_exists, read_local_certificate_bundle, store_proxy_certificate_bundle,
+  certificate_bundle_exists, delete_certificate_bundle, list_proxy_certificate_bundles, read_local_certificate_bundle, store_proxy_certificate_bundle, BundleKind,
 };
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -13,7 +13,7 @@ use crate::secret_metadata::secret_metadata;
 use crate::subject::Requirements;
 use crate::subjects::aclgroup::options::ACL_GROUP_NAME_OPTION;
 use crate::subjects::certificate::labels::CertificateLabel;
-use crate::subjects::proxy::labels::BundleLabel;
+use crate::subjects::proxy::labels::ProxyBundleLabel;
 use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone, ENABLE_SCHEMA_STORE_OPTION, LANGUAGE_ARGUMENT};
 use crate::subjects::secret::SecretLabel;
 use crate::target_platform::get_target_platform;
@@ -24,37 +24,6 @@ use async_trait::async_trait;
 use clap::ArgMatches;
 use itertools::Itertools;
 use log::trace;
-
-static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
-  CertificateLabel::Target,
-  CertificateLabel::DistinguishedName,
-  CertificateLabel::DnsNames,
-  CertificateLabel::NotAfter,
-  CertificateLabel::NotBefore,
-  CertificateLabel::SerialNumber,
-];
-static BUNDLE_LABELS_CREATE: [BundleLabel; 10] = [
-  BundleLabel::Platform,
-  BundleLabel::Tenant,
-  BundleLabel::ProxyName,
-  BundleLabel::BundleName,
-  BundleLabel::GroupId,
-  BundleLabel::CaCommonName,
-  BundleLabel::SchemaStore,
-  BundleLabel::VhostZone,
-  BundleLabel::AclGroupName,
-  BundleLabel::NumberOfDsnRecords,
-];
-static BUNDLE_LABELS_CODE_CONFIGURATION: [BundleLabel; 8] = [
-  BundleLabel::ClientId,
-  BundleLabel::GroupId,
-  BundleLabel::BundleDirectory,
-  BundleLabel::PkiCaCertificateFilename,
-  BundleLabel::PkiClientCertificateFilename,
-  BundleLabel::PkiClientKeyFilename,
-  BundleLabel::Brokers,
-  BundleLabel::SchemaStoreEndpoint,
-];
 
 pub(crate) struct BundleCode {}
 
@@ -107,6 +76,17 @@ impl CommandExecutor for BundleCode {
   }
 }
 
+static BUNDLE_LABELS_CODE_CONFIGURATION: [ProxyBundleLabel; 8] = [
+  ProxyBundleLabel::ClientId,
+  ProxyBundleLabel::GroupId,
+  ProxyBundleLabel::BundleDirectory,
+  ProxyBundleLabel::PkiCaCertificateFilename,
+  ProxyBundleLabel::PkiClientCertificateFilename,
+  ProxyBundleLabel::PkiClientKeyFilename,
+  ProxyBundleLabel::Brokers,
+  ProxyBundleLabel::SchemaStoreEndpoint,
+];
+
 pub(crate) struct BundleCodeConfiguration {}
 
 #[async_trait]
@@ -131,6 +111,28 @@ impl CommandExecutor for BundleCodeConfiguration {
   }
 }
 
+static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
+  CertificateLabel::Target,
+  CertificateLabel::DistinguishedName,
+  CertificateLabel::DnsNames,
+  CertificateLabel::NotAfter,
+  CertificateLabel::NotBefore,
+  CertificateLabel::SerialNumber,
+];
+
+static PROXY_BUNDLE_LABELS_CREATE: [ProxyBundleLabel; 10] = [
+  ProxyBundleLabel::Platform,
+  ProxyBundleLabel::Tenant,
+  ProxyBundleLabel::ProxyName,
+  ProxyBundleLabel::BundleName,
+  ProxyBundleLabel::GroupId,
+  ProxyBundleLabel::CaCommonName,
+  ProxyBundleLabel::SchemaStore,
+  ProxyBundleLabel::VhostZone,
+  ProxyBundleLabel::AclGroupName,
+  ProxyBundleLabel::NumberOfDsnRecords,
+];
+
 pub(crate) struct BundleCreate {}
 
 #[async_trait]
@@ -140,7 +142,7 @@ impl CommandExecutor for BundleCreate {
     let tenant = get_target_tenant(matches, context.settings())?;
     let proxy_bundle_id = target.unwrap_or_else(|| unreachable!());
 
-    if proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
+    if certificate_bundle_exists(&platform, &tenant, BundleKind::Proxy, &proxy_bundle_id)? {
       context.print_warning(format!(
         "proxy certificate bundle '{}' already exists for '{}@{}'",
         proxy_bundle_id, platform, tenant
@@ -178,7 +180,7 @@ impl CommandExecutor for BundleCreate {
     if !context.quiet() {
       match context.verbosity() {
         Verbosity::Off | Verbosity::Low => (),
-        Verbosity::Medium | Verbosity::High => UnitFormatter::new(&proxy_bundle_id, &BUNDLE_LABELS_CREATE, context).print(&config, None)?,
+        Verbosity::Medium | Verbosity::High => UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_CREATE, context).print(&config, None)?,
       }
     }
 
@@ -238,7 +240,7 @@ impl CommandExecutor for BundleDelete {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant = get_target_tenant(matches, context.settings())?;
     let bundle_id = target.unwrap_or_else(|| unreachable!());
-    if !proxy_certificate_bundle_exists(&platform, &tenant, &bundle_id)? {
+    if !certificate_bundle_exists(&platform, &tenant, BundleKind::Proxy, &bundle_id)? {
       return err!("proxy certificate bundle '{}' for '{}@{}' does not exist", bundle_id, platform, tenant);
     }
     context.print_explanation(format!("delete proxy certificates bundle '{}' for '{}@{}'", bundle_id, platform, tenant));
@@ -246,7 +248,7 @@ impl CommandExecutor for BundleDelete {
       if context.dry_run() {
         context.print_warning("dry-run mode, proxy certificate bundle not deleted");
       } else {
-        delete_proxy_certificate_bundle(&platform, &tenant, &bundle_id)?;
+        delete_certificate_bundle(&platform, &tenant, BundleKind::Proxy, &bundle_id)?;
         context.print_outcome(format!("proxy certificate bundle '{}' deleted", bundle_id));
       }
     } else {
@@ -260,14 +262,14 @@ impl CommandExecutor for BundleDelete {
   }
 }
 
-static BUNDLE_LABELS_LIST: [BundleLabel; 7] = [
-  BundleLabel::BundleName,
-  BundleLabel::CaCommonName,
-  BundleLabel::SchemaStore,
-  BundleLabel::VhostZone,
-  BundleLabel::NumberOfDsnRecords,
-  BundleLabel::AclGroupName,
-  BundleLabel::BundleDirectory,
+static BUNDLE_LABELS_LIST: [ProxyBundleLabel; 7] = [
+  ProxyBundleLabel::BundleName,
+  ProxyBundleLabel::CaCommonName,
+  ProxyBundleLabel::SchemaStore,
+  ProxyBundleLabel::VhostZone,
+  ProxyBundleLabel::NumberOfDsnRecords,
+  ProxyBundleLabel::AclGroupName,
+  ProxyBundleLabel::BundleDirectory,
 ];
 
 pub(crate) struct BundleList {}
@@ -308,20 +310,20 @@ static BUNDLE_SECRET_LABELS_SHOW: [SecretLabel; 11] = [
   SecretLabel::Subject,
 ];
 
-static BUNDLE_LABELS_SHOW: [BundleLabel; 9] = [
-  BundleLabel::CaCommonName,
-  BundleLabel::SchemaStore,
-  BundleLabel::NumberOfDsnRecords,
-  BundleLabel::Platform,
-  BundleLabel::ProxyName,
-  BundleLabel::Tenant,
-  BundleLabel::VhostZone,
-  BundleLabel::AclGroupName,
-  BundleLabel::BundleDirectory,
+static BUNDLE_LABELS_SHOW: [ProxyBundleLabel; 9] = [
+  ProxyBundleLabel::CaCommonName,
+  ProxyBundleLabel::SchemaStore,
+  ProxyBundleLabel::NumberOfDsnRecords,
+  ProxyBundleLabel::Platform,
+  ProxyBundleLabel::ProxyName,
+  ProxyBundleLabel::Tenant,
+  ProxyBundleLabel::VhostZone,
+  ProxyBundleLabel::AclGroupName,
+  ProxyBundleLabel::BundleDirectory,
 ];
 
-static BUNDLE_DERIVED_LABELS_SHOW: [BundleLabel; 5] =
-  [BundleLabel::BundleName, BundleLabel::PlatformDomain, BundleLabel::DnsEntries, BundleLabel::GroupId, BundleLabel::ProxyCommonName];
+static BUNDLE_DERIVED_LABELS_SHOW: [ProxyBundleLabel; 5] =
+  [ProxyBundleLabel::BundleName, ProxyBundleLabel::PlatformDomain, ProxyBundleLabel::DnsEntries, ProxyBundleLabel::GroupId, ProxyBundleLabel::ProxyCommonName];
 
 pub(crate) struct BundleShow {}
 

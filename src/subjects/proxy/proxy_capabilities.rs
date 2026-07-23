@@ -1,6 +1,6 @@
 use crate::capability::CommandExecutor;
 use crate::context::Context;
-use crate::directory::{proxy_certificate_bundle_exists, read_proxy_certificate_bundle};
+use crate::directory::{certificate_bundle_exists, read_proxy_certificate_bundle, BundleKind};
 use crate::error::DshCliError;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
@@ -73,7 +73,7 @@ impl CommandExecutor for ProxyDeploy {
     if client.get_kafkaproxy_configuration(&proxy_bundle_id).await.is_ok() {
       return err!("proxy '{}' already exists", proxy_bundle_id);
     }
-    if !proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
+    if !certificate_bundle_exists(&platform, &tenant, BundleKind::Proxy, &proxy_bundle_id)? {
       return err!("proxy certificate bundle '{}' does not exist", proxy_bundle_id);
     }
 
