@@ -1,7 +1,7 @@
 use homedir::my_home;
 use std::fs;
 use std::fs::DirEntry;
-use std::time::UNIX_EPOCH;
+use std::os::unix::fs::MetadataExt;
 
 use sha2::Digest;
 use sha2::Sha256;
@@ -63,14 +63,13 @@ fn get_key() -> DshCliResult<Key<Aes256Gcm>> {
 /// The hash is computed by listing all the entries in the users home directory and generating
 /// the hash from all entry names plus their creation timestamp.
 ///
-/// Note that this algorithm does not guarantee that the computed has will be the same every
+/// Note that this algorithm does not guarantee that the computed hash will be the same every
 /// time the function is executed. Typically, if a new entry was added to the users home
 /// directory or when an entry has been deleted, the computed hash will change.
 fn get_system_hash() -> DshCliResult<Sha256> {
   match my_home() {
     Ok(Some(user_home_directory)) => match fs::read_dir(user_home_directory) {
       Ok(dir) => {
-        // TODO Exclude DSH_CLI_HOME
         let mut representations: Vec<String> = dir.into_iter().map(|dir_entry| entry_representation(&dir_entry?)).collect::<Result<Vec<_>, _>>()?;
         representations.sort();
         let mut hasher = Sha256::new();
@@ -90,6 +89,6 @@ fn entry_representation(entry: &DirEntry) -> DshCliResult<String> {
   Ok(format!(
     "{}:{}",
     entry.file_name().to_str().ok_or("invalid unicode in filename".to_string())?,
-    entry.metadata()?.created()?.duration_since(UNIX_EPOCH)?.as_millis()
+    entry.metadata()?.ctime()
   ))
 }
