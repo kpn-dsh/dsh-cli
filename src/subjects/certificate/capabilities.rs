@@ -295,14 +295,14 @@ impl CommandExecutor for CertificateListUsage {
 pub(crate) static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 10] = [
   CertificateLabel::Target,
   CertificateLabel::Kind,
-  CertificateLabel::CertChainSecret,
   CertificateLabel::DistinguishedName,
   CertificateLabel::DnsNames,
-  CertificateLabel::KeySecret,
   CertificateLabel::NotAfter,
   CertificateLabel::NotBefore,
   CertificateLabel::PassphraseSecret,
   CertificateLabel::SerialNumber,
+  CertificateLabel::CertChainSecret,
+  CertificateLabel::KeySecret,
 ];
 
 pub(crate) static SECRET_CERTIFICATE_LABELS: [SecretLabel; 14] = [
