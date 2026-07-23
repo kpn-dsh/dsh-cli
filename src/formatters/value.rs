@@ -166,6 +166,26 @@ impl Value {
     Self::Ignore(value.to_string())
   }
 
+  /// Create `Value` representing a list of value that might be empty or not.
+  ///
+  /// # Parameters
+  /// * `values` - `&[T]` that represents the value vector that might be empty.
+  ///
+  /// # Returns
+  /// * `Value::Plain(values)` - When `values` is not empty.
+  /// * `Value::Hide` - When `values` is empty.
+  #[cfg(feature = "rock")]
+  pub(crate) fn non_empty_or_hide<T>(values: &[T]) -> Self
+  where
+    T: ToString,
+  {
+    if values.is_empty() {
+      Value::hide()
+    } else {
+      Value::plain(values.iter().map(|value| value.to_string()).collect::<Vec<_>>().join("\n"))
+    }
+  }
+
   /// Create `Value` representing a value that is not applicable.
   ///
   /// # Returns
