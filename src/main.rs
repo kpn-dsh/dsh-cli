@@ -778,7 +778,7 @@ pub(crate) static RELEASE_LABELS: [ReleaseLabel; 5] = [ReleaseLabel::Release, Re
 
 #[test]
 fn test_open_api_version() {
-  assert_eq!(openapi_version(), &Version::new(1, 12, 0, None));
+  assert_eq!(openapi_version(), &Version::new(1, 13, 0, None));
 }
 
 #[test]
