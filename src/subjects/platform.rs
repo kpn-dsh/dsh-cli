@@ -1,6 +1,6 @@
 use crate::arguments::{
-  app_id_argument, bucket_id_argument, proxy_id_argument, service_id_argument, topic_id_argument, vendor_name_argument, vhost_id_argument, APP_ID_ARGUMENT, BUCKET_ID_ARGUMENT,
-  PROXY_ID_ARGUMENT, SERVICE_ID_ARGUMENT, TOPIC_ID_ARGUMENT, VENDOR_NAME_ARGUMENT, VHOST_ID_ARGUMENT,
+  app_id_argument, bucket_id_argument, proxy_id_argument, service_id_argument, topic_id_argument, vendor_name_argument, vhost_subdomain_argument, APP_ID_ARGUMENT,
+  BUCKET_ID_ARGUMENT, PROXY_ID_ARGUMENT, SERVICE_ID_ARGUMENT, TOPIC_ID_ARGUMENT, VENDOR_NAME_ARGUMENT, VHOST_SUBDOMAIN_ARGUMENT,
 };
 use crate::capability::{Capability, CommandExecutor, EXPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
@@ -11,7 +11,7 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::settings::Settings;
 use crate::subject::{Requirements, Subject};
-use crate::target_platform::get_target_platform_from_all_sources;
+use crate::target_platform::get_target_platform;
 use crate::target_tenant::{get_target_tenant, get_target_tenant_non_interactive};
 use crate::{err, read_single_line, DshCliResult};
 use arboard::Clipboard;
@@ -110,7 +110,7 @@ lazy_static! {
         service_id_argument().long("service"),
         topic_id_argument().long("topic"),
         vendor_name_argument().long("vendor"),
-        vhost_id_argument().long("vhost")
+        vhost_subdomain_argument().long("vhost")
       ])
   );
   static ref PLATFORM__CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
@@ -167,7 +167,7 @@ impl CommandExecutor for PlatformOpen {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
     match matches.subcommand() {
       Some((target, arg_matches)) => {
-        let platform = get_target_platform_from_all_sources(matches, context.settings())?;
+        let platform = get_target_platform(matches, context.settings())?;
         match target {
           OPEN_APP => Self::open_app(&platform, arg_matches, context),
           OPEN_CONSOLE => Self::open_console(&platform, context),
@@ -186,7 +186,7 @@ impl CommandExecutor for PlatformOpen {
     match matches.subcommand() {
       Some((target, _)) => match target {
         OPEN_SWAGGER => {
-          let platform = get_target_platform_from_all_sources(matches, context.settings())?;
+          let platform = get_target_platform(matches, context.settings())?;
           Self::open_swagger(&platform, client, context).await
         }
         _ => unreachable!(),
@@ -343,14 +343,14 @@ struct PlatformShow {}
 #[async_trait]
 impl CommandExecutor for PlatformShow {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
-    let platform = get_target_platform_from_all_sources(matches, context.settings())?;
-    context.print_explanation(format!("list all configured parameters for platform '{}'", platform));
+    let platform = get_target_platform(matches, context.settings())?;
+    context.print_explanation(format!("configured parameters for platform '{}'", platform));
     UnitFormatter::new(platform.name(), &DSH_PLATFORM_LABELS_CONFIGURATION, context).print(&platform, None)?;
-    context.print_explanation(format!("list all derived parameters for platform '{}'", platform));
+    context.print_explanation(format!("derived parameters for platform '{}'", platform));
     UnitFormatter::new(platform.name(), &DSH_PLATFORM_LABELS_DERIVED, context).print(&platform, None)?;
     let provided_arguments = ProvidedArguments::try_from((matches, context.settings()))?;
     if let Some(description) = provided_arguments.describe() {
-      context.print_explanation(format!("list all derived parameters for platform '{}' and arguments {}", platform, description));
+      context.print_explanation(format!("derived parameters for platform '{}' and arguments {}", platform, description));
       let labels = DSH_PLATFORM_LABELS_DERIVED_ARGUMENTS
         .iter()
         .filter(|label| label.all_required_arguments_provided(&provided_arguments))
@@ -418,7 +418,7 @@ impl ProvidedArguments {
 impl TryFrom<(&ArgMatches, &Settings)> for ProvidedArguments {
   type Error = DshCliError;
 
-  fn try_from(value: (&ArgMatches, &Settings)) -> Result<Self, Self::Error> {
+  fn try_from(value: (&ArgMatches, &Settings)) -> DshCliResult<Self> {
     let (matches, settings) = value;
     Ok(Self {
       app_id: matches.get_one::<String>(APP_ID_ARGUMENT).cloned(),
@@ -428,7 +428,7 @@ impl TryFrom<(&ArgMatches, &Settings)> for ProvidedArguments {
       tenant: get_target_tenant_non_interactive(matches, settings)?,
       topic_id: matches.get_one::<String>(TOPIC_ID_ARGUMENT).cloned(),
       vendor_id: matches.get_one::<String>(VENDOR_NAME_ARGUMENT).cloned(),
-      vhost: matches.get_one::<String>(VHOST_ID_ARGUMENT).cloned(),
+      vhost: matches.get_one::<String>(VHOST_SUBDOMAIN_ARGUMENT).cloned(),
     })
   }
 }
@@ -675,11 +675,11 @@ impl DshPlatformLabel {
       | DshPlatformLabel::TenantDataCatalogUrl
       | DshPlatformLabel::TenantMonitoringUrl
       | DshPlatformLabel::TenantPublicAppsDomain
-      | DshPlatformLabel::ProxyCommonName
       | DshPlatformLabel::ProxyVhostDomain => REQUIRED_ARGUMENTS_TENANT,
       DshPlatformLabel::HttpMessagingApiUrlMulti | DshPlatformLabel::HttpMessagingApiUrlSingle => REQUIRED_ARGUMENTS_TOPIC,
       DshPlatformLabel::TenantPrivateVhostDomain => REQUIRED_ARGUMENTS_TENANT_VHOST,
       DshPlatformLabel::ProxyBrokerVhost
+      | DshPlatformLabel::ProxyCommonName
       | DshPlatformLabel::ProxyConsumerGroup
       | DshPlatformLabel::ProxyConsumerGroupAcl
       | DshPlatformLabel::ProxySchemaStoreVhost
