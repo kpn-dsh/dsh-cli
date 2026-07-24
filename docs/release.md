@@ -23,19 +23,21 @@ The `dsh` tool needs to be build separately for each required feature set and fo
 supported platform. The build steps are described assuming a macOS platform. For Linux or
 Windows the steps are similar, but the details may vary.
 
+### `macOS`
+
+#### Prerequisites
+
 It is assumed that a recent Rust toolchain is installed.
 
-### macOS
+#### Building
 
-Since we're building for the native platform (macOS, `aarch64-apple-darwin`), the build
+Since we're building for the native platform (`macOS`, `aarch64-apple-darwin`), the build
 commands are simple:
 
 ```shell
 > cargo build --release
-...
 > mv target/release/dsh dsh-v0.10.0-aarch64-apple-darwin
-> cargo build --release --all-features
-...
+> cargo build --all-features --release
 > mv target/release/dsh dsh-manage-v0.10.0-aarch64-apple-darwin
 ```
 
@@ -51,26 +53,47 @@ total 87072
 ...
 ```
 
+#### Codesigning
+
 For the binaries to be able to run on other machines than the machine it was build on,
 the binaries need to be codesigned and notarized. See
 [Codesign and notarize for macOS](code-signing-macos.md) for the required steps.
 
 ### Linux
 
-Since we're building for the native platform (macOS, `aarch64-apple-darwin`), the build
-commands are simple:
+This chapter explains how to build a statically linked Linux version on a macOS platform.
+
+#### Prerequisites
+
+It is assumed that a recent Rust toolchain is installed.
+
+https://github.com/FiloSottile/homebrew-musl-cross
+
+In order to be able to cross-build a Linux version on a macOS platform, the Linux target and a
+cross-linker need to be available. For a statically lnked binary, the target and linker can be
+installed via the following two commands:
 
 ```shell
-> rustup target add x86_64-unknown-linux-gnu
+> rustup target add x86_64-unknown-linux-musl
+> brew install filosottile/musl-cross/musl-cross
 ```
 
+In order for the linker to be recognized by `cargo`, edit the cargo configuration file (most
+likely in your home directory `~/.cargo/config.toml`) and add the following lines to it:
+
+```toml
+[target.x86_64-unknown-linux-musl]
+linker = "x86_64-linux-musl-gcc"
+```
+
+#### Cross-building
+
 ```shell
-> cargo build --target x86_64-unknown-linux-gnu --release
-...
-> mv target/release/dsh dsh-v0.10.0-x86_64-unknown-linux-gnu
-> cargo build --target x86_64-unknown-linux-gnu --release --all-features
-...
-> mv target/release/dsh dsh-manage-v0.10.0-x86_64-unknown-linux-gnu
+> export TARGET_CC=x86_64-linux-musl-gcc
+> cargo build --release --target x86_64-unknown-linux-musl
+> mv target/x86_64-unknown-linux-musl/release/dsh ./dsh-v0.10.0-x86_64-unknown-linux-musl
+> cargo build --all-features --release --target x86_64-unknown-linux-musl
+> mv target/x86_64-unknown-linux-musl/release/dsh ./dsh-manage-v0.10.0-x86_64-unknown-linux-musl
 ```
 
 This will result in two executables in your project directory, one with `robot`, `stream` and
@@ -80,8 +103,8 @@ This will result in two executables in your project directory, one with `robot`,
 > ls -al
 total 87072
 ...
--rwxr-xr-x   1 username  staff  23506384  6 mrt. 09:51 dsh-manage-v0.10.0-x86_64-unknown-linux-gnu
--rwxr-xr-x   1 username  staff  21444176  6 mrt. 09:51 dsh-v0.10.0-x86_64-unknown-linux-gnu
+-rwxr-xr-x   1 username  staff  23506384 21 jul. 09:51 dsh-manage-v0.10.0-x86_64-unknown-linux-musl
+-rwxr-xr-x   1 username  staff  21444176 21 jul. 09:51 dsh-v0.10.0-x86_64-unknown-linux-musl
 ...
 ```
 
@@ -98,7 +121,9 @@ Prerequisites for creating a release are:
 * All macOS binaries are available, properly named, codesigned and notarized:
     * `dsh-manage-v0.10.0-aarch64-apple-darwin`
     * `dsh-v0.10.0-aarch64-apple-darwin`
-* If applicable, all Linux binaries are available and properly named.
+* All Linux binaries are available and properly named:
+    * `dsh-manage-v0.10.0-x86_64-unknown-linux-musl`
+    * `dsh-v0.10.0-x86_64-unknown-linux-musl`
 * If applicable, all Windows binaries are available, properly named and codesigned.
 * The release git branch is tagged with the release version number, without prefixes
   (`0.10.0`).
