@@ -1,5 +1,5 @@
-use crate::err;
 use crate::error::DshCliError;
+use crate::{err, DshCliResult};
 use chrono::DateTime;
 use dsh_api::error::DshApiResult;
 use itertools::Itertools;
@@ -269,7 +269,7 @@ impl Display for OutputFormat {
 impl TryFrom<&str> for OutputFormat {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "csv" => Ok(Self::Csv),
       "json" => Ok(Self::Json),

@@ -421,7 +421,7 @@ impl CommandExecutor for AclGroupShow {
   }
 }
 
-fn list_streams(acl_group_name: &String, acl_group: &KafkaAclGroup, context: &Context) -> Result<(), DshCliError> {
+fn list_streams(acl_group_name: &String, acl_group: &KafkaAclGroup, context: &Context) -> DshCliResult<()> {
   let streams = get_streams(&acl_group.readable_streams, &acl_group.writable_streams)
     .into_iter()
     .map(Some)

@@ -1,5 +1,4 @@
 use crate::context::Context;
-use crate::error::DshCliError;
 use crate::formatters::{ColumnAlignment, OutputFormat};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::{err, DshCliResult};
@@ -194,7 +193,7 @@ where
     }
   }
 
-  fn print_plain(&self) -> Result<(), DshCliError> {
+  fn print_plain(&self) -> DshCliResult<()> {
     self.context.println(self.labels.iter().map(|label| label.as_str()).join(","));
     for (target_id, value) in &self.values {
       self
@@ -204,7 +203,7 @@ where
     Ok(())
   }
 
-  fn print_table(&self) -> Result<(), DshCliError> {
+  fn print_table(&self) -> DshCliResult<()> {
     let mut tabled_builder = TabledBuilder::default();
     tabled_builder.push_record(self.labels.iter().map(|label| {
       if label.is_target_label() {
@@ -262,7 +261,7 @@ where
     Ok(())
   }
 
-  fn print_table_no_borders(&self) -> Result<(), DshCliError> {
+  fn print_table_no_borders(&self) -> DshCliResult<()> {
     let mut tabled_builder = TabledBuilder::default();
     tabled_builder.push_record(self.labels.iter().map(|label| {
       if label.is_target_label() {

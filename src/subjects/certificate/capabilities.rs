@@ -1,6 +1,5 @@
 use crate::capability::CommandExecutor;
 use crate::context::Context;
-use crate::error::DshCliError;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -222,7 +221,7 @@ impl CommandExecutor for CertificateListIds {
 static CERTIFICATE_ISSUE_LABELS_LIST: [IssueLabel; 6] =
   [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::DependencyName, IssueLabel::DependencySubject, IssueLabel::DependencyValue, IssueLabel::IssueDetails];
 
-async fn list_certificates(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
+async fn list_certificates(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> DshCliResult<DshCliResult<()>> {
   let expiration_days = get_expiration_days(matches, context.settings())?;
   let start_instant = context.now();
   let certificate_ids = client.get_certificate_ids().await?;

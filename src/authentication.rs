@@ -42,7 +42,7 @@ pub(crate) enum AuthenticationMethod {
 impl TryFrom<&str> for AuthenticationMethod {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "robot" => Ok(Self::Robot),
       "sso" | "single-sign-on" => Ok(Self::SingleSignOn),

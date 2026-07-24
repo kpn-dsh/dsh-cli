@@ -5,7 +5,6 @@ use crate::capability::{
 };
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-use crate::error::DshCliError;
 use crate::flags::FlagType;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
@@ -383,7 +382,7 @@ impl CommandExecutor for SecretListIssues {
 static SECRET_LIST_ISSUES_LABELS_LIST: [IssueLabel; 5] =
   [IssueLabel::Target, IssueLabel::IssueKind, IssueLabel::SubjectKind, IssueLabel::SubjectDescription, IssueLabel::IssueDetails];
 
-async fn list_issues(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> Result<Result<(), DshCliError>, DshCliError> {
+async fn list_issues(client: &DshApiClient, matches: &ArgMatches, context: &Context, only_errors: bool) -> DshCliResult<DshCliResult<()>> {
   let expiration_days = get_expiration_days(matches, context.settings())?;
   let start_instant = context.now();
   let secrets: Vec<(String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>)> = secrets_with_metadata(client).await?;

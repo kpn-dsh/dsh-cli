@@ -33,7 +33,7 @@ use std::str::FromStr;
 /// ## Returns
 /// * `Ok<Platform>`  - Target platform.
 /// * `Err<DshCliError>` - Error message.
-pub(crate) fn get_target_platform_from_all_sources(matches: &ArgMatches, settings: &Settings) -> Result<DshPlatform, DshCliError> {
+pub(crate) fn get_target_platform_from_all_sources(matches: &ArgMatches, settings: &Settings) -> DshCliResult<DshPlatform> {
   Ok(match get_target_platform_from_command_line_argument(matches)? {
     Some(target_platform) => target_platform,
     None => get_target_platform(matches, settings)?,

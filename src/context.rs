@@ -53,7 +53,7 @@ pub(crate) enum BrowserMethod {
 impl TryFrom<&str> for BrowserMethod {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "instruct" => Ok(Self::Instruct),
       "open" => Ok(Self::Open),

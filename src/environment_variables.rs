@@ -1,5 +1,4 @@
 use crate::context::Context;
-use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter};
@@ -82,7 +81,7 @@ pub(crate) fn is_environment_variable_specified(env_var_name: &str, matches: &Ar
   !environment_variable_from_arguments(env_var_name, matches).is_empty() || get_env_var(env_var_name).is_some()
 }
 
-fn environment_variable_from_file_or_os(env_var_name: &str, matches: Option<&ArgMatches>) -> Result<DshCliResult<Option<String>>, DshCliError> {
+fn environment_variable_from_file_or_os(env_var_name: &str, matches: Option<&ArgMatches>) -> DshCliResult<DshCliResult<Option<String>>> {
   Ok(match environment_variable_from_file(env_var_name, matches)? {
     Some((env_var_value, env_var_file)) => {
       override_from_file_warning(env_var_name, &env_var_file);

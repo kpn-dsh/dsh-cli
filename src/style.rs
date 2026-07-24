@@ -1,5 +1,5 @@
-use crate::err;
 use crate::error::DshCliError;
+use crate::{err, DshCliResult};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -48,7 +48,7 @@ impl Display for DshColor {
 impl TryFrom<&str> for DshColor {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "normal" => Ok(Self::Normal),
       "black" => Ok(Self::Black),
@@ -98,7 +98,7 @@ impl Display for DshStyle {
 impl TryFrom<&str> for DshStyle {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "normal" => Ok(Self::Normal),
       "bold" => Ok(Self::Bold),
