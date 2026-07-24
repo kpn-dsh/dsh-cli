@@ -174,6 +174,7 @@ export SAFE_COMMANDS=(
   "platform show --app $APP_UNDER_TEST --vendor $VENDOR_UNDER_TEST"
   "platform show --app $APP_UNDER_TEST"
   "platform show --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
+  "platform show --proxy $PROXY_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --service $SERVICE_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
