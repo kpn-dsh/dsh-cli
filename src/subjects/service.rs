@@ -146,9 +146,8 @@ impl Subject for ServiceSubject {
     "Show, manage and list services deployed on the DSH.".to_string()
   }
 
-  fn subject_command_alias(&self) -> Option<&str> {
-    Some("s")
-  }
+  // Shortcut 's' is an alias for 'secret' since release 0.10.1
+  // fn subject_command_alias(&self) -> Option<&str> { Some("s") }
 
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
