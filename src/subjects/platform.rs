@@ -599,7 +599,11 @@ impl SubjectFormatter<DshPlatformLabel> for (DshPlatform, ProvidedArguments) {
     let vhost = provided_arguments.vhost.clone().unwrap_or_default();
     match label {
       // Derived from configuration and arguments
-      DshPlatformLabel::BucketName => Value::plain(platform.bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID")).unwrap_or_else(|error| error)),
+      DshPlatformLabel::BucketName => Value::plain(
+        platform
+          .bucket_name(tenant, bucket_id, Some("ACCESS_KEY_ID"))
+          .unwrap_or_else(|error| error.to_string()),
+      ),
       DshPlatformLabel::HttpMessagingApiUrlMulti => Value::plain(platform.http_messaging_api_url_multi(topic)),
       DshPlatformLabel::HttpMessagingApiUrlSingle => Value::plain(platform.http_messaging_api_url_single(topic)),
       DshPlatformLabel::InternalDomain => Value::plain(platform.internal_domain(tenant)),
