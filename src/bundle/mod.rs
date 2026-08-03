@@ -4,12 +4,21 @@ pub(crate) mod vhost;
 use crate::error::DshCliError;
 use crate::DshCliResult;
 use rcgen::{
-  Certificate as RcgenCertificate, CertificateParams, CertificateSigningRequest, CertificateSigningRequestParams, DistinguishedName, DnType, DnValue, DnValue::PrintableString,
-  ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose, RsaKeySize,
+  Certificate as RcgenCertificate, CertificateParams, CertificateSigningRequestParams, DistinguishedName, DnType, DnValue, DnValue::PrintableString, ExtendedKeyUsagePurpose, IsCa,
+  KeyPair, KeyUsagePurpose, RsaKeySize,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use time::OffsetDateTime;
+
+#[derive(Default, clap::ValueEnum, Clone, Debug)]
+pub(crate) enum CertificateAuthority {
+  #[clap(name = "rock-kpn-ca")]
+  RockKpnCa,
+  #[clap(name = "self-signed")]
+  #[default]
+  SelfSigned,
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 pub(crate) struct _Validation {
@@ -38,14 +47,24 @@ pub(crate) struct DshCertificate {
   pub key_pair: KeyPair,
 }
 
-/// Contains certificate signing request and key-pair.
-///
-/// * `csr` - Certificate signing request.
-/// * `key_pair` - Public and private key pair
-pub(crate) struct _DshCsr {
-  pub csr: CertificateSigningRequest,
-  pub key_pair: KeyPair,
-}
+// /// Contains certificate signing request and key-pair.
+// ///
+// /// * `csr` - Certificate signing request.
+// /// * `key_pair` - Public and private key pair
+// pub(crate) struct DshCsr {
+//   pub csr: CertificateSigningRequest,
+//   pub key_pair: KeyPair,
+// }
+
+// impl Debug for DshCsr {
+//   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//     let mut builder = f.debug_struct("DshCsr");
+//     // TODO
+//     builder.field("csr", &"TODO");
+//     builder.field("key_pair", &self.key_pair);
+//     builder.finish()
+//   }
+// }
 
 impl Debug for DshCertificate {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -159,33 +178,28 @@ where
   Ok(DshCertificate { certificate, key_pair })
 }
 
-pub fn _generate_csr<T>(common_name: T, subject_alt_names: impl Into<Vec<String>>) -> DshCliResult<_DshCsr>
-where
-  T: Into<DnValue>,
-{
-  let mut params: CertificateParams = CertificateParams::new(subject_alt_names)?;
-  params.is_ca = IsCa::NoCa;
-
-  let mut dn = DistinguishedName::new();
-  dn.push(DnType::CommonName, common_name);
-  dn.push(DnType::CountryName, "NL");
-  dn.push(DnType::StateOrProvinceName, "Zuid-Holland");
-  dn.push(DnType::LocalityName, "Rotterdam");
-  dn.push(DnType::OrganizationName, PrintableString("Koninklijke KPN N.V.".try_into()?));
-  params.distinguished_name = dn;
-
-  let now = time::OffsetDateTime::now_utc();
-  params.not_before = now;
-  params.not_after = now + time::Duration::days(365);
-
-  params.key_usages = vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment, KeyUsagePurpose::KeyAgreement];
-  params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
-
-  let key_pair = generate_key_pair()?;
-  let csr = params.serialize_request(&key_pair)?;
-
-  Ok(_DshCsr { csr, key_pair })
-}
+// pub fn generate_csr<T>(common_name: T, subject_alt_names: impl Into<Vec<String>>) -> DshCliResult<DshCsr>
+// where
+//   T: Into<DnValue>,
+// {
+//   let mut params: CertificateParams = CertificateParams::new(subject_alt_names)?;
+//   params.is_ca = IsCa::NoCa;
+//   let mut distinguished_name = DistinguishedName::new();
+//   distinguished_name.push(DnType::CommonName, common_name);
+//   distinguished_name.push(DnType::CountryName, "NL");
+//   distinguished_name.push(DnType::StateOrProvinceName, "Zuid-Holland");
+//   distinguished_name.push(DnType::LocalityName, "Rotterdam");
+//   distinguished_name.push(DnType::OrganizationName, PrintableString("Koninklijke KPN N.V.".try_into()?));
+//   params.distinguished_name = distinguished_name;
+//   let now = time::OffsetDateTime::now_utc();
+//   params.not_before = now;
+//   params.not_after = now + time::Duration::days(365);
+//   params.key_usages = vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment, KeyUsagePurpose::KeyAgreement];
+//   params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
+//   let key_pair = generate_key_pair()?;
+//   let csr = params.serialize_request(&key_pair)?;
+//   Ok(DshCsr { csr, key_pair })
+// }
 
 fn not_before_not_after(days: i64) -> (OffsetDateTime, OffsetDateTime) {
   let now = time::OffsetDateTime::now_utc();

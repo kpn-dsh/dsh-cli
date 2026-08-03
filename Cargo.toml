@@ -23,7 +23,7 @@ opt-level = "s"
 [features]
 manage = ["dsh_api/manage"]
 robot = ["dsh_api/robot"]
-# rock = ["rock-api"]
+rock = ["dep:rock_api"]
 
 [dependencies]
 aes-gcm = { version = "0.10" }
@@ -63,11 +63,13 @@ pkcs1 = { version = "0.7", features = ["pem"] }
 pkcs8 = { version = "0.10", features = ["pem"] }
 x509-cert = { version = "0.2", features = ["pem"] }
 
-# rock-api = { version = "0.1.0", path = "/Users/wilbert/Workspaces/kpn/rock-api", features = ["log"], optional = true }
-# rock-api = { version = "0.1.0", git = "ssh://git@github.com/kpn-dsh/rock-api-rs.git", features = ["log"], optional = true }
+#der = { version = "0.8", features = ["std"] }
 
-# dsh_api = { version = "0.10.1", features = ["generic"] }
-dsh_api = { version = "0.10.1", path = "../dsh-api/dsh-api", features = ["generic"] }
+rock_api = { version = "0.1.0", path = "/Users/wilbert/Workspaces/kpn/rock-api-rs", features = ["log", "rcgen"], optional = true }
+# rock_api = { version = "0.1.0", git = "ssh://git@github.com/kpn-dsh/rock-api-rs.git", features = ["log", "rcgen"], optional = true }
+
+# dsh_api = { version = "0.11.0", features = ["generic"] }
+dsh_api = { version = "0.11.0", path = "../dsh-api/dsh-api", features = ["generic"] }
 
 [dev-dependencies]
 rdkafka = { version = "0.39", features = ["ssl-vendored"] }
