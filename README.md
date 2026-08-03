@@ -31,8 +31,21 @@ The following features are defined:
 * `manage` - Enables the manage methods. Enabling this feature is only useful
   if your tenant is authorized for management capabilities.
 * `robot` - Enables the robot operation.
+* `rock` - Enable certificate signing capabilities via the KPN _RoCK API_ service.
 
 ## Installation
+
+### Pre-built binaries
+
+For macOS and Linux pre-built binaries are available via the projects `GitHub`
+[release page](https://github.com/kpn-dsh/dsh-cli/releases).
+The installation for macOS and Linux is the same:
+
+* Download the binary for your OS.
+* Rename the downloaded binary to `dsh`.
+* Make the `dsh` binary executable (`chmod u+x dsh`).
+* Move the binary to a directory that is included in your `PATH` variable (`/usr/local/bin` or
+  `/usr/bin` or similar).
 
 ### Cargo install
 
@@ -44,17 +57,6 @@ directly from `crates.io`, by executing the following command:
 ```
 
 This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/dsh`.
-
-### Pre-built binaries
-
-For some platforms a pre-built binary is available at the `GitHub` release page:
-[`https://github.com/kpn-dsh/dsh-cli/releases`](https://github.com/kpn-dsh/dsh-cli/releases).
-You can download this file to your workstation. Make sure that the directory where you store
-the executable is included in your `PATH` variable and that you set the execute flag:
-
-```shell
-> chmod $DIR/dsh u+x
-```
 
 ## Next steps
 
