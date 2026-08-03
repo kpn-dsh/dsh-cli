@@ -1,10 +1,10 @@
 use homedir::my_home;
+use sha2::Digest;
+use sha2::Sha256;
 use std::fs;
 use std::fs::DirEntry;
 use std::os::unix::fs::MetadataExt;
-
-use sha2::Digest;
-use sha2::Sha256;
+use std::time::UNIX_EPOCH;
 
 use aes_gcm::aead::consts::U12;
 use aes_gcm::aead::Aead;
@@ -13,17 +13,16 @@ use aes_gcm::aead::KeyInit;
 use aes_gcm::aead::Nonce;
 use aes_gcm::aead::OsRng;
 use aes_gcm::aes::Aes256;
-use aes_gcm::Key;
 use aes_gcm::{Aes256Gcm, AesGcm};
 
 use crate::error::DshCliError;
 use crate::{err, DshCliResult};
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
-use log::warn;
+use log::{debug, warn};
 
 pub(crate) fn encrypt(plain_text: &String) -> DshCliResult<String> {
-  let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
+  let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_system_hash().map(|hash| hash.finalize())?);
   let nonce: Nonce<Aes256Gcm> = Aes256Gcm::generate_nonce(&mut OsRng);
   let encoded_nonce: String = STANDARD_NO_PAD.encode(nonce);
   let ciphertext: Vec<u8> = cipher.encrypt(&nonce, plain_text.as_bytes())?;
@@ -40,9 +39,12 @@ pub(crate) fn decrypt(encoded_ciphertext_nonce: &str) -> DshCliResult<String> {
     let decoded_nonce: Vec<u8> = STANDARD_NO_PAD.decode(encoded_nonce)?;
     #[allow(deprecated)] // TODO
     let nonce = Nonce::<Aes256Gcm>::clone_from_slice(&decoded_nonce);
-    let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_key()?);
+    let cipher: AesGcm<Aes256, U12> = Aes256Gcm::new(&get_system_hash().map(|hash| hash.finalize())?);
     match cipher.decrypt(&nonce, ciphertext.as_ref()) {
-      Ok(plaintext) => Ok(String::from_utf8(plaintext)?),
+      Ok(plaintext) => {
+        debug!("refresh key decrypted");
+        Ok(String::from_utf8(plaintext)?)
+      }
       Err(error) => {
         warn!("refresh key could not be decrypted");
         Err(DshCliError::from(error))
@@ -51,10 +53,6 @@ pub(crate) fn decrypt(encoded_ciphertext_nonce: &str) -> DshCliResult<String> {
   } else {
     err!("illegal ciphertext nonce pair")
   }
-}
-
-fn get_key() -> DshCliResult<Key<Aes256Gcm>> {
-  get_system_hash().map(|hash| hash.finalize())
 }
 
 /// Compute a hash based on unique system characteristics
@@ -86,9 +84,17 @@ fn get_system_hash() -> DshCliResult<Sha256> {
 
 // Representation is the concatenation file name and the creation timestamp
 fn entry_representation(entry: &DirEntry) -> DshCliResult<String> {
-  Ok(format!(
-    "{}:{}",
-    entry.file_name().to_str().ok_or("invalid unicode in filename".to_string())?,
-    entry.metadata()?.ctime()
-  ))
+  match entry.metadata()?.created() {
+    Ok(created) => Ok(format!(
+      "{}:{}",
+      entry.file_name().to_str().ok_or("invalid unicode in filename".to_string())?,
+      created.duration_since(UNIX_EPOCH)?.as_millis()
+    )),
+    // Metadata.created method is not supported on Linux
+    Err(_) => Ok(format!(
+      "{}:{}",
+      entry.file_name().to_str().ok_or("invalid unicode in filename".to_string())?,
+      entry.metadata()?.ctime()
+    )),
+  }
 }

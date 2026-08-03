@@ -555,13 +555,15 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
 
   let environment_variables: Vec<(&str, String)> = get_configured_environment_variables();
   if !environment_variables.is_empty() {
-    let environment_variables_table = to_help_items("Environment variables:", environment_variables);
-    after_help.push(environment_variables_table);
+    if let Some(environment_variables_table) = to_help_items("Environment variables:", environment_variables) {
+      after_help.push(environment_variables_table);
+    }
   }
   let non_empty_settings = settings.non_empty_attributes().unwrap_or_else(|error| unreachable!("{}", error));
   if !non_empty_settings.is_empty() {
-    let settings_table = to_help_items("Settings:", non_empty_settings.iter().map(|(a, b)| (a.as_str(), b.to_string())).collect_vec());
-    after_help.push(settings_table);
+    if let Some(settings_table) = to_help_items("Settings:", non_empty_settings.iter().map(|(a, b)| (a.as_str(), b.to_string())).collect_vec()) {
+      after_help.push(settings_table);
+    }
   }
 
   if let Ok(access_tokens) = get_access_tokens().await {
@@ -573,7 +575,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
             (platform.name(), {
               tenant_permissions
                 .iter()
-                .map(|permission| permission.tenant.to_string())
+                .filter_map(|permission| if permission.tenant == "dsh" { None } else { Some(permission.tenant.to_string()) })
                 .collect_vec()
                 .chunks(6)
                 .collect_vec()
@@ -586,8 +588,9 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
           })
         })
         .collect_vec();
-      let authorizations = to_help_items("Authorizations:", access_tokens);
-      after_help.push(authorizations);
+      if let Some(authorizations) = to_help_items("Authorizations:", access_tokens) {
+        after_help.push(authorizations);
+      }
     }
   }
   command = command.after_help(after_help.join("\n\n"));
@@ -701,26 +704,31 @@ where
   }
 }
 
-// Method will panic if rows vector is empty
-fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> String {
-  let bold_green = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-  let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
-  let key_value_length_pairs: Vec<(&str, &str, usize)> = rows.iter().map(|(key, value)| (*key, value.as_ref(), key.len())).collect_vec();
-  let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap_or_else(|| unreachable!()).clone();
-  let mut pairs = vec![];
-  for (key, value, len) in key_value_length_pairs {
-    let values = value.split("\n").collect_vec().iter().map(|s| s.to_string()).collect_vec();
-    pairs.push(format!(
-      "  {bold_blue}{}{bold_blue:#}{}  {}",
-      key,
-      " ".repeat(first_column_width - len),
-      values.first().map(|s| s.to_string()).unwrap_or_default()
-    ));
-    for v in values[1..].iter() {
-      pairs.push(format!("  {}  {}", " ".repeat(*first_column_width), v));
+fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> Option<String> {
+  if rows.is_empty() {
+    None
+  } else {
+    let bold_green = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+    let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
+    let key_value_length_pairs: Vec<(&str, &str, usize)> = rows.iter().map(|(key, value)| (*key, value.as_ref(), key.len())).collect_vec();
+
+    let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap_or_else(|| unreachable!()).clone();
+
+    let mut pairs = vec![];
+    for (key, value, len) in key_value_length_pairs {
+      let values = value.split("\n").collect_vec().iter().map(|s| s.to_string()).collect_vec();
+      pairs.push(format!(
+        "  {bold_blue}{}{bold_blue:#}{}  {}",
+        key,
+        " ".repeat(first_column_width - len),
+        values.first().map(|s| s.to_string()).unwrap_or_default()
+      ));
+      for v in values[1..].iter() {
+        pairs.push(format!("  {}  {}", " ".repeat(*first_column_width), v));
+      }
     }
+    Some(format!("{bold_green}{}{bold_green:#}\n{}", header, pairs.join("\n")))
   }
-  format!("{bold_green}{}{bold_green:#}\n{}", header, pairs.join("\n"))
 }
 
 fn enabled_features() -> Option<Vec<&'static str>> {

@@ -226,6 +226,7 @@ fn get_access_token_from_stored_refresh_token(
     Some(stored_refresh_token) => {
       let refresh_jwt = DshJwt::from_str(stored_refresh_token.secret())?;
       if refresh_jwt.expired().is_some_and(|expired| expired) {
+        trace!("refresh token is expired and will be deleted");
         delete_refresh_token(platform)?;
         Ok(None)
       } else {
@@ -238,8 +239,8 @@ fn get_access_token_from_stored_refresh_token(
             Ok(Some(access_token))
           }
           None => {
+            trace!("access and refresh token could not be exchanged and will be deleted");
             delete_refresh_token(platform)?;
-
             Ok(None)
           }
         }
@@ -390,10 +391,7 @@ pub(crate) fn get_stored_refresh_token(platform: &DshPlatform) -> DshCliResult<O
         err!("error decrypting refresh token for platform '{}', token deleted", platform)
       }
     },
-    None => {
-      debug!("refresh token for platform '{}' not found", platform);
-      Ok(None)
-    }
+    None => Ok(None),
   }
 }
 
