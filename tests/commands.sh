@@ -217,6 +217,7 @@ export SAFE_COMMANDS=(
   "secret d $SECRET_NAME_UNDER_TEST --force --dry-run"
   "secret list"
   "secret l"
+  "s l"
   "secret list --certificates"
   "secret list --certificates --expiration 200"
   "secret list --errors"
@@ -245,6 +246,7 @@ export SAFE_COMMANDS=(
   "secret show kda-test"
   "secret update $SECRET_NAME_UNDER_TEST --dry-run --authentication sso < /dev/null"
   "secrets"
+  "ss"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
   "service d $SERVICE_UNDER_TEST --force --dry-run"
@@ -265,7 +267,6 @@ export SAFE_COMMANDS=(
   "service stop $SERVICE_UNDER_TEST --force --dry-run"
   "service update $SERVICE_UNDER_TEST --cpus 1 --instances 1 --mem 32 --force --dry-run"
   "services"
-  "ss"
 
   "setting list"
   "setting l"
