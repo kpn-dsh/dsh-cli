@@ -6,11 +6,12 @@ use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::global_options::get_expiration_days;
 use crate::issues::{IssueDescription, IssueLabel};
-use crate::secret_metadata::secret_metadata;
+use crate::secret_metadata::secrets_with_metadata;
 use crate::subject::Requirements;
 use crate::subjects::certificate::labels::CertificateLabel;
-use crate::subjects::certificate::{has_issues, SecretTuple, CERTIFICATE_SUBJECT_TARGET};
-use crate::subjects::secret::{secrets_with_metadata, SecretLabel};
+use crate::subjects::certificate::{has_issues, CERTIFICATE_SUBJECT_TARGET};
+use crate::subjects::secret::capabilities::{print_certificate_secret, print_key_secret};
+use crate::subjects::secret::SecretWithMetadata;
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
@@ -96,8 +97,15 @@ impl CommandExecutor for CertificateDelete {
   }
 }
 
-static CERTIFICATE_LABELS_LIST: [CertificateLabel; 5] =
-  [CertificateLabel::Target, CertificateLabel::Kind, CertificateLabel::DistinguishedName, CertificateLabel::DnsNamesSummary, CertificateLabel::NotAfter];
+pub(crate) static CERTIFICATE_LABELS_LIST: [CertificateLabel; 7] = [
+  CertificateLabel::Target,
+  CertificateLabel::Kind,
+  CertificateLabel::DistinguishedName,
+  CertificateLabel::DnsNamesSummary,
+  CertificateLabel::NotAfter,
+  CertificateLabel::CertChainSecret,
+  CertificateLabel::KeySecret,
+];
 
 pub(crate) struct CertificateList {}
 
@@ -225,7 +233,7 @@ async fn list_certificates(client: &DshApiClient, matches: &ArgMatches, context:
   let expiration_days = get_expiration_days(matches, context.settings())?;
   let start_instant = context.now();
   let certificate_ids = client.get_certificate_ids().await?;
-  let (certificates_statuses, secrets): (Vec<DshApiResult<CertificateStatus>>, DshCliResult<Vec<SecretTuple>>) = join!(
+  let (certificates_statuses, secrets): (Vec<DshApiResult<CertificateStatus>>, DshCliResult<Vec<SecretWithMetadata>>) = join!(
     join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate(certificate_id))),
     secrets_with_metadata(client),
   );
@@ -304,23 +312,6 @@ pub(crate) static CERTIFICATE_LABELS_SHOW: [CertificateLabel; 10] = [
   CertificateLabel::KeySecret,
 ];
 
-pub(crate) static SECRET_CERTIFICATE_LABELS: [SecretLabel; 14] = [
-  SecretLabel::CaChain,
-  SecretLabel::Description,
-  SecretLabel::Format,
-  SecretLabel::FormatKind,
-  SecretLabel::Issuer,
-  SecretLabel::Kind,
-  SecretLabel::Label,
-  SecretLabel::NotBefore,
-  SecretLabel::NotAfter,
-  SecretLabel::NumberOfEntries,
-  SecretLabel::Private,
-  SecretLabel::SecretName,
-  SecretLabel::Size,
-  SecretLabel::Subject,
-];
-
 pub(crate) struct CertificateShow {}
 
 #[async_trait]
@@ -337,15 +328,15 @@ impl CommandExecutor for CertificateShow {
         .dns_names
         .first()
         .and_then(|first_dns| client.platform().validate_vhost_domain(first_dns).ok());
+      context.print_explanation(format!("certificate '{}'", certificate_id));
       UnitFormatter::new(certificate_id.clone(), &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days), validated_dns), None)?;
-      let cert_chain_secret = client.get_secret(&actual_certificate.cert_chain_secret).await?;
-      UnitFormatter::new(&actual_certificate.cert_chain_secret, &SECRET_CERTIFICATE_LABELS, context).print(&(secret_metadata(&cert_chain_secret), Some(expiration_days)), None)?;
-      let key_secret = client.get_secret(&actual_certificate.key_secret).await?;
-      UnitFormatter::new(&actual_certificate.key_secret, &SECRET_CERTIFICATE_LABELS, context).print(&(secret_metadata(&key_secret), None), None)?;
-      if let Some(passphrase_secret_name) = &actual_certificate.passphrase_secret {
-        let passphrase_secret = client.get_secret(&passphrase_secret_name).await?;
-        UnitFormatter::new(passphrase_secret_name, &SECRET_CERTIFICATE_LABELS, context).print(&(secret_metadata(&passphrase_secret), Some(expiration_days)), None)?;
-      }
+
+      context.print_explanation(format!("certificate chain secret '{}'", actual_certificate.cert_chain_secret));
+      print_certificate_secret(actual_certificate.cert_chain_secret.as_str(), expiration_days, client, context).await?;
+
+      context.print_explanation(format!("key secret '{}'", actual_certificate.key_secret));
+      print_key_secret(actual_certificate.key_secret.as_str(), client, context).await?;
+
       if let Some(certificate) = &certificate_status.configuration {
         if actual_certificate.cert_chain_secret != certificate.cert_chain_secret
           || actual_certificate.key_secret != certificate.key_secret

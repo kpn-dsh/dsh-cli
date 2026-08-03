@@ -15,12 +15,10 @@ use crate::subjects::certificate::capabilities::{
   CertificateListUsage, CertificateShow, CertificateShowAllocationStatus, CertificateShowUsage,
 };
 use crate::subjects::secret;
+use crate::subjects::secret::SecretWithMetadata;
 use async_trait::async_trait;
 use dsh_api::error::DshApiResult;
-use dsh_api::secret::SecretInjection;
-use dsh_api::types::AllocationStatus;
 use dsh_api::types::CertificateStatus;
-use dsh_api::Dependant;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -124,7 +122,7 @@ static CERTIFICATE_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + 
 /// * `Some(Vec<IssueDescription>)` - List of tuples describing the issues found
 ///   (at least one).
 /// * `None` - No issues where found.
-fn has_issues(certificate_status: DshApiResult<CertificateStatus>, secrets: &[SecretTuple], days: Option<u64>, only_errors: bool) -> Option<Vec<IssueDescription<'_>>> {
+fn has_issues(certificate_status: DshApiResult<CertificateStatus>, secrets: &[SecretWithMetadata], days: Option<u64>, only_errors: bool) -> Option<Vec<IssueDescription<'_>>> {
   let certificate_status = match certificate_status {
     Ok(certificate_status) => certificate_status,
     Err(_) => return Some(vec![(None, Issue::Unexpected { message: "could not get certificate status".to_string() })]),
@@ -185,23 +183,15 @@ fn has_issues(certificate_status: DshApiResult<CertificateStatus>, secrets: &[Se
   }
 }
 
-/// Tuple describing a secret.
-///
-/// * `String` - Secret name.
-/// * `Option<String>` - Secret id when it is a system secret.
-/// * `SecretMetadata` - Secret metadata.
-/// * `Option<AllocationStatus>` - Secret allocation status.
-/// * `Vec<Dependant<SecretInjection>>` - List of apps, applications and proxies that depend
-///   on the secret.
-type SecretTuple = (String, Option<String>, SecretMetadata, Option<AllocationStatus>, Vec<Dependant<SecretInjection>>);
-
-fn secret_issues<'a>(secret: &str, days: Option<u64>, only_errors: bool, secret_attribute: &'static str, secrets: &[SecretTuple]) -> Vec<IssueDescription<'a>> {
+fn secret_issues<'a>(secret: &str, days: Option<u64>, only_errors: bool, secret_attribute: &'static str, secrets: &[SecretWithMetadata]) -> Vec<IssueDescription<'a>> {
   let mut issues: Vec<IssueDescription<'_>> = vec![];
-  match secrets.iter().find(|(secret_id, _, _, _, _)| secret_id == secret) {
+  match secrets.iter().find(|SecretWithMetadata { name, .. }| name == secret) {
     Some(secret_tuple) => {
-      if let Some(cert_chain_secret_issues) = secret::has_issues(secret_tuple, days, only_errors) {
+      if let Some(cert_chain_secret_issues) = secret::has_issues(secret_tuple, days) {
         for issue in cert_chain_secret_issues {
-          issues.push((Some((secret_attribute, secret.to_string(), "secret")), issue));
+          if !only_errors || issue.severity() == Severity::Error {
+            issues.push((Some((secret_attribute, secret.to_string(), "secret")), issue));
+          }
         }
       }
     }
@@ -212,11 +202,11 @@ fn secret_issues<'a>(secret: &str, days: Option<u64>, only_errors: bool, secret_
   issues
 }
 
-fn secret_is_certificate(secret: &str, secrets: &[SecretTuple]) -> Option<bool> {
+fn secret_is_certificate(secret: &str, secrets: &[SecretWithMetadata]) -> Option<bool> {
   secrets
     .iter()
-    .find(|(secret_id, _, _, _, _)| secret_id == secret)
-    .map(|(_, _, secret_metadata, _, _)| matches!(secret_metadata, SecretMetadata::Certificate { .. }))
+    .find(|SecretWithMetadata { name, .. }| *name == secret)
+    .map(|SecretWithMetadata { metadata, .. }| matches!(metadata, SecretMetadata::Certificate { .. }))
 }
 
 pub(crate) fn format_distinguished_name(distinguished_name: &str) -> String {
