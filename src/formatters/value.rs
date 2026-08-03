@@ -1,6 +1,8 @@
 use crate::context::Context;
+use crate::issues::Issue;
 use crate::subjects::certificate::format_distinguished_name;
 use chrono::{DateTime, Days, Utc};
+use itertools::Itertools;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) enum Value {
@@ -16,6 +18,7 @@ pub(crate) enum Value {
   Target(String),
   Todo,
   Unreachable,
+  Vec(Vec<Value>),
   Warn(String),
 }
 
@@ -164,6 +167,27 @@ impl Value {
     T: ToString,
   {
     Self::Ignore(value.to_string())
+  }
+
+  /// Create `Value` representing a value that should be ignored.
+  ///
+  /// # Returns
+  /// * `Value::Ignore` - Represents an ignore message.
+  pub(crate) fn issue(issue: &Issue, expiration_days: &Option<u64>) -> Self {
+    match issue {
+      Issue::Before { not_before } => Value::timestamp_seconds_not_before(*not_before),
+      Issue::CreationUpdateNotification { .. } => Value::warn("creation notification"),
+      Issue::Empty => Value::warn("empty"),
+      Issue::Expired { not_after } => Value::timestamp_seconds_expired(*not_after, *expiration_days),
+      Issue::ExpirationUpcoming { not_after } => Value::timestamp_seconds_expired(*not_after, *expiration_days),
+      Issue::IncorrectValue { explanation } => Value::warn(explanation),
+      Issue::Misconfiguration { explanation } => Value::error(explanation),
+      Issue::NotFound => Value::error("not found"),
+      Issue::NotProvisioned => Value::error("not provisioned"),
+      Issue::NotUsed => Value::warn("not used"),
+      Issue::RemovalNotification { .. } => Value::warn("removal notification"),
+      Issue::Unexpected { message } => Value::error(message),
+    }
   }
 
   /// Create `Value` representing a list of value that might be empty or not.
@@ -424,6 +448,17 @@ impl Value {
     Self::Unreachable
   }
 
+  /// Create `Value` representing a vector of `Value`s.
+  ///
+  /// # Parameters
+  /// * `values` - Values.
+  ///
+  /// # Returns
+  /// * `Value::Vec` - Represents the values.
+  pub(crate) fn vec(values: Vec<Value>) -> Self {
+    Self::Vec(values)
+  }
+
   /// Create `Value` representing a warning.
   ///
   /// # Returns
@@ -450,6 +485,7 @@ impl Value {
       Self::Target(value) => context.apply_target_style(value),
       Self::Todo => context.apply_error_style("TODO"),
       Self::Unreachable => context.apply_error_style("unreachable"),
+      Self::Vec(elements) => elements.iter().map(|element| element.to_decorated_string(context)).collect_vec().join("\n"),
       Self::Warn(value) => context.apply_warning_style(value),
     }
   }
@@ -467,6 +503,7 @@ impl Value {
       Self::Target(value) => value.to_string(),
       Self::Todo => "TODO".to_string(),
       Self::Unreachable => "unreachable".to_string(),
+      Self::Vec(values) => values.iter().map(|value| value.to_undecorated_string()).collect_vec().join("\n"),
       Self::Warn(value) => value.to_string(),
     }
   }
