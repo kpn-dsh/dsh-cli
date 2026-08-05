@@ -415,9 +415,9 @@ impl SubjectFormatter<VolumeLabel> for Volume {
 impl SubjectFormatter<VolumeLabel> for VolumeStatus {
   fn value(&self, label: &VolumeLabel, target_id: &str) -> Value {
     match label {
-      VolumeLabel::ActualSize => Value::some_or(self.actual.clone().map(|volume| volume.size_gi_b), "NA"),
-      VolumeLabel::ConfigurationSize => Value::some_or(self.configuration.clone().map(|volume| volume.size_gi_b), "NA"),
-      VolumeLabel::Size => Value::some_or(self.actual.clone().map(|volume| volume.size_gi_b), "NA"),
+      VolumeLabel::ActualSize => Value::some_or(self.actual.clone().map(|volume| volume.size_gi_b), Value::warn("NA")),
+      VolumeLabel::ConfigurationSize => Value::some_or(self.configuration.clone().map(|volume| volume.size_gi_b), Value::warn("NA")),
+      VolumeLabel::Size => Value::some_or(self.actual.clone().map(|volume| volume.size_gi_b), Value::warn("NA")),
       VolumeLabel::Target => Value::target(target_id),
     }
   }

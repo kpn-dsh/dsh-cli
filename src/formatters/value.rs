@@ -222,19 +222,18 @@ impl Value {
   ///
   /// # Parameters
   /// * `value` - `Result<T, _>` that represents the value that might be incorrect.
-  /// * `default` - Value that will be shown when `value` is an `Err`.
+  /// * `default` - `Value` that will be shown when `value` is an `Err`.
   ///
   /// # Returns
   /// * `Value::Plain(value)` - When `value` is `Ok`.
-  /// * `Value::Plain(default)` - When `value` is an `Err`.
-  pub(crate) fn ok_or<T, U, E>(value: Result<T, E>, default: U) -> Self
+  /// * `default` - When `value` is an `Err`.
+  pub(crate) fn _ok_or<T, E>(value: Result<T, E>, default: Value) -> Self
   where
     T: ToString,
-    U: ToString,
   {
     match value {
       Ok(v) => Self::plain(v.to_string()),
-      Err(_) => Self::plain(default.to_string()),
+      Err(_) => default,
     }
   }
 
@@ -319,19 +318,18 @@ impl Value {
   ///
   /// # Parameters
   /// * `value` - `Option<T>` that represents the optional value.
-  /// * `default` - Value that will be shown when `value` is `None`.
+  /// * `default` - `Value` that will be shown when `value` is `None`.
   ///
   /// # Returns
   /// * `Value::Plain(value)` - When `value` is `Some`.
-  /// * `Value::Plain(default)` - When `value` is `None`.
-  pub(crate) fn some_or<T, U>(value: Option<T>, default: U) -> Self
+  /// * `default` - When `value` is `None`.
+  pub(crate) fn some_or<T>(value: Option<T>, default: Value) -> Self
   where
     T: ToString,
-    U: ToString,
   {
     match value {
       Some(v) => Self::plain(v.to_string()),
-      None => Self::plain(default.to_string()),
+      None => default,
     }
   }
 

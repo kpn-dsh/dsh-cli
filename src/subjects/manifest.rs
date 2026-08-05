@@ -462,7 +462,7 @@ impl SubjectFormatter<PropertyLabel> for Property {
     match label {
       PropertyLabel::Default => match self.kind {
         PropertyKind::DnsZone => Value::plain("private"),
-        PropertyKind::Number => Value::some_or(self.default.clone(), "mandatory"),
+        PropertyKind::Number => Value::some_or(self.default.clone(), Value::warn("mandatory")),
         PropertyKind::String => Value::plain(match &self.default {
           Some(default_value) => {
             if self.enumeration.is_some() {
