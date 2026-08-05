@@ -22,6 +22,7 @@ use async_trait::async_trait;
 use clap::{Arg, ArgAction, ArgMatches};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::parse::ImageString;
+use dsh_api::platform::VhostZone;
 use dsh_api::types::{Application, ApplicationSecret, TaskState};
 use dsh_api::vhost::VhostString;
 use futures::future::try_join_all;
@@ -484,25 +485,22 @@ impl CommandExecutor for ServiceOpen {
           Some(vhost) => {
             let vhost_string = VhostString::from_str(vhost)?;
             match vhost_string.zone {
-              Some(zone) => {
-                if zone == "private" {
-                  context.open_url(
-                    format!(
-                      "https://{}",
-                      client.platform().tenant_private_vhost_domain(client.tenant().name(), vhost_string.vhost_name)?
-                    ),
-                    format!("private vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
-                  );
-                  Ok(())
-                } else if zone == "public" {
-                  context.open_url(
-                    format!("https://{}", client.platform().public_vhost_domain(vhost_string.vhost_name)),
-                    format!("public vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
-                  );
-                  Ok(())
-                } else {
-                  err!("exposed port has illegal zone {}", zone)
-                }
+              Some(VhostZone::Private) => {
+                context.open_url(
+                  format!(
+                    "https://{}",
+                    client.platform().tenant_private_vhost_domain(client.tenant().name(), vhost_string.vhost_name)?
+                  ),
+                  format!("private vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                );
+                Ok(())
+              }
+              Some(VhostZone::Public) => {
+                context.open_url(
+                  format!("https://{}", client.platform().public_vhost_domain(vhost_string.vhost_name)),
+                  format!("public vhost for tenant '{}@{}' and service '{}'", tenant_name, platform, service_id),
+                );
+                Ok(())
               }
               None => err!("exposed port has no zone"),
             }
