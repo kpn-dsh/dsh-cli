@@ -88,7 +88,7 @@ impl SubjectFormatter<KafkaProxyLabel> for KafkaProxy {
             "disabled".to_string()
           }
         }),
-        "NA",
+        Value::warn("NA"),
       ),
       KafkaProxyLabel::Target => Value::target(target_id),
       KafkaProxyLabel::Validations => {

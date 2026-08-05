@@ -7,13 +7,14 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::global_options::get_expiration_days;
-use crate::secret_metadata::{secret_metadata, SecretMetadata};
+use crate::secret_metadata::SecretMetadata;
 use crate::subject::Requirements;
 use crate::subjects::certificate::capabilities::CERTIFICATE_LABELS_SHOW;
 use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::proxy::labels::KafkaProxyLabel;
 use crate::subjects::proxy::PROXY_SUBJECT_TARGET;
-use crate::subjects::secret::SecretLabel;
+use crate::subjects::secret::capabilities::{print_certificate_secret, print_key_secret};
+use crate::subjects::secret::labels::{SecretLabel, SecretMetadataExpirationDays};
 use crate::subjects::service::{CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
@@ -34,18 +35,7 @@ use tokio::time::sleep;
 static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 4] =
   [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
 
-static SECRET_LABELS_SHOW: [SecretLabel; 10] = [
-  SecretLabel::SecretName,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::NotBefore,
-  SecretLabel::NotAfter,
-  SecretLabel::Subject,
-  SecretLabel::Issuer,
-  SecretLabel::SerialNumber,
-];
+static SECRET_LABELS_SHOW: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::Format, SecretLabel::Size, SecretLabel::Description];
 
 static PROXY_LABELS_SHOW: [KafkaProxyLabel; 11] = [
   KafkaProxyLabel::Target,
@@ -77,10 +67,10 @@ impl CommandExecutor for ProxyDeploy {
       return err!("proxy certificate bundle '{}' does not exist", proxy_bundle_id);
     }
 
-    let proxy_certificate_name = format!("{}-certificate", proxy_bundle_id);
-    let proxy_ca_certificate_secret_name = format!("{}-ca-certificate", proxy_bundle_id);
-    let proxy_private_key_secret_name = format!("{}-private-key", proxy_bundle_id);
-    let proxy_server_certificate_secret_name = format!("{}-server-certificate", proxy_bundle_id);
+    let proxy_certificate_name = format!("{}-cert", proxy_bundle_id);
+    let proxy_ca_certificate_secret_name = format!("{}-ca-cert", proxy_bundle_id);
+    let proxy_private_key_secret_name = format!("{}-key", proxy_bundle_id);
+    let proxy_server_certificate_secret_name = format!("{}-server-cert", proxy_bundle_id);
 
     let (proxy_certificate_result, ca_secret_result, key_secret_result, cert_secret_result) = join!(
       client.get_certificate(&proxy_certificate_name),
@@ -145,9 +135,14 @@ impl CommandExecutor for ProxyDeploy {
 
     UnitFormatter::new(&proxy_bundle_id, &PROXY_LABELS_SHOW, context).print(&kafka_proxy, None)?;
     UnitFormatter::new(&proxy_certificate_name, &GENERATED_CERTIFICATE_LABELS, context).print(&certificate_body, None)?;
-    UnitFormatter::new(&proxy_ca_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_ca_certificate), None), None)?;
-    UnitFormatter::new(&proxy_server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_server_certificate), None), None)?;
-    UnitFormatter::new(&proxy_private_key_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_private_key), None), None)?;
+    UnitFormatter::new(&proxy_ca_certificate_secret_name, &SECRET_LABELS_SHOW, context)
+      .print(&SecretMetadataExpirationDays::new(SecretMetadata::from(proxy_ca_certificate.as_str()), None), None)?;
+    UnitFormatter::new(&proxy_server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(
+      &SecretMetadataExpirationDays::new(SecretMetadata::from(proxy_server_certificate.as_str()), None),
+      None,
+    )?;
+    UnitFormatter::new(&proxy_private_key_secret_name, &SECRET_LABELS_SHOW, context)
+      .print(&SecretMetadataExpirationDays::new(SecretMetadata::from(proxy_private_key.as_str()), None), None)?;
 
     if !context.confirmed(format!("deploy proxy '{}'?", proxy_bundle_id))? {
       return err!("cancelled, proxy '{}' not deployed", proxy_bundle_id);
@@ -251,9 +246,6 @@ impl CommandExecutor for ProxyListIds {
   }
 }
 
-pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 6] =
-  [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::FormatKind, SecretLabel::Size, SecretLabel::Description, SecretLabel::NotAfter];
-
 pub(crate) struct ProxyShow {}
 
 #[async_trait]
@@ -266,36 +258,28 @@ impl CommandExecutor for ProxyShow {
     match proxy {
       Ok(proxy) => {
         let certificate_status = client.get_certificate(&proxy.certificate).await?;
+
         context.print_allocation_status(&allocation_status, PROXY_SUBJECT_TARGET);
         UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, context).print(&proxy, None)?;
-        let mut secret_names: Vec<String> = vec![proxy.secret_name_ca_chain];
+
         if let Some(actual_certificate) = &certificate_status.actual {
           let validated_dns = actual_certificate
             .dns_names
             .first()
             .and_then(|first_dns| client.platform().validate_vhost_domain(first_dns).ok());
-          UnitFormatter::new(proxy.certificate, &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days), validated_dns), None)?;
-          secret_names.push(actual_certificate.key_secret.clone());
-          secret_names.push(actual_certificate.cert_chain_secret.clone());
-          if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
-            secret_names.push(passphrase_secret.clone());
-          }
+          context.print_explanation(format!("certificate '{}'", proxy.certificate));
+          UnitFormatter::new(proxy.certificate.clone(), &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days), validated_dns), None)?;
         }
-        secret_names.sort();
-        let secrets = try_join_all(secret_names.iter().map(|secret_id| client.secret_with_status(secret_id))).await?;
-        let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
-        for (secret_name, (secret_value, _)) in secret_names.iter().zip(&secrets) {
-          formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata(secret_value), Some(expiration_days)));
-        }
-        formatter.print(None)?;
-        for (secret_name, (secret_value, allocation_status)) in secret_names.iter().zip(secrets) {
-          let secret_metadata = secret_metadata(&secret_value);
-          match secret_metadata {
-            SecretMetadata::Certificate { .. } | SecretMetadata::Pki { .. } => {
-              UnitFormatter::new(secret_name, &SECRET_LABELS_SHOW, context).print(&(None, secret_metadata, Some(expiration_days), Some(allocation_status)), None)?
-            }
-            _ => {}
-          }
+
+        if let Some(actual_certificate) = &certificate_status.actual {
+          context.print_explanation(format!("ca certificate secret '{}'", proxy.secret_name_ca_chain));
+          print_certificate_secret(proxy.secret_name_ca_chain.as_str(), expiration_days, client, context).await?;
+
+          context.print_explanation(format!("cert chain secret '{}'", actual_certificate.cert_chain_secret));
+          print_certificate_secret(actual_certificate.cert_chain_secret.as_str(), expiration_days, client, context).await?;
+
+          context.print_explanation(format!("key secret '{}'", actual_certificate.key_secret));
+          print_key_secret(actual_certificate.key_secret.as_str(), client, context).await?;
         }
         Ok(())
       }

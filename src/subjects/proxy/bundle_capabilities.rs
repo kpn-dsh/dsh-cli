@@ -9,13 +9,13 @@ use crate::directory::{
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::global_options::get_expiration_days;
-use crate::secret_metadata::secret_metadata;
+use crate::secret_metadata::SecretMetadata;
 use crate::subject::Requirements;
 use crate::subjects::aclgroup::options::ACL_GROUP_NAME_OPTION;
 use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::proxy::labels::ProxyBundleLabel;
 use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone, ENABLE_SCHEMA_STORE_OPTION, LANGUAGE_ARGUMENT};
-use crate::subjects::secret::SecretLabel;
+use crate::subjects::secret::labels::{SecretLabel, SecretMetadataExpirationDays};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
 use crate::verbosity::Verbosity;
@@ -296,19 +296,7 @@ impl CommandExecutor for BundleList {
   }
 }
 
-static BUNDLE_SECRET_LABELS_SHOW: [SecretLabel; 11] = [
-  SecretLabel::SecretName,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::NotBefore,
-  SecretLabel::NotAfter,
-  SecretLabel::Subject,
-  SecretLabel::Issuer,
-  SecretLabel::CaChain,
-  SecretLabel::Subject,
-];
+static BUNDLE_SECRET_LABELS_SHOW: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::Format, SecretLabel::Size, SecretLabel::Description];
 
 static BUNDLE_LABELS_SHOW: [ProxyBundleLabel; 9] = [
   ProxyBundleLabel::CaCommonName,
@@ -344,24 +332,37 @@ impl CommandExecutor for BundleShow {
     UnitFormatter::new(format!("{} / derived values", bundle_id), &BUNDLE_DERIVED_LABELS_SHOW, context).print(&bundle.configuration, None)?;
 
     context.print_explanation(format!("server certificate file '{}'", bundle.server_pem.filename));
-    UnitFormatter::new(format!("{} / server certificate", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context)
-      .print(&(secret_metadata(&bundle.server_pem.value), Some(expiration_days)), None)?;
+    UnitFormatter::new(format!("{} / server certificate", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context).print(
+      &SecretMetadataExpirationDays::new(SecretMetadata::from(bundle.server_pem.value.as_str()), Some(expiration_days)),
+      None,
+    )?;
     context.print_explanation(format!("server key file '{}'", bundle.server_key.filename));
-    UnitFormatter::new(format!("{} / server key", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context)
-      .print(&(secret_metadata(&bundle.server_key.value), Some(expiration_days)), None)?;
+    UnitFormatter::new(format!("{} / server key", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context).print(
+      &SecretMetadataExpirationDays::new(SecretMetadata::from(bundle.server_key.value.as_str()), Some(expiration_days)),
+      None,
+    )?;
 
     context.print_explanation(format!("client certificate file '{}'", bundle.client_pem.filename));
-    UnitFormatter::new(format!("{} / client certificate", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context)
-      .print(&(secret_metadata(&bundle.client_pem.value), Some(expiration_days)), None)?;
+    UnitFormatter::new(format!("{} / client certificate", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context).print(
+      &SecretMetadataExpirationDays::new(SecretMetadata::from(bundle.client_pem.value.as_str()), Some(expiration_days)),
+      None,
+    )?;
     context.print_explanation(format!("client key file '{}'", bundle.client_key.filename));
-    UnitFormatter::new(format!("{} / client key", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context)
-      .print(&(secret_metadata(&bundle.client_key.value), Some(expiration_days)), None)?;
+    UnitFormatter::new(format!("{} / client key", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context).print(
+      &SecretMetadataExpirationDays::new(SecretMetadata::from(bundle.client_key.value.as_str()), Some(expiration_days)),
+      None,
+    )?;
 
     context.print_explanation(format!("certificate authority certificate file '{}'", bundle.ca_pem.filename));
-    UnitFormatter::new(format!("{} / ca certificate", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context)
-      .print(&(secret_metadata(&bundle.ca_pem.value), Some(expiration_days)), None)?;
+    UnitFormatter::new(format!("{} / ca certificate", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context).print(
+      &SecretMetadataExpirationDays::new(SecretMetadata::from(bundle.ca_pem.value.as_str()), Some(expiration_days)),
+      None,
+    )?;
     context.print_explanation(format!("certificate authority key file '{}'", bundle.ca_key.filename));
-    UnitFormatter::new(format!("{} / ca key", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context).print(&(secret_metadata(&bundle.ca_key.value), Some(expiration_days)), None)?;
+    UnitFormatter::new(format!("{} / ca key", bundle_id), &BUNDLE_SECRET_LABELS_SHOW, context).print(
+      &SecretMetadataExpirationDays::new(SecretMetadata::from(bundle.ca_key.value.as_str()), Some(expiration_days)),
+      None,
+    )?;
     Ok(())
   }
 
