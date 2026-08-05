@@ -99,6 +99,7 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
   spawn_blocking(move || {
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
     let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
+    debug!("provider metadata read from '{}'", &issuer_url);
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
         let access_token_jwt = DshJwt::from_str(access_token.secret())?;
@@ -312,6 +313,7 @@ fn authenticate_and_get_access_and_refresh_tokens(
     .add_scope(Scope::new("openid".to_string()))
     .add_scope(Scope::new(format!("manage:{}", platform.realm())))
     .add_scope(Scope::new("dsh_perms".to_string()));
+  trace!("device authorization request -> {:#?}", device_authorization_request);
   match device_authorization_request.request(http_client) {
     Ok(device_authorization_response) => {
       open_login_page(&device_authorization_response, platform, context);
