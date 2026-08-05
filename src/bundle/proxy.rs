@@ -73,7 +73,7 @@ impl ProxyCertificateBundleConfig {
   // Make sure that the CN has the same value as the first SAN so that we don't 'waste' a DNS
   // record on a unique name.
   pub(crate) fn common_name(&self) -> DshCliResult<String> {
-    Ok(self.platform.proxy_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), 0)?)
+    Ok(self.platform.proxy_vhost_index(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), 0)?)
   }
 
   pub(crate) fn domain_from_platform(&self) -> DshCliResult<String> {
@@ -89,7 +89,7 @@ impl ProxyCertificateBundleConfig {
   pub(crate) fn dns_entries(&self) -> DshCliResult<Vec<String>> {
     let mut dns_entries: Vec<String> = vec![];
     for index in 0..self.effective_number_of_dns_entries() {
-      dns_entries.push(self.platform.proxy_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), index)?);
+      dns_entries.push(self.platform.proxy_vhost_index(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), index)?);
     }
     if self.enable_schema_store {
       dns_entries.push(self.platform.proxy_schema_store_vhost(&self.tenant, &self.proxy_name, self.vhost_zone.clone())?);
