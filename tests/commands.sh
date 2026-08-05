@@ -179,6 +179,10 @@ export SAFE_COMMANDS=(
   "platform show --service $SERVICE_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST"
+
+  "platform show --app my-app --bucket my-bucket --proxy my-proxy --service my-service --topic my-topic --vendor my-vendor --vhost my-vhost"
+  "platform show --app my-app --bucket my-bucket --proxy my-proxy --service my-service --topic my-topic --vendor my-vendor --vhost my-vhost -p prodaz"
+
   "platform show"
   "platforms"
   "ps"
