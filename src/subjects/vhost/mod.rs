@@ -1,16 +1,14 @@
 pub(crate) mod capabilities;
 pub(crate) mod labels;
 
-use crate::capability::{Capability, LIST_COMMAND, LIST_COMMAND_ALIAS};
+use crate::arguments::vhost_subdomain_argument;
+use crate::capability::{Capability, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::subject::Subject;
-use crate::subjects::vhost::capabilities::{VhostList, VhostListUsage};
-use crate::subjects::vhost::labels::VhostListLabel;
+use crate::subjects::vhost::capabilities::{VhostList, VhostListApps, VhostListUsage, VhostShow};
 use async_trait::async_trait;
-use dsh_api::types::PortMapping;
-use serde::Serialize;
 use std::sync::LazyLock;
 
 struct VhostSubject {}
@@ -42,9 +40,10 @@ impl Subject for VhostSubject {
     use crate::capability::{ADD_COMMAND, UPDATE_COMMAND};
 
     match capability_command {
-      ADD_COMMAND => Some(ADD_CERTIFICATE_CAPABILITY.as_ref()),
+      ADD_COMMAND => Some(VHOST_ADD_CERTIFICATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
-      UPDATE_COMMAND => Some(UPDATE_CERTIFICATE_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(VHOST_SHOW_CAPABILITY.as_ref()),
+      UPDATE_COMMAND => Some(VHOST_UPDATE_CERTIFICATE_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -53,6 +52,7 @@ impl Subject for VhostSubject {
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
+      SHOW_COMMAND => Some(VHOST_SHOW_CAPABILITY.as_ref()),
       _ => None,
     }
   }
@@ -63,7 +63,7 @@ impl Subject for VhostSubject {
 }
 
 #[cfg(feature = "rock")]
-static ADD_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
+static VHOST_ADD_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   use crate::arguments::vhost_subdomain_argument;
   use crate::capability::{ADD_COMMAND, ADD_COMMAND_ALIAS};
   use crate::global_options::expiration_option;
@@ -86,6 +86,7 @@ static VHOST_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = Lazy
         "List vhosts that have been configured in one or more services. Vhosts that are \
        provisioned but are not configured in any services will not be shown.",
       )
+      .add_command_executor(FlagType::Apps, &VhostListApps {}, None)
       .add_command_executor(FlagType::Usage, &VhostListUsage {}, None)
       .add_filter_flags(vec![
         (FilterFlagType::Started, Some("List vhosts configured in started services.".to_string())),
@@ -95,7 +96,7 @@ static VHOST_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = Lazy
 });
 
 #[cfg(feature = "rock")]
-static UPDATE_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
+static VHOST_UPDATE_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   use crate::arguments::vhost_subdomain_argument;
   use crate::capability::UPDATE_COMMAND;
   use crate::subjects::vhost::capabilities::VhostUpdateCertificate;
@@ -105,13 +106,25 @@ static UPDATE_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>
   )
 });
 
+static VHOST_SHOW_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
+  Box::new(
+    CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &VhostShow {}, "Show vhost")
+      .set_long_about(
+        "Shows the configuration of a vhost that is configured in one or more services. Vhosts that are \
+       provisioned but are not configured in any services cannot not be shown.",
+      )
+      .add_target_argument(vhost_subdomain_argument().required(true)),
+  )
+});
+
 static VHOST_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   vec![
     #[cfg(feature = "rock")]
-    ADD_CERTIFICATE_CAPABILITY.as_ref(),
-    #[cfg(feature = "rock")]
-    UPDATE_CERTIFICATE_CAPABILITY.as_ref(),
+    VHOST_ADD_CERTIFICATE_CAPABILITY.as_ref(),
     VHOST_LIST_CAPABILITY.as_ref(),
+    VHOST_SHOW_CAPABILITY.as_ref(),
+    #[cfg(feature = "rock")]
+    VHOST_UPDATE_CERTIFICATE_CAPABILITY.as_ref(),
   ]
 });
 
@@ -135,30 +148,3 @@ pub(crate) fn certificate_authority_argument() -> clap::Arg {
       assumed.",
     )
 }
-
-#[derive(Clone, Serialize)]
-struct VhostListValue {
-  vhost: String,
-  zone: Option<String>,
-  tenant: Option<String>,
-  kafka_flag: bool,
-  service_id: String,
-  instances: u64,
-  port: String,
-  port_mapping: PortMapping,
-}
-
-static VHOST_LIST_LABELS: [VhostListLabel; 12] = [
-  VhostListLabel::Vhost,
-  VhostListLabel::Zone,
-  VhostListLabel::ServiceId,
-  VhostListLabel::Port,
-  VhostListLabel::Instances,
-  VhostListLabel::Auth,
-  VhostListLabel::Tenant,
-  VhostListLabel::Mode,
-  VhostListLabel::Paths,
-  VhostListLabel::Tls,
-  VhostListLabel::KafkaFlag,
-  VhostListLabel::Whitelist,
-];

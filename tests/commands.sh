@@ -24,7 +24,7 @@ export SYSTEM_SECRET_ID_UNDER_TEST="\!rest-api-client"
 export SYSTEM_SECRET_NAME_UNDER_TEST=system/rest-api-client
 export SERVICE_NON_EXISTING=non-existing-service
 export SERVICE_UNDER_TEST=keyring-dev
-export SERVICE_TASK_UNDER_TEST=58b9fc6c48-z9t46-00000000
+export SERVICE_TASK_UNDER_TEST=58b9fc6c48-kk58t-00000000
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
 export TOPIC_UNDER_TEST=cli-test
@@ -224,6 +224,7 @@ export SAFE_COMMANDS=(
   "s l"
   "secret list --certificates"
   "secret list --certificates --expiration 200"
+  "secret list --certificate"
   "secret list --errors"
   "secret list --ids"
   "secret list --issues"
@@ -319,6 +320,7 @@ export SAFE_COMMANDS=(
 
   "vhost list"
   "vhost l"
+  "vhost list --apps"
   "vhost list --started"
   "vhost list --stopped"
   "vhost list --started --stopped"

@@ -1,22 +1,25 @@
 use crate::capability::CommandExecutor;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
+use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::Requirements;
+use crate::subjects::certificate::get_relative_distinguished_name;
 #[cfg(feature = "rock")]
 use crate::subjects::vhost::labels::RockCertificateLabel;
-use crate::subjects::vhost::{VhostListValue, VHOST_LIST_LABELS};
-use crate::subjects::DEPENDANT_LABELS_LIST;
+use crate::subjects::vhost::labels::{VhostListLabel, VhostValue};
+use crate::subjects::{DependantLabel, DEPENDANT_LABELS_LIST};
 use crate::{include_started_stopped, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
 use dsh_api::dsh_api_client::DshApiClient;
+use dsh_api::types::{ActualCertificate, CertificateStatus};
 use dsh_api::vhost::{VhostInjection, VhostString};
-use dsh_api::Dependant;
+use dsh_api::{Dependant, DependantApp};
+use futures::future::{join_all, try_join};
 use itertools::Itertools;
+#[cfg(feature = "rock")]
+use rock_api::rcgen::INTERMEDIATE_KPN_PRIVATE_NV_TB_G1_CRT;
 use std::str::FromStr;
-
-// static VHOST_BUNDLE_LABELS_CREATE: [VhostBundleLabel; 5] =
-//   [VhostBundleLabel::Platform, VhostBundleLabel::Tenant, VhostBundleLabel::BundleName, VhostBundleLabel::CaCommonName, VhostBundleLabel::VhostZone];
 
 #[cfg(feature = "rock")]
 pub(crate) struct VhostAddCertificate {}
@@ -188,6 +191,9 @@ impl CommandExecutor for VhostAddCertificate {
   }
 }
 
+static VHOST_LIST_LABELS: [VhostListLabel; 7] =
+  [VhostListLabel::Vhost, VhostListLabel::Zone, VhostListLabel::Kind, VhostListLabel::ServiceId, VhostListLabel::Instances, VhostListLabel::Url, VhostListLabel::Cert];
+
 pub(crate) struct VhostList {}
 
 #[async_trait]
@@ -197,6 +203,9 @@ impl CommandExecutor for VhostList {
     context.print_explanation("list configured vhosts");
     let start_instant = context.now();
     let applications = client.get_application_configuration_map().await?;
+
+    let certs: Vec<(String, CertificateStatus)> = client.certificates().await?;
+
     context.print_execution_time(start_instant);
     let (include_started, include_stopped) = include_started_stopped(matches);
     let mut vhost_list_values = applications
@@ -208,16 +217,22 @@ impl CommandExecutor for VhostList {
           .iter()
           .filter_map(|(port, port_mapping)| match port_mapping.vhost {
             Some(ref vhost_string) => match VhostString::from_str(vhost_string) {
-              Ok(vhost) => Some(VhostListValue {
-                vhost: vhost.vhost_name,
-                zone: vhost.zone,
-                tenant: vhost.tenant_name,
-                kafka_flag: vhost.kafka,
-                service_id: application_id.to_string(),
-                instances: application.instances,
-                port: port.to_string(),
-                port_mapping: port_mapping.clone(),
-              }),
+              Ok(vhost) => {
+                let url = client.platform().url_from_vhost_string(&vhost, Some(client.tenant_name())).ok();
+                let cert = url.as_ref().map(|url| find_cert(url, &certs)).unwrap_or_default().map(|(cert_id, _)| cert_id);
+                Some(VhostValue {
+                  vhost: vhost.vhost_name,
+                  zone: vhost.zone,
+                  tenant: vhost.tenant_name,
+                  kafka_flag: vhost.kafka,
+                  service_id: application_id.to_string(),
+                  instances: application.instances,
+                  port: port.to_string(),
+                  port_mapping: port_mapping.clone(),
+                  url,
+                  cert,
+                })
+              }
               Err(_) => None,
             },
             None => None,
@@ -234,6 +249,49 @@ impl CommandExecutor for VhostList {
       formatter.push_values(&vhost_list_values);
       formatter.print(None)
     }
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+fn find_cert(target_common_name: &str, certs: &[(String, CertificateStatus)]) -> Option<(String, ActualCertificate)> {
+  certs.iter().find_map(|(certificate_id, certificate_status)| match &certificate_status.actual {
+    Some(actual_certificate) => match get_relative_distinguished_name(actual_certificate.distinguished_name.as_str(), "CN") {
+      Some(common_name) => {
+        if target_common_name == common_name {
+          Some((certificate_id.clone(), actual_certificate.clone()))
+        } else {
+          None
+        }
+      }
+      None => None,
+    },
+    None => None,
+  })
+}
+
+static DEPENDANT_LABELS_LIST_APPS: [DependantLabel; 2] = [DependantLabel::DependantId, DependantLabel::Dependencies];
+
+pub(crate) struct VhostListApps {}
+
+#[async_trait]
+impl CommandExecutor for VhostListApps {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    context.print_warning("only vhosts that are used as resources in apps will be listed here");
+    context.print_explanation("list vhosts with apps that use them as resources");
+    let start_instant = context.now();
+    let vhosts_with_app_usage: Vec<(String, Vec<DependantApp>)> = client.vhosts_with_dependant_apps().await?;
+    context.print_execution_time(start_instant);
+    let mut formatter = ListFormatter::new(&DEPENDANT_LABELS_LIST_APPS, context);
+    for (vhost, dependant_apps) in &vhosts_with_app_usage {
+      for dependant in dependant_apps {
+        formatter.push_target_id_value(vhost.clone(), dependant);
+      }
+    }
+    formatter.print(None)?;
+    Ok(())
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
@@ -258,6 +316,104 @@ impl CommandExecutor for VhostListUsage {
       }
     }
     formatter.print(None)?;
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_with_api()
+  }
+}
+
+static VHOST_SHOW_LABELS: [VhostListLabel; 14] = [
+  VhostListLabel::Vhost,
+  VhostListLabel::Zone,
+  VhostListLabel::Kind,
+  VhostListLabel::ServiceId,
+  VhostListLabel::Port,
+  VhostListLabel::Instances,
+  VhostListLabel::Auth,
+  VhostListLabel::Tenant,
+  VhostListLabel::Mode,
+  VhostListLabel::Paths,
+  VhostListLabel::Tls,
+  VhostListLabel::Whitelist,
+  VhostListLabel::Url,
+  VhostListLabel::Cert,
+];
+
+pub(crate) struct VhostShow {}
+
+#[async_trait]
+impl CommandExecutor for VhostShow {
+  async fn execute_with_client(&self, target: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+    let vhost_id = target.unwrap_or_else(|| unreachable!());
+    context.print_explanation(format!("show all parameters for vhost '{}'", vhost_id));
+    let start_instant = context.now();
+    let (applications, certificate_ids) = try_join(client.get_application_configuration_map(), client.get_certificate_ids()).await?;
+    // let applications = client.get_application_configuration_map().await?;
+    // let certificate_ids = client.get_certificate_ids().await?;
+    let _certificate_statuses = join_all(certificate_ids.iter().map(|certificate_id| client.get_certificate(certificate_id))).await;
+
+    //     let certs = certificate_ids.zip() certificate_statuses.iter().filter_map(|certificate_status| {
+    //       if let Ok(certificate_status) = certificate_status {
+    //         let actual_certificate = certificate_status.actual.unwrap();
+    //        if let Some(common_name) = get_relative_distinguished_name(&actual_certificate.distinguished_name, "CN") {
+    // if common_name ==
+    //        }
+    //         actual_certificate.dns_names;
+    //         let configuration = b.configuration;
+    //         None
+    //       } else {
+    //         None
+    //       }
+    //     }).collect_vec();
+
+    let certs: Vec<(String, CertificateStatus)> = client.certificates().await?;
+
+    context.print_execution_time(start_instant);
+    let mut vhosts = applications
+      .iter()
+      .flat_map(|(application_id, application)| {
+        application
+          .exposed_ports
+          .iter()
+          .filter_map(|(port, port_mapping)| match port_mapping.vhost {
+            Some(ref vhost_string) => match VhostString::from_str(vhost_string) {
+              Ok(vhost) => {
+                if vhost.vhost_name == vhost_id {
+                  let url = client.platform().url_from_vhost_string(&vhost, Some(client.tenant_name())).ok();
+                  let cert = url.as_ref().map(|url| find_cert(url, &certs)).unwrap_or_default().map(|(cert_id, _)| cert_id);
+                  Some(VhostValue {
+                    vhost: vhost.vhost_name,
+                    zone: vhost.zone,
+                    tenant: vhost.tenant_name,
+                    kafka_flag: vhost.kafka,
+                    service_id: application_id.to_string(),
+                    instances: application.instances,
+                    port: port.to_string(),
+                    port_mapping: port_mapping.clone(),
+                    url,
+                    cert,
+                  })
+                } else {
+                  None
+                }
+              }
+              Err(_) => None,
+            },
+            None => None,
+          })
+          .collect_vec()
+      })
+      .collect_vec();
+    if vhosts.is_empty() {
+      context.print_outcome(format!("vhost '{}' not configured", vhost_id));
+    } else {
+      vhosts.sort_by(|a, b| (&a.vhost, &a.service_id).cmp(&(&b.vhost, &b.service_id)));
+      for vhost in vhosts {
+        UnitFormatter::new(vhost.vhost.clone(), &VHOST_SHOW_LABELS, context).print(&vhost, None)?;
+      }
+    }
     Ok(())
   }
 
@@ -445,40 +601,3 @@ const ROCK_CERTIFICATE_LABELS: [RockCertificateLabel; 9] = [
   RockCertificateLabel::NotBefore,
   RockCertificateLabel::Status,
 ];
-
-const INTERMEDIATE_KPN_PRIVATE_NV_TB_G1_CRT: &str = r#"-----BEGIN CERTIFICATE-----
-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
-9KK2q2I+jyufvDBq870RDLdBQQxI7ZgZwtA=
------END CERTIFICATE-----"#;
-
-// let _url = "https://artifacts.kpn.org/artifactory/kpn-pki/intermediate.kpn.private.nv.tb-g1.crt";

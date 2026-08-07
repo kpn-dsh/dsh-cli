@@ -147,7 +147,7 @@ impl SubjectFormatter<DependantLabel> for DependantCertificate {
   fn value(&self, label: &DependantLabel, target_id: &str) -> Value {
     match label {
       DependantLabel::DependantId => Value::target(&self.certificate_id),
-      DependantLabel::DependantKind => Value::plain("certificate"),
+      DependantLabel::DependantKind => Value::plain("cert"),
       DependantLabel::Dependencies => Value::plain(self.secret_kind.to_string()),
       DependantLabel::Target => Value::target(target_id),
       _ => Value::hide(),
