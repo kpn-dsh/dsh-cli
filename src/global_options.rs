@@ -91,18 +91,6 @@ pub(crate) fn dry_run_flag() -> Arg {
     .global(true)
 }
 
-pub(crate) fn expiration_option() -> Arg {
-  Arg::new(EXPIRATION_OPTION)
-    .long("expiration")
-    .action(ArgAction::Set)
-    .value_parser(RangedValueParser::<u64>::new(0, 10000))
-    .value_name("DAYS")
-    .help("Expiration period in days")
-    .long_help("Number of days used to check if some resource is about to expire.")
-    .hide_short_help(false)
-    .global(true)
-}
-
 pub(crate) fn environment_variable_option() -> Arg {
   Arg::new(ENVIRONMENT_VARIABLE_OPTION)
     .long("environment-variable")
@@ -117,6 +105,18 @@ pub(crate) fn environment_variable_option() -> Arg {
           This option can be provided multiple times.",
     )
     .hide_short_help(true)
+    .global(true)
+}
+
+pub(crate) fn expiration_option() -> Arg {
+  Arg::new(EXPIRATION_OPTION)
+    .long("expiration")
+    .action(ArgAction::Set)
+    .value_parser(RangedValueParser::<u64>::new(0, 10000))
+    .value_name("DAYS")
+    .help("Expiration period in days")
+    .long_help("Number of days used to check if some resource is about to expire.")
+    .hide_short_help(false)
     .global(true)
 }
 
