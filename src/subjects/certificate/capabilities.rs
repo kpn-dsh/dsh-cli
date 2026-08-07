@@ -97,15 +97,8 @@ impl CommandExecutor for CertificateDelete {
   }
 }
 
-pub(crate) static CERTIFICATE_LABELS_LIST: [CertificateLabel; 7] = [
-  CertificateLabel::Target,
-  CertificateLabel::Kind,
-  CertificateLabel::DistinguishedName,
-  CertificateLabel::DnsNamesSummary,
-  CertificateLabel::NotAfter,
-  CertificateLabel::CertChainSecret,
-  CertificateLabel::KeySecret,
-];
+pub(crate) static CERTIFICATE_LABELS_LIST: [CertificateLabel; 6] =
+  [CertificateLabel::Target, CertificateLabel::Kind, CertificateLabel::CommonName, CertificateLabel::NotAfter, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret];
 
 pub(crate) struct CertificateList {}
 

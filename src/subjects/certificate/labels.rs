@@ -2,6 +2,7 @@ use crate::bundle::DshCertificate;
 use crate::formatters::{hashmap_to_table, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subjects::certificate::capabilities::ValidatedVhost;
+use crate::subjects::certificate::get_relative_distinguished_name;
 use dsh_api::types::{ActualCertificate, Certificate};
 use itertools::Itertools;
 use rcgen::{DistinguishedName, DnType, DnValue, OtherNameValue, SanType};
@@ -11,9 +12,9 @@ use std::collections::HashMap;
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum CertificateLabel {
   CertChainSecret,
+  CommonName,
   DistinguishedName,
   DnsNames,
-  DnsNamesSummary,
   KeySecret,
   Kind,
   NotAfter,
@@ -27,9 +28,9 @@ impl Label for CertificateLabel {
   fn as_str(&self) -> &str {
     match self {
       Self::CertChainSecret => "cert chain secret",
+      Self::CommonName => "common name",
       Self::DistinguishedName => "distinguished name",
       Self::DnsNames => "dns names",
-      Self::DnsNamesSummary => "dns names",
       Self::KeySecret => "key secret",
       Self::Kind => "kind",
       Self::NotAfter => "not after",
@@ -50,9 +51,9 @@ impl SubjectFormatter<CertificateLabel> for (&ActualCertificate, Option<u64>, Op
     let (actual_certificate, days, validated_vhost) = self;
     match label {
       CertificateLabel::CertChainSecret => Value::target(&actual_certificate.cert_chain_secret),
+      CertificateLabel::CommonName => Value::some_or(get_relative_distinguished_name(&actual_certificate.distinguished_name, "CN"), Value::error("error")),
       CertificateLabel::DistinguishedName => Value::distinguished_name(&actual_certificate.distinguished_name),
       CertificateLabel::DnsNames => Value::plain(actual_certificate.dns_names.join("\n")),
-      CertificateLabel::DnsNamesSummary => Value::plain(summarize_dns_names(&actual_certificate.dns_names)),
       CertificateLabel::KeySecret => Value::target(&actual_certificate.key_secret),
       CertificateLabel::Kind => Value::some_or_hide(validated_vhost.as_ref().map(|(_, _, kafka, _)| if *kafka { "proxy" } else { "vhost" })),
       CertificateLabel::NotAfter => Value::datetime_expired(&actual_certificate.not_after, *days),
@@ -63,32 +64,6 @@ impl SubjectFormatter<CertificateLabel> for (&ActualCertificate, Option<u64>, Op
       },
       CertificateLabel::SerialNumber => Value::plain(&actual_certificate.serial_number),
       CertificateLabel::Target => Value::target(target_id),
-    }
-  }
-}
-
-fn summarize_dns_names(dns_names: &[String]) -> String {
-  if dns_names.len() <= 4 {
-    dns_names.join("\n")
-  } else {
-    if dns_names.last().is_some_and(|last_dns| last_dns.contains("-schema-store.")) {
-      let mut summary = String::new();
-      summary.push_str(dns_names.first().unwrap_or_else(|| unreachable!()));
-      summary.push('\n');
-      summary.push_str("...");
-      summary.push('\n');
-      summary.push_str(dns_names.get(dns_names.len() - 2).unwrap_or_else(|| unreachable!()));
-      summary.push('\n');
-      summary.push_str(dns_names.last().unwrap_or_else(|| unreachable!()));
-      summary
-    } else {
-      let mut summary = String::new();
-      summary.push_str(dns_names.first().unwrap_or_else(|| unreachable!()));
-      summary.push('\n');
-      summary.push_str("...");
-      summary.push('\n');
-      summary.push_str(dns_names.last().unwrap_or_else(|| unreachable!()));
-      summary
     }
   }
 }
@@ -116,11 +91,12 @@ impl SubjectFormatter<CertificateLabel> for DshCertificate {
   fn value(&self, label: &CertificateLabel, target_id: &str) -> Value {
     match label {
       CertificateLabel::CertChainSecret => Value::unreachable(),
+      CertificateLabel::CommonName => Value::some_or(
+        get_rdn_from_distinguished_name(&self.certificate.params().distinguished_name, DnType::CommonName),
+        Value::error("error"),
+      ),
       CertificateLabel::DistinguishedName => Value::plain(hashmap_to_table(&hashmap_from_distinguished_name(&self.certificate.params().distinguished_name))),
       CertificateLabel::DnsNames => Value::plain(self.certificate.params().subject_alt_names.iter().map(san_to_string).collect_vec().join("\n")),
-      CertificateLabel::DnsNamesSummary => Value::plain(summarize_dns_names(
-        &self.certificate.params().subject_alt_names.iter().map(san_to_string).collect_vec(),
-      )),
       CertificateLabel::KeySecret => Value::unreachable(),
       CertificateLabel::Kind => Value::unreachable(),
       CertificateLabel::NotAfter => Value::plain(self.certificate.params().not_after),
@@ -141,6 +117,18 @@ fn san_to_string(san_type: &SanType) -> String {
     SanType::OtherName((_, OtherNameValue::Utf8String(utf8_string))) => format!("utf8: {}", utf8_string),
     _ => "".to_string(),
   }
+}
+
+pub(crate) fn get_rdn_from_distinguished_name(distinguished_name: &DistinguishedName, target_rdn_type: DnType) -> Option<String> {
+  distinguished_name.iter().find_map(
+    |(dn_type, dn_value)| {
+      if *dn_type == target_rdn_type {
+        Some(dn_value_string(dn_value))
+      } else {
+        None
+      }
+    },
+  )
 }
 
 fn hashmap_from_distinguished_name(distinguished_name: &DistinguishedName) -> HashMap<String, String> {

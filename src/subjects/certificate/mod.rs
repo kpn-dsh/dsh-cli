@@ -219,22 +219,63 @@ pub(crate) fn format_distinguished_name(distinguished_name: &str) -> String {
     }
   }
   for (attribute, value) in map {
-    if !ATTRIBUTES.contains(&attribute.as_str()) {
-      attribute_value_pairs.push((attribute, vec![value]))
+    if !ATTRIBUTES.contains(&attribute) {
+      attribute_value_pairs.push((attribute.to_string(), vec![value.to_string()]))
     }
   }
   vec_to_table(&attribute_value_pairs)
 }
 
-pub(crate) fn distinguished_name_to_map(distinguished_name: &str) -> HashMap<String, String> {
+/// Get relative distinguished name from distinguished name string.
+///
+/// ## Examples
+/// ```
+/// let common_name = get_relative_distinguished_name(
+///   "CN=tenant.org,O=Tenant Organization,L=City,ST=State,C=NL",
+///   "CN",
+/// );
+/// assert_eq!(common_name, Some("tenant.org"));
+/// ```
+///
+/// ## Parameters
+/// * `distinguished_name` - Haystack distinguished name.
+/// * `target_rdn_type` - Case sensitive target relative distinguished name type (e.g. "CN").
+pub(crate) fn get_relative_distinguished_name<'a>(distinguished_name: &'a str, target_rdn_type: &str) -> Option<&'a str> {
+  distinguished_name.split(",").find_map(|rdn_pair| {
+    rdn_pair
+      .split("=")
+      .collect_array()
+      .and_then(|[rdn_type, rdn_value]| if rdn_type == target_rdn_type { Some(rdn_value) } else { None })
+  })
+}
+
+pub(crate) fn distinguished_name_to_map(distinguished_name: &str) -> HashMap<&str, &str> {
   distinguished_name
     .split(",")
-    .map(|relative_distinguished_name| {
-      let attribute_value = relative_distinguished_name.split("=").map(|s| s.trim().to_string()).collect_vec();
-      (
-        attribute_value.first().cloned().unwrap_or_default().to_string(),
-        attribute_value.get(1).cloned().unwrap_or_default().to_string(),
-      )
-    })
+    .flat_map(|rdn_pair| rdn_pair.split("=").collect_tuple())
     .collect::<HashMap<_, _>>()
+}
+
+// pub(crate) fn distinguished_name_to_map(distinguished_name: &str) -> HashMap<String, String> {
+//   distinguished_name
+//     .split(",")
+//     .map(|rdn_pair| {
+//       let attribute_value = rdn_pair.split("=").map(|s| s.trim().to_string()).collect_vec();
+//       (
+//         attribute_value.first().cloned().unwrap_or_default().to_string(),
+//         attribute_value.get(1).cloned().unwrap_or_default().to_string(),
+//       )
+//     })
+//     .collect::<HashMap<_, _>>()
+// }
+
+#[test]
+fn test_get_relative_distinguished_name() {
+  const DISTINGUISHED_NAME: &str = "CN=tenant.org,O=Tenant Organization,L=City,ST=State,C=NL";
+  assert_eq!(get_relative_distinguished_name(DISTINGUISHED_NAME, "CN"), Some("tenant.org"));
+  assert_eq!(get_relative_distinguished_name(DISTINGUISHED_NAME, "O"), Some("Tenant Organization"));
+  assert_eq!(get_relative_distinguished_name(DISTINGUISHED_NAME, "L"), Some("City"));
+  assert_eq!(get_relative_distinguished_name(DISTINGUISHED_NAME, "ST"), Some("State"));
+  assert_eq!(get_relative_distinguished_name(DISTINGUISHED_NAME, "C"), Some("NL"));
+  assert!(get_relative_distinguished_name(DISTINGUISHED_NAME, "OU").is_none());
 }
