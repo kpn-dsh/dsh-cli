@@ -198,7 +198,6 @@ impl Value {
   /// # Returns
   /// * `Value::Plain(values)` - When `values` is not empty.
   /// * `Value::Hide` - When `values` is empty.
-  #[cfg(feature = "rock")]
   pub(crate) fn non_empty_or_hide<T>(values: &[T]) -> Self
   where
     T: ToString,
