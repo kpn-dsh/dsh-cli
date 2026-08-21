@@ -1,4 +1,5 @@
 use crate::authentication::AuthenticationMethod;
+use crate::bundle::CertificateAuthorityId;
 use crate::context::BrowserMethod;
 use crate::directory::{get_settings, write_settings};
 use crate::formatters::OutputFormat;
@@ -6,6 +7,7 @@ use crate::log_level::LogLevel;
 use crate::style::{DshColor, DshStyle};
 use crate::verbosity::Verbosity;
 use crate::{cli_error, err, DshCliResult};
+use dsh_api::platform::VhostZone;
 use itertools::Itertools;
 use log::debug;
 use serde::{Deserialize, Serialize};
@@ -19,6 +21,8 @@ pub(crate) struct Settings {
   pub(crate) authentication: Option<AuthenticationMethod>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) browser: Option<BrowserMethod>,
+  #[serde(rename = "certificate-authority", skip_serializing_if = "Option::is_none")]
+  pub(crate) certificate_authority: Option<CertificateAuthorityId>,
   #[serde(rename = "csv-quote", skip_serializing_if = "Option::is_none")]
   pub(crate) csv_quote: Option<char>,
   #[serde(rename = "csv-separator", skip_serializing_if = "Option::is_none")]
@@ -81,6 +85,8 @@ pub(crate) struct Settings {
   pub(crate) terminal_width: Option<usize>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) verbosity: Option<Verbosity>,
+  // #[serde(rename = "vhost-zone", skip_serializing_if = "Option::is_none")]
+  // TODO pub(crate) vhost_zone: Option<VhostZone>,
   #[serde(skip_serializing)]
   pub(crate) file_name: Option<String>,
   #[serde(rename = "warning-color", skip_serializing_if = "Option::is_none")]
@@ -136,6 +142,9 @@ impl Debug for Settings {
     }
     if let Some(browser) = &self.browser {
       builder.field("browser", browser);
+    }
+    if let Some(certificate_authority) = &self.certificate_authority {
+      builder.field("certificate_authority", certificate_authority);
     }
     if let Some(csv_quote) = &self.csv_quote {
       builder.field("csv_quote", csv_quote);

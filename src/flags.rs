@@ -15,6 +15,8 @@ pub(crate) enum FlagType {
   Keys,
   OpenId,
   Properties,
+  #[cfg(feature = "rock")]
+  Rock,
   #[cfg(feature = "manage")]
   Stream,
   System,
@@ -38,6 +40,8 @@ impl FlagType {
       Self::Keys => "keys-flag",
       Self::OpenId => "open-id-flag",
       Self::Properties => "properties-flag",
+      #[cfg(feature = "rock")]
+      Self::Rock => "rock-flag",
       #[cfg(feature = "manage")]
       Self::Stream => "stream-flag",
       Self::System => "system-flag",
@@ -61,6 +65,8 @@ impl FlagType {
       Self::Keys => "keys",
       Self::OpenId => "openid",
       Self::Properties => "properties",
+      #[cfg(feature = "rock")]
+      Self::Rock => "rock",
       #[cfg(feature = "manage")]
       Self::Stream => "stream",
       Self::System => "system",
@@ -92,6 +98,8 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     FlagType::Keys => create_clap_flag(FlagType::Keys, format!("Show {}s as a keys", subject), long_help),
     FlagType::OpenId => create_clap_flag(FlagType::OpenId, "Show openid refresh token".to_string(), long_help),
     FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties", subject), long_help),
+    #[cfg(feature = "rock")]
+    FlagType::Rock => create_clap_flag(FlagType::Rock, format!("Include the rock {}'s", subject), long_help),
     #[cfg(feature = "manage")]
     FlagType::Stream => create_clap_flag(FlagType::Stream, format!("Include the {}'s stream", subject), long_help),
     FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s", subject), long_help),

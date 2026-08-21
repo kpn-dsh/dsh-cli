@@ -447,6 +447,7 @@ const ENV_VAR_DSH_API_PLATFORMS_FILE: &str = "DSH_API_PLATFORMS_FILE";
 
 pub(crate) const ENV_VAR_DSH_CLI_AUTHENTICATION: &str = "DSH_CLI_AUTHENTICATION";
 pub(crate) const ENV_VAR_DSH_CLI_BROWSER: &str = "DSH_CLI_BROWSER";
+pub(crate) const ENV_VAR_DSH_CLI_CERTIFICATE_AUTHORITY: &str = "DSH_CLI_CERTIFICATE_AUTHORITY";
 pub(crate) const ENV_VAR_DSH_CLI_CSV_QUOTE: &str = "DSH_CLI_CSV_QUOTE";
 pub(crate) const ENV_VAR_DSH_CLI_CSV_SEPARATOR: &str = "DSH_CLI_CSV_SEPARATOR";
 pub(crate) const ENV_VAR_DSH_CLI_DRY_RUN: &str = "DSH_CLI_DRY_RUN";
@@ -482,13 +483,14 @@ pub(crate) const ENV_VAR_DSH_CLI_TARGET_STYLE: &str = "DSH_CLI_TARGET_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_TENANT: &str = "DSH_CLI_TENANT";
 pub(crate) const ENV_VAR_DSH_CLI_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
 pub(crate) const ENV_VAR_DSH_CLI_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
+// TODO pub(crate) const ENV_VAR_DSH_CLI_VHOST_ZONE: &str = "DSH_CLI_VHOST_ZONE";
 pub(crate) const ENV_VAR_DSH_CLI_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_WARNING_STYLE: &str = "DSH_CLI_WARNING_STYLE";
 pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
 
 lazy_static! {
-  static ref EnvironmentVariables: [EnvironmentVariable; 42] = [
+  static ref EnvironmentVariables: [EnvironmentVariable; 43] = [
     EnvironmentVariable::new(
       ENV_VAR_DSH_API_PLATFORMS_FILE,
       "Overrides the default list of available platforms.",
@@ -525,6 +527,20 @@ lazy_static! {
       open it. The allowed values are 'instruct' and 'open'. If this variable is not provided, the \n\
       value from the settings file will be used, if it exists. Else, the default value will be \n\
       'open' when the cli tool is run interactive ('stdin' is a terminal) and 'instruct' if not.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_CERTIFICATE_AUTHORITY,
+      "Specifies the certificate authority to use when signing certificates.",
+      false,
+      true,
+      None,
+      "This environment variable specifies the certificate authority that the cli tool will use \n\
+      when it needs to sign generated certificates. Signed certificates can be used with vhosts \n\
+      or proxies to ensure the validity of the server (and clients in the case of proxies). \n\
+      The allowed values are 'kpn-ca', 'kpn-digic-rsdv' and 'self-signed'. If this variable is \n\
+      not provided, the value from the settings file will be used, if it exists. Else, the user \n\
+      will be prompted when the cli tool is run interactive ('stdin' is a terminal) and the cli \n\
+      tool exits with an error if not.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_CSV_QUOTE,

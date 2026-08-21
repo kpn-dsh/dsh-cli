@@ -21,6 +21,7 @@ export DSH_CLI_VERBOSITY="low"
 export APP_UNDER_TEST=cmd
 export SERVICE_UNDER_TEST=keyring-dev
 export SERVICE_TASK_UNDER_TEST=58b9fc6c48-z9t46-00000000
+export VHOST_UNDER_TEST=eavesdropper
 
 PLATFORM_OPEN_COMMANDS=(
   "app open $APP_UNDER_TEST"
@@ -34,6 +35,7 @@ PLATFORM_OPEN_COMMANDS=(
   "service open $SERVICE_UNDER_TEST"
   "task open $SERVICE_UNDER_TEST"
   "task open $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
+  "vhost open $VHOST_UNDER_TEST"
 )
 
 set -f

@@ -1,3 +1,4 @@
+use crate::bundle::{create_certificate_authority, get_certificate_authority, CertificateAuthorityId};
 use crate::capability::CommandExecutor;
 use crate::context::Context;
 use crate::formatters::ids_formatter::IdsFormatter;
@@ -10,9 +11,12 @@ use crate::secret_metadata::secrets_with_metadata;
 use crate::subject::Requirements;
 use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::certificate::{has_issues, CERTIFICATE_SUBJECT_TARGET};
+use crate::subjects::proxy::options::get_vhost_zone;
 use crate::subjects::secret::capabilities::{print_certificate_secret, print_key_secret};
 use crate::subjects::secret::SecretWithMetadata;
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
+use crate::target_platform::get_target_platform;
+use crate::target_tenant::get_target_tenant;
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
@@ -261,6 +265,28 @@ impl CommandExecutor for CertificateListIssues {
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
     Requirements::standard_with_api()
+  }
+}
+
+pub(crate) struct CertificateListRock {}
+
+#[async_trait]
+impl CommandExecutor for CertificateListRock {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    let platform = get_target_platform(matches, context.settings())?;
+    let tenant_name = get_target_tenant(matches, context.settings())?;
+    let expiration_days = get_expiration_days(matches, context.settings())?;
+    let vhost_zone = get_vhost_zone(matches, context, VhostZone::Private)?;
+    let tenant_domain = &platform.tenant_domain(&tenant_name, vhost_zone.clone())?;
+    context.print_explanation(format!("list all rock certificates for domain '{}'", tenant_domain));
+    let certificate_authority_id = get_certificate_authority(matches, context.settings())?.unwrap_or(CertificateAuthorityId::RockKpnCa);
+    let certificate_authority = create_certificate_authority(certificate_authority_id)?;
+    certificate_authority.list(tenant_domain, context, expiration_days).await?;
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
   }
 }
 

@@ -49,6 +49,22 @@ pub(crate) fn enable_schema_store_option() -> Arg {
     )
 }
 
+pub(crate) const ATTACH_CA_CHAIN_OPTION: &str = "attach-ca-chain-option";
+
+pub(crate) fn attach_ca_chain_option() -> Arg {
+  Arg::new(ATTACH_CA_CHAIN_OPTION)
+    .long("attach-ca-chain")
+    .action(ArgAction::Set)
+    .value_parser(builder::BoolValueParser::new())
+    .default_value("true")
+    .value_name("BOOL")
+    .help("Attach ca chain to generated certificate")
+    .long_help(
+      "If this option is enabled the the intermediate and root certificates will be \
+      attached to the generated certificates. Default is TRUE.",
+    )
+}
+
 pub(crate) const NUMBER_OF_DNS_RECORDS_OPTION: &str = "number-of-dns-records-option";
 
 pub(crate) fn number_of_dns_records_option() -> Arg {
@@ -88,16 +104,20 @@ pub(crate) fn vhost_zone_option() -> Arg {
     .value_parser(possible_values)
     .value_name("ZONE")
     .help("Vhost zone")
-    .long_help("This option indicates whether the certificates will be created for a public or a private vhost.")
+    .long_help("This option indicates whether the vhost will be public or a private.")
 }
 
-pub(crate) fn get_vhost_zone(matches: &ArgMatches, context: &Context) -> DshCliResult<VhostZone> {
+pub(crate) fn get_vhost_zone(matches: &ArgMatches, context: &Context, default: VhostZone) -> DshCliResult<VhostZone> {
   match matches.get_one::<String>(VHOST_ZONE_OPTION) {
     Some(vhost_zone) => Ok(VhostZone::from_str(vhost_zone)?),
     None => {
-      let vhost_zone_string = context.read_single_line("vhost zone [PRIVATE/public]")?;
+      let prompt = match default {
+        VhostZone::Private => "vhost zone [PRIVATE/public]",
+        VhostZone::Public => "vhost zone [private/PUBLIC]",
+      };
+      let vhost_zone_string = context.read_single_line(prompt)?;
       if vhost_zone_string.is_empty() {
-        Ok(VhostZone::Private)
+        Ok(default)
       } else {
         Ok(VhostZone::from_str(&vhost_zone_string)?)
       }

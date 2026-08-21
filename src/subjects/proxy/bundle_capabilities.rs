@@ -22,6 +22,7 @@ use crate::verbosity::Verbosity;
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use clap::ArgMatches;
+use dsh_api::platform::VhostZone;
 use itertools::Itertools;
 use log::trace;
 
@@ -163,7 +164,7 @@ impl CommandExecutor for BundleCreate {
       None => context.confirmed("enable schema store?")?,
     };
     let number_of_dns_records = get_number_of_dns_records(matches, context)?;
-    let vhost_zone = get_vhost_zone(matches, context)?;
+    let vhost_zone = get_vhost_zone(matches, context, VhostZone::Private)?;
 
     let config = ProxyCertificateBundleConfig {
       acl_group_name,

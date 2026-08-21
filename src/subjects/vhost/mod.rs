@@ -2,13 +2,16 @@ pub(crate) mod capabilities;
 pub(crate) mod labels;
 
 use crate::arguments::vhost_subdomain_argument;
-use crate::capability::{Capability, LIST_COMMAND, LIST_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::bundle::CertificateAuthorityId;
+use crate::capability::{Capability, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
 use crate::subject::Subject;
-use crate::subjects::vhost::capabilities::{VhostList, VhostListApps, VhostListUsage, VhostShow};
+use crate::subjects::proxy::options::attach_ca_chain_option;
+use crate::subjects::vhost::capabilities::{VhostList, VhostListApps, VhostListUsage, VhostOpen, VhostShow};
 use async_trait::async_trait;
+use clap::builder::EnumValueParser;
 use std::sync::LazyLock;
 
 struct VhostSubject {}
@@ -42,6 +45,7 @@ impl Subject for VhostSubject {
     match capability_command {
       ADD_COMMAND => Some(VHOST_ADD_CERTIFICATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
+      OPEN_COMMAND => Some(VHOST_OPEN_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(VHOST_SHOW_CAPABILITY.as_ref()),
       UPDATE_COMMAND => Some(VHOST_UPDATE_CERTIFICATE_CAPABILITY.as_ref()),
       _ => None,
@@ -52,6 +56,7 @@ impl Subject for VhostSubject {
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
+      OPEN_COMMAND => Some(VHOST_OPEN_CAPABILITY.as_ref()),
       SHOW_COMMAND => Some(VHOST_SHOW_CAPABILITY.as_ref()),
       _ => None,
     }
@@ -71,11 +76,12 @@ static VHOST_ADD_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sy
   use crate::subjects::vhost::capabilities::VhostAddCertificate;
 
   Box::new(
-    CapabilityBuilder::new(ADD_COMMAND, Some(ADD_COMMAND_ALIAS), &VhostAddCertificate {}, "Add certificate to private vhost")
+    CapabilityBuilder::new(ADD_COMMAND, Some(ADD_COMMAND_ALIAS), &VhostAddCertificate {}, "Add certificate to vhost")
       .add_target_argument(vhost_subdomain_argument().required(true))
-      .add_extra_argument(certificate_authority_argument())
+      .add_extra_argument(certificate_authority_option())
       .add_extra_argument(expiration_option())
-      .add_extra_argument(vhost_zone_option()),
+      .add_extra_argument(vhost_zone_option())
+      .add_extra_argument(attach_ca_chain_option()),
   )
 });
 
@@ -95,15 +101,19 @@ static VHOST_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = Lazy
   )
 });
 
+static VHOST_OPEN_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
+  Box::new(
+    CapabilityBuilder::new(OPEN_COMMAND, Some(OPEN_COMMAND_ALIAS), &VhostOpen {}, "Open vhost in your browser").add_target_argument(vhost_subdomain_argument().required(true)),
+  )
+});
+
 #[cfg(feature = "rock")]
 static VHOST_UPDATE_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   use crate::arguments::vhost_subdomain_argument;
   use crate::capability::UPDATE_COMMAND;
   use crate::subjects::vhost::capabilities::VhostUpdateCertificate;
 
-  Box::new(
-    CapabilityBuilder::new(UPDATE_COMMAND, None, &VhostUpdateCertificate {}, "Update certificate for private vhost").add_target_argument(vhost_subdomain_argument().required(true)),
-  )
+  Box::new(CapabilityBuilder::new(UPDATE_COMMAND, None, &VhostUpdateCertificate {}, "Update certificate for vhost").add_target_argument(vhost_subdomain_argument().required(true)))
 });
 
 static VHOST_SHOW_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
@@ -122,29 +132,25 @@ static VHOST_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>
     #[cfg(feature = "rock")]
     VHOST_ADD_CERTIFICATE_CAPABILITY.as_ref(),
     VHOST_LIST_CAPABILITY.as_ref(),
+    VHOST_OPEN_CAPABILITY.as_ref(),
     VHOST_SHOW_CAPABILITY.as_ref(),
     #[cfg(feature = "rock")]
     VHOST_UPDATE_CERTIFICATE_CAPABILITY.as_ref(),
   ]
 });
 
-#[cfg(feature = "rock")]
-pub(crate) const CERTIFICATE_AUTHORITY_ARGUMENT: &str = "certificate-authority-argument";
+pub(crate) const CERTIFICATE_AUTHORITY_OPTION: &str = "certificate-authority-option";
 
-#[cfg(feature = "rock")]
-pub(crate) fn certificate_authority_argument() -> clap::Arg {
-  use crate::bundle::CertificateAuthority;
-  use clap::builder::EnumValueParser;
-
-  clap::Arg::new(CERTIFICATE_AUTHORITY_ARGUMENT)
+pub(crate) fn certificate_authority_option() -> clap::Arg {
+  clap::Arg::new(CERTIFICATE_AUTHORITY_OPTION)
     .long("certificate-authority")
     .alias("ca")
     .action(clap::ArgAction::Set)
-    .value_parser(EnumValueParser::<CertificateAuthority>::new())
+    .value_parser(EnumValueParser::<CertificateAuthorityId>::new())
     .value_name("CA")
     .long_help(
       "Use this option to specify the certificate authority that will be used to sign \
-      proxy or vhost certificates. When this option is not provided --self-signed will be \
-      assumed.",
+      proxy or vhost certificates. When this option is not provided, the user will be \
+      prompted for a value.",
     )
 }

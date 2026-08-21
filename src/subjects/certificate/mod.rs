@@ -12,10 +12,12 @@ use crate::secret_metadata::SecretMetadata;
 use crate::subject::Subject;
 use crate::subjects::certificate::capabilities::{
   CertificateDelete, CertificateList, CertificateListAllocationStatus, CertificateListConfiguration, CertificateListErrors, CertificateListIds, CertificateListIssues,
-  CertificateListUsage, CertificateShow, CertificateShowAllocationStatus, CertificateShowUsage,
+  CertificateListRock, CertificateListUsage, CertificateShow, CertificateShowAllocationStatus, CertificateShowUsage,
 };
+use crate::subjects::proxy::options::vhost_zone_option;
 use crate::subjects::secret;
 use crate::subjects::secret::SecretWithMetadata;
+use crate::subjects::vhost::certificate_authority_option;
 use async_trait::async_trait;
 use dsh_api::error::DshApiResult;
 use dsh_api::types::CertificateStatus;
@@ -80,12 +82,15 @@ static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> 
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &CertificateList {}, "List certificates")
       .set_long_about("Lists all available certificates.")
       .add_extra_argument(expiration_option())
+      .add_extra_argument(certificate_authority_option())
+      .add_extra_argument(vhost_zone_option())
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &CertificateListAllocationStatus {}, None),
         (FlagType::Configuration, &CertificateListConfiguration {}, None),
         (FlagType::Errors, &CertificateListErrors {}, None),
         (FlagType::Ids, &CertificateListIds {}, None),
         (FlagType::Issues, &CertificateListIssues {}, None),
+        (FlagType::Rock, &CertificateListRock {}, None),
         (FlagType::Usage, &CertificateListUsage {}, None),
       ]),
   )
@@ -255,19 +260,6 @@ pub(crate) fn distinguished_name_to_map(distinguished_name: &str) -> HashMap<&st
     .flat_map(|rdn_pair| rdn_pair.split("=").collect_tuple())
     .collect::<HashMap<_, _>>()
 }
-
-// pub(crate) fn distinguished_name_to_map(distinguished_name: &str) -> HashMap<String, String> {
-//   distinguished_name
-//     .split(",")
-//     .map(|rdn_pair| {
-//       let attribute_value = rdn_pair.split("=").map(|s| s.trim().to_string()).collect_vec();
-//       (
-//         attribute_value.first().cloned().unwrap_or_default().to_string(),
-//         attribute_value.get(1).cloned().unwrap_or_default().to_string(),
-//       )
-//     })
-//     .collect::<HashMap<_, _>>()
-// }
 
 #[test]
 fn test_get_relative_distinguished_name() {

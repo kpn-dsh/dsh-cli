@@ -6,7 +6,7 @@ use crate::settings::Settings;
 use crate::style::{style_from, DshColor, DshStyle};
 use crate::{err, DshCliResult};
 use clap::ArgMatches;
-use log::LevelFilter;
+use log::{LevelFilter, Record};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
@@ -61,17 +61,7 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Ds
       .filter_module("dsh_api", LevelFilter::from(log_level_dsh_api))
       .format_target(false)
       .format_timestamp(None)
-      .format(move |buf, record| {
-        let level_module = format!(
-          "[{}{}]",
-          record.level(),
-          record
-            .module_path()
-            .map(|mp| if mp.starts_with("dsh_api") { ":API" } else { ":DSH" })
-            .unwrap_or_default()
-        );
-        writeln!(buf, "{log_style}{:11} {}{log_style:#}", level_module, record.args())
-      })
+      .format(move |buf, record| writeln!(buf, "{log_style}{:11} {}{log_style:#}", level_module(record), record.args()))
       .init();
   } else {
     env_logger::builder()
@@ -85,6 +75,25 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Ds
       .init();
   }
   Ok(())
+}
+
+fn level_module(record: &Record) -> String {
+  format!(
+    "[{}:{}]",
+    record.level(),
+    record
+      .module_path()
+      .map(|mp| if mp.starts_with("dsh_api") {
+        "API"
+      } else if mp.starts_with("dsh") {
+        "DSH"
+      } else if mp.starts_with("rock_api") {
+        "RCK"
+      } else {
+        mp
+      })
+      .unwrap_or_default()
+  )
 }
 
 impl TryFrom<&str> for LogLevel {
