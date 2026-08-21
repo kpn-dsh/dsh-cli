@@ -17,3 +17,4 @@
 /tests/.dsh_cli_under_test/
 /vendor/
 /releases/
+/auth_token.json
