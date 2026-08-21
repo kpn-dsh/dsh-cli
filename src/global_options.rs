@@ -114,8 +114,8 @@ pub(crate) fn expiration_option() -> Arg {
     .action(ArgAction::Set)
     .value_parser(RangedValueParser::<u64>::new(0, 10000))
     .value_name("DAYS")
-    .help("Expiration period in days")
-    .long_help("Number of days used to check if some resource is about to expire.")
+    .help("Check expiration period in days")
+    .long_help("Number of days used to check if some resources are about to expire.")
     .hide_short_help(false)
     .global(true)
 }

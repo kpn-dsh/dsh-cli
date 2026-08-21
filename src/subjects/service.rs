@@ -147,9 +147,6 @@ impl Subject for ServiceSubject {
     "Show, manage and list services deployed on the DSH.".to_string()
   }
 
-  // Shortcut 's' is an alias for 'secret' since release 0.10.1
-  // fn subject_command_alias(&self) -> Option<&str> { Some("s") }
-
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
     match capability_command {
       CREATE_COMMAND => Some(SERVICE_CREATE_CAPABILITY.as_ref()),
@@ -881,6 +878,7 @@ impl SubjectFormatter<ServiceLabel> for Application {
           Value::hide()
         } else {
           Value::plain(
+            // TODO Format as table
             self
               .exposed_ports
               .iter()

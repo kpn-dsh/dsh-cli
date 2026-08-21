@@ -706,7 +706,7 @@ impl Context {
   /// Open the provided url in the system browser
   pub(crate) fn open_url(&self, url: impl AsRef<OsStr> + Display, opening_target: impl Display) {
     if self.dry_run() {
-      self.print_warning(format!("dry-run mode, opening '{}' canceled", opening_target));
+      self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
       self.print_warning(format!("{}", url));
     } else {
       match self.browser_method() {
