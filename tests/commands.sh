@@ -29,7 +29,7 @@ export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
 export TOPIC_UNDER_TEST=cli-test
 export VENDOR_UNDER_TEST=kpn
-export VHOST_UNDER_TEST=greenbox-dev
+export VHOST_UNDER_TEST=eavesdropper
 export VOLUME_NON_EXISTING=non-existing-volume
 export VOLUME_UNDER_TEST=cli-test
 
@@ -325,6 +325,7 @@ export SAFE_COMMANDS=(
   "vhost list --stopped"
   "vhost list --started --stopped"
   "vhost list --usage"
+  "vhost open $VHOST_UNDER_TEST --dry-run"
   "vhosts"
   "vs"
 
