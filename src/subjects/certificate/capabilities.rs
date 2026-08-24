@@ -276,7 +276,7 @@ impl CommandExecutor for CertificateListRock {
     let platform = get_target_platform(matches, context.settings())?;
     let tenant_name = get_target_tenant(matches, context.settings())?;
     let expiration_days = get_expiration_days(matches, context.settings())?;
-    let vhost_zone = get_vhost_zone(matches, context, VhostZone::Private)?;
+    let vhost_zone = get_vhost_zone(matches, context)?.unwrap_or(VhostZone::Private);
     let tenant_domain = &platform.tenant_domain(&tenant_name, vhost_zone.clone())?;
     context.print_explanation(format!("list all rock certificates for domain '{}'", tenant_domain));
     let certificate_authority_id = get_certificate_authority(matches, context.settings())?.unwrap_or(CertificateAuthorityId::RockKpnCa);

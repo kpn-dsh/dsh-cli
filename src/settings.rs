@@ -85,8 +85,8 @@ pub(crate) struct Settings {
   pub(crate) terminal_width: Option<usize>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) verbosity: Option<Verbosity>,
-  // #[serde(rename = "vhost-zone", skip_serializing_if = "Option::is_none")]
-  // TODO pub(crate) vhost_zone: Option<VhostZone>,
+  #[serde(rename = "vhost-zone", skip_serializing_if = "Option::is_none")]
+  pub(crate) vhost_zone: Option<VhostZone>,
   #[serde(skip_serializing)]
   pub(crate) file_name: Option<String>,
   #[serde(rename = "warning-color", skip_serializing_if = "Option::is_none")]
@@ -238,6 +238,9 @@ impl Debug for Settings {
     }
     if let Some(verbosity) = &self.verbosity {
       builder.field("verbosity", verbosity);
+    }
+    if let Some(vhost_zone) = &self.vhost_zone {
+      builder.field("vhost_zone", vhost_zone);
     }
     if let Some(file_name) = &self.file_name {
       builder.field("file_name", file_name);

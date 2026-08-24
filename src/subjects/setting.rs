@@ -94,7 +94,7 @@ const SETTING_TARGET_COLOR: &str = "target-color";
 const SETTING_TARGET_STYLE: &str = "target-style";
 const SETTING_TERMINAL_WIDTH: &str = "terminal-width";
 const SETTING_VERBOSITY: &str = "verbosity";
-// TODO const SETTING_VHOST_ZONE: &str = "vhost-zone";
+const SETTING_VHOST_ZONE: &str = "vhost-zone";
 const SETTING_WARNING_COLOR: &str = "warning-color";
 const SETTING_WARNING_STYLE: &str = "warning-style";
 
@@ -336,6 +336,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Default verbosity level"),
+    Command::new(SETTING_VHOST_ZONE)
+      .arg(
+        Arg::new(SETTING_VHOST_ZONE)
+          .action(ArgAction::Set)
+          .value_parser(builder::NonEmptyStringValueParser::new())
+          .required(required),
+      )
+      .about("Default vhost zone, used for vhost and proxy certificates"),
     Command::new(SETTING_WARNING_COLOR)
       .arg(
         Arg::new(SETTING_WARNING_COLOR)
@@ -399,7 +407,7 @@ impl CommandExecutor for SettingDefault {
 }
 
 static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [EnvironmentVariableLabel::Variable, EnvironmentVariableLabel::Value];
-static SETTING_LABELS: [SettingLabel; 38] = [
+static SETTING_LABELS: [SettingLabel; 39] = [
   SettingLabel::Authentication,
   SettingLabel::Browser,
   SettingLabel::CertificateAuthority,
@@ -436,6 +444,7 @@ static SETTING_LABELS: [SettingLabel; 38] = [
   SettingLabel::TargetStyle,
   SettingLabel::TerminalWidth,
   SettingLabel::Verbosity,
+  SettingLabel::VhostZone,
   SettingLabel::WarningColor,
   SettingLabel::WarningStyle,
 ];
@@ -634,6 +643,9 @@ impl CommandExecutor for SettingSet {
       SETTING_VERBOSITY => {
         upsert_settings(move |settings| Ok(Settings { verbosity: get_some(SETTING_VERBOSITY, matches, context)?, ..settings }))?;
       }
+      SETTING_VHOST_ZONE => {
+        upsert_settings(move |settings| Ok(Settings { vhost_zone: get_some(SETTING_VHOST_ZONE, matches, context)?, ..settings }))?;
+      }
       SETTING_WARNING_COLOR => {
         upsert_settings(move |settings| Ok(Settings { warning_color: get_some(SETTING_WARNING_COLOR, matches, context)?, ..settings }))?;
       }
@@ -793,6 +805,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(|settings| Ok(Settings { verbosity: None, ..settings }))?;
         context.print_outcome("verbosity level unset");
       }
+      SETTING_VHOST_ZONE => {
+        upsert_settings(|settings| Ok(Settings { vhost_zone: None, ..settings }))?;
+        context.print_outcome("vhost zone unset");
+      }
       SETTING_WARNING_COLOR => {
         upsert_settings(|settings| Ok(Settings { warning_color: None, ..settings }))?;
         context.print_outcome("warning color unset");
@@ -849,6 +865,7 @@ enum SettingLabel {
   TargetStyle,
   TerminalWidth,
   Verbosity,
+  VhostZone,
   WarningColor,
   WarningStyle,
 }
@@ -892,6 +909,7 @@ impl Label for SettingLabel {
       Self::TargetStyle => SETTING_TARGET_STYLE,
       Self::TerminalWidth => SETTING_TERMINAL_WIDTH,
       Self::Verbosity => SETTING_VERBOSITY,
+      Self::VhostZone => SETTING_VHOST_ZONE,
       Self::WarningColor => SETTING_WARNING_COLOR,
       Self::WarningStyle => SETTING_WARNING_STYLE,
     }
@@ -944,6 +962,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::TargetStyle => Value::some_or_empty(self.target_style.as_ref()),
       SettingLabel::TerminalWidth => Value::some_or_empty(self.terminal_width),
       SettingLabel::Verbosity => Value::some_or_empty(self.verbosity.as_ref()),
+      SettingLabel::VhostZone => Value::some_or_empty(self.vhost_zone.as_ref()),
       SettingLabel::WarningColor => Value::some_or_empty(self.warning_color.as_ref()),
       SettingLabel::WarningStyle => Value::some_or_empty(self.warning_style.as_ref()),
     }

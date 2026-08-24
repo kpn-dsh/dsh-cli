@@ -1,5 +1,6 @@
 use crate::code::{LANGUAGE_JAVASCRIPT, LANGUAGE_JSON, LANGUAGE_PYTHON, LANGUAGE_RUST};
 use crate::context::Context;
+use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_VHOST_ZONE};
 use crate::{err, DshCliResult};
 use clap::builder::PossibleValue;
 use clap::{builder, Arg, ArgAction, ArgMatches};
@@ -107,9 +108,9 @@ pub(crate) fn vhost_zone_option() -> Arg {
     .long_help("This option indicates whether the vhost will be public or a private.")
 }
 
-pub(crate) fn get_vhost_zone(matches: &ArgMatches, context: &Context, default: VhostZone) -> DshCliResult<VhostZone> {
-  match matches.get_one::<String>(VHOST_ZONE_OPTION) {
-    Some(vhost_zone) => Ok(VhostZone::from_str(vhost_zone)?),
+pub(crate) fn get_vhost_zone_interactive(matches: &ArgMatches, context: &Context, default: VhostZone) -> DshCliResult<VhostZone> {
+  match get_vhost_zone(matches, context)? {
+    Some(vhost_zone) => Ok(vhost_zone),
     None => {
       let prompt = match default {
         VhostZone::Private => "vhost zone [PRIVATE/public]",
@@ -122,6 +123,19 @@ pub(crate) fn get_vhost_zone(matches: &ArgMatches, context: &Context, default: V
         Ok(VhostZone::from_str(&vhost_zone_string)?)
       }
     }
+  }
+}
+
+pub(crate) fn get_vhost_zone(matches: &ArgMatches, context: &Context) -> DshCliResult<Option<VhostZone>> {
+  match matches.get_one::<String>(VHOST_ZONE_OPTION) {
+    Some(vhost_zone) => Ok(Some(VhostZone::from_str(vhost_zone)?)),
+    None => match environment_variable(ENV_VAR_DSH_CLI_VHOST_ZONE, Some(matches))? {
+      Some(env_var) => Ok(Some(VhostZone::from_str(env_var.as_str())?)),
+      None => match &context.settings().vhost_zone {
+        Some(setting) => Ok(Some(setting.to_owned())),
+        None => Ok(None),
+      },
+    },
   }
 }
 

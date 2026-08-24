@@ -14,7 +14,7 @@ use crate::subject::Requirements;
 use crate::subjects::aclgroup::options::ACL_GROUP_NAME_OPTION;
 use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::proxy::labels::ProxyBundleLabel;
-use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone, ENABLE_SCHEMA_STORE_OPTION, LANGUAGE_ARGUMENT};
+use crate::subjects::proxy::options::{get_ca_common_name, get_number_of_dns_records, get_vhost_zone_interactive, ENABLE_SCHEMA_STORE_OPTION, LANGUAGE_ARGUMENT};
 use crate::subjects::secret::labels::{SecretLabel, SecretMetadataExpirationDays};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
@@ -164,7 +164,7 @@ impl CommandExecutor for BundleCreate {
       None => context.confirmed("enable schema store?")?,
     };
     let number_of_dns_records = get_number_of_dns_records(matches, context)?;
-    let vhost_zone = get_vhost_zone(matches, context, VhostZone::Private)?;
+    let vhost_zone = get_vhost_zone_interactive(matches, context, VhostZone::Private)?;
 
     let config = ProxyCertificateBundleConfig {
       acl_group_name,

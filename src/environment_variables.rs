@@ -483,14 +483,14 @@ pub(crate) const ENV_VAR_DSH_CLI_TARGET_STYLE: &str = "DSH_CLI_TARGET_STYLE";
 pub(crate) const ENV_VAR_DSH_CLI_TENANT: &str = "DSH_CLI_TENANT";
 pub(crate) const ENV_VAR_DSH_CLI_TERMINAL_WIDTH: &str = "DSH_CLI_TERMINAL_WIDTH";
 pub(crate) const ENV_VAR_DSH_CLI_VERBOSITY: &str = "DSH_CLI_VERBOSITY";
-// TODO pub(crate) const ENV_VAR_DSH_CLI_VHOST_ZONE: &str = "DSH_CLI_VHOST_ZONE";
+pub(crate) const ENV_VAR_DSH_CLI_VHOST_ZONE: &str = "DSH_CLI_VHOST_ZONE";
 pub(crate) const ENV_VAR_DSH_CLI_WARNING_COLOR: &str = "DSH_CLI_WARNING_COLOR";
 pub(crate) const ENV_VAR_DSH_CLI_WARNING_STYLE: &str = "DSH_CLI_WARNING_STYLE";
 pub(crate) const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 pub(crate) const ENV_VAR_RUST_LOG: &str = "RUST_LOG";
 
 lazy_static! {
-  static ref EnvironmentVariables: [EnvironmentVariable; 43] = [
+  static ref EnvironmentVariables: [EnvironmentVariable; 44] = [
     EnvironmentVariable::new(
       ENV_VAR_DSH_API_PLATFORMS_FILE,
       "Overrides the default list of available platforms.",
@@ -927,10 +927,21 @@ lazy_static! {
       true,
       Some("low"),
       "If this option is provided, it will set the verbosity level. The default verbosity setting \n\
-      is 'low'. The supported verbosity levels are: off, low, medium or high. This environment \n\
-      variable can be overridden via the '--verbosity' command line argument. Also, when the \n\
-      environment variable 'DSH_CLI_QUIET' is set or the command line argument '--quiet' is \n\
-      provided, nothing will be printed.",
+      is 'low'. The supported verbosity levels are: 'off', 'low', 'medium' or 'high'. This \n\
+      environment variable can be overridden via the '--verbosity' command line argument. Also, \n\
+      when the environment variable 'DSH_CLI_QUIET' is set or the command line argument '--quiet' \n\
+      is provided, nothing will be printed.",
+    ),
+    EnvironmentVariable::new(
+      ENV_VAR_DSH_CLI_VHOST_ZONE,
+      "Specifies the vhost zone.",
+      false,
+      true,
+      Some("public"),
+      "If this option is provided, it will set the vhost zone used with vhost and proxy \n\
+      certificates. The default vhost zone setting is 'public'. The supported vhost zone are: \n\
+      'public' and 'private'. This environment variable can be overridden via the 'vhost-zone' \n\
+      setting or the '--vhost-zone' command line argument.",
     ),
     EnvironmentVariable::new(
       ENV_VAR_DSH_CLI_WARNING_COLOR,

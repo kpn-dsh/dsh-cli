@@ -6,7 +6,7 @@ use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::subject::Requirements;
 use crate::subjects::certificate::get_relative_distinguished_name;
-use crate::subjects::proxy::options::{get_vhost_zone, ATTACH_CA_CHAIN_OPTION};
+use crate::subjects::proxy::options::{get_vhost_zone_interactive, ATTACH_CA_CHAIN_OPTION};
 use crate::subjects::vhost::labels::{VhostListLabel, VhostValue};
 use crate::subjects::{DependantLabel, DEPENDANT_LABELS_LIST};
 use crate::target_platform::get_target_platform;
@@ -98,7 +98,7 @@ impl CommandExecutor for VhostAddCertificate {
         }
       }
     };
-    let vhost_zone = get_vhost_zone(matches, context, default_vhost_zone.unwrap_or(VhostZone::Private))?;
+    let vhost_zone = get_vhost_zone_interactive(matches, context, default_vhost_zone.unwrap_or(VhostZone::Private))?;
 
     let certificate_authority_id = match get_certificate_authority(matches, context.settings())? {
       Some(ca_id) => ca_id,
