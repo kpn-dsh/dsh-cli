@@ -9,7 +9,7 @@ use crate::issues::{Issue, IssueLabel, Severity};
 use crate::modifier_flags::ModifierFlagType;
 use crate::secret_metadata::{secrets_with_metadata, SecretMetadata};
 use crate::subject::Requirements;
-use crate::subjects::secret::labels::{CertificateSecretLabel, PkiSecretLabel, SecretLabel, SecretMetadataExpirationDays, SecretMetadataIssue};
+use crate::subjects::secret::labels::{CertificateSecretLabel, PkiSecretLabel, SecretLabel, SecretMetadataIssue};
 use crate::subjects::secret::{has_issues, SecretWithMetadata, SECRET_SUBJECT_TARGET};
 use crate::subjects::{DEFAULT_ALLOCATION_STATUS_LABELS, DEPENDANT_LABELS, DEPENDANT_LABELS_LIST};
 use crate::{err, DshCliResult};
@@ -304,16 +304,15 @@ pub(crate) struct SecretListKeys {}
 
 #[async_trait]
 impl CommandExecutor for SecretListKeys {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all secrets that contain private of public keys");
-    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&KEY_LABELS_LIST, context);
     for SecretWithMetadata { name, metadata, .. } in secrets_with_metadata {
       if let SecretMetadata::Pki { .. } = &metadata {
-        formatter.push_target_id_value_owned(name.clone(), SecretMetadataExpirationDays::new(metadata, Some(expiration_days)));
+        formatter.push_target_id_value_owned(name.clone(), metadata);
       }
     }
     formatter.print(None)?;
@@ -331,16 +330,15 @@ pub(crate) struct SecretListSystem {}
 
 #[async_trait]
 impl CommandExecutor for SecretListSystem {
-  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
+  async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list all system secret ids");
-    let expiration_days = get_expiration_days(matches, context.settings())?;
     let start_instant = context.now();
     let secrets_with_metadata = secrets_with_metadata(client).await?;
     context.print_execution_time(start_instant);
     let mut formatter = ListFormatter::new(&SYSTEM_LABELS_LIST, context);
     for secret_with_metadata in secrets_with_metadata {
       if secret_with_metadata.id.is_some() {
-        formatter.push_target_id_value_owned(secret_with_metadata.name.clone(), (secret_with_metadata, Some(expiration_days)));
+        formatter.push_target_id_value_owned(secret_with_metadata.name.clone(), secret_with_metadata);
       }
     }
     formatter.print(None)?;

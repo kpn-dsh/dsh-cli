@@ -14,7 +14,7 @@ use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::proxy::labels::KafkaProxyLabel;
 use crate::subjects::proxy::PROXY_SUBJECT_TARGET;
 use crate::subjects::secret::capabilities::{print_certificate_secret, print_key_secret};
-use crate::subjects::secret::labels::{SecretLabel, SecretMetadataExpirationDays};
+use crate::subjects::secret::labels::SecretLabel;
 use crate::subjects::service::{CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
@@ -135,14 +135,9 @@ impl CommandExecutor for ProxyDeploy {
 
     UnitFormatter::new(&proxy_bundle_id, &PROXY_LABELS_SHOW, context).print(&kafka_proxy, None)?;
     UnitFormatter::new(&proxy_certificate_name, &GENERATED_CERTIFICATE_LABELS, context).print(&certificate_body, None)?;
-    UnitFormatter::new(&proxy_ca_certificate_secret_name, &SECRET_LABELS_SHOW, context)
-      .print(&SecretMetadataExpirationDays::new(SecretMetadata::from(proxy_ca_certificate.as_str()), None), None)?;
-    UnitFormatter::new(&proxy_server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(
-      &SecretMetadataExpirationDays::new(SecretMetadata::from(proxy_server_certificate.as_str()), None),
-      None,
-    )?;
-    UnitFormatter::new(&proxy_private_key_secret_name, &SECRET_LABELS_SHOW, context)
-      .print(&SecretMetadataExpirationDays::new(SecretMetadata::from(proxy_private_key.as_str()), None), None)?;
+    UnitFormatter::new(&proxy_ca_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&SecretMetadata::from(proxy_ca_certificate.as_str()), None)?;
+    UnitFormatter::new(&proxy_server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&SecretMetadata::from(proxy_server_certificate.as_str()), None)?;
+    UnitFormatter::new(&proxy_private_key_secret_name, &SECRET_LABELS_SHOW, context).print(&SecretMetadata::from(proxy_private_key.as_str()), None)?;
 
     if !context.confirmed(format!("deploy proxy '{}'?", proxy_bundle_id))? {
       return err!("cancelled, proxy '{}' not deployed", proxy_bundle_id);

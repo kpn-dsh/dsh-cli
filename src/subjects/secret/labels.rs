@@ -84,27 +84,44 @@ impl Label for SecretLabel {
   }
 }
 
-impl SubjectFormatter<SecretLabel> for (SecretWithMetadata, Option<u64>) {
+impl SubjectFormatter<SecretLabel> for SecretMetadata {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
-    (&self.0, self.1).value(label, target_id)
+    match label {
+      SecretLabel::Bytes => Value::some_or_hide(self.secret_size().map(|size| size.number_of_characters)),
+      SecretLabel::Description => match self.kind() {
+        Some("error") => Value::error(self.additional_info().map(|info| info.to_string()).unwrap_or_default()),
+        _ => Value::some_or_hide(self.additional_info()),
+      },
+      SecretLabel::Format => Value::plain(self.format()),
+      SecretLabel::Kind => match self.kind() {
+        Some("error") => Value::error("ERROR"),
+        _ => Value::some_or_hide(self.kind()),
+      },
+      SecretLabel::Label => match self {
+        SecretMetadata::Pki { metadata, .. } => Value::plain(metadata.labels.join("/")),
+        _ => Value::hide(),
+      },
+      SecretLabel::SecretName => Value::target(target_id),
+      SecretLabel::Size => Value::some_or_hide(self.secret_size()),
+      _ => Value::unreachable(),
+    }
   }
 }
 
-impl SubjectFormatter<SecretLabel> for (&SecretWithMetadata, Option<u64>) {
+impl SubjectFormatter<SecretLabel> for SecretWithMetadata {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
-    let (metadata, expiration_days) = self;
     match label {
-      SecretLabel::DerivedFrom => match metadata.allocation_status.clone().and_then(|allocation_status| allocation_status.derived_from) {
+      SecretLabel::DerivedFrom => match self.allocation_status.clone().and_then(|allocation_status| allocation_status.derived_from) {
         Some(derived_from) => Value::plain(derived_from),
         None => Value::hide(),
       },
-      SecretLabel::Notifications => match &metadata.allocation_status {
+      SecretLabel::Notifications => match &self.allocation_status {
         Some(allocation_status) if !allocation_status.notifications.is_empty() => {
           Value::warn(allocation_status.notifications.iter().map(|notification| notification.to_string()).join("\n"))
         }
         _ => Value::hide(),
       },
-      SecretLabel::Provisioned => match &metadata.allocation_status {
+      SecretLabel::Provisioned => match &self.allocation_status {
         Some(allocation_status) => {
           if allocation_status.provisioned {
             Value::plain("yes")
@@ -114,19 +131,18 @@ impl SubjectFormatter<SecretLabel> for (&SecretWithMetadata, Option<u64>) {
         }
         None => Value::hide(),
       },
-      SecretLabel::SecretId => match &metadata.id {
+      SecretLabel::SecretId => match &self.id {
         Some(secret_id) => Value::target(secret_id),
         None => Value::hide(),
       },
-      SecretLabel::SecretName => Value::target(target_id),
       SecretLabel::System => {
-        if metadata.id.is_some() {
+        if self.id.is_some() {
           Value::plain("yes")
         } else {
           Value::plain("no")
         }
       }
-      _ => SecretMetadataExpirationDays::new(metadata.metadata.clone(), *expiration_days).value(label, target_id),
+      _ => self.metadata.clone().value(label, target_id),
     }
   }
 }
@@ -142,13 +158,9 @@ impl SubjectFormatter<SecretLabel> for (SecretWithMetadata, Option<u64>, Vec<Iss
 /// * `Issues` - Possible issues.
 impl SubjectFormatter<SecretLabel> for (&SecretWithMetadata, Option<u64>, &Vec<Issue>) {
   fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
-    let (SecretWithMetadata { id, metadata, allocation_status, dependants, .. }, expiration_days, issues) = self;
+    let (SecretWithMetadata { id, metadata, dependants, .. }, expiration_days, issues) = self;
     match label {
       SecretLabel::Dependants => Value::non_empty_or_hide(&dependants.iter().map(|dependant| format!("{:9}{}", dependant.kind(), dependant)).collect_vec()),
-      SecretLabel::DerivedFrom => match allocation_status.clone().and_then(|allocation_status| allocation_status.derived_from) {
-        Some(derived_from) => Value::plain(derived_from),
-        None => Value::hide(),
-      },
       SecretLabel::Issues => {
         if issues.is_empty() {
           Value::hide()
@@ -156,26 +168,6 @@ impl SubjectFormatter<SecretLabel> for (&SecretWithMetadata, Option<u64>, &Vec<I
           Value::vec(issues.iter().map(|issue| Value::issue(issue, expiration_days)).collect_vec())
         }
       }
-      SecretLabel::Notifications => match allocation_status {
-        Some(allocation_status) if !allocation_status.notifications.is_empty() => {
-          Value::warn(allocation_status.notifications.iter().map(|notification| notification.to_string()).join("\n"))
-        }
-        _ => Value::hide(),
-      },
-      SecretLabel::Provisioned => match allocation_status {
-        Some(allocation_status) => {
-          if allocation_status.provisioned {
-            Value::plain("yes")
-          } else {
-            Value::plain("no")
-          }
-        }
-        None => Value::hide(),
-      },
-      SecretLabel::SecretId => match id {
-        Some(secret_id) => Value::target(secret_id),
-        None => Value::hide(),
-      },
       SecretLabel::SecretName => {
         if id.is_some() {
           Value::target(format!("{}*", target_id))
@@ -183,57 +175,8 @@ impl SubjectFormatter<SecretLabel> for (&SecretWithMetadata, Option<u64>, &Vec<I
           Value::target(target_id)
         }
       }
-      SecretLabel::System => {
-        if id.is_some() {
-          Value::plain("yes")
-        } else {
-          Value::plain("no")
-        }
-      }
-      _ => SecretMetadataExpirationDays::new(metadata.clone(), None).value(label, target_id),
-    }
-  }
-}
-
-/// Secret metadata plus expiration days
-///
-/// # Fields
-/// * `metadata` - `SecretMetadata`
-/// * `days` - `Option<u64>`
-#[derive(Clone, Serialize)]
-pub(crate) struct SecretMetadataExpirationDays {
-  pub(crate) metadata: SecretMetadata,
-  pub(crate) days: Option<u64>,
-}
-
-impl SecretMetadataExpirationDays {
-  pub(crate) fn new(metadata: SecretMetadata, days: Option<u64>) -> Self {
-    Self { metadata, days }
-  }
-}
-
-// TODO Expiration days is not used
-impl SubjectFormatter<SecretLabel> for SecretMetadataExpirationDays {
-  fn value(&self, label: &SecretLabel, target_id: &str) -> Value {
-    let SecretMetadataExpirationDays { metadata, .. } = self;
-    match label {
-      SecretLabel::Bytes => Value::some_or_hide(metadata.secret_size().map(|size| size.number_of_characters)),
-      SecretLabel::Description => match metadata.kind() {
-        Some("error") => Value::error(metadata.additional_info().map(|info| info.to_string()).unwrap_or_default()),
-        _ => Value::some_or_hide(metadata.additional_info()),
-      },
-      SecretLabel::Format => Value::plain(metadata.format()),
-      SecretLabel::Kind => match metadata.kind() {
-        Some("error") => Value::error("ERROR"),
-        _ => Value::some_or_hide(metadata.kind()),
-      },
-      SecretLabel::Label => match metadata {
-        SecretMetadata::Pki { metadata, .. } => Value::plain(metadata.labels.join("/")),
-        _ => Value::hide(),
-      },
-      SecretLabel::SecretName => Value::target(target_id),
-      SecretLabel::Size => Value::some_or_hide(metadata.secret_size()),
-      _ => Value::unreachable(),
+      SecretLabel::Bytes | SecretLabel::Description | SecretLabel::Format | SecretLabel::Kind | SecretLabel::Label | SecretLabel::Size => metadata.clone().value(label, target_id),
+      SecretLabel::DerivedFrom | SecretLabel::Notifications | SecretLabel::Provisioned | SecretLabel::SecretId | SecretLabel::System => self.0.value(label, target_id),
     }
   }
 }
