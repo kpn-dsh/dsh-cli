@@ -219,11 +219,11 @@ impl SubjectFormatter<ImageUsageLabel> for ImageUsage {
       ImageUsageLabel::Source => Value::plain(self.image.source()),
       ImageUsageLabel::Stage => match &self.image {
         ImageString::App { image } => Value::plain(&image.stage),
-        _ => Value::hide(),
+        ImageString::Registry { .. } | ImageString::Unrecognized { .. } => Value::hide(),
       },
       ImageUsageLabel::Supplier => match &self.image {
         ImageString::App { image } => Value::plain(&image.supplier),
-        _ => Value::hide(),
+        ImageString::Registry { .. } | ImageString::Unrecognized { .. } => Value::hide(),
       },
       ImageUsageLabel::Tenant => Value::plain(self.image.tenant()),
       ImageUsageLabel::Version => Value::plain(self.image.version()),

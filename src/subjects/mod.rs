@@ -138,7 +138,7 @@ impl SubjectFormatter<DependantLabel> for DependantApp {
       DependantLabel::Dependencies => Value::plain(self.resources.iter().map(|resource| resource.to_string()).join("\n")),
       DependantLabel::Resources => Value::plain(self.resources.iter().map(|resource| resource.to_string()).join("\n")),
       DependantLabel::Target => Value::target(target_id),
-      _ => Value::hide(),
+      DependantLabel::Injections | DependantLabel::Instances => Value::hide(),
     }
   }
 }
@@ -150,7 +150,7 @@ impl SubjectFormatter<DependantLabel> for DependantCertificate {
       DependantLabel::DependantKind => Value::plain("cert"),
       DependantLabel::Dependencies => Value::plain(self.secret_kind.to_string()),
       DependantLabel::Target => Value::target(target_id),
-      _ => Value::hide(),
+      DependantLabel::Injections | DependantLabel::Instances | DependantLabel::Resources => Value::hide(),
     }
   }
 }
@@ -162,7 +162,7 @@ impl SubjectFormatter<DependantLabel> for DependantProxy {
       DependantLabel::DependantKind => Value::plain("proxy"),
       DependantLabel::Instances => Value::plain(self.instances),
       DependantLabel::Target => Value::target(target_id),
-      _ => Value::hide(),
+      DependantLabel::Dependencies | DependantLabel::Injections | DependantLabel::Resources => Value::hide(),
     }
   }
 }
