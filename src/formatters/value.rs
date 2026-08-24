@@ -442,6 +442,7 @@ impl Value {
   /// # Returns
   /// * `Value::Unreachable`
   pub(crate) fn unreachable() -> Self {
+    warn!("reach unexpected code");
     Self::Unreachable
   }
 
