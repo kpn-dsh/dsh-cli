@@ -1,10 +1,11 @@
+use crate::bundle::proxy::ProxyCertificateBundle;
 use crate::bundle::proxy::ProxyCertificateBundleConfig;
-use crate::bundle::proxy::{LocalProxyCertificateBundle, ProxyCertificateBundle};
 use crate::capability::CommandExecutor;
 use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
 use crate::directory::{
   certificate_bundle_exists, delete_certificate_bundle, list_proxy_certificate_bundles, read_local_certificate_bundle, store_proxy_certificate_bundle, BundleKind,
+  LocalProxyCertificateBundle,
 };
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
@@ -184,7 +185,7 @@ impl CommandExecutor for BundleCreate {
       }
     }
 
-    let cert_bundle = ProxyCertificateBundle::try_from(config)?;
+    let cert_bundle = ProxyCertificateBundle::create_self_signed(config)?;
 
     if !context.quiet() {
       match context.verbosity() {

@@ -38,8 +38,8 @@
 //! Note that the environment variables `DSH_CLI_HOME` and `HOME` must be regular environment
 //! variables and cannot be specified via the command line `--environment-variable` argument.
 
+use crate::bundle::proxy::ProxyCertificateBundle;
 use crate::bundle::proxy::ProxyCertificateBundleConfig;
-use crate::bundle::proxy::{LocalProxyCertificate, LocalProxyCertificateBundle, ProxyCertificateBundle};
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
 use crate::settings::Settings;
 use crate::{err, error_map, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
@@ -359,6 +359,21 @@ fn read_local_certificate_bundle_configuration(local_bundle_directory_pathbuf: &
     }
     None => err!("local certificate bundle configuration '{}' not found", config_file_path.display()),
   }
+}
+
+pub(crate) struct LocalProxyCertificate {
+  pub(crate) value: String,
+  pub(crate) filename: String,
+}
+
+pub(crate) struct LocalProxyCertificateBundle {
+  pub(crate) configuration: (ProxyCertificateBundleConfig, String),
+  pub(crate) ca_key: LocalProxyCertificate,
+  pub(crate) ca_pem: LocalProxyCertificate,
+  pub(crate) client_key: LocalProxyCertificate,
+  pub(crate) client_pem: LocalProxyCertificate,
+  pub(crate) server_key: LocalProxyCertificate,
+  pub(crate) server_pem: LocalProxyCertificate,
 }
 
 /// Reads locally stored certificate bundle.

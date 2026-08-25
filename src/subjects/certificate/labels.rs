@@ -1,4 +1,4 @@
-use crate::bundle::DshCertificate;
+use crate::bundle::proxy::DshCertificate;
 use crate::formatters::{hashmap_to_table, Value};
 use crate::formatters::{Label, SubjectFormatter};
 use crate::subjects::certificate::capabilities::ValidatedVhost;
