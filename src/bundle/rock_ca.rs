@@ -1,3 +1,4 @@
+use crate::bundle::csr::{CsrBuilder, KPN_DN_COUNTRY_NAME, KPN_DN_LOCALITY_NAME, KPN_DN_ORGANIZATION_NAME, KPN_DN_STATE_OR_PROVINCE_NAME};
 use crate::bundle::CertificateAuthority;
 use crate::context::Context;
 use crate::error::DshCliError;
@@ -8,7 +9,7 @@ use crate::{err, DshCliResult};
 use async_trait::async_trait;
 use itertools::Itertools;
 use log::debug;
-use rcgen::CertificateSigningRequest;
+use rcgen::{CertificateSigningRequest, KeyUsagePurpose};
 use rock_api::client::{CertsParameter, PkiConnector, RockApiClient};
 use rock_api::error::RockApiError;
 use rock_api::types::Certificate;
@@ -77,6 +78,40 @@ impl CertificateAuthority for RockCertificateAuthority {
     }
   }
 
+  /// Create `CsrBuilder` with default parameters for KPN certificate.
+  ///
+  /// <span style="color:#a00000">This method is only available when the <code>rcgen</code>
+  /// feature is enabled.</span>
+  ///
+  /// Creates a `CsrBuilder` with the proper default settings for a signing request via the KPN
+  /// _RoCK API_. The following parameters are set:
+  /// * `country` - `"NL"`,
+  /// * `key_usages` - `DigitalSignature`, `KeyEncipherment` and
+  ///   `ContentCommitment (NonRepudiation)`,
+  /// * `locality` - `"Rotterdam"`,
+  /// * `organization` - `"Koninklijke KPN N.V."`,
+  /// * `rsa_key_size` - recommended rsa key size from `pki_connector`,
+  /// * `signature_algorithm` - recommended signature algorithm from `pki_connector`,
+  /// * `state` - `"Zuid-Holland"`.
+  ///
+  /// The other parameters have their default values (`None` or empty).
+  fn default_csr_builder(&self) -> DshCliResult<CsrBuilder> {
+    Ok(
+      CsrBuilder::default()
+        .country(KPN_DN_COUNTRY_NAME)
+        .key_usages(vec![
+          KeyUsagePurpose::DigitalSignature,
+          KeyUsagePurpose::KeyEncipherment,
+          KeyUsagePurpose::ContentCommitment,
+        ])
+        .locality(KPN_DN_LOCALITY_NAME)
+        .organization(KPN_DN_ORGANIZATION_NAME)
+        .rsa_key_size(self.pki_connector.recommended_rsa_key_size())
+        .signature_algorithm(self.pki_connector.recommended_signature_algorithm())
+        .state(KPN_DN_STATE_OR_PROVINCE_NAME),
+    )
+  }
+
   async fn existing_certificate(&self, vhost_domain: &str, context: Option<(&Context, u64)>) -> DshCliResult<Option<String>> {
     let query: HashMap<CertsParameter, String> = HashMap::from([(CertsParameter::Status, "AC".to_string()), (CertsParameter::Domain, vhost_domain.to_string())]);
     match self
@@ -114,7 +149,7 @@ impl CertificateAuthority for RockCertificateAuthority {
     Ok(())
   }
 
-  async fn signed_certificate(&self, csr: &CertificateSigningRequest, context: Option<(&Context, u64)>) -> DshCliResult<(String, String)> {
+  async fn sign_certificate(&self, csr: &CertificateSigningRequest, context: Option<(&Context, u64)>) -> DshCliResult<(String, String)> {
     let signed_certificate = self.client.get_signed_certificate(csr, self.pki_connector.clone()).await?;
     // Due to a bug in the RoCK API (see KNOWN_ISSUES.md in rock_api crate) we need to load
     // the certificate again to obtain the proper not_before and not_after values.

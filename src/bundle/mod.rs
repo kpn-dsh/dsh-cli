@@ -1,8 +1,10 @@
+pub(crate) mod ca_signed;
 pub(crate) mod csr;
 pub(crate) mod proxy;
 pub(crate) mod rock_ca;
-pub(crate) mod self_signing;
+pub(crate) mod self_signed;
 
+use crate::bundle::csr::CsrBuilder;
 use crate::bundle::rock_ca::RockCertificateAuthority;
 use crate::context::Context;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_CERTIFICATE_AUTHORITY};
@@ -55,14 +57,24 @@ pub(crate) trait CertificateAuthority {
   #[allow(unused)]
   async fn ca_chain(&self) -> DshCliResult<Option<String>>;
 
-  /// Check connection with _RoCK API_.
+  /// Check connection certificate authority api.
   ///
-  /// Checks whether the _RoCK API_ can be reached and whether the client has valid credentials.
+  /// Checks whether the certificate authority api can be reached and whether the client has valid
+  /// credentials.
   ///
   /// # Returns
-  /// `Ok(())` - _RoCK API_ can be reached and client has valid credentials.
+  /// `Ok(())` - Certificate authority api can be reached and client has valid credentials.
   /// `Err(DshCliError)` - Otherwise, the error message describes the reason.
   async fn check_connection(&self) -> DshCliResult<()>;
+
+  /// Create default csr builder.
+  ///
+  /// Create a [CsrBuilder] with all default settings for the certificate authority.
+  ///
+  /// # Returns
+  /// `Ok(())` - [CsrBuilder] with all default settings for this certificate authority.
+  /// `Err(DshCliError)` - Otherwise, the error message describes the reason.
+  fn default_csr_builder(&self) -> DshCliResult<CsrBuilder>;
 
   /// Check whether a certificate already exists.
   ///
@@ -80,7 +92,7 @@ pub(crate) trait CertificateAuthority {
   /// `None` - When the certificate does not exist.
   async fn existing_certificate(&self, vhost_domain: &str, context: Option<(&Context, u64)>) -> DshCliResult<Option<String>>;
 
-  /// List RoCK API certificates.
+  /// List certificate authority certificates.
   ///
   /// # Parameters
   /// * `domain` - Tenant domain string.
@@ -99,7 +111,7 @@ pub(crate) trait CertificateAuthority {
   /// Tuple containing
   /// * `String` - Certificate id.
   /// * `String` - Certificate in pem format.
-  async fn signed_certificate(&self, csr: &CertificateSigningRequest, context: Option<(&Context, u64)>) -> DshCliResult<(String, String)>;
+  async fn sign_certificate(&self, csr: &CertificateSigningRequest, context: Option<(&Context, u64)>) -> DshCliResult<(String, String)>;
 }
 
 #[derive(Default, Deserialize, clap::ValueEnum, Clone, Debug, Serialize)]

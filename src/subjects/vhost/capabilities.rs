@@ -1,4 +1,3 @@
-use crate::bundle::csr::CsrBuilder;
 use crate::bundle::{create_certificate_authority, get_certificate_authority, CertificateAuthorityId};
 use crate::capability::CommandExecutor;
 use crate::context::Context;
@@ -52,7 +51,7 @@ impl CommandExecutor for VhostAddCertificate {
     // generate signed_certificate, key_pair in rock
     // reload certificate (due to bug in rock)
     // ask user to confirm
-    // check whether certificate_name, key_secret_name or certificate_secret_name alreay exist in dsh
+    // check whether certificate_name, key_secret_name or certificate_secret_name already exist in dsh
     // deploy certificate_pem and key_pair
     // deploy certificate
 
@@ -156,11 +155,13 @@ impl CommandExecutor for VhostAddCertificate {
     }
 
     context.print_explanation("generate server certificate signing request");
-    let builder = CsrBuilder::default_kpn(&vhost_domain, None, true, false)?;
+
+    // let builder = CsrBuilder::default_kpn(&vhost_domain, None, true, false)?;
+    let builder = certificate_authority.default_csr_builder()?.common_name(&vhost_domain).server_certificate();
     let (csr, key_pair) = builder.build()?;
 
     context.print_explanation("generate signed certificate");
-    let (signed_certificate_id, signed_certificate_pem) = certificate_authority.signed_certificate(&csr, Some((context, expiration_days))).await?;
+    let (signed_certificate_id, signed_certificate_pem) = certificate_authority.sign_certificate(&csr, Some((context, expiration_days))).await?;
 
     if !context.confirmed(format!("deploy vhost certificate '{}' for domain '{}'?", signed_certificate_id, vhost_domain))? {
       return err!("cancelled, vhost certificate '{}' not deployed", signed_certificate_id);

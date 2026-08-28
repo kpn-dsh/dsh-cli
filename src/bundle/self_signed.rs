@@ -1,8 +1,21 @@
-use crate::bundle::proxy::DshCertificate;
+use crate::bundle::proxy::{DshCertificate, ProxyCertificateBundle, ProxyCertificateBundleConfig};
 use crate::error::DshCliError;
 use crate::DshCliResult;
 use rcgen::{CertificateParams, CertificateSigningRequestParams, DistinguishedName, DnType, DnValue, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose, RsaKeySize};
 use time::OffsetDateTime;
+
+/// Create self-signed proxy certificate bundle.
+///
+/// Creates a proxy certificate bundle with self-signed certificates.
+///
+/// # Parameters
+/// * `config` - Proxy certificate bundle configuration.
+pub(crate) fn generate_self_signed_certificate_bundle(config: ProxyCertificateBundleConfig) -> DshCliResult<ProxyCertificateBundle> {
+  let ca_certificate = generate_ca_certificate(&config.ca_common_name)?;
+  let client_certificate = generate_client_certificate(config.client_id(), config.acl_group_name.clone(), &ca_certificate)?;
+  let server_certificate = generate_server_certificate(&config.common_name()?, config.dns_entries()?, &ca_certificate)?;
+  Ok(ProxyCertificateBundle { config, ca_certificate, client_certificate, server_certificate })
+}
 
 /// Generates self-signed certificate authority certificate.
 ///
@@ -17,7 +30,7 @@ use time::OffsetDateTime;
 ///
 /// # Parameters
 /// * `ca_common_name` - Name to use for the self-signed certificate.
-pub(crate) fn generate_ca_certificate<T>(ca_common_name: T) -> DshCliResult<DshCertificate>
+fn generate_ca_certificate<T>(ca_common_name: T) -> DshCliResult<DshCertificate>
 where
   T: Into<String> + Copy,
 {
