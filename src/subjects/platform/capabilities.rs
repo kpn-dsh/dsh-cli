@@ -51,8 +51,8 @@ impl CommandExecutor for PLatformList {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, context: &Context) -> DshCliResult<()> {
     context.print_explanation("list platforms");
     let mut formatter = ListFormatter::new_override_target_id_label(&DSH_PLATFORM_LABELS_LIST, "platform id", context);
-    let full_names = DshPlatform::all().iter().map(|platform| platform.name().to_string()).collect_vec();
-    formatter.push_target_ids_and_values(&full_names, DshPlatform::all());
+    let full_names = DshPlatform::all()?.iter().map(|platform| platform.name().to_string()).collect_vec();
+    formatter.push_target_ids_and_values(&full_names, DshPlatform::all()?);
     formatter.print(None)?;
     Ok(())
   }

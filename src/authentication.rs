@@ -185,7 +185,7 @@ fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
 /// * `DshJwt` - Permissions for this authentication.
 pub(crate) async fn get_access_tokens() -> DshCliResult<Vec<(DshPlatform, DshJwt)>> {
   try_join_all(
-    DshPlatform::all()
+    DshPlatform::all()?
       .iter()
       .map(|platform| get_access_token(platform.clone()).map(|access_token| access_token.map(|jwt| (platform.clone(), jwt)))),
   )

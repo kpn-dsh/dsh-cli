@@ -292,6 +292,7 @@ pub(crate) fn password_file_option() -> Arg {
 /// If a target platform is required, use the function `get_target_platform` to get the value.
 pub(crate) fn platform_option() -> Arg {
   let possible_values = DshPlatform::all()
+    .expect("unreachable")
     .iter()
     .map(|platform| {
       PossibleValue::new(platform.name())

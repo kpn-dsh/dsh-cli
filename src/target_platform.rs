@@ -107,6 +107,7 @@ const PLATFORM_NAME_ARGUMENT: &str = "platform-name-argument";
 /// [`get_target_platform_from_command_line_argument`] to get the value.
 pub(crate) fn platform_name_argument() -> Arg {
   let possible_values = DshPlatform::all()
+    .expect("unreachable")
     .iter()
     .map(|platform| {
       PossibleValue::new(platform.name())

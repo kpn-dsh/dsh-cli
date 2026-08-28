@@ -32,6 +32,7 @@ use clap::builder::{styling, Styles};
 use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
 use context::Context;
+use dsh_api::platform::DshPlatform;
 use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
@@ -234,6 +235,10 @@ async fn main() -> DshCliExit {
 }
 
 async fn inner_main() -> DshCliExit {
+  if let Err(error) = DshPlatform::all() {
+    return DshCliExit::Err(error.to_string());
+  }
+
   let _ = ctrlc::set_handler(move || {
     eprintln!("{}", apply_default_warning_style("interrupted"));
     process::exit(0);
