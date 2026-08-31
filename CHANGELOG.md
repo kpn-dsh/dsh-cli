@@ -21,7 +21,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 * Added `Makefile`.
 * Improved `vhost` list and show capabilities.
 * Added `vhost` open capability.
-* Setting and environment variable for vhost zone.
+* Setting and environment variable to configure vhost zone.
 
 ### Changed
 
@@ -33,7 +33,8 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ### Fixes
 
-* Fixed bug that occured when a user is not authorized for any tenant on a platform.
+* Fixed bug that occurred when a user is not authorized for any tenant on a platform.
+* Fixed bug when platforms file could not be found.
 
 ## [0.10.0] - 2026-05-29
 
