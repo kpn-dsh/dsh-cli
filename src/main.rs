@@ -485,7 +485,7 @@ async fn inner_main() -> DshCliExit {
 
 fn login_command() -> Command {
   Command::new("login")
-    .about("Login via single-sign-on")
+    .about("Login via single-sign-on.")
     .long_about(
       "Login via single-sign-on. You will be directed to the login page for the currently \
         selected platform where you must sign in using your credentials (using two-factor \
@@ -497,7 +497,7 @@ fn login_command() -> Command {
 
 fn logout_command() -> Command {
   Command::new("logout")
-    .about("Logout from single-sign-on")
+    .about("Logout from single-sign-on.")
     .long_about(
       "Logout from single-sign-on. You will be directed to the logout page for the currently \
         selected platform where you must confirm.",
