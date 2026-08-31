@@ -134,11 +134,11 @@ impl From<CertificateAuthorityId> for PkiConnector {
   }
 }
 
-pub(crate) fn create_certificate_authority(id: CertificateAuthorityId) -> DshCliResult<Box<dyn CertificateAuthority + Send + Sync>> {
+pub(crate) async fn create_certificate_authority(id: CertificateAuthorityId) -> DshCliResult<Box<dyn CertificateAuthority + Send + Sync>> {
   debug!("create certificate authority {}", id);
   match id {
     CertificateAuthorityId::RockKpnCa | CertificateAuthorityId::RockKpnDigicRsdv => match RockApiClient::header_based_from_auth_token_file() {
-      Ok(client) => RockCertificateAuthority::create(client, id.into()),
+      Ok(client) => RockCertificateAuthority::create(client, id.into()).await,
       Err(rock_api_error) => {
         debug!("{}", rock_api_error);
         match &rock_api_error {

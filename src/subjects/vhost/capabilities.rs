@@ -81,14 +81,14 @@ impl CommandExecutor for VhostAddCertificate {
       match vhost_applications.first() {
         Some((service_id, _, vhost_string)) => {
           if vhost_string.kafka {
-            return err!("vhost '{}' is configured in kafka proxy service '{}'", vhost_name, service_id);
+            return err!("vhost '{}' used in kafka proxy service '{}'", vhost_name, service_id);
           } else {
-            context.print_outcome(format!("vhost '{}' is configured in service '{}'", vhost_name, service_id));
+            context.print_outcome(format!("vhost '{}' used in service '{}'", vhost_name, service_id));
             vhost_string.zone.clone()
           }
         }
         None => {
-          context.print_warning(format!("vhost '{}' not configured in any service", vhost_name));
+          context.print_warning(format!("vhost '{}' not used in any service", vhost_name));
           if context.confirmed("continue")? {
             None
           } else {
@@ -110,9 +110,7 @@ impl CommandExecutor for VhostAddCertificate {
         }
       }
     };
-    let certificate_authority = create_certificate_authority(certificate_authority_id)?;
-
-    certificate_authority.check_connection().await?;
+    let certificate_authority = create_certificate_authority(certificate_authority_id).await?;
 
     // Check if RoCK supports this platform and tenant
     let tenant_domain = &platform.tenant_domain(&tenant_name, vhost_zone.clone())?;

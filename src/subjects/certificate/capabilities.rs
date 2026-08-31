@@ -280,7 +280,7 @@ impl CommandExecutor for CertificateListRock {
     let tenant_domain = &platform.tenant_domain(&tenant_name, vhost_zone.clone())?;
     context.print_explanation(format!("list all rock certificates for domain '{}'", tenant_domain));
     let certificate_authority_id = get_certificate_authority(matches, context.settings())?.unwrap_or(CertificateAuthorityId::RockKpnCa);
-    let certificate_authority = create_certificate_authority(certificate_authority_id)?;
+    let certificate_authority = create_certificate_authority(certificate_authority_id).await?;
     certificate_authority.list(tenant_domain, context, expiration_days).await?;
     Ok(())
   }

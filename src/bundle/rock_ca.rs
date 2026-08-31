@@ -23,9 +23,11 @@ pub(crate) struct RockCertificateAuthority {
 }
 
 impl RockCertificateAuthority {
-  pub(crate) fn create(client: RockApiClient, pki_connector: PkiConnector) -> DshCliResult<Box<dyn CertificateAuthority + Send + Sync>> {
+  pub(crate) async fn create(client: RockApiClient, pki_connector: PkiConnector) -> DshCliResult<Box<dyn CertificateAuthority + Send + Sync>> {
     debug!("create rock certificate authority {}", pki_connector);
-    Ok(Box::new(Self { client, pki_connector }))
+    let ca = Box::new(Self { client, pki_connector });
+    ca.check_connection().await?;
+    Ok(ca)
   }
 }
 

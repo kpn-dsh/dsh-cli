@@ -48,7 +48,7 @@ impl ProxyCertificateBundle {
     certificate_authority_id: CertificateAuthorityId,
     context: Option<(&Context, u64)>,
   ) -> DshCliResult<Self> {
-    let certificate_authority = create_certificate_authority(certificate_authority_id)?;
+    let certificate_authority = create_certificate_authority(certificate_authority_id).await?;
     let bundle = _generate_signed_certificate_bundle(config, certificate_authority.as_ref(), context).await?;
     Ok(bundle)
   }
