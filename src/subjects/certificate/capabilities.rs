@@ -281,7 +281,24 @@ impl CommandExecutor for CertificateListRock {
     context.print_explanation(format!("list all rock certificates for domain '{}'", tenant_domain));
     let certificate_authority_id = get_certificate_authority(matches, context.settings())?.unwrap_or(CertificateAuthorityId::RockKpnCa);
     let certificate_authority = create_certificate_authority(certificate_authority_id).await?;
-    certificate_authority.list(tenant_domain, context, expiration_days).await?;
+    certificate_authority.list_certificates(tenant_domain, context, expiration_days).await?;
+    Ok(())
+  }
+
+  fn requirements(&self, _: &ArgMatches) -> Requirements {
+    Requirements::standard_without_api()
+  }
+}
+
+pub(crate) struct CertificateListRockDomains {}
+
+#[async_trait]
+impl CommandExecutor for CertificateListRockDomains {
+  async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {
+    context.print_explanation("list all rock domains and subnets");
+    let certificate_authority_id = get_certificate_authority(matches, context.settings())?.unwrap_or(CertificateAuthorityId::RockKpnCa);
+    let certificate_authority = create_certificate_authority(certificate_authority_id).await?;
+    certificate_authority.list_domains(context).await?;
     Ok(())
   }
 

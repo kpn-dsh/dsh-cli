@@ -12,7 +12,7 @@ use crate::secret_metadata::SecretMetadata;
 use crate::subject::Subject;
 use crate::subjects::certificate::capabilities::{
   CertificateDelete, CertificateList, CertificateListAllocationStatus, CertificateListConfiguration, CertificateListErrors, CertificateListIds, CertificateListIssues,
-  CertificateListRock, CertificateListUsage, CertificateShow, CertificateShowAllocationStatus, CertificateShowUsage,
+  CertificateListRock, CertificateListRockDomains, CertificateListUsage, CertificateShow, CertificateShowAllocationStatus, CertificateShowUsage,
 };
 use crate::subjects::proxy::options::vhost_zone_option;
 use crate::subjects::secret;
@@ -91,6 +91,7 @@ static CERTIFICATE_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> 
         (FlagType::Ids, &CertificateListIds {}, None),
         (FlagType::Issues, &CertificateListIssues {}, None),
         (FlagType::Rock, &CertificateListRock {}, None),
+        (FlagType::RockDomains, &CertificateListRockDomains {}, None),
         (FlagType::Usage, &CertificateListUsage {}, None),
       ]),
   )

@@ -2,17 +2,19 @@ use crate::bundle::csr::{CsrBuilder, KPN_DN_COUNTRY_NAME, KPN_DN_LOCALITY_NAME, 
 use crate::bundle::CertificateAuthority;
 use crate::context::Context;
 use crate::error::DshCliError;
+use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
 use crate::{err, DshCliResult};
 use async_trait::async_trait;
+use dsh_api::platform::{DshPlatform, VhostZone};
 use itertools::Itertools;
 use log::debug;
 use rcgen::{CertificateSigningRequest, KeyUsagePurpose};
 use rock_api::client::{CertsParameter, PkiConnector, RockApiClient};
 use rock_api::error::RockApiError;
-use rock_api::types::Certificate;
+use rock_api::types::{Certificate, DomainList};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -135,7 +137,7 @@ impl CertificateAuthority for RockCertificateAuthority {
     }
   }
 
-  async fn list(&self, domain: &str, context: &Context, expiration_days: u64) -> DshCliResult<()> {
+  async fn list_certificates(&self, domain: &str, context: &Context, expiration_days: u64) -> DshCliResult<()> {
     let query_active: HashMap<CertsParameter, String> = HashMap::from([(CertsParameter::Status, "AC".to_string()), (CertsParameter::Domain, domain.to_string())]);
     let mut certificates = self.client.certs(&query_active).await?.results;
     let query_revoked: HashMap<CertsParameter, String> = HashMap::from([(CertsParameter::Status, "RE".to_string()), (CertsParameter::Domain, domain.to_string())]);
@@ -148,6 +150,49 @@ impl CertificateAuthority for RockCertificateAuthority {
     }
     formatter.print(None)?;
 
+    Ok(())
+  }
+
+  async fn list_domains(&self, context: &Context) -> DshCliResult<()> {
+    let DomainList { domains, subnets } = self.client.domain_list().await?;
+    if !domains.is_empty() {
+      let mut rock_domains: Vec<RockDomain> = domains
+        .into_iter()
+        .map(|domain| {
+          DshPlatform::from_subdomain(&domain).map(|a| match a {
+            Some((platform, subdomain, vhost_zone)) => RockDomain { domain, subdomain: Some(subdomain), platform: Some((platform, vhost_zone)) },
+            None => RockDomain { domain, subdomain: None, platform: None },
+          })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+      rock_domains.sort_by(|a, b| (&a.platform, &a.domain).cmp(&(&b.platform, &b.domain)));
+
+      for platform in DshPlatform::all()? {
+        let platform_domains = rock_domains
+          .iter()
+          .filter(|rock_domain| rock_domain.platform.as_ref().is_some_and(|pl| pl.0 == *platform))
+          .collect_vec();
+        if !platform_domains.is_empty() {
+          context.print_explanation(format!("rock domains for platform '{}'", platform));
+          let mut formatter = ListFormatter::new(&ROCK_DOMAIN_LABELS_LIST, context);
+          formatter.push_values(&platform_domains);
+          formatter.print(None)?;
+        }
+      }
+
+      let no_platform_domains = rock_domains.iter().filter(|rock_domain| rock_domain.platform.as_ref().is_none()).collect_vec();
+      if !no_platform_domains.is_empty() {
+        context.print_explanation("rock domains for unrecognized platform");
+        let mut formatter = ListFormatter::new(&ROCK_DOMAIN_LABELS_LIST, context);
+        formatter.push_values(&no_platform_domains);
+        formatter.print(None)?;
+      }
+    }
+    if !subnets.is_empty() {
+      let mut formatter = IdsFormatter::new("subnet", context);
+      formatter.push_target_ids(&subnets);
+      formatter.print(None)?;
+    }
     Ok(())
   }
 
@@ -186,6 +231,9 @@ const ROCK_CERTIFICATE_LABELS_SHOW: [RockCertificateLabel; 9] = [
   RockCertificateLabel::NotBefore,
   RockCertificateLabel::Status,
 ];
+
+#[cfg(feature = "rock")]
+const ROCK_DOMAIN_LABELS_LIST: [RockDomainsLabel; 3] = [RockDomainsLabel::Domain, RockDomainsLabel::Subdomain, RockDomainsLabel::VhostZone];
 
 #[cfg(feature = "rock")]
 #[derive(Eq, Hash, PartialEq, Serialize)]
@@ -250,6 +298,48 @@ impl SubjectFormatter<RockCertificateLabel> for (&Certificate, Option<u64>) {
           Value::plain(certificate.status.clone())
         }
       }
+    }
+  }
+}
+
+#[cfg(feature = "rock")]
+#[derive(Clone, Eq, Hash, PartialEq, Serialize)]
+pub(crate) enum RockDomainsLabel {
+  Domain,
+  Subdomain,
+  VhostZone,
+}
+
+#[cfg(feature = "rock")]
+impl Label for RockDomainsLabel {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::Domain => "domain",
+      Self::Subdomain => "subdomain",
+      Self::VhostZone => "zone",
+    }
+  }
+
+  fn is_target_label(&self) -> bool {
+    matches!(self, RockDomainsLabel::Domain)
+  }
+}
+
+#[cfg(feature = "rock")]
+#[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Serialize)]
+struct RockDomain {
+  domain: String,
+  subdomain: Option<String>,
+  platform: Option<(DshPlatform, VhostZone)>,
+}
+
+#[cfg(feature = "rock")]
+impl SubjectFormatter<RockDomainsLabel> for &RockDomain {
+  fn value(&self, label: &RockDomainsLabel, _target_id: &str) -> Value {
+    match label {
+      RockDomainsLabel::Domain => Value::target(self.domain.clone()),
+      RockDomainsLabel::Subdomain => Value::some_or_hide(self.subdomain.as_ref()),
+      RockDomainsLabel::VhostZone => Value::some_or_hide(self.platform.as_ref().map(|(_, vhost_zone)| vhost_zone)),
     }
   }
 }

@@ -17,6 +17,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
     * Create JSON file with generic Kafka client properties.
     * Proxy example code generation for JavaScript.
     * List _RoCK API_ certificates.
+    * List _RoCK API_ domains.
 * Pre-built Linux versions on GitHub releases page.
 * Added `Makefile`.
 * Improved `vhost` list and show capabilities.

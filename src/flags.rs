@@ -17,6 +17,9 @@ pub(crate) enum FlagType {
   Properties,
   #[cfg(feature = "rock")]
   Rock,
+  #[cfg(feature = "rock")]
+  RockDomains,
+  SelfSigned,
   #[cfg(feature = "manage")]
   Stream,
   System,
@@ -42,6 +45,9 @@ impl FlagType {
       Self::Properties => "properties-flag",
       #[cfg(feature = "rock")]
       Self::Rock => "rock-flag",
+      #[cfg(feature = "rock")]
+      Self::RockDomains => "rock-domains-flag",
+      Self::SelfSigned => "self-signed-flag",
       #[cfg(feature = "manage")]
       Self::Stream => "stream-flag",
       Self::System => "system-flag",
@@ -67,6 +73,9 @@ impl FlagType {
       Self::Properties => "properties",
       #[cfg(feature = "rock")]
       Self::Rock => "rock",
+      #[cfg(feature = "rock")]
+      Self::RockDomains => "rock-domains",
+      Self::SelfSigned => "self-signed",
       #[cfg(feature = "manage")]
       Self::Stream => "stream",
       Self::System => "system",
@@ -100,6 +109,9 @@ pub(crate) fn create_flag(flag_type: &FlagType, subject: &str, long_help: Option
     FlagType::Properties => create_clap_flag(FlagType::Properties, format!("Include the {}'s properties", subject), long_help),
     #[cfg(feature = "rock")]
     FlagType::Rock => create_clap_flag(FlagType::Rock, format!("Include the rock {}'s", subject), long_help),
+    #[cfg(feature = "rock")]
+    FlagType::RockDomains => create_clap_flag(FlagType::RockDomains, "List the rock domains".to_string(), long_help),
+    FlagType::SelfSigned => create_clap_flag(FlagType::SelfSigned, format!("Use self-signed certificates for the {}", subject), long_help),
     #[cfg(feature = "manage")]
     FlagType::Stream => create_clap_flag(FlagType::Stream, format!("Include the {}'s stream", subject), long_help),
     FlagType::System => create_clap_flag(FlagType::System, format!("Include the system {}'s", subject), long_help),
