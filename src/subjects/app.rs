@@ -16,7 +16,7 @@ use crate::subject::{Requirements, Subject};
 use crate::subjects::bucket::BucketLabel;
 use crate::subjects::certificate::capabilities::CERTIFICATE_LABELS_SHOW;
 use crate::subjects::manifest::ManifestExplain;
-use crate::subjects::service::SERVICE_LABELS_SHOW;
+use crate::subjects::service::capabilities::SERVICE_LABELS_SHOW;
 use crate::subjects::topic::TOPIC_LABELS;
 use crate::subjects::vhost::labels::VhostLabel;
 use crate::subjects::volume::VOLUME_LABELS;

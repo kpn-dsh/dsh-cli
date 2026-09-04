@@ -156,10 +156,6 @@ impl SecretMetadata {
   /// Returns the secrets kind of format.
   pub(crate) fn value_description(&self) -> Option<String> {
     match self {
-      // Self::Certificate { subject, .. } => match distinguished_name_to_map(subject).get("CN") {
-      //   Some(common_name) => Some(common_name.to_string()),
-      //   None => Some(subject.to_string()),
-      // },
       Self::Certificate { .. } => None, // TODO
       Self::Empty => None,
       Self::Error { .. } => None,
@@ -437,19 +433,20 @@ pub(crate) fn find_certificates(secret: &str) -> Option<Vec<CertificateSecretMet
       if certificates.is_empty() {
         None
       } else {
-        let parts = certificates
-          .iter()
-          .map(|certificate| CertificateSecretMetadata {
-            issuer_common_name: get_common_name(&certificate.tbs_certificate.issuer),
-            issuer_distinguished_name: certificate.tbs_certificate.issuer.to_string(),
-            not_after: certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs(),
-            not_before: certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs(),
-            serial_number: certificate.tbs_certificate.serial_number.to_string().replace(":", ""),
-            subject_common_name: get_common_name(&certificate.tbs_certificate.subject),
-            subject_distinguished_name: certificate.tbs_certificate.subject.to_string(),
-          })
-          .collect_vec();
-        Some(parts)
+        Some(
+          certificates
+            .iter()
+            .map(|certificate| CertificateSecretMetadata {
+              issuer_common_name: get_common_name(&certificate.tbs_certificate.issuer),
+              issuer_distinguished_name: certificate.tbs_certificate.issuer.to_string(),
+              not_after: certificate.tbs_certificate.validity.not_after.to_unix_duration().as_secs(),
+              not_before: certificate.tbs_certificate.validity.not_before.to_unix_duration().as_secs(),
+              serial_number: certificate.tbs_certificate.serial_number.to_string().replace(":", ""),
+              subject_common_name: get_common_name(&certificate.tbs_certificate.subject),
+              subject_distinguished_name: certificate.tbs_certificate.subject.to_string(),
+            })
+            .collect_vec(),
+        )
       }
     }
     Err(_) => None,
