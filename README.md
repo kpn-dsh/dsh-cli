@@ -72,3 +72,4 @@ This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/
 * [Publish](docs/publish.md)
 * [Release](docs/release.md)
 * [Codesign and notarize for macOS](docs/code-signing-macos.md)
+* [Certificate signing](docs/certificate signing.md)
