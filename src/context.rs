@@ -400,6 +400,55 @@ impl Context {
     }
   }
 
+  /// Ask a yes or no question
+  ///
+  /// 1. If run from a terminal the user will be prompted for confirmation.
+  /// 1. When not run from a terminal `default` will be returned.
+  ///
+  /// Note that it does not matter whether or not `force` is enabled.
+  ///
+  /// # Parameters
+  /// * `question` - Question prompt.
+  /// * `default` - Default value, if `true` the default is yes.
+  ///
+  /// # Returns
+  /// * If the user entered `n` or `N`: `false`.
+  /// * If the user entered `y` or `Y`: `true`.
+  /// * If the user entered anything else: `default`.
+  pub(crate) fn yes_or_no(&self, question: impl Display, default: bool) -> DshCliResult<bool> {
+    if self.stdin_is_terminal {
+      if default {
+        self.print(format!("{} [Y/n]", question));
+      } else {
+        self.print(format!("{} [y/N]", question));
+      }
+      let _ = stdout().lock().flush();
+      match Getch::new().getch() {
+        Ok(key) => match key {
+          Key::Char('n') | Key::Char('N') => {
+            eprintln!();
+            Ok(false)
+          }
+          Key::Char('y') | Key::Char('Y') => {
+            eprintln!();
+            Ok(true)
+          }
+          Key::Ctrl('c') => {
+            eprintln!("{}", apply_default_warning_style("\ninterrupted"));
+            process::exit(0);
+          }
+          _ => {
+            eprintln!();
+            Ok(default)
+          }
+        },
+        Err(error) => err!("\nerror getting key event ({})", error),
+      }
+    } else {
+      Ok(false)
+    }
+  }
+
   /// Gets csv quote context value
   ///
   /// 1. Try environment variable `DSH_CLI_CSV_QUOTE`
