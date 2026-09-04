@@ -38,9 +38,11 @@
 //! Note that the environment variables `DSH_CLI_HOME` and `HOME` must be regular environment
 //! variables and cannot be specified via the command line `--environment-variable` argument.
 
-use crate::bundle::proxy::ProxyCertificateBundle;
+use crate::bundle::ca_signed::ProxyCaCertificateBundle;
 use crate::bundle::proxy::ProxyCertificateBundleConfig;
+use crate::bundle::self_signed::ProxySelfSignedCertificateBundle;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_HOME};
+use crate::error::DshCliError;
 use crate::settings::Settings;
 use crate::{err, error_map, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::platform::DshPlatform;
@@ -64,14 +66,12 @@ const TARGETS_SUBDIRECTORY: &str = "targets";
 #[derive(Clone, Debug)]
 pub(crate) enum BundleKind {
   Proxy,
-  // Vhost,
 }
 
 impl Display for BundleKind {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Proxy => f.write_str("proxy"),
-      // Self::Vhost => f.write_str("vhost"),
     }
   }
 }
@@ -222,16 +222,15 @@ pub(crate) fn write_refresh_token(platform: &DshPlatform, refresh_token: &str) -
   }
 }
 
-const CA_KEY_FILENAME: &str = "ca.key";
 const CONFIG_FILENAME: &str = "bundle.toml";
-const SERVER_CERTIFICATE_FILENAME: &str = "server.pem";
-const SERVER_KEY_FILENAME: &str = "server.key";
-
+const CA_KEY_FILENAME: &str = "ca.key";
 pub(crate) const CA_CERTIFICATE_FILENAME: &str = "ca.pem";
-pub(crate) const CLIENT_CERTIFICATE_FILENAME: &str = "client.pem";
+const CLIENT_CSR_FILENAME: &str = "client.csr";
 pub(crate) const CLIENT_KEY_FILENAME: &str = "client.key";
-// pub(crate) const CSR_FILENAME: &str = "csr.pem";
-// pub(crate) const CSR_KEY_FILENAME: &str = "csr.key";
+pub(crate) const CLIENT_CERTIFICATE_FILENAME: &str = "client.pem";
+const SERVER_CSR_FILENAME: &str = "server.csr";
+const SERVER_KEY_FILENAME: &str = "server.key";
+const SERVER_CERTIFICATE_FILENAME: &str = "server.pem";
 
 /// Checks whether stored proxy certificate bundle exists.
 ///
@@ -333,12 +332,19 @@ pub(crate) fn read_proxy_certificate_bundle(
 /// # Parameters
 /// * `directory_pathbuf` - Pathbuf for local certificate bundle directory.
 /// * `filename` - Filename in local certificate bundle directory.
-fn read_local_certificate_bundle_file(directory_pathbuf: &Path, filename: &str) -> DshCliResult<LocalProxyCertificate> {
+fn read_local_certificate_bundle_file(directory_pathbuf: &Path, filename: &str) -> DshCliResult<Option<LocalProxyCertificate>> {
   let mut file_path = directory_pathbuf.to_path_buf();
   file_path.push(filename);
-  let local_certificate_bundle_file = fs::read_to_string(&file_path)?;
-  debug!("local certificate bundle file read from '{}'", file_path.display());
-  Ok(LocalProxyCertificate { value: local_certificate_bundle_file, filename: file_path.display().to_string() })
+  match fs::read_to_string(&file_path) {
+    Ok(file_content) => {
+      debug!("local certificate bundle file read from '{}'", file_path.display());
+      Ok(Some(LocalProxyCertificate { value: file_content, filename: file_path.display().to_string() }))
+    }
+    Err(error) => match error.kind() {
+      ErrorKind::NotFound => return Ok(None),
+      _ => return Err(DshCliError::from(error)),
+    },
+  }
 }
 
 /// Reads local certificate bundle configuration.
@@ -368,10 +374,12 @@ pub(crate) struct LocalProxyCertificate {
 
 pub(crate) struct LocalProxyCertificateBundle {
   pub(crate) configuration: (ProxyCertificateBundleConfig, String),
-  pub(crate) ca_key: LocalProxyCertificate,
-  pub(crate) ca_pem: LocalProxyCertificate,
+  pub(crate) ca_key: Option<LocalProxyCertificate>,
+  pub(crate) ca_pem: Option<LocalProxyCertificate>,
+  pub(crate) client_csr: Option<LocalProxyCertificate>,
   pub(crate) client_key: LocalProxyCertificate,
   pub(crate) client_pem: LocalProxyCertificate,
+  pub(crate) server_csr: Option<LocalProxyCertificate>,
   pub(crate) server_key: LocalProxyCertificate,
   pub(crate) server_pem: LocalProxyCertificate,
 }
@@ -397,10 +405,16 @@ pub(crate) fn read_local_certificate_bundle(platform: &DshPlatform, tenant: impl
         ),
         ca_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_KEY_FILENAME)?,
         ca_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CA_CERTIFICATE_FILENAME)?,
-        client_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_KEY_FILENAME)?,
-        client_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_CERTIFICATE_FILENAME)?,
-        server_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_KEY_FILENAME)?,
-        server_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_CERTIFICATE_FILENAME)?,
+        client_csr: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_CSR_FILENAME)?,
+        client_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_KEY_FILENAME)?
+          .ok_or_else(|| DshCliError::Configuration("client key not found".to_string()))?,
+        client_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, CLIENT_CERTIFICATE_FILENAME)?
+          .ok_or_else(|| DshCliError::Configuration("client certificate not found".to_string()))?,
+        server_csr: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_CSR_FILENAME)?,
+        server_key: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_KEY_FILENAME)?
+          .ok_or_else(|| DshCliError::Configuration("server key not found".to_string()))?,
+        server_pem: read_local_certificate_bundle_file(&certificate_bundle_directory_pathbuf, SERVER_CERTIFICATE_FILENAME)?
+          .ok_or_else(|| DshCliError::Configuration("server certificate not found".to_string()))?,
       })
     }
     None => err!("dsh directory disabled, proxy certificate bundle cannot be read"),
@@ -467,17 +481,65 @@ pub(crate) fn list_proxy_certificate_bundles(platform: &DshPlatform, tenant: imp
 /// * `Ok<String>` - If storing was successful, the directory name where the bundle was stored
 ///   will be returned.
 /// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
-pub(crate) fn store_proxy_certificate_bundle(
+pub(crate) fn store_proxy_ca_certificate_bundle(
   platform: &DshPlatform,
   tenant: impl Display,
   proxy_bundle_id: impl Display,
-  certificate_bundle: &ProxyCertificateBundle,
+  certificate_bundle: &ProxyCaCertificateBundle,
 ) -> DshCliResult<String> {
   match certificate_bundle_pathbuf(platform, tenant, BundleKind::Proxy, proxy_bundle_id)? {
     Some(proxy_certificate_bundle_directory_pathbuf) => {
       let mut config_file_path = proxy_certificate_bundle_directory_pathbuf.clone();
       config_file_path.push(CONFIG_FILENAME);
       debug!("write proxy certificate bundle configuration file '{}'", config_file_path.display());
+      trace!("{:#?}", &certificate_bundle.config);
+      let serialized_config = toml::to_string(&certificate_bundle.config)?;
+      write_with_mode(config_file_path, &serialized_config, Some(MODE_U_RW))?;
+
+      let pems: Vec<(&str, &str, Option<u32>)> = vec![
+        (CA_CERTIFICATE_FILENAME, &certificate_bundle.ca_chain, Some(MODE_U_RW)),
+        (CLIENT_CSR_FILENAME, &certificate_bundle.client_csr, Some(MODE_U_RW)),
+        (CLIENT_CERTIFICATE_FILENAME, &certificate_bundle.client_pem, Some(MODE_U_RW)),
+        (CLIENT_KEY_FILENAME, &certificate_bundle.client_key, Some(MODE_U_RW)),
+        (SERVER_CSR_FILENAME, &certificate_bundle.server_csr, Some(MODE_U_RW)),
+        (SERVER_CERTIFICATE_FILENAME, &certificate_bundle.server_pem, Some(MODE_U_RW)),
+        (SERVER_KEY_FILENAME, &certificate_bundle.server_key, Some(MODE_U_RW)),
+      ];
+      for (filename, pem, mode) in pems {
+        let mut file_path = proxy_certificate_bundle_directory_pathbuf.clone();
+        file_path.push(filename);
+        debug!("write proxy certificate bundle file '{}'", file_path.display());
+        write_with_mode(file_path, &pem, mode)?;
+      }
+      Ok(proxy_certificate_bundle_directory_pathbuf.display().to_string())
+    }
+    None => err!("dsh directory disabled, proxy certificate bundle cannot be stored"),
+  }
+}
+
+/// Stores proxy certificate bundle for self-signed certificates.
+///
+/// # Parameters
+/// * `platform` - Platform for which the proxy certificate bundle must be stored.
+/// * `tenant` - Tenant for which the proxy certificate bundle must be stored.
+/// * `proxy_bundle_id` - Proxy certificate bundle id prefix for the proxy certificate bundle.
+/// * `certificate_bundle` - Proxy certificate bundle that must be stored.
+///
+/// # Returns
+/// * `Ok<String>` - If storing was successful, the directory name where the bundle was stored
+///   will be returned.
+/// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
+pub(crate) fn store_proxy_self_signed_certificate_bundle(
+  platform: &DshPlatform,
+  tenant: impl Display,
+  proxy_bundle_id: impl Display,
+  certificate_bundle: &ProxySelfSignedCertificateBundle,
+) -> DshCliResult<String> {
+  match certificate_bundle_pathbuf(platform, tenant, BundleKind::Proxy, proxy_bundle_id)? {
+    Some(proxy_certificate_bundle_directory_pathbuf) => {
+      let mut config_file_path = proxy_certificate_bundle_directory_pathbuf.clone();
+      config_file_path.push(CONFIG_FILENAME);
+      debug!("write proxy self-signed certificate bundle configuration file '{}'", config_file_path.display());
       trace!("{:#?}", &certificate_bundle.config);
       let serialized_config = toml::to_string(&certificate_bundle.config)?;
       write_with_mode(config_file_path, &serialized_config, Some(MODE_U_RW))?;
@@ -501,54 +563,14 @@ pub(crate) fn store_proxy_certificate_bundle(
       for (filename, pem, mode) in pems {
         let mut file_path = proxy_certificate_bundle_directory_pathbuf.clone();
         file_path.push(filename);
-        debug!("write proxy certificate bundle file '{}'", file_path.display());
+        debug!("write proxy self-signed certificate bundle file '{}'", file_path.display());
         write_with_mode(file_path, &pem, mode)?;
       }
       Ok(proxy_certificate_bundle_directory_pathbuf.display().to_string())
     }
-    None => err!("dsh directory disabled, proxy certificate bundle cannot be stored"),
+    None => err!("dsh directory disabled, proxy self-signed certificate bundle cannot be stored"),
   }
 }
-
-// /// Stores proxy certificate bundle.
-// ///
-// /// # Parameters
-// /// * `platform` - Platform for which the proxy certificate bundle must be stored.
-// /// * `tenant` - Tenant for which the proxy certificate bundle must be stored.
-// /// * `proxy_bundle_id` - Proxy certificate bundle id prefix for the proxy certificate bundle.
-// /// * `certificate_bundle` - Proxy certificate bundle that must be stored.
-// ///
-// /// # Returns
-// /// * `Ok<String>` - If storing was successful, the directory name where the bundle was stored
-// ///   will be returned.
-// /// * `Err<DshCliError>` - Dsh tool does not support dsh directory or was unable to determine it.
-// pub(crate) fn store_vhost_certificate_bundle(
-//   platform: &DshPlatform,
-//   tenant: impl Display,
-//   vhost_bundle_id: impl Display,
-//   certificate_bundle: &VhostCertificateBundle,
-// ) -> DshCliResult<String> {
-//   match certificate_bundle_pathbuf(platform, tenant, BundleKind::Vhost, vhost_bundle_id)? {
-//     Some(vhost_certificate_bundle_directory_pathbuf) => {
-//       let mut config_file_path = vhost_certificate_bundle_directory_pathbuf.clone();
-//       config_file_path.push(CONFIG_FILENAME);
-//       debug!("write vhost certificate bundle configuration file '{}'", config_file_path.display());
-//       trace!("{:#?}", &certificate_bundle.config);
-//       let serialized_config = toml::to_string(&certificate_bundle.config)?;
-//       write_with_mode(config_file_path, &serialized_config, Some(MODE_U_RW))?;
-//
-//       let pems = vec![(CSR_FILENAME, certificate_bundle.csr.csr.pem()?, Some(MODE_U_RW)), (CSR_KEY_FILENAME, certificate_bundle.csr.key_pair.serialize_pem(), Some(MODE_U_RW))];
-//       for (filename, pem, mode) in pems {
-//         let mut file_path = vhost_certificate_bundle_directory_pathbuf.clone();
-//         file_path.push(filename);
-//         debug!("write vhost certificate bundle file '{}'", file_path.display());
-//         write_with_mode(file_path, &pem, mode)?;
-//       }
-//       Ok(vhost_certificate_bundle_directory_pathbuf.display().to_string())
-//     }
-//     None => err!("dsh directory disabled, vhost certificate bundle cannot be stored"),
-//   }
-// }
 
 fn write_with_mode<T>(file_path: T, data: &str, mode: Option<u32>) -> DshCliResult<()>
 where

@@ -206,6 +206,7 @@ impl CertificateAuthority for RockCertificateAuthority {
     }
     let reloaded_certificate = self.client.cert(signed_certificate.id).await?;
     if let Some((context, expiration_days)) = context {
+      context.print_explanation("rock api response".to_string());
       UnitFormatter::new(reloaded_certificate.id, &ROCK_CERTIFICATE_LABELS_SHOW, context).print(&(&reloaded_certificate, Some(expiration_days)), None)?;
     }
     Ok((

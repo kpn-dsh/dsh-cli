@@ -15,7 +15,7 @@ use crate::subjects::proxy::labels::KafkaProxyLabel;
 use crate::subjects::proxy::PROXY_SUBJECT_TARGET;
 use crate::subjects::secret::capabilities::{print_certificate_secret, print_key_secret};
 use crate::subjects::secret::labels::SecretLabel;
-use crate::subjects::service::{CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
+use crate::subjects::service::capabilities::{CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
 use crate::{cli_error, err, DshCliResult};

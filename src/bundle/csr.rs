@@ -42,6 +42,8 @@ use rcgen::{
   CertificateParams, CertificateSigningRequest, DistinguishedName, DnType, DnValue, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose, RsaKeySize, SanType,
   SignatureAlgorithm,
 };
+use std::fmt::{Debug, Formatter};
+use std::net::IpAddr;
 
 /// Distinguished organization name (`O`): `"Koninklijke KPN N.V."`.
 pub const KPN_DN_ORGANIZATION_NAME: &str = "Koninklijke KPN N.V.";
@@ -55,7 +57,7 @@ pub const KPN_DN_STATE_OR_PROVINCE_NAME: &str = "Zuid-Holland";
 /// Distinguished country name (`C`): `"NL"`.
 pub const KPN_DN_COUNTRY_NAME: &str = "NL";
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct CsrBuilder {
   common_name: Option<DnValue>,
   country: Option<DnValue>,
@@ -75,8 +77,10 @@ impl CsrBuilder {
   ///
   /// Enables extended key usage `ClientAuth`, which indicates that the generated certificate
   /// can be used as a client (mTLS) certificate.
-  pub fn _client_certificate(mut self) -> Self {
-    self.extended_key_usages.push(ExtendedKeyUsagePurpose::ClientAuth);
+  pub fn client_certificate(mut self) -> Self {
+    if !self.extended_key_usages.contains(&ExtendedKeyUsagePurpose::ClientAuth) {
+      self.extended_key_usages.push(ExtendedKeyUsagePurpose::ClientAuth);
+    }
     self
   }
 
@@ -149,7 +153,9 @@ impl CsrBuilder {
   /// Enables extended key usage `ServerAuth`, which indicates that the generated certificate
   /// can be used as a server certificate.
   pub fn server_certificate(mut self) -> Self {
-    self.extended_key_usages.push(ExtendedKeyUsagePurpose::ServerAuth);
+    if !self.extended_key_usages.contains(&ExtendedKeyUsagePurpose::ServerAuth) {
+      self.extended_key_usages.push(ExtendedKeyUsagePurpose::ServerAuth);
+    }
     self
   }
 
@@ -251,5 +257,65 @@ impl CsrBuilder {
       self.rsa_key_size.ok_or_else(|| DshCliError::from("rsa key size not set"))?,
     )
     .map_err(DshCliError::from)
+  }
+}
+
+fn dn_debug(dn_value: &DnValue) -> &dyn Debug {
+  match dn_value {
+    DnValue::BmpString(s) => s,
+    DnValue::Ia5String(s) => s,
+    DnValue::PrintableString(s) => s,
+    DnValue::TeletexString(s) => s,
+    DnValue::UniversalString(s) => s,
+    DnValue::Utf8String(s) => s,
+    _ => &"unreachable",
+  }
+}
+
+fn san_debug(san_type: &SanType) -> String {
+  match san_type {
+    SanType::Rfc822Name(s) => s.to_string(),
+    SanType::DnsName(s) => s.to_string(),
+    SanType::URI(s) => s.to_string(),
+    SanType::IpAddress(s) => match s {
+      IpAddr::V4(s) => s.to_string(),
+      IpAddr::V6(s) => s.to_string(),
+    },
+    SanType::OtherName(_) => "other-name".to_string(),
+    _ => "unreachable".to_string(),
+  }
+}
+
+impl Debug for CsrBuilder {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    let mut builder = f.debug_struct("CsrBuilder");
+    if let Some(common_name) = &self.common_name {
+      builder.field("common_name", dn_debug(common_name));
+    }
+    if let Some(country) = &self.country {
+      builder.field("country", dn_debug(country));
+    }
+    builder.field("extended_key_usages", &self.extended_key_usages);
+    builder.field("key_usages", &self.key_usages);
+    if let Some(locality) = &self.locality {
+      builder.field("locality", dn_debug(locality));
+    }
+    if let Some(organization) = &self.organization {
+      builder.field("organization", dn_debug(organization));
+    }
+    if let Some(organizational_unit) = &self.organizational_unit {
+      builder.field("organizational_unit", dn_debug(organizational_unit));
+    }
+    if let Some(rsa_key_size) = &self.rsa_key_size {
+      builder.field("rsa_key_size", rsa_key_size);
+    }
+    if let Some(signature_algorithm) = &self.signature_algorithm {
+      builder.field("signature_algorithm", signature_algorithm);
+    }
+    if let Some(state) = &self.state {
+      builder.field("state", dn_debug(state));
+    }
+    builder.field("subject_alt_names", &self.subject_alt_names.iter().map(san_debug).collect_vec());
+    builder.finish()
   }
 }

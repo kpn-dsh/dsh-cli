@@ -57,7 +57,6 @@ pub(crate) fn attach_ca_chain_option() -> Arg {
     .long("attach-ca-chain")
     .action(ArgAction::Set)
     .value_parser(builder::BoolValueParser::new())
-    .default_value("true")
     .value_name("BOOL")
     .help("Attach ca chain to generated certificate")
     .long_help(

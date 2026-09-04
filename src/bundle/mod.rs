@@ -98,7 +98,13 @@ pub(crate) trait CertificateAuthority {
   /// * `domain` - Tenant domain string.
   /// * `context` - Used for the `ListFormatter`.
   /// * `expiration_days` - Used for printing the list.
-  async fn list(&self, domain: &str, context: &Context, expiration_days: u64) -> DshCliResult<()>;
+  async fn list_certificates(&self, domain: &str, context: &Context, expiration_days: u64) -> DshCliResult<()>;
+
+  /// List domains and subnets.
+  ///
+  /// # Parameters
+  /// * `context` - Used for the `ListFormatter`.
+  async fn list_domains(&self, context: &Context) -> DshCliResult<()>;
 
   /// Get signed certificate.
   ///
@@ -190,6 +196,27 @@ pub(crate) fn get_certificate_authority(matches: &ArgMatches, settings: &Setting
         None => Ok(None),
       },
     },
+  }
+}
+
+/// Gets certificate authority
+///
+/// 1. Try command line argument --certificate-authority
+/// 1. Try environment variable `DSH_CLI_CERTIFICATE_AUTHORITY`
+/// 1. Try value `certificate-authority` in settings file
+/// 1. Prompt user
+/// 1. Return `CertificateAuthorityId::RockKpnCa`
+pub(crate) fn get_certificate_authority_interactive(matches: &ArgMatches, context: &Context) -> DshCliResult<CertificateAuthorityId> {
+  match get_certificate_authority(matches, context.settings())? {
+    Some(ca_id) => Ok(ca_id),
+    None => {
+      let ca_id_string = context.read_single_line("certificate authority [KPN-CA/kpn-digic-rsdv]")?;
+      if ca_id_string.is_empty() {
+        Ok(CertificateAuthorityId::RockKpnCa)
+      } else {
+        Ok(CertificateAuthorityId::from_str(&ca_id_string)?)
+      }
+    }
   }
 }
 

@@ -187,12 +187,14 @@ export SAFE_COMMANDS=(
   "platforms"
   "ps"
 
+
   "proxy code $PROXY_UNDER_TEST --configuration"
   "proxy code $PROXY_UNDER_TEST json --force --dry-run"
   "proxy code $PROXY_UNDER_TEST python --force --dry-run"
   "proxy code $PROXY_UNDER_TEST rust --force --dry-run"
-  "proxy create $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
-  "proxy c $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
+  "proxy create $PROXY_NON_EXISTING --attach-ca-chain true --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --self-signed --dry-run"
+  "proxy create $PROXY_NON_EXISTING --certificate-authority kpn-ca --attach-ca-chain false --acl-group-name acl --enable-schema-store true --vhost-zone private --force --dry-run"
+  "proxy c $PROXY_NON_EXISTING --certificate-authority kpn-ca --attach-ca-chain true --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
   "proxy delete $PROXY_UNDER_TEST --force --dry-run"
   "proxy d $PROXY_UNDER_TEST --force --dry-run"
   "proxy list --bundle"

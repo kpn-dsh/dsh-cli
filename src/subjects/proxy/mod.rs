@@ -13,10 +13,13 @@ use crate::flags::FlagType;
 use crate::global_options::expiration_option;
 use crate::subject::Subject;
 use crate::subjects::aclgroup::options::acl_group_name_option;
-use crate::subjects::proxy::bundle_capabilities::{BundleCode, BundleCodeConfiguration, BundleCreate, BundleDelete, BundleList, BundleShow};
-use crate::subjects::proxy::options::{ca_common_name_option, enable_schema_store_option, language_argument, number_of_dns_records_option, vhost_zone_option};
+use crate::subjects::proxy::bundle_capabilities::{BundleCode, BundleCodeConfiguration, BundleCreateCaSigned, BundleCreateSelfSigned, BundleDelete, BundleList, BundleShow};
+use crate::subjects::proxy::options::{
+  attach_ca_chain_option, ca_common_name_option, enable_schema_store_option, language_argument, number_of_dns_records_option, vhost_zone_option,
+};
 use crate::subjects::proxy::proxy_capabilities::{ProxyDeploy, ProxyList, ProxyListIds, ProxyShow, ProxyUndeploy};
-use crate::subjects::service::{cpus_option, instances_option, mem_option};
+use crate::subjects::service::capabilities::{cpus_option, instances_option, mem_option};
+use crate::subjects::vhost::certificate_authority_option;
 use crate::COMMAND_OPTIONS_HEADING;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
@@ -89,13 +92,21 @@ static BUNDLE_CREATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = L
     CapabilityBuilder::new(
       CREATE_COMMAND,
       Some(CREATE_COMMAND_ALIAS),
-      &BundleCreate {},
+      &BundleCreateCaSigned {},
       "Create local proxy certificates bundle",
+    )
+    .add_command_executor(
+      FlagType::SelfSigned,
+      &BundleCreateSelfSigned {},
+      Some("Create self signed local proxy certificates bundle.".to_string()),
     )
     .add_target_argument(proxy_id_argument().required(true))
     .add_extra_argument(acl_group_name_option())
+    .add_extra_argument(attach_ca_chain_option())
     .add_extra_argument(ca_common_name_option())
+    .add_extra_argument(certificate_authority_option())
     .add_extra_argument(enable_schema_store_option())
+    .add_extra_argument(expiration_option())
     .add_extra_argument(number_of_dns_records_option())
     .add_extra_argument(vhost_zone_option()),
   )

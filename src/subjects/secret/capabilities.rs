@@ -394,7 +394,7 @@ static SECRET_LABELS_SHOW: [SecretLabel; 13] = [
   SecretLabel::Dependants,
 ];
 
-static CERTIFICATE_LABELS_SHOW: [CertificateSecretLabel; 6] = [
+pub(crate) static CERTIFICATE_LABELS_SHOW: [CertificateSecretLabel; 6] = [
   CertificateSecretLabel::SubjectCommonName,
   CertificateSecretLabel::SubjectDistinguishedName,
   CertificateSecretLabel::IssuerDistinguishedName,

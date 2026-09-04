@@ -1,4 +1,4 @@
-use crate::bundle::{create_certificate_authority, get_certificate_authority, CertificateAuthorityId};
+use crate::bundle::{create_certificate_authority, get_certificate_authority_interactive};
 use crate::capability::CommandExecutor;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
@@ -42,23 +42,10 @@ impl CommandExecutor for VhostAddCertificate {
     use regex::Regex;
     use std::sync::LazyLock;
 
-    // validate vhost subdomain
-    // determine domain
-    // check iff rock supports (is authorized for) domain
-    // check if there already is a certificate for the domain
-    // check if rock already has a certificate for the domain
-    //   ask to overwrite
-    // generate signed_certificate, key_pair in rock
-    // reload certificate (due to bug in rock)
-    // ask user to confirm
-    // check whether certificate_name, key_secret_name or certificate_secret_name already exist in dsh
-    // deploy certificate_pem and key_pair
-    // deploy certificate
-
     // TODO    vhost_subdomain need not be the same as certificate id
 
     let platform = get_target_platform(matches, context.settings())?;
-    let tenant_name = get_target_tenant(matches, context.settings())?;
+    let tenant = get_target_tenant(matches, context.settings())?;
     let vhost_name = target.unwrap_or_else(|| unreachable!());
     let expiration_days = get_expiration_days(matches, context.settings())?;
 
@@ -72,7 +59,7 @@ impl CommandExecutor for VhostAddCertificate {
     let vhost_applications: Vec<(String, &Application, VhostString)> = applications_using_vhost(&vhost_name, &applications);
     let default_vhost_zone: Option<VhostZone> = if vhost_applications.len() > 1 {
       context.print_warning(format!(
-        "vhost '{}' configured in multiple services ({})",
+        "vhost '{}' used in multiple services ({})",
         vhost_name,
         vhost_applications.iter().map(|(application_id, _, _)| application_id).join(", ")
       ));
@@ -99,27 +86,17 @@ impl CommandExecutor for VhostAddCertificate {
     };
     let vhost_zone = get_vhost_zone_interactive(matches, context, default_vhost_zone.unwrap_or(VhostZone::Private))?;
 
-    let certificate_authority_id = match get_certificate_authority(matches, context.settings())? {
-      Some(ca_id) => ca_id,
-      None => {
-        let ca_id_string = context.read_single_line("certificate authority [KPN-CA/kpn-digic-rsdv]")?;
-        if ca_id_string.is_empty() {
-          CertificateAuthorityId::RockKpnCa
-        } else {
-          CertificateAuthorityId::from_str(&ca_id_string)?
-        }
-      }
-    };
+    let certificate_authority_id = get_certificate_authority_interactive(matches, context)?;
     let certificate_authority = create_certificate_authority(certificate_authority_id).await?;
 
     // Check if RoCK supports this platform and tenant
-    let tenant_domain = &platform.tenant_domain(&tenant_name, vhost_zone.clone())?;
+    let tenant_domain = &platform.tenant_domain(&tenant, vhost_zone.clone())?;
     if !certificate_authority.authorization_check(tenant_domain).await? {
       return err!("authenticated user has no authorization for tenant domain '{}' at rock api", tenant_domain);
     }
 
     let vhost_domain = match vhost_zone {
-      VhostZone::Private => platform.tenant_private_vhost_domain(&tenant_name, &vhost_name)?,
+      VhostZone::Private => platform.tenant_private_vhost_domain(&tenant, &vhost_name)?,
       VhostZone::Public => platform.public_vhost_domain(&vhost_name),
     };
 
@@ -154,7 +131,6 @@ impl CommandExecutor for VhostAddCertificate {
 
     context.print_explanation("generate server certificate signing request");
 
-    // let builder = CsrBuilder::default_kpn(&vhost_domain, None, true, false)?;
     let builder = certificate_authority.default_csr_builder()?.common_name(&vhost_domain).server_certificate();
     let (csr, key_pair) = builder.build()?;
 

@@ -1,58 +1,10 @@
-use crate::bundle::ca_signed::_generate_signed_certificate_bundle;
-use crate::bundle::self_signed::generate_self_signed_certificate_bundle;
-use crate::bundle::{create_certificate_authority, CertificateAuthorityId};
-use crate::context::Context;
+use crate::bundle::CertificateAuthorityId;
 use crate::error::DshCliError;
 use crate::DshCliResult;
 use dsh_api::platform::{deserialize_platform, serialize_platform};
 use dsh_api::platform::{DshPlatform, VhostZone};
-use rcgen::{Certificate, KeyPair};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-
-/// Contains proxy certificate bundle and configuration.
-///
-/// * `config: ProxyCertificateBundleConfig`
-/// * `ca_certificate: DshCertificate`
-/// * `client_certificate: DshCertificate`
-/// * `server_certificate: DshCertificate`
-#[derive(Debug)]
-pub(crate) struct ProxyCertificateBundle {
-  pub config: ProxyCertificateBundleConfig,
-  pub ca_certificate: DshCertificate,
-  pub client_certificate: DshCertificate,
-  pub server_certificate: DshCertificate,
-}
-
-impl ProxyCertificateBundle {
-  /// Create proxy certificate bundle with self-signed certificates.
-  ///
-  /// # Parameters
-  /// * `config` - Proxy certificate bundle configuration.
-  pub(crate) fn create_self_signed(config: ProxyCertificateBundleConfig) -> DshCliResult<Self> {
-    generate_self_signed_certificate_bundle(config)
-  }
-
-  /// Create proxy certificate bundle with ca-signed certificates.
-  ///
-  /// Creates a proxy certificate bundle with certificates signed by the designated certificate
-  /// authority.
-  ///
-  /// # Parameters
-  /// * `config` - Proxy certificate bundle configuration.
-  /// * `certificate_authority_id` - Selects the certificate authority.
-  /// * `context` - Optional pair of context reference and expiration days value). If non-empty,
-  ///   the generated certificates will be printed via the `UnitFormatter` mechanism.
-  pub(crate) async fn _create_ca_signed(
-    config: ProxyCertificateBundleConfig,
-    certificate_authority_id: CertificateAuthorityId,
-    context: Option<(&Context, u64)>,
-  ) -> DshCliResult<Self> {
-    let certificate_authority = create_certificate_authority(certificate_authority_id).await?;
-    let bundle = _generate_signed_certificate_bundle(config, certificate_authority.as_ref(), context).await?;
-    Ok(bundle)
-  }
-}
 
 /// Contains configuration for certificate bundle.
 ///
@@ -69,8 +21,12 @@ impl ProxyCertificateBundle {
 pub(crate) struct ProxyCertificateBundleConfig {
   #[serde(rename = "acl-group-name", skip_serializing_if = "Option::is_none")]
   pub(crate) acl_group_name: Option<String>,
-  #[serde(rename = "ca-common-name")]
-  pub(crate) ca_common_name: String,
+  #[serde(default, rename = "attach-ca-chain")]
+  pub(crate) attach_ca_chain: bool,
+  #[serde(rename = "ca-common-name", skip_serializing_if = "Option::is_none")]
+  pub(crate) ca_common_name: Option<String>,
+  #[serde(rename = "ca-id", skip_serializing_if = "Option::is_none")]
+  pub(crate) certificate_authority_id: Option<CertificateAuthorityId>,
   #[serde(rename = "enable-schema-store")]
   pub(crate) enable_schema_store: bool,
   #[serde(rename = "number_of_dns_records")]
@@ -84,24 +40,6 @@ pub(crate) struct ProxyCertificateBundleConfig {
   pub(crate) vhost_zone: VhostZone,
 }
 
-/// Contains certificate and key-pair.
-///
-/// * `certificate: rcgen::Certificate`
-/// * `key_pair: rcgen::KeyPair`
-pub(crate) struct DshCertificate {
-  pub certificate: Certificate,
-  pub key_pair: KeyPair,
-}
-
-impl Debug for DshCertificate {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    let mut builder = f.debug_struct("DshCertificate");
-    builder.field("key", &self.key_pair);
-    builder.field("cert", self.certificate.params());
-    builder.finish()
-  }
-}
-
 impl ProxyCertificateBundleConfig {
   pub(crate) fn client_id(&self) -> String {
     self.tenant.clone()
@@ -109,8 +47,12 @@ impl ProxyCertificateBundleConfig {
 
   // Make sure that the CN has the same value as the first SAN so that we don't 'waste' a DNS
   // record on a unique name.
-  pub(crate) fn common_name(&self) -> DshCliResult<String> {
+  pub(crate) fn server_common_name(&self) -> DshCliResult<String> {
     Ok(self.platform.proxy_vhost_index(&self.tenant, &self.proxy_name, self.vhost_zone.clone(), 0)?)
+  }
+
+  pub(crate) fn client_common_name(&self) -> DshCliResult<String> {
+    Ok(self.platform.tenant_domain(&self.tenant, self.vhost_zone.clone())?)
   }
 
   pub(crate) fn domain_from_platform(&self) -> DshCliResult<String> {

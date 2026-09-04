@@ -111,11 +111,13 @@ impl SubjectFormatter<KafkaProxyLabel> for KafkaProxy {
 
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum ProxyBundleLabel {
+  AclGroupEnabled,
   AclGroupName,
   Brokers,
   BundleDirectory,
   BundleName,
   CaCommonName,
+  CaId,
   ClientId,
   DnsEntries,
   GroupId,
@@ -125,8 +127,9 @@ pub(crate) enum ProxyBundleLabel {
   PkiClientKeyFilename,
   Platform,
   PlatformDomain,
-  ProxyCommonName,
+  ProxyClientCommonName,
   ProxyName,
+  ProxyServerCommonName,
   SchemaStore,
   SchemaStoreEndpoint,
   Tenant,
@@ -136,11 +139,13 @@ pub(crate) enum ProxyBundleLabel {
 impl Label for ProxyBundleLabel {
   fn as_str(&self) -> &str {
     match self {
+      Self::AclGroupEnabled => "acl group enabled",
       Self::AclGroupName => "acl group name",
       Self::Brokers => "brokers",
       Self::BundleDirectory => "bundle directory",
       Self::BundleName => "bundle",
       Self::CaCommonName => "ca common name",
+      Self::CaId => "certificate authority",
       Self::ClientId => "client id",
       Self::DnsEntries => "dns entries",
       Self::GroupId => "group id",
@@ -150,8 +155,9 @@ impl Label for ProxyBundleLabel {
       Self::PkiClientKeyFilename => "client key file",
       Self::Platform => "platform",
       Self::PlatformDomain => "platform domain",
-      Self::ProxyCommonName => "proxy common name",
+      Self::ProxyClientCommonName => "proxy client common name",
       Self::ProxyName => "proxy name",
+      Self::ProxyServerCommonName => "proxy server common name",
       Self::SchemaStore => "schema store",
       Self::SchemaStoreEndpoint => "schema store endpoint",
       Self::Tenant => "tenant",
@@ -177,6 +183,7 @@ impl SubjectFormatter<ProxyBundleLabel> for (ProxyCertificateBundleConfig, Strin
 impl SubjectFormatter<ProxyBundleLabel> for ProxyCertificateBundleConfig {
   fn value(&self, label: &ProxyBundleLabel, target_id: &str) -> Value {
     match label {
+      ProxyBundleLabel::AclGroupEnabled => Value::plain(if self.acl_group_name.is_some() { "yes" } else { "no" }),
       ProxyBundleLabel::AclGroupName => Value::some_or_hide(self.acl_group_name.clone()),
       ProxyBundleLabel::Brokers => Value::result(
         self
@@ -185,7 +192,8 @@ impl SubjectFormatter<ProxyBundleLabel> for ProxyCertificateBundleConfig {
           .map(|servers| servers.join("\n")),
       ),
       ProxyBundleLabel::BundleName => Value::target(target_id),
-      ProxyBundleLabel::CaCommonName => Value::plain(&self.ca_common_name),
+      ProxyBundleLabel::CaCommonName => Value::some_or_hide(self.ca_common_name.clone()),
+      ProxyBundleLabel::CaId => Value::some_or_hide(self.certificate_authority_id.clone()),
       ProxyBundleLabel::ClientId => Value::plain(self.client_id()),
       ProxyBundleLabel::DnsEntries => Value::result(self.dns_entries().map(|dns_entry| dns_entry.join("\n"))),
       ProxyBundleLabel::GroupId => Value::plain(self.group_id(1)),
@@ -195,8 +203,9 @@ impl SubjectFormatter<ProxyBundleLabel> for ProxyCertificateBundleConfig {
       ProxyBundleLabel::PkiClientKeyFilename => Value::plain(CLIENT_KEY_FILENAME),
       ProxyBundleLabel::Platform => Value::target(&self.platform),
       ProxyBundleLabel::PlatformDomain => Value::result(self.domain_from_platform()),
-      ProxyBundleLabel::ProxyCommonName => Value::result(self.common_name()),
+      ProxyBundleLabel::ProxyClientCommonName => Value::result(self.client_common_name()),
       ProxyBundleLabel::ProxyName => Value::target(&self.proxy_name),
+      ProxyBundleLabel::ProxyServerCommonName => Value::result(self.server_common_name()),
       ProxyBundleLabel::SchemaStore => {
         if self.enable_schema_store {
           Value::plain("enabled")

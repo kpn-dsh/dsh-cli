@@ -1,8 +1,44 @@
-use crate::bundle::proxy::{DshCertificate, ProxyCertificateBundle, ProxyCertificateBundleConfig};
+use crate::bundle::proxy::ProxyCertificateBundleConfig;
 use crate::error::DshCliError;
-use crate::DshCliResult;
-use rcgen::{CertificateParams, CertificateSigningRequestParams, DistinguishedName, DnType, DnValue, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose, RsaKeySize};
+use crate::{err, DshCliResult};
+use rcgen::{
+  Certificate, CertificateParams, CertificateSigningRequestParams, DistinguishedName, DnType, DnValue, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose, RsaKeySize,
+};
+use std::fmt::{Debug, Formatter};
 use time::OffsetDateTime;
+
+/// Contains proxy certificate bundle and configuration for self-signed certificates.
+///
+/// * `config: ProxyCertificateBundleConfig`
+/// * `ca_certificate: DshCertificate`
+/// * `client_certificate: DshCertificate`
+/// * `server_certificate: DshCertificate`
+#[derive(Debug)]
+pub(crate) struct ProxySelfSignedCertificateBundle {
+  pub config: ProxyCertificateBundleConfig,
+  pub ca_certificate: DshCertificate,
+  pub client_certificate: DshCertificate,
+  pub server_certificate: DshCertificate,
+}
+
+/// Contains certificate and key-pair.
+///
+/// * `certificate: rcgen::Certificate`
+/// * `key_pair: rcgen::KeyPair`
+pub(crate) struct DshCertificate {
+  pub certificate: Certificate,
+  pub key_pair: KeyPair,
+}
+
+impl ProxySelfSignedCertificateBundle {
+  /// Create proxy certificate bundle with self-signed certificates.
+  ///
+  /// # Parameters
+  /// * `config` - Proxy certificate bundle configuration.
+  pub(crate) fn create_self_signed(config: ProxyCertificateBundleConfig) -> DshCliResult<Self> {
+    generate_self_signed_certificate_bundle(config)
+  }
+}
 
 /// Create self-signed proxy certificate bundle.
 ///
@@ -10,11 +46,16 @@ use time::OffsetDateTime;
 ///
 /// # Parameters
 /// * `config` - Proxy certificate bundle configuration.
-pub(crate) fn generate_self_signed_certificate_bundle(config: ProxyCertificateBundleConfig) -> DshCliResult<ProxyCertificateBundle> {
-  let ca_certificate = generate_ca_certificate(&config.ca_common_name)?;
-  let client_certificate = generate_client_certificate(config.client_id(), config.acl_group_name.clone(), &ca_certificate)?;
-  let server_certificate = generate_server_certificate(&config.common_name()?, config.dns_entries()?, &ca_certificate)?;
-  Ok(ProxyCertificateBundle { config, ca_certificate, client_certificate, server_certificate })
+pub(crate) fn generate_self_signed_certificate_bundle(config: ProxyCertificateBundleConfig) -> DshCliResult<ProxySelfSignedCertificateBundle> {
+  match &config.ca_common_name {
+    Some(ca_common_name) => {
+      let ca_certificate = generate_ca_certificate(ca_common_name)?;
+      let client_certificate = generate_client_certificate(config.client_id(), config.acl_group_name.clone(), &ca_certificate)?;
+      let server_certificate = generate_server_certificate(&config.server_common_name()?, config.dns_entries()?, &ca_certificate)?;
+      Ok(ProxySelfSignedCertificateBundle { config, ca_certificate, client_certificate, server_certificate })
+    }
+    None => err!("certificate common name not specified"),
+  }
 }
 
 /// Generates self-signed certificate authority certificate.
@@ -161,4 +202,13 @@ where
 
 fn generate_key_pair() -> DshCliResult<KeyPair> {
   KeyPair::generate_rsa_for(&rcgen::PKCS_RSA_SHA256, RsaKeySize::_4096).map_err(DshCliError::from)
+}
+
+impl Debug for DshCertificate {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    let mut builder = f.debug_struct("DshCertificate");
+    builder.field("key_pair", &self.key_pair);
+    builder.field("certificate", self.certificate.params());
+    builder.finish()
+  }
 }
