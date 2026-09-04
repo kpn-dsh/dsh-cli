@@ -1,5 +1,5 @@
 use crate::arguments::{service_id_argument, task_id_argument, TASK_ID_ARGUMENT};
-use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{Capability, CommandExecutor, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
 use crate::formatters::list_formatter::ListFormatter;
@@ -61,8 +61,9 @@ impl Subject for TaskSubject {
   }
 }
 
-static TASK_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> =
-  LazyLock::new(|| Box::new(CapabilityBuilder::new(LIST_COMMAND, None, &TaskList {}, "List all tasks for a service").add_target_argument(service_id_argument().required(true))));
+static TASK_LIST_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
+  Box::new(CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TaskList {}, "List all tasks for a service").add_target_argument(service_id_argument().required(true)))
+});
 
 static TASK_OPEN_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
