@@ -4,6 +4,7 @@ pub(crate) mod labels;
 use crate::arguments::vhost_subdomain_argument;
 use crate::bundle::CertificateAuthorityId;
 use crate::capability::{Capability, LIST_COMMAND, LIST_COMMAND_ALIAS, OPEN_COMMAND, OPEN_COMMAND_ALIAS, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
+use crate::capability::{ADD_COMMAND, UPDATE_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::filter_flags::FilterFlagType;
 use crate::flags::FlagType;
@@ -38,10 +39,7 @@ impl Subject for VhostSubject {
     Some("v")
   }
 
-  #[cfg(feature = "rock")]
   fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
-    use crate::capability::{ADD_COMMAND, UPDATE_COMMAND};
-
     match capability_command {
       ADD_COMMAND => Some(VHOST_ADD_CERTIFICATE_CAPABILITY.as_ref()),
       LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
@@ -52,22 +50,11 @@ impl Subject for VhostSubject {
     }
   }
 
-  #[cfg(not(feature = "rock"))]
-  fn capability(&self, capability_command: &str) -> Option<&(dyn Capability + Send + Sync)> {
-    match capability_command {
-      LIST_COMMAND => Some(VHOST_LIST_CAPABILITY.as_ref()),
-      OPEN_COMMAND => Some(VHOST_OPEN_CAPABILITY.as_ref()),
-      SHOW_COMMAND => Some(VHOST_SHOW_CAPABILITY.as_ref()),
-      _ => None,
-    }
-  }
-
   fn capabilities(&self) -> &Vec<&(dyn Capability + Send + Sync)> {
     &VHOST_CAPABILITIES
   }
 }
 
-#[cfg(feature = "rock")]
 static VHOST_ADD_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   use crate::arguments::vhost_subdomain_argument;
   use crate::capability::{ADD_COMMAND, ADD_COMMAND_ALIAS};
@@ -107,7 +94,6 @@ static VHOST_OPEN_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = Lazy
   )
 });
 
-#[cfg(feature = "rock")]
 static VHOST_UPDATE_CERTIFICATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   use crate::arguments::vhost_subdomain_argument;
   use crate::capability::UPDATE_COMMAND;
@@ -129,12 +115,10 @@ static VHOST_SHOW_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = Lazy
 
 static VHOST_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>> = LazyLock::new(|| {
   vec![
-    #[cfg(feature = "rock")]
     VHOST_ADD_CERTIFICATE_CAPABILITY.as_ref(),
     VHOST_LIST_CAPABILITY.as_ref(),
     VHOST_OPEN_CAPABILITY.as_ref(),
     VHOST_SHOW_CAPABILITY.as_ref(),
-    #[cfg(feature = "rock")]
     VHOST_UPDATE_CERTIFICATE_CAPABILITY.as_ref(),
   ]
 });

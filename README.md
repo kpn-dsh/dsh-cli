@@ -22,17 +22,6 @@ Some of the capabilities of the `dsh` tool are:
 * Reversed lookup functions. For example find all services that use a given secret or volume,
   or contain an environment value with a given value in their configuration.
 
-## Features
-
-By enabling/disabling the features described below you have some control over what's included
-in the `dsh` tool and what's not. The features are disabled by default.
-The following features are defined:
-
-* `manage` - Enables the manage methods. Enabling this feature is only useful
-  if your tenant is authorized for management capabilities.
-* `robot` - Enables the robot operation.
-* `rock` - Enable certificate signing capabilities via the KPN _RoCK API_ service.
-
 ## Installation
 
 ### Pre-built binaries
@@ -53,10 +42,10 @@ If you have the Rust tool-chain installed, the `dsh` tool can be installed on yo
 directly from `crates.io`, by executing the following command:
 
 ```shell
-> cargo install dsh --all-features --locked
+> cargo install dsh --locked
 ```
 
-This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/dsh`.
+This will install the `dsh` tool in `$HOME/.cargo/bin/dsh`.
 
 ## Next steps
 
@@ -71,5 +60,6 @@ This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/
 * [Developers](docs/developers.md)
 * [Publish](docs/publish.md)
 * [Release](docs/release.md)
+* [Make](docs/make.md)
 * [Codesign and notarize for macOS](docs/code-signing-macos.md)
-* [Certificate signing](docs/certificate signing.md)
+* [Certificate signing](docs/certificate-signing.md)

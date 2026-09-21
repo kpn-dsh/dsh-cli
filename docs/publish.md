@@ -28,17 +28,17 @@ Check the dependency in `Cargo.toml`:
 
 ```toml
 # When publishing, alway use the crates.io dependency.
-dsh_api = { path = "../dsh-api/dsh-api", version = "0.10.0", features = ["generic"] }
-# While developing use the relative path dependency to dsh_api and enable the manage feature.
-#dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
+dsh_api = { path = "../dsh-api/dsh-api", version = "0.10.0", features = ["generic", "manage", "robot"] }
+# While developing use the relative path dependency to dsh_api and enable all features.
+#dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage", "robot"] }
 ```
 
 Now from the root directory of the `dsh` project publish the crate using:
 
 ```shell
-> cargo publish --all-features --dry-run
+> cargo publish --dry-run
 > ...
-> cargo publish --all-features
+> cargo publish
 ```
 
 Once the tool is published to `crates.io`, the next step is to create a binary release.

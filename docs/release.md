@@ -19,9 +19,9 @@ any prefixes. This tag is required when creating the `GitHub` release.
 
 ## Build release binaries
 
-The `dsh` tool needs to be build separately for each required feature set and for each
-supported platform. The build steps are described assuming a macOS platform. For Linux or
-Windows the steps are similar, but the details may vary.
+The `dsh` tool needs to be build separately for each supported platform. The build steps are
+described assuming a
+macOS platform. For Linux or Windows the steps are similar, but the details may vary.
 
 ### `macOS`
 
@@ -37,18 +37,14 @@ commands are simple:
 ```shell
 > cargo build --release
 > mv target/release/dsh dsh-v0.10.0-aarch64-apple-darwin
-> cargo build --all-features --release
-> mv target/release/dsh dsh-manage-v0.10.0-aarch64-apple-darwin
 ```
 
-This will result in two executables in your project directory, one with `robot`, `stream` and
-`tenant` features enabled, and one without:
+This will result in an executable in your project directory:
 
 ```shell
 > ls -al
 total 87072
 ...
--rwxr-xr-x   1 username  staff  23506384  6 mrt. 09:51 dsh-manage-v0.10.0-aarch64-apple-darwin
 -rwxr-xr-x   1 username  staff  21444176  6 mrt. 09:51 dsh-v0.10.0-aarch64-apple-darwin
 ...
 ```
@@ -92,18 +88,14 @@ linker = "x86_64-linux-musl-gcc"
 > export TARGET_CC=x86_64-linux-musl-gcc
 > cargo build --release --target x86_64-unknown-linux-musl
 > mv target/x86_64-unknown-linux-musl/release/dsh ./dsh-v0.10.0-x86_64-unknown-linux-musl
-> cargo build --all-features --release --target x86_64-unknown-linux-musl
-> mv target/x86_64-unknown-linux-musl/release/dsh ./dsh-manage-v0.10.0-x86_64-unknown-linux-musl
 ```
 
-This will result in two executables in your project directory, one with `robot`, `stream` and
-`tenant` features enabled, and one without:
+This will result in an executables in your project directory:
 
 ```shell
 > ls -al
 total 87072
 ...
--rwxr-xr-x   1 username  staff  23506384 21 jul. 09:51 dsh-manage-v0.10.0-x86_64-unknown-linux-musl
 -rwxr-xr-x   1 username  staff  21444176 21 jul. 09:51 dsh-v0.10.0-x86_64-unknown-linux-musl
 ...
 ```

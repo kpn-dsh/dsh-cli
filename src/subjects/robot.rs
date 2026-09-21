@@ -1,11 +1,9 @@
 use crate::authentication::AuthenticationMethod;
-#[cfg(feature = "robot")]
 use crate::capability::UPDATE_COMMAND;
 use crate::capability::{Capability, CommandExecutor, COPY_COMMAND, IMPORT_COMMAND, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::clients::create_client_access_token_from_platform_tenant;
 use crate::context::Context;
-#[cfg(feature = "robot")]
 use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::{Label, SubjectFormatter, Value};
@@ -17,11 +15,8 @@ use crate::{err, DshCliResult};
 use arboard::Clipboard;
 use async_trait::async_trait;
 use clap::ArgMatches;
-#[cfg(feature = "robot")]
 use dsh_api::dsh_api_client_factory::DshApiClientFactory;
-#[cfg(feature = "robot")]
 use dsh_api::dsh_api_tenant::DshApiTenant;
-#[cfg(feature = "robot")]
 use dsh_api::error::DshApiError;
 use dsh_api::platform::DshPlatform;
 use dsh_api::secret::ROBOT_SECRET;
@@ -57,7 +52,6 @@ impl Subject for RobotSubject {
       LIST_COMMAND => Some(ROBOT_LIST_CAPABILITY.as_ref()),
       SET_COMMAND => Some(ROBOT_SET_CAPABILITY.as_ref()),
       UNSET_COMMAND => Some(ROBOT_UNSET_CAPABILITY.as_ref()),
-      #[cfg(feature = "robot")]
       UPDATE_COMMAND => Some(ROBOT_UPDATE_CAPABILITY.as_ref()),
       _ => None,
     }
@@ -113,7 +107,6 @@ static ROBOT_UNSET_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = Laz
   )
 });
 
-#[cfg(feature = "robot")]
 static ROBOT_UPDATE_CAPABILITY: LazyLock<Box<dyn Capability + Send + Sync>> = LazyLock::new(|| {
   Box::new(
     CapabilityBuilder::new(UPDATE_COMMAND, None, &RobotUpdate {}, "Request a new robot secret")
@@ -135,7 +128,6 @@ static ROBOT_CAPABILITIES: LazyLock<Vec<&'static (dyn Capability + Send + Sync)>
     ROBOT_LIST_CAPABILITY.as_ref(),
     ROBOT_SET_CAPABILITY.as_ref(),
     ROBOT_UNSET_CAPABILITY.as_ref(),
-    #[cfg(feature = "robot")]
     ROBOT_UPDATE_CAPABILITY.as_ref(),
   ]
 });
@@ -295,10 +287,8 @@ impl CommandExecutor for RobotUnset {
   }
 }
 
-#[cfg(feature = "robot")]
 struct RobotUpdate {}
 
-#[cfg(feature = "robot")]
 #[async_trait]
 impl CommandExecutor for RobotUpdate {
   async fn execute_without_client(&self, _: Option<String>, _: Option<String>, matches: &ArgMatches, context: &Context) -> DshCliResult<()> {

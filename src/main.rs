@@ -71,9 +71,7 @@ use subjects::robot::ROBOT_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
 use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
-#[cfg(feature = "manage")]
 use subjects::stream::STREAM_SUBJECT;
-#[cfg(feature = "manage")]
 use subjects::tenant::TENANT_SUBJECT;
 use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
@@ -100,7 +98,6 @@ mod formatters;
 mod global_options;
 mod issues;
 mod keyring;
-#[cfg(feature = "manage")]
 mod limits_options;
 mod log_level;
 mod modifier_flags;
@@ -264,10 +261,8 @@ async fn inner_main() -> DshCliExit {
     ROBOT_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     SERVICE_SUBJECT.as_ref(),
-    #[cfg(feature = "manage")]
     STREAM_SUBJECT.as_ref(),
     TASK_SUBJECT.as_ref(),
-    #[cfg(feature = "manage")]
     TENANT_SUBJECT.as_ref(),
     TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
@@ -506,14 +501,10 @@ fn logout_command() -> Command {
 }
 
 async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
-  let long_about = match enabled_features() {
-    Some(enabled_features) => format!("{} Enabled features: {}.", LONG_ABOUT, enabled_features.join(", ")),
-    None => LONG_ABOUT.to_string(),
-  };
   let mut command = Command::new(APPLICATION_NAME)
     .about(ABOUT)
     .author(AUTHOR)
-    .long_about(long_about)
+    .long_about(LONG_ABOUT)
     .disable_help_subcommand(true)
     .subcommands(clap_commands)
     .args(vec![
@@ -631,7 +622,7 @@ where
       Ok(deserialized_toml) => Ok(Some(deserialized_toml)),
       Err(de_error) => {
         let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().display(), de_error.message());
-        error!("{}", &message);
+        error!("{}", message);
         Err(DshCliError::from(message))
       }
     },
@@ -639,7 +630,7 @@ where
       NotFound => Ok(None),
       _ => {
         let message = format!("could not read file '{}'", toml_file.as_ref().display());
-        error!("{}", &message);
+        error!("{}", message);
         Err(DshCliError::from(message))
       }
     },
@@ -655,13 +646,13 @@ where
       Ok(_) => Ok(()),
       Err(io_error) => {
         let message = format!("could not write file '{}' ({})", toml_file.as_ref().display(), io_error);
-        error!("{}", &message);
+        error!("{}", message);
         Err(DshCliError::from(message))
       }
     },
     Err(ser_error) => {
       let message = format!("could not serialize data ({})", ser_error);
-      error!("{}", &message);
+      error!("{}", message);
       Err(DshCliError::from(message))
     }
   }
@@ -733,20 +724,6 @@ fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> Option<String> {
       }
     }
     Some(format!("{bold_green}{}{bold_green:#}\n{}", header, pairs.join("\n")))
-  }
-}
-
-fn enabled_features() -> Option<Vec<&'static str>> {
-  #[allow(unused_mut)]
-  let mut enabled_features = vec![];
-  #[cfg(feature = "manage")]
-  enabled_features.push("manage");
-  #[cfg(feature = "robot")]
-  enabled_features.push("robot");
-  if enabled_features.is_empty() {
-    None
-  } else {
-    Some(enabled_features)
   }
 }
 

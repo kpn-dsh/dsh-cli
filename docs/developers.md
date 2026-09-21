@@ -26,7 +26,7 @@ Then you can for example install the `dsh` tool on your local machine using:
 When developing, it is convenient to set an alias:
 
 ```shell
-> alias dshd="cargo run --all-features --package dsh --bin dsh --"
+> alias dshd="cargo run --package dsh --bin dsh --"
 ````
 
 You can then easily run the `dsh` tool without installing it:
@@ -48,32 +48,22 @@ client and data types for the DSH resource management API. This library is publi
 
 ```toml
 [dependencies]
-dsh_api = { version = "0.10.0", features = ["generic"] }
+dsh_api = { version = "0.10.0", features = ["generic", "manage", "robot"] }
 ```
 
-The `generic` feature must be enabled. The `dsh` tool has some optional features specified,
-which correspond to features of the `dsh_api` crate with the same name:
-
-```toml
-[features]
-manage = ["dsh_api/manage"]
-robot = ["dsh_api/robot"]
-```
+The `generic`, `manage` and `robot` features must be enabled.
 
 Because of the strong dependencies between the `dsh` tool and the `dsh_api` library, they are often
 been worked on at the same time. In that case it is convenient to set the dependency to the local
-copy of the library crate. Also, you might want to enable the `manage` feature while developing.
+copy of the library crate.
 
 ```toml
-dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage"] }
+dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage", "robot"] }
 ```
-
-rock_api = { version = "0.1.0", path = "/Users/wilbert/Workspaces/kpn/rock-api-rs",
-features = ["log", "rcgen"], optional = true }
 
 #### `rock_api` dependency
 
-When the `rock` feature is enabled, the `dsh` tool also has a dependency on the `rock_api`
+The `dsh` tool also has a dependency on the `rock_api`
 library that provides functions to sign certificates for private vhosts. At this time it is not
 clear in which repository `rock_api` will land.
 
@@ -103,27 +93,15 @@ The following commands should return without any remarks:
 ```shell
 > cargo +nightly fmt --check
 > cargo clippy
-> cargo clippy --all-features
 > cargo deny check licenses
 ```
 
 Consider configuring your IDE to automatically apply the formatting rules when saving a file.
 
-For a more thorough check whether all feature combinations work, use the `cargo-all-features`
-subcommand:
-
-```shell
-> cargo install cargo-all-features
-> cargo all-features build
-> cargo all-features test
-```
-
 ## Unit testing
 
-Be sure to include the `--all-features` flag when you run the unit tests:
-
 ```shell
-> cargo test --all-features
+> cargo test
 ```
 
 ## Integration testing

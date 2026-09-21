@@ -5,9 +5,7 @@ use async_trait::async_trait;
 use clap::{Arg, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 
-#[cfg(feature = "rock")]
 pub(crate) const ADD_COMMAND: &str = "add";
-#[cfg(feature = "rock")]
 pub(crate) const ADD_COMMAND_ALIAS: &str = "a";
 pub(crate) const CODE_COMMAND: &str = "code";
 pub(crate) const COPY_COMMAND: &str = "copy";

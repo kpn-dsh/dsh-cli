@@ -18,7 +18,6 @@ use rock_api::types::{Certificate, DomainList};
 use serde::Serialize;
 use std::collections::HashMap;
 
-#[cfg(feature = "rock")]
 pub(crate) struct RockCertificateAuthority {
   client: RockApiClient,
   pki_connector: PkiConnector,
@@ -33,7 +32,6 @@ impl RockCertificateAuthority {
   }
 }
 
-#[cfg(feature = "rock")]
 #[async_trait]
 impl CertificateAuthority for RockCertificateAuthority {
   async fn attach_ca_chain(&self, certificate_pem: &str) -> DshCliResult<String> {
@@ -216,11 +214,9 @@ impl CertificateAuthority for RockCertificateAuthority {
   }
 }
 
-#[cfg(feature = "rock")]
 const ROCK_CERTIFICATE_LABELS_LIST: [RockCertificateLabel; 5] =
   [RockCertificateLabel::CommonName, RockCertificateLabel::AdministrativeGroup, RockCertificateLabel::NotAfter, RockCertificateLabel::Status, RockCertificateLabel::Id];
 
-#[cfg(feature = "rock")]
 const ROCK_CERTIFICATE_LABELS_SHOW: [RockCertificateLabel; 9] = [
   RockCertificateLabel::AdministrativeGroup,
   RockCertificateLabel::AltNames,
@@ -233,10 +229,8 @@ const ROCK_CERTIFICATE_LABELS_SHOW: [RockCertificateLabel; 9] = [
   RockCertificateLabel::Status,
 ];
 
-#[cfg(feature = "rock")]
 const ROCK_DOMAIN_LABELS_LIST: [RockDomainsLabel; 3] = [RockDomainsLabel::Domain, RockDomainsLabel::Subdomain, RockDomainsLabel::VhostZone];
 
-#[cfg(feature = "rock")]
 #[derive(Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum RockCertificateLabel {
   AdministrativeGroup,
@@ -250,7 +244,6 @@ pub(crate) enum RockCertificateLabel {
   Status,
 }
 
-#[cfg(feature = "rock")]
 impl Label for RockCertificateLabel {
   fn as_str(&self) -> &str {
     match self {
@@ -271,7 +264,6 @@ impl Label for RockCertificateLabel {
   }
 }
 
-#[cfg(feature = "rock")]
 impl SubjectFormatter<RockCertificateLabel> for (&Certificate, Option<u64>) {
   fn value(&self, label: &RockCertificateLabel, _target_id: &str) -> Value {
     use chrono::{DateTime, Utc};
@@ -303,7 +295,6 @@ impl SubjectFormatter<RockCertificateLabel> for (&Certificate, Option<u64>) {
   }
 }
 
-#[cfg(feature = "rock")]
 #[derive(Clone, Eq, Hash, PartialEq, Serialize)]
 pub(crate) enum RockDomainsLabel {
   Domain,
@@ -311,7 +302,6 @@ pub(crate) enum RockDomainsLabel {
   VhostZone,
 }
 
-#[cfg(feature = "rock")]
 impl Label for RockDomainsLabel {
   fn as_str(&self) -> &str {
     match self {
@@ -326,7 +316,6 @@ impl Label for RockDomainsLabel {
   }
 }
 
-#[cfg(feature = "rock")]
 #[derive(Clone, Eq, Ord, PartialOrd, PartialEq, Serialize)]
 struct RockDomain {
   domain: String,
@@ -334,7 +323,6 @@ struct RockDomain {
   platform: Option<(DshPlatform, VhostZone)>,
 }
 
-#[cfg(feature = "rock")]
 impl SubjectFormatter<RockDomainsLabel> for &RockDomain {
   fn value(&self, label: &RockDomainsLabel, _target_id: &str) -> Value {
     match label {

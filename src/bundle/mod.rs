@@ -122,11 +122,9 @@ pub(crate) trait CertificateAuthority {
 
 #[derive(Default, Deserialize, clap::ValueEnum, Clone, Debug, Serialize)]
 pub(crate) enum CertificateAuthorityId {
-  #[cfg(feature = "rock")]
   #[clap(name = "kpn-ca")]
   #[default]
   RockKpnCa,
-  #[cfg(feature = "rock")]
   #[clap(name = "kpn-digic-rsdv")]
   RockKpnDigicRsdv,
 }

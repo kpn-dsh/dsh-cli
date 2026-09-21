@@ -4,9 +4,7 @@ pub(crate) const ACL_GROUP_NAME_ARGUMENT: &str = "acl-group-name-argument";
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
 pub(crate) const CERTIFICATE_ID_ARGUMENT: &str = "certificate-id-argument";
-#[cfg(feature = "manage")]
 pub(crate) const MANAGED_STREAM_ARGUMENT: &str = "managed-stream-argument";
-#[cfg(feature = "manage")]
 pub(crate) const MANAGED_TENANT_NAME_ARGUMENT: &str = "managed-tenant-name-argument";
 pub(crate) const MANIFEST_ID_ARGUMENT: &str = "manifest-id-argument";
 pub(crate) const NODEPOOL_ID_ARGUMENT: &str = "node-pool-id-argument";
@@ -57,7 +55,6 @@ pub(crate) fn certificate_id_argument() -> Arg {
     .long_help("Identifies a certificate on the DSH.")
 }
 
-#[cfg(feature = "manage")]
 pub(crate) fn managed_stream_argument() -> Arg {
   Arg::new(MANAGED_STREAM_ARGUMENT)
     .action(ArgAction::Set)
@@ -67,7 +64,6 @@ pub(crate) fn managed_stream_argument() -> Arg {
     .long_help("Identifies a managed stream on the DSH.")
 }
 
-#[cfg(feature = "manage")]
 pub(crate) fn managed_tenant_argument() -> Arg {
   Arg::new(MANAGED_TENANT_NAME_ARGUMENT)
     .action(ArgAction::Set)

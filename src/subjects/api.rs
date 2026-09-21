@@ -1,7 +1,6 @@
 use crate::capability::{Capability, CommandExecutor, SHOW_COMMAND, SHOW_COMMAND_ALIAS};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::Context;
-#[cfg(feature = "manage")]
 use crate::error::DshCliError;
 use crate::formatters::OutputFormat;
 use crate::subject::{Requirements, Subject};
@@ -10,7 +9,6 @@ use async_trait::async_trait;
 use clap::{builder, Arg, ArgAction, ArgMatches, Command};
 use dsh_api::dsh_api_client::DshApiClient;
 use dsh_api::generic::{MethodDescriptor, DELETE_METHODS, GET_METHODS, POST_METHODS, PUT_METHODS};
-#[cfg(feature = "manage")]
 use dsh_api::generic::{HEAD_METHODS, PATCH_METHODS};
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -43,9 +41,7 @@ impl Subject for ApiSubject {
     match capability_command {
       DELETE_COMMAND => Some(API_DELETE_CAPABILITY.as_ref()),
       GET_COMMAND => Some(API_GET_CAPABILITY.as_ref()),
-      #[cfg(feature = "manage")]
       HEAD_COMMAND => Some(API_HEAD_CAPABILITY.as_ref()),
-      #[cfg(feature = "manage")]
       PATCH_COMMAND => Some(API_PATCH_CAPABILITY.as_ref()),
       POST_COMMAND => Some(API_POST_CAPABILITY.as_ref()),
       PUT_COMMAND => Some(API_PUT_CAPABILITY.as_ref()),
@@ -59,7 +55,6 @@ impl Subject for ApiSubject {
   }
 }
 
-#[cfg(feature = "manage")]
 lazy_static! {
   static ref API_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
   static ref API_GET_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
@@ -84,27 +79,9 @@ lazy_static! {
   ];
 }
 
-#[cfg(not(feature = "manage"))]
-lazy_static! {
-  static ref API_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(DELETE_COMMAND, DELETE_ABOUT, DELETE_LONG_ABOUT, &ApiDelete {});
-  static ref API_GET_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(GET_COMMAND, GET_ABOUT, GET_LONG_ABOUT, &ApiGet {});
-  static ref API_POST_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(POST_COMMAND, POST_ABOUT, POST_LONG_ABOUT, &ApiPost {});
-  static ref API_PUT_CAPABILITY: Box<dyn Capability + Send + Sync> = create_generic_capability(PUT_COMMAND, PUT_ABOUT, PUT_LONG_ABOUT, &ApiPut {});
-  static ref API_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(CapabilityBuilder::new(
-    SHOW_COMMAND,
-    Some(SHOW_COMMAND_ALIAS),
-    &ApiShow {},
-    "Print the open api specification"
-  ));
-  static ref API_CAPABILITIES: Vec<&'static (dyn Capability + Send + Sync)> =
-    vec![API_DELETE_CAPABILITY.as_ref(), API_GET_CAPABILITY.as_ref(), API_POST_CAPABILITY.as_ref(), API_PUT_CAPABILITY.as_ref(), API_SHOW_CAPABILITY.as_ref(),];
-}
-
 const DELETE_COMMAND: &str = "delete";
 const GET_COMMAND: &str = "get";
-#[cfg(feature = "manage")]
 const HEAD_COMMAND: &str = "head";
-#[cfg(feature = "manage")]
 const PATCH_COMMAND: &str = "patch";
 const POST_COMMAND: &str = "post";
 const PUT_COMMAND: &str = "put";
@@ -113,9 +90,7 @@ fn method_descriptors(method: &str) -> &'static [(&str, MethodDescriptor)] {
   match method {
     DELETE_COMMAND => &DELETE_METHODS,
     GET_COMMAND => &GET_METHODS,
-    #[cfg(feature = "manage")]
     HEAD_COMMAND => &HEAD_METHODS,
-    #[cfg(feature = "manage")]
     PATCH_COMMAND => &PATCH_METHODS,
     POST_COMMAND => &POST_METHODS,
     PUT_COMMAND => &PUT_METHODS,
@@ -293,10 +268,8 @@ impl CommandExecutor for ApiGet {
   }
 }
 
-#[cfg(feature = "manage")]
 struct ApiHead {}
 
-#[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiHead {
   async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
@@ -316,10 +289,8 @@ impl CommandExecutor for ApiHead {
   }
 }
 
-#[cfg(feature = "manage")]
 struct ApiPatch {}
 
-#[cfg(feature = "manage")]
 #[async_trait]
 impl CommandExecutor for ApiPatch {
   async fn execute_with_client(&self, _: Option<String>, _sub_argument: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
@@ -464,9 +435,7 @@ const GET_LONG_ABOUT: &str = "Call a get operation on the DSH resource managemen
    The method will return an error message when the server did not accept the request, \
    for example if the resource specified by the identifier does not exist.";
 
-#[cfg(feature = "manage")]
 const HEAD_ABOUT: &str = "Call head operation";
-#[cfg(feature = "manage")]
 const HEAD_LONG_ABOUT: &str = "Call a head operation on the DSH resource management api. \
    Head operations are typically used to check whether a resource on the platform exists, \
    or if a user is entitled to use it. \
@@ -480,9 +449,7 @@ const HEAD_LONG_ABOUT: &str = "Call a head operation on the DSH resource managem
    It will return an error message when the resource specified by the identifier \
    does not exist or cannot be used by the user.";
 
-#[cfg(feature = "manage")]
 const PATCH_ABOUT: &str = "Call patch operation";
-#[cfg(feature = "manage")]
 const PATCH_LONG_ABOUT: &str = "Call a patch operation on the DSH resource management api. \
    Patch operations are typically used to update an already existing resources on the platform. \
    The type of the resource that needs to be updated is specified by the required selector command, \

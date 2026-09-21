@@ -23,15 +23,6 @@ Below in an overview of the capabilities of the `dsh` tool:
 * Reversed lookup functions. For example find all services that use a given secret or volume,
   or have an environment value with a given value in their configuration.
 
-## Features
-
-By enabling/disabling the features described below you have some control over what's included
-in the `dsh` tool and what's not. The features are disabled by default.
-The following features are defined:
-
-* `manage` - Enables the manage methods.
-* `robot` - Enables the robot operation.
-
 ## Installation
 
 The DSH Api Command Line Tool (`dsh`) can be installed on your local machine

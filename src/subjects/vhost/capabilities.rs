@@ -23,10 +23,8 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[cfg(feature = "rock")]
 pub(crate) struct VhostAddCertificate {}
 
-#[cfg(feature = "rock")]
 #[async_trait]
 impl CommandExecutor for VhostAddCertificate {
   async fn execute_with_client(&self, target: Option<String>, _: Option<String>, matches: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
@@ -169,7 +167,7 @@ impl CommandExecutor for VhostAddCertificate {
       let key_pair_secret = key_pair.serialize_pem();
       let secret = Secret::new(&key_secret_name, &key_pair_secret);
       client.post_secret(&secret).await?;
-      context.print_outcome(format!("key secret '{}' deployed", &key_secret_name));
+      context.print_outcome(format!("key secret '{}' deployed", key_secret_name));
     }
 
     if context.dry_run() {
@@ -184,7 +182,7 @@ impl CommandExecutor for VhostAddCertificate {
       };
       let secret = Secret::new(&certificate_secret_name, &certificate_secret);
       client.post_secret(&secret).await?;
-      context.print_outcome(format!("certificate secret '{}' deployed", &certificate_secret_name));
+      context.print_outcome(format!("certificate secret '{}' deployed", certificate_secret_name));
     }
 
     if context.dry_run() {
@@ -195,7 +193,7 @@ impl CommandExecutor for VhostAddCertificate {
         .put_certificate_configuration(&certificate_name, &certificate_body)
         .await
         .map_err(|error| cli_error!("error deploying certificate configuration '{}' ({})", certificate_name, error))?;
-      context.print_outcome(format!("certificate '{}' deployed", &certificate_name));
+      context.print_outcome(format!("certificate '{}' deployed", certificate_name));
     }
 
     Ok(())
@@ -458,10 +456,8 @@ impl CommandExecutor for VhostShow {
   }
 }
 
-#[cfg(feature = "rock")]
 pub(crate) struct VhostUpdateCertificate {}
 
-#[cfg(feature = "rock")]
 #[async_trait]
 impl CommandExecutor for VhostUpdateCertificate {
   async fn execute_with_client(&self, _target: Option<String>, _: Option<String>, _matches: &ArgMatches, _client: &DshApiClient, _context: &Context) -> DshCliResult<()> {

@@ -14,10 +14,8 @@ pub(crate) mod robot;
 pub(crate) mod secret;
 pub(crate) mod service;
 pub(crate) mod setting;
-#[cfg(feature = "manage")]
 pub(crate) mod stream;
 pub(crate) mod task;
-#[cfg(feature = "manage")]
 pub(crate) mod tenant;
 pub(crate) mod token;
 pub(crate) mod topic;
