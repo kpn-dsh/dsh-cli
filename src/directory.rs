@@ -341,8 +341,8 @@ fn read_local_certificate_bundle_file(directory_pathbuf: &Path, filename: &str) 
       Ok(Some(LocalProxyCertificate { value: file_content, filename: file_path.display().to_string() }))
     }
     Err(error) => match error.kind() {
-      ErrorKind::NotFound => return Ok(None),
-      _ => return Err(DshCliError::from(error)),
+      ErrorKind::NotFound => Ok(None),
+      _ => Err(DshCliError::from(error)),
     },
   }
 }
@@ -492,7 +492,7 @@ pub(crate) fn store_proxy_ca_certificate_bundle(
       let mut config_file_path = proxy_certificate_bundle_directory_pathbuf.clone();
       config_file_path.push(CONFIG_FILENAME);
       debug!("write proxy certificate bundle configuration file '{}'", config_file_path.display());
-      trace!("{:#?}", &certificate_bundle.config);
+      trace!("{:#?}", certificate_bundle.config);
       let serialized_config = toml::to_string(&certificate_bundle.config)?;
       write_with_mode(config_file_path, &serialized_config, Some(MODE_U_RW))?;
 
@@ -509,7 +509,7 @@ pub(crate) fn store_proxy_ca_certificate_bundle(
         let mut file_path = proxy_certificate_bundle_directory_pathbuf.clone();
         file_path.push(filename);
         debug!("write proxy certificate bundle file '{}'", file_path.display());
-        write_with_mode(file_path, &pem, mode)?;
+        write_with_mode(file_path, pem, mode)?;
       }
       Ok(proxy_certificate_bundle_directory_pathbuf.display().to_string())
     }
@@ -540,7 +540,7 @@ pub(crate) fn store_proxy_self_signed_certificate_bundle(
       let mut config_file_path = proxy_certificate_bundle_directory_pathbuf.clone();
       config_file_path.push(CONFIG_FILENAME);
       debug!("write proxy self-signed certificate bundle configuration file '{}'", config_file_path.display());
-      trace!("{:#?}", &certificate_bundle.config);
+      trace!("{:#?}", certificate_bundle.config);
       let serialized_config = toml::to_string(&certificate_bundle.config)?;
       write_with_mode(config_file_path, &serialized_config, Some(MODE_U_RW))?;
 

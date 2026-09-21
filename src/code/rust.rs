@@ -10,11 +10,11 @@ pub(crate) fn generate_rust_example_code(bundle_configuration: &ProxyCertificate
   create_dir_all(&example_directory)?;
   context.print_outcome(format!("created directory '{}'", example_directory));
 
-  let src_directory = format!("{}/src", &example_directory);
+  let src_directory = format!("{}/src", example_directory);
   create_dir_all(&src_directory)?;
   context.print_outcome(format!("created directory '{}'", src_directory));
 
-  let bin_directory = format!("{}/src/bin", &example_directory);
+  let bin_directory = format!("{}/src/bin", example_directory);
   create_dir_all(&bin_directory)?;
   context.print_outcome(format!("created directory '{}'", bin_directory));
 

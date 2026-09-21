@@ -564,8 +564,8 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
     }
     Resource::Bucket { bucket } => {
       let mut strings = vec![];
-      strings.push(format!("encrypted: {}", &bucket.encrypted));
-      strings.push(format!("versioned: {}", &bucket.versioned));
+      strings.push(format!("encrypted: {}", bucket.encrypted));
+      strings.push(format!("versioned: {}", bucket.versioned));
       strings
     }
     Resource::Certificate { certificate } => vec![certificate.unformatted_representation.to_string()],
@@ -574,7 +574,7 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
       strings.push(format!("cpus: {}", database.cpus));
       strings.push(format!("mem: {}", database.mem));
       strings.push(format!("instances: {}", database.instances));
-      strings.push(format!("version: {}", &database.version));
+      strings.push(format!("version: {}", database.version));
       strings.push(format!("extensions: {}", database.extensions.join(", ")));
       strings.push(format!("snapshot interval: {}", database.snapshot_interval));
       strings.push(format!("volume size: {}", database.volume_size));

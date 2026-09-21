@@ -59,7 +59,7 @@ impl ProxyCertificateBundleConfig {
     match self.vhost_zone {
       VhostZone::Private => match &self.platform.private_domain() {
         Some(private_domain) => Ok(private_domain.to_string()),
-        None => Err(DshCliError::Configuration(format!("platform '{}' does not support private vhosts", &self.platform))),
+        None => Err(DshCliError::Configuration(format!("platform '{}' does not support private vhosts", self.platform))),
       },
       VhostZone::Public => Ok(self.platform.public_domain().to_string()),
     }

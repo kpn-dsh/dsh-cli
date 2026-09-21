@@ -73,7 +73,7 @@ pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Opti
     let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string())?;
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
     let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
-    debug!("provider metadata read from '{}'", &issuer_url);
+    debug!("provider metadata read from '{}'", issuer_url);
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
         let access_token_jwt = DshJwt::from_str(access_token.secret())?;
@@ -99,7 +99,7 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
   spawn_blocking(move || {
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
     let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
-    debug!("provider metadata read from '{}'", &issuer_url);
+    debug!("provider metadata read from '{}'", issuer_url);
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
         let access_token_jwt = DshJwt::from_str(access_token.secret())?;

@@ -147,7 +147,7 @@ impl CommandExecutor for ServiceDuplicate {
         if !verbatim {
           match edit_configuration(
             &application,
-            &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
+            &format!("{}.{}.{}.configuration.json", client.platform().name(), client.tenant().name(), service_id,),
             matches,
           )
           .await?
@@ -186,7 +186,7 @@ impl CommandExecutor for ServiceEdit {
       Ok(application) => {
         match edit_configuration(
           &application,
-          &format!("{}.{}.{}.configuration.json", &client.platform().name(), client.tenant().name(), &service_id,),
+          &format!("{}.{}.{}.configuration.json", client.platform().name(), client.tenant().name(), service_id,),
           matches,
         )
         .await?

@@ -486,7 +486,7 @@ where
   match matches.get_one::<T>(setting) {
     Some(one) => {
       let cloned = one.clone();
-      context.print_outcome(format!("{} set to {}", setting, &cloned));
+      context.print_outcome(format!("{} set to {}", setting, cloned));
       Ok(Some(cloned))
     }
     None => err!("{}", setting),
@@ -591,7 +591,7 @@ impl CommandExecutor for SettingSet {
         let output_directory = match matches.get_one::<PathBuf>(SETTING_OUTPUT_DIRECTORY) {
           Some(one) => {
             let cloned = one.clone();
-            context.print_outcome(format!("{} set to {}", SETTING_OUTPUT_DIRECTORY, &cloned.display()));
+            context.print_outcome(format!("{} set to {}", SETTING_OUTPUT_DIRECTORY, cloned.display()));
             Ok(Some(cloned))
           }
           None => err!("{}", SETTING_OUTPUT_DIRECTORY),
