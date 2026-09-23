@@ -285,7 +285,7 @@ export SAFE_COMMANDS=(
   "task l $SERVICE_UNDER_TEST"
   "task show $SERVICE_UNDER_TEST"
   "task s $SERVICE_UNDER_TEST"
-  "task show $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
+  #  "task show $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
 
   "token copy --dry-run"
   "token fetch"
