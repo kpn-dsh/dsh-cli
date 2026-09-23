@@ -158,10 +158,46 @@ impl CommandExecutor for BundleCreateCaSigned {
 
     context.print_explanation(format!("create proxy certificates bundle '{}' for '{}@{}'", proxy_bundle_id, platform, tenant));
 
+    let vhost_zone = get_vhost_zone_interactive(matches, context, VhostZone::Private)?;
     let certificate_authority_id = get_certificate_authority_interactive(matches, context)?;
     let certificate_authority = create_certificate_authority(certificate_authority_id.clone()).await?;
+    let attach_ca_chain = match matches.get_one::<bool>(ATTACH_CA_CHAIN_OPTION) {
+      Some(attach_ca_chain) => *attach_ca_chain,
+      None => context.yes_or_no("attach ca chain to certificates?", false)?,
+    };
+    let acl_group_name = get_acl_group_name(matches, context)?;
+    let enable_schema_store = if acl_group_name.is_some() {
+      context.print_warning("schema store will be disabled since acl groups are enabled");
+      false
+    } else {
+      match matches.get_one::<bool>(ENABLE_SCHEMA_STORE_OPTION) {
+        Some(enable_schema_store) => *enable_schema_store,
+        None => context.yes_or_no("enable schema store?", false)?,
+      }
+    };
+    let number_of_dns_records = get_number_of_dns_records(matches, context)?;
 
-    let config = get_config(&platform, &tenant, &proxy_bundle_id, None, Some(certificate_authority_id), matches, context)?;
+    let config = ProxyCertificateBundleConfig {
+      acl_group_name,
+      attach_ca_chain,
+      ca_common_name: None,
+      certificate_authority_id: Some(certificate_authority_id),
+      enable_schema_store,
+      number_of_dns_records,
+      platform: platform.clone(),
+      proxy_name: proxy_bundle_id.to_string(),
+      tenant: tenant.to_string(),
+      vhost_zone,
+    };
+    if !context.quiet() {
+      match context.verbosity() {
+        Verbosity::Off | Verbosity::Low => (),
+        Verbosity::Medium | Verbosity::High => {
+          context.print_explanation("proxy bundle configuration".to_string());
+          UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_CREATE, context).print(&config, None)?
+        }
+      }
+    }
     trace!("{:#?}", config);
 
     let cert_bundle = ProxyCaCertificateBundle::create_ca_signed(config.clone(), certificate_authority.as_ref(), Some((context, expiration_days))).await?;
@@ -205,7 +241,40 @@ impl CommandExecutor for BundleCreateSelfSigned {
       proxy_bundle_id, platform, tenant
     ));
 
-    let config = get_config(&platform, &tenant, &proxy_bundle_id, Some(&ca_common_name), None, matches, context)?;
+    let vhost_zone = get_vhost_zone_interactive(matches, context, VhostZone::Private)?;
+    let acl_group_name = get_acl_group_name(matches, context)?;
+    let enable_schema_store = if acl_group_name.is_some() {
+      context.print_warning("schema store will be disabled since acl groups are enabled");
+      false
+    } else {
+      match matches.get_one::<bool>(ENABLE_SCHEMA_STORE_OPTION) {
+        Some(enable_schema_store) => *enable_schema_store,
+        None => context.yes_or_no("enable schema store?", false)?,
+      }
+    };
+    let number_of_dns_records = get_number_of_dns_records(matches, context)?;
+
+    let config = ProxyCertificateBundleConfig {
+      acl_group_name,
+      attach_ca_chain: false,
+      ca_common_name: Some(ca_common_name),
+      certificate_authority_id: None,
+      enable_schema_store,
+      number_of_dns_records,
+      platform: platform.clone(),
+      proxy_name: proxy_bundle_id.to_string(),
+      tenant: tenant.to_string(),
+      vhost_zone,
+    };
+    if !context.quiet() {
+      match context.verbosity() {
+        Verbosity::Off | Verbosity::Low => (),
+        Verbosity::Medium | Verbosity::High => {
+          context.print_explanation("proxy bundle configuration".to_string());
+          UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_CREATE, context).print(&config, None)?
+        }
+      }
+    }
     trace!("{:#?}", config);
 
     let cert_bundle = ProxySelfSignedCertificateBundle::create_self_signed(config)?;
@@ -236,51 +305,6 @@ impl CommandExecutor for BundleCreateSelfSigned {
   fn requirements(&self, _: &ArgMatches) -> Requirements {
     Requirements::standard_without_api()
   }
-}
-
-fn get_config(
-  platform: &DshPlatform,
-  tenant: &str,
-  proxy_bundle_id: &str,
-  ca_common_name: Option<&str>,
-  ca_id: Option<CertificateAuthorityId>,
-  matches: &ArgMatches,
-  context: &Context,
-) -> DshCliResult<ProxyCertificateBundleConfig> {
-  let acl_group_name = get_acl_group_name(matches, context)?;
-  let vhost_zone = get_vhost_zone_interactive(matches, context, VhostZone::Private)?;
-  let attach_ca_chain = match matches.get_one::<bool>(ATTACH_CA_CHAIN_OPTION) {
-    Some(attach_ca_chain) => *attach_ca_chain,
-    None => context.yes_or_no("attach ca chain to certificates?", false)?,
-  };
-  let enable_schema_store = match matches.get_one::<bool>(ENABLE_SCHEMA_STORE_OPTION) {
-    Some(enable_schema_store) => *enable_schema_store,
-    None => context.yes_or_no("enable schema store?", false)?,
-  };
-  let number_of_dns_records = get_number_of_dns_records(matches, context)?;
-
-  let config = ProxyCertificateBundleConfig {
-    acl_group_name,
-    attach_ca_chain,
-    ca_common_name: ca_common_name.map(|cn| cn.to_string()),
-    certificate_authority_id: ca_id,
-    enable_schema_store,
-    number_of_dns_records,
-    platform: platform.clone(),
-    proxy_name: proxy_bundle_id.to_string(),
-    tenant: tenant.to_string(),
-    vhost_zone,
-  };
-  if !context.quiet() {
-    match context.verbosity() {
-      Verbosity::Off | Verbosity::Low => (),
-      Verbosity::Medium | Verbosity::High => {
-        context.print_explanation("proxy bundle configuration".to_string());
-        UnitFormatter::new(proxy_bundle_id, &PROXY_BUNDLE_LABELS_CREATE, context).print(&config, None)?
-      }
-    }
-  }
-  Ok(config)
 }
 
 fn bundle_exists_cancel_overwrite(platform: &DshPlatform, tenant: &str, proxy_bundle_id: &str, context: &Context) -> DshCliResult<bool> {

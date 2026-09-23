@@ -154,9 +154,9 @@ impl CommandExecutor for ProxyDeploy {
         client.post_secret(&private_key_secret),
         client.post_secret(&ca_certificate_secret),
       );
-      context.print_outcome(format!("server certificate secret '{}' created", &server_certificate_secret));
-      context.print_outcome(format!("private key secret '{}' created", &private_key_secret));
-      context.print_outcome(format!("ca certificate secret '{}' created", &ca_certificate_secret));
+      context.print_outcome(format!("server certificate secret '{}' created", server_certificate_secret));
+      context.print_outcome(format!("private key secret '{}' created", private_key_secret));
+      context.print_outcome(format!("ca certificate secret '{}' created", ca_certificate_secret));
 
       if let Err(error) = cert_secret_result {
         context.print_error(format!("error writing certificate secret '{}' ({})", proxy_server_certificate_secret_name, error));
@@ -172,7 +172,7 @@ impl CommandExecutor for ProxyDeploy {
         .put_certificate_configuration(&proxy_certificate_name, &certificate_body)
         .await
         .map_err(|error| cli_error!("error writing certificate configuration '{}' ({})", proxy_certificate_name, error))?;
-      context.print_outcome(format!("certificate '{}' created", &proxy_certificate_name));
+      context.print_outcome(format!("certificate '{}' created", proxy_certificate_name));
 
       client
         .put_kafkaproxy_configuration(&proxy_bundle_id, &kafka_proxy)
@@ -311,7 +311,7 @@ impl CommandExecutor for ProxyUndeploy {
       } else {
         client.delete_kafkaproxy_configuration(&proxy_id).await?;
         context.print_outcome(format!("proxy '{}' undeployed", proxy_id));
-        if context.confirmed(format!("delete certificate '{}'?", &kafka_proxy.certificate))? {
+        if context.confirmed(format!("delete certificate '{}'?", kafka_proxy.certificate))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, certificate not deleted");
           } else {
@@ -326,7 +326,7 @@ impl CommandExecutor for ProxyUndeploy {
             }
             context.print_error("");
             client.delete_certificate_configuration(&kafka_proxy.certificate).await?;
-            context.print_outcome(format!("certificate '{}' deleted", &kafka_proxy.certificate));
+            context.print_outcome(format!("certificate '{}' deleted", kafka_proxy.certificate));
             if context.confirmed(format!(
               "delete secrets {}?",
               certificate_secrets.iter().map(|secret| format!("'{}'", secret)).join(", ")
@@ -346,7 +346,7 @@ impl CommandExecutor for ProxyUndeploy {
                 context.print_error("");
                 for secret in certificate_secrets {
                   client.delete_secret_configuration(&secret).await?;
-                  context.print_outcome(format!("secret '{}' deleted", &secret));
+                  context.print_outcome(format!("secret '{}' deleted", secret));
                 }
               }
             }
