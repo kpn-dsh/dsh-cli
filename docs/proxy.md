@@ -28,12 +28,16 @@ dcli> export DSH_CLI_TENANT=my-tenant
 
 ## Create a proxy certificate bundle
 
-The first step is to create a so-called proxy certificate bundle, which contains all the settings
-and the certificates and public/private key pairs. In a real situation the certificates
+The first step is to create a so-called proxy certificate bundle, which contains all the settings,
+certificates and public/private key pairs. In a real situation the certificates
 should be signed as an Organization Validated (OV) certificate or an Extended Validation (EV)
-certificate, but the current version of the `dsh` tool does not support this yet.
+certificate. See [Certificate signing](certificate-signing.md) how to create signed `proxy`
+certificates.
 
-For the example we will use a self-signed ca certificate and the following settings:
+Here we will use a self-signed ca certificate. See [Certificate signing](certificate-signing.md)
+how to use signed certificates.
+
+For the example we will use the following settings:
 
 * proxy name: `my-proxy`
 * ACL groups: not enabled
@@ -46,10 +50,10 @@ this and let the tool prompt us for them. Since we will use all default values, 
 press the enter-key after each prompt.
 
 ```shell
-> dsh proxy create my-proxy
-create proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
-enable acl groups? [y/N]
+> dsh proxy create my-proxy --self-signed
 certificate authority common name [username]:
+create self-signed proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
+vhost zone [PRIVATE/public]:
 enable schema store? [y/N]
 vhost zone [PRIVATE/public]:
 ┌────────────────┬─────────────────────────┐
@@ -58,14 +62,14 @@ vhost zone [PRIVATE/public]:
 │ platform       │ np-aws-lz-dsh           │
 │ tenant         │ my-tenant               │
 │ proxy name     │ my-proxy                │
-│ group id       │ my-tenant_my-proxy_1 │
+│ group id       │ my-tenant_my-proxy_1    │
 │ ca common name │ username                │
 │ schema store   │ disabled                │
 │ vhost zone     │ private                 │
 │ records        │ 10                      │
 └────────────────┴─────────────────────────┘
 ...
-proxy certificates bundle 'my-proxy' stored in directory '/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy'
+self-signed proxy certificates bundle 'my-proxy' stored in directory '/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy'
 ```
 
 After a few seconds an overview of the created configuration, certificates and keys will be

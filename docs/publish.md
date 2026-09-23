@@ -23,14 +23,12 @@ repository for an explanation on how to publish the `dsh_api` crate.
 
 ## Publish `dsh`
 
-First make sure that the `dsh_api` dependency is pointing to the proper version at `crates.io`.
-Check the dependency in `Cargo.toml`:
+First check the dependencies for `dsh_api` and `rock_api` in `Cargo.toml` whether they are pointing
+to the proper versions at `crates.io` and `artifactory` respectively:
 
 ```toml
-# When publishing, alway use the crates.io dependency.
-dsh_api = { path = "../dsh-api/dsh-api", version = "0.10.0", features = ["generic", "manage", "robot"] }
-# While developing use the relative path dependency to dsh_api and enable all features.
-#dsh_api = { path = "../dsh-api/dsh-api", features = ["generic", "manage", "robot"] }
+dsh_api = { version = "0.11.0", features = ["generic", "manage", "robot"] }
+rock_api = { version = "0.1.0", features = ["log", "rcgen"], registry = "artifactory" }
 ```
 
 Now from the root directory of the `dsh` project publish the crate using:
