@@ -1,7 +1,7 @@
 use crate::bundle::ca_signed::ProxyCaCertificateBundle;
 use crate::bundle::proxy::ProxyCertificateBundleConfig;
 use crate::bundle::self_signed::ProxySelfSignedCertificateBundle;
-use crate::bundle::{create_certificate_authority, get_certificate_authority_interactive, CertificateAuthorityId};
+use crate::bundle::{create_certificate_authority, get_certificate_authority_interactive};
 use crate::capability::CommandExecutor;
 use crate::code::{delete_example_code, example_code_exists, generate_example_code};
 use crate::context::Context;
