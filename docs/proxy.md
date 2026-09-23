@@ -31,8 +31,7 @@ dcli> export DSH_CLI_TENANT=my-tenant
 The first step is to create a so-called proxy certificate bundle, which contains all the settings,
 certificates and public/private key pairs. In a real situation the certificates
 should be signed as an Organization Validated (OV) certificate or an Extended Validation (EV)
-certificate. See [Certificate signing](certificate-signing.md) how to create signed `proxy`
-certificates.
+certificate.
 
 Here we will use a self-signed ca certificate. See [Certificate signing](certificate-signing.md)
 how to use signed certificates.
