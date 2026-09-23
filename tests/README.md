@@ -54,8 +54,7 @@ All commands must produce a controlled error message and never terminate in pani
 
 ## `test_manage_commands.sh`
 
-This script will run commands that are only available when the `manage` feature
-was enabled when the tool was built or installed.
+This script will run commands that are only available when the user has `manage` authorizations.
 All commands must succeed and print output to `stdout` (and possibly `stderr`).
 Commands that would result in changes on the DSH platform
 all have the `--dry-run` argument included, so that no actual changes will be made.
