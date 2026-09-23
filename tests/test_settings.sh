@@ -18,7 +18,6 @@ SETTING_COMMANDS=(
   "dsh setting set browser open"
   "dsh setting set certificate-authority kpn-ca"
   "dsh setting set certificate-authority kpn-digic-rsdv"
-  "dsh setting set certificate-authority self-signed"
   "dsh setting set csv-quote \"'\""
   "dsh setting set csv-separator \"|\""
   "dsh setting set default-platform $PLATFORM"

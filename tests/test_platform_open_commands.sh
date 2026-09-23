@@ -33,9 +33,9 @@ PLATFORM_OPEN_COMMANDS=(
   "platform open tenant"
   "platform open tracing"
   "service open $SERVICE_UNDER_TEST"
+  "vhost open $VHOST_UNDER_TEST"
   "task open $SERVICE_UNDER_TEST"
   "task open $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
-  "vhost open $VHOST_UNDER_TEST"
 )
 
 set -f
