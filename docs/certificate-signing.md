@@ -1,6 +1,6 @@
 # Certificate signing
 
-[&#x2190; Release](release.md)
+[&#x2190; README](../README.md)
 
 DSH supports Public Key Infrastructure (PKI) certificates for `vhosts` and `proxys`. To guarantee
 trust and security it is required to use certificates with all services and proxies
@@ -135,4 +135,4 @@ vhost zone [PRIVATE/public]:
 The deployment step, generating code examples and using `acl-groups` is exactly the same as for
 the self-signed case.
 
-[Release &#x2192;](release.md)
+[README &#x2192;](../README.md)

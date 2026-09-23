@@ -1,6 +1,6 @@
 # Codesign and notarize for macOS
 
-[&#x2190; Release](release.md)
+[&#x2190; README](../README.md)
 
 On devices with macOS 10.15 or higher all apps distributed outside the App Store must be signed
 by the developer using an Apple-issued Developer ID certificate and notarised by Apple to run
@@ -194,4 +194,4 @@ this as follows:
 
 <img src="images/whats-your-sign.png" width="600" />
 
-[Release &#x2192;](release.md)
+[README &#x2192;](../README.md)

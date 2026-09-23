@@ -1,6 +1,6 @@
 # Make
 
-[&#x2190; Release](release.md)
+[&#x2190; README](../README.md)
 
 The `Makefile` in the root of this project defines rules and targets to help with the necessary
 steps for building, signing, publishing and releasing the `dsh` tool.
@@ -189,4 +189,4 @@ this as follows:
 
 <img src="images/whats-your-sign.png" width="600" />
 
-[Release &#x2192;](release.md)
+[README &#x2192;](../README.md)
