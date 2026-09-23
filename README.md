@@ -45,7 +45,7 @@ directly from `crates.io`, by executing the following command:
 > cargo install dsh --locked
 ```
 
-This will install the `dsh` tool in `$HOME/.cargo/bin/dsh`.
+This will install the `dsh` tool in the directory `$HOME/.cargo/bin/dsh`.
 
 ## Next steps
 
