@@ -1,4 +1,3 @@
-use crate::bundle::csr::{CsrBuilder, KPN_DN_COUNTRY_NAME, KPN_DN_LOCALITY_NAME, KPN_DN_ORGANIZATION_NAME, KPN_DN_STATE_OR_PROVINCE_NAME};
 use crate::bundle::CertificateAuthority;
 use crate::context::Context;
 use crate::error::DshCliError;
@@ -11,10 +10,11 @@ use async_trait::async_trait;
 use dsh_api::platform::{DshPlatform, VhostZone};
 use itertools::Itertools;
 use log::debug;
-use rcgen::{CertificateSigningRequest, KeyUsagePurpose};
-use rock_api::client::{CertsParameter, PkiConnector, RockApiClient};
+use rcgen::CertificateSigningRequest;
+use rock_api::client::{PkiConnector, RockApiClient};
+use rock_api::csr::CsrBuilder;
 use rock_api::error::RockApiError;
-use rock_api::types::{Certificate, DomainList};
+use rock_api::types::{Certificate, CertsParameter, DomainList};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -98,20 +98,7 @@ impl CertificateAuthority for RockCertificateAuthority {
   ///
   /// The other parameters have their default values (`None` or empty).
   fn default_csr_builder(&self) -> DshCliResult<CsrBuilder> {
-    Ok(
-      CsrBuilder::default()
-        .country(KPN_DN_COUNTRY_NAME)
-        .key_usages(vec![
-          KeyUsagePurpose::DigitalSignature,
-          KeyUsagePurpose::KeyEncipherment,
-          KeyUsagePurpose::ContentCommitment,
-        ])
-        .locality(KPN_DN_LOCALITY_NAME)
-        .organization(KPN_DN_ORGANIZATION_NAME)
-        .rsa_key_size(self.pki_connector.recommended_rsa_key_size())
-        .signature_algorithm(self.pki_connector.recommended_signature_algorithm())
-        .state(KPN_DN_STATE_OR_PROVINCE_NAME),
-    )
+    Ok(CsrBuilder::default_kpn(PkiConnector::Internal))
   }
 
   async fn existing_certificate(&self, vhost_domain: &str, context: Option<(&Context, u64)>) -> DshCliResult<Option<String>> {

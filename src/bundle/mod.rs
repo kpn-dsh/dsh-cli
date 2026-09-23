@@ -1,11 +1,8 @@
 pub(crate) mod ca_signed;
-pub(crate) mod csr;
 pub(crate) mod proxy;
 pub(crate) mod rock_ca;
 pub(crate) mod self_signed;
 
-use crate::bundle::csr::CsrBuilder;
-use crate::bundle::rock_ca::RockCertificateAuthority;
 use crate::context::Context;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_CERTIFICATE_AUTHORITY};
 use crate::error::DshCliError;
@@ -17,6 +14,7 @@ use clap::ArgMatches;
 use log::debug;
 use rcgen::CertificateSigningRequest;
 use rock_api::client::{PkiConnector, RockApiClient};
+use rock_api::csr::CsrBuilder;
 use rock_api::error::RockApiError;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -121,6 +119,7 @@ pub(crate) trait CertificateAuthority {
 }
 
 #[derive(Default, Deserialize, clap::ValueEnum, Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub(crate) enum CertificateAuthorityId {
   #[clap(name = "kpn-ca")]
   #[default]
@@ -129,20 +128,14 @@ pub(crate) enum CertificateAuthorityId {
   RockKpnDigicRsdv,
 }
 
-impl From<CertificateAuthorityId> for PkiConnector {
-  fn from(id: CertificateAuthorityId) -> Self {
-    match id {
-      CertificateAuthorityId::RockKpnCa => PkiConnector::Internal,
-      CertificateAuthorityId::RockKpnDigicRsdv => PkiConnector::ExternalRsdv,
-    }
-  }
-}
-
 pub(crate) async fn create_certificate_authority(id: CertificateAuthorityId) -> DshCliResult<Box<dyn CertificateAuthority + Send + Sync>> {
   debug!("create certificate authority {}", id);
   match id {
     CertificateAuthorityId::RockKpnCa | CertificateAuthorityId::RockKpnDigicRsdv => match RockApiClient::header_based_from_auth_token_file() {
-      Ok(client) => RockCertificateAuthority::create(client, id.into()).await,
+      Ok(client) => match id {
+        CertificateAuthorityId::RockKpnCa => crate::bundle::rock_ca::RockCertificateAuthority::create(client, PkiConnector::Internal).await,
+        CertificateAuthorityId::RockKpnDigicRsdv => crate::bundle::rock_ca::RockCertificateAuthority::create(client, PkiConnector::ExternalRsdv).await,
+      },
       Err(rock_api_error) => {
         debug!("{}", rock_api_error);
         match &rock_api_error {
