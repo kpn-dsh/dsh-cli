@@ -18,19 +18,22 @@ All notable changes to the `dsh` tool project will be documented in this file.
     * Proxy example code generation for JavaScript.
     * List _RoCK API_ certificates.
     * List _RoCK API_ domains.
+    * Setting and environment variable to configure vhost zone.
+    * Setting and environment variable to configure certificate authority.
 * Pre-built Linux versions on GitHub releases page.
 * Added `Makefile`.
 * Improved `vhost` list and show capabilities.
 * Added `vhost` open capability.
-* Setting and environment variable to configure vhost zone.
 
 ### Changed
 
+* Removed separate features. All capabilities will now be included.
 * Shortcut `s` is now an alias for subject `secret` (was `service`).
 * Some filenames for generated code examples.
 * Added warning with managed tenants creation.
 * Added certificate type and dns names to certificate listing.
 * Secret that contain multiple certificates properly shown.
+* Check that acl groups and schema store cannot be enabled at the same time.
 
 ### Fixes
 
