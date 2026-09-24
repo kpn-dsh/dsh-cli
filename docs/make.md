@@ -3,7 +3,25 @@
 [&#x2190; README](../README.md)
 
 The `Makefile` in the root of this project defines rules and targets to help with the necessary
-steps for building, signing, publishing and releasing the `dsh` tool.
+steps for building, signing, publishing and releasing the `dsh` tool. Type `make` for a complete
+list of all targets.
+
+```shell
+> make
+Targets:
+  build           Builds macos and linux binaries.
+  build-linux     Builds linux binaries.
+  build-macos     Builds macos binaries.
+  check           Check if project is ready to be released.
+  help            Displays this help text.
+  codesign        Run macOS code signing.
+  codesign-check  Check macOS code signing.
+  notarize        Run macOS code notarize (requires password=APP_SPECIFIC_PASSWORD).
+  notarize-check  Check macOS code notarizing.
+  notarize-poll   Poll macOS code notarize (requires password=APP_SPECIFIC_PASSWORD and session=NOTARY_SESSION_ID).
+  publish         Publish crates to cargo.io.
+  release         Create GitHub release.
+```
 
 ## Prerequisites
 
@@ -73,9 +91,7 @@ Before pushing code to `GitHub`, make sure that you adhere to the code formattin
 The following commands should return without any remarks:
 
 ```shell
-> cargo +nightly fmt --check
-> cargo clippy
-> cargo deny check licenses
+> make check
 ```
 
 ## Steps
@@ -83,7 +99,6 @@ The following commands should return without any remarks:
 Build the tool with the following command:
 
 ```shell
-> make check
 > make build
 ```
 

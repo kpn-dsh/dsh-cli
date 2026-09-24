@@ -38,11 +38,16 @@ The installation for macOS and Linux is the same:
 
 ### Cargo install
 
-If you have the Rust tool-chain installed, the `dsh` tool can be installed on your local machine
-directly from `crates.io`, by executing the following command:
+Older versions of the `dsh` tool could be installed directly from `crates.io`, but since the
+current version has a dependency on the `rock_api` crate which is on KPN `artifactory`, this is
+currently not possible. However, if you have access to `artifactory` and you have the Rust
+tool-chain installed, the `dsh` tool can be installed from `GitHub`, by executing the following
+commands:
 
 ```shell
-> cargo install dsh --locked
+> git clone git@github.com:kpn-dsh/dsh-cli.git
+> mv dsh-cli
+> cargo install --path .
 ```
 
 This will install the `dsh` tool in the directory `$HOME/.cargo/bin/dsh`.
