@@ -4,7 +4,7 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.10.1] - YYYY-MM-DD
+## [0.10.1] - 2026-09-24
 
 ### Added
 
