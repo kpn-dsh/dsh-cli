@@ -62,7 +62,7 @@ impl Subject for ManifestSubject {
 }
 
 lazy_static! {
-  static ref MANIFEST_EXPLAIN_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_EXPLAIN_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EXPLAIN_COMMAND, None, &ManifestExplain {}, "Explain manifest configuration")
       .set_long_about(
         "Explains the app catalog manifest, including the short and long description \
@@ -72,7 +72,7 @@ lazy_static! {
       .add_target_argument(manifest_id_argument().required(true))
       .add_target_argument(manifest_version_argument())
   );
-  static ref MANIFEST_EXPORT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_EXPORT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(EXPORT_COMMAND, None, &ManifestExport {}, "Export manifest")
       .set_long_about(
         "Exports the app catalog manifest file. When the <VERSION> argument is not provided the \
@@ -81,7 +81,7 @@ lazy_static! {
       .add_target_argument(manifest_id_argument().required(true))
       .add_target_argument(manifest_version_argument())
   );
-  static ref MANIFEST_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &ManifestListLatest {}, "List manifests")
       .set_long_about(
         "Lists all manifest files from the app catalog. Only the latest final versions are \
@@ -97,7 +97,7 @@ lazy_static! {
       .add_command_executor(FlagType::Ids, &ManifestListIds {}, Some("List only the manifest identifiers.".to_string()))
       .add_filter_flag(FilterFlagType::Draft, Some("Include draft versions of the manifests.".to_string()))
   );
-  static ref MANIFEST_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref MANIFEST_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &ManifestShow {}, "Show manifest configuration")
       .set_long_about(
         "Shows parameters in the app catalog manifest like name, description, \
@@ -462,7 +462,7 @@ impl SubjectFormatter<PropertyLabel> for Property {
     match label {
       PropertyLabel::Default => match self.kind {
         PropertyKind::DnsZone => Value::plain("private"),
-        PropertyKind::Number => Value::some_or(self.default.clone(), "mandatory"),
+        PropertyKind::Number => Value::some_or(self.default.clone(), Value::warn("mandatory")),
         PropertyKind::String => Value::plain(match &self.default {
           Some(default_value) => {
             if self.enumeration.is_some() {
@@ -564,8 +564,8 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
     }
     Resource::Bucket { bucket } => {
       let mut strings = vec![];
-      strings.push(format!("encrypted: {}", &bucket.encrypted));
-      strings.push(format!("versioned: {}", &bucket.versioned));
+      strings.push(format!("encrypted: {}", bucket.encrypted));
+      strings.push(format!("versioned: {}", bucket.versioned));
       strings
     }
     Resource::Certificate { certificate } => vec![certificate.unformatted_representation.to_string()],
@@ -574,7 +574,7 @@ fn resource_to_strings(resource: &Resource) -> Vec<String> {
       strings.push(format!("cpus: {}", database.cpus));
       strings.push(format!("mem: {}", database.mem));
       strings.push(format!("instances: {}", database.instances));
-      strings.push(format!("version: {}", &database.version));
+      strings.push(format!("version: {}", database.version));
       strings.push(format!("extensions: {}", database.extensions.join(", ")));
       strings.push(format!("snapshot interval: {}", database.snapshot_interval));
       strings.push(format!("volume size: {}", database.volume_size));

@@ -1,6 +1,6 @@
 # Codesign and notarize for macOS
 
-[&#x2190; Release](release.md)
+[&#x2190; README](../README.md)
 
 On devices with macOS 10.15 or higher all apps distributed outside the App Store must be signed
 by the developer using an Apple-issued Developer ID certificate and notarised by Apple to run
@@ -30,9 +30,6 @@ following pages:
 
 This explanation assumes that you already built the `dsh` tool for release and that the generated
 macOS compatible binary is in the file system at `target/release/dsh`.
-When a release consists of multiple binaries (e.g. a version with the `manage` feature
-enabled and a version without that feature), the steps described below must be executed for
-each version.
 
 ### KPN Developer Certificate and Team
 
@@ -83,16 +80,12 @@ them in your CI/CD pipeline.
 
 ### Build
 
-The first step is to build the release version of the tool. Here you have to decide which features
-you want to be enabled (`manage` and/or `robot`). For this document we will build a version with
-all features enabled. Note that if you want to build multiple versions for different feature sets,
-you have to rename the created binaries between the different builds and execute the steps in the
-rest of this text once for each binary.
+The first step is to build the release version of the tool.
 
 Build the tool with the following command:
 
 ```shell
-> cargo build --release --all-features
+> cargo build --release
 ```
 
 The build step will result in a binary file (`target/release/dsh`).
@@ -201,4 +194,4 @@ this as follows:
 
 <img src="images/whats-your-sign.png" width="600" />
 
-[Release &#x2192;](release.md)
+[README &#x2192;](../README.md)

@@ -28,12 +28,15 @@ dcli> export DSH_CLI_TENANT=my-tenant
 
 ## Create a proxy certificate bundle
 
-The first step is to create a so-called proxy certificate bundle, which contains all the settings
-and the certificates and public/private key pairs. In a real situation the certificates
+The first step is to create a so-called proxy certificate bundle, which contains all the settings,
+certificates and public/private key pairs. In a real situation the certificates
 should be signed as an Organization Validated (OV) certificate or an Extended Validation (EV)
-certificate, but the current version of the `dsh` tool does not support this yet.
+certificate.
 
-For the example we will use a self-signed ca certificate and the following settings:
+Here we will use a self-signed ca certificate. See [Certificate signing](certificate-signing.md)
+how to use signed certificates.
+
+For the example we will use the following settings:
 
 * proxy name: `my-proxy`
 * ACL groups: not enabled
@@ -46,10 +49,10 @@ this and let the tool prompt us for them. Since we will use all default values, 
 press the enter-key after each prompt.
 
 ```shell
-> dsh proxy create my-proxy
-create proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
-enable acl groups? [y/N]
+> dsh proxy create my-proxy --self-signed
 certificate authority common name [username]:
+create self-signed proxy certificates bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
+vhost zone [PRIVATE/public]:
 enable schema store? [y/N]
 vhost zone [PRIVATE/public]:
 ┌────────────────┬─────────────────────────┐
@@ -58,14 +61,14 @@ vhost zone [PRIVATE/public]:
 │ platform       │ np-aws-lz-dsh           │
 │ tenant         │ my-tenant               │
 │ proxy name     │ my-proxy                │
-│ group id       │ my-tenant_my-proxy_1 │
+│ group id       │ my-tenant_my-proxy_1    │
 │ ca common name │ username                │
 │ schema store   │ disabled                │
 │ vhost zone     │ private                 │
 │ records        │ 10                      │
 └────────────────┴─────────────────────────┘
 ...
-proxy certificates bundle 'my-proxy' stored in directory '/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy'
+self-signed proxy certificates bundle 'my-proxy' stored in directory '/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy'
 ```
 
 After a few seconds an overview of the created configuration, certificates and keys will be
@@ -151,9 +154,9 @@ If you are curious, you can also check the installed certificate and secrets:
 
 Now that we have a running proxy, we want to use it to connect to a Kafka cluster on the DSH
 platform. The easiest way to do this is to let the `dsh` tool create a code example and run it.
-At this time code examples can be generated for the `Python` and `Rust` programming languages.
-The next version of the tool will support more languages (`Go`, `Java`, `Javascript/Typescript`
-and `Scala` are on the roadmap).
+At this time code examples can be generated for the `JavaScript`, `Python` and `Rust` programming
+languages. The next version of the tool will support more languages (`Go`, `Java`, `Scala` and
+`TypeScript` are on the roadmap).
 
 For each supported programming language there are (will be) three different examples generated:
 
@@ -161,7 +164,7 @@ For each supported programming language there are (will be) three different exam
   <dt><code>consumer</code></dt>
   <dd>Will create a client that connects to the Kafka cluster as a consumer, subscribes
   to a topic and prints the keys of the records that it receives from the topic.</dd>
-  <dt><code>list-topic</code></dt>
+  <dt><code>list-topics</code></dt>
   <dd>Will will create a client that connects to the Kafka cluster as an admin or consumer and 
   lists all topics that the client can read from.</dd>
   <dt><code>producer</code></dt>
@@ -169,10 +172,33 @@ For each supported programming language there are (will be) three different exam
   record to a topic each second, with the timestamp as record key.</dd>
 </dl>
 
-Select one of the supported programming language to generate code examples:
+Select one of the supported programming languages to generate code examples:
 
-* [Python code example](code-examples/python.md)
-* [Rust code example](code-examples/rust.md)
+* [`JavaScript` code example](code-examples/javascript.md)
+* [`JSON` containing Kafka client properties](code-examples/kafka-client-json.md)
+* [`Python` code example](code-examples/python.md)
+* [`Rust` code example](code-examples/rust.md)
+
+If you're favorite programming language is not available or if you prefer to write your own code
+you can list the required Kafka client properties by typing:
+
+```shell
+> dsh proxy code my-proxy --configuration
+listing Kafka client property values for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
+┌─────────────────────────┬───────────────────────────────────────────────────────────────────────────┐
+│ target id               │ my-proxy                                                                  │
+├─────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+│ client id               │ my-tenant                                                                 │
+│ group id                │ my-tenant_my-proxy_1                                                      │
+│ bundle directory        │ /Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy │
+│ ca certificate file     │ ca.pem                                                                    │
+│ client certificate file │ client.pem                                                                │
+│ client key file         │ client.key                                                                │
+│ brokers                 │ my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091                │
+│                         │ my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091                │
+│                         │ my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091                │
+└─────────────────────────┴───────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Proxy with ACL groups
 
@@ -224,31 +250,31 @@ list all proxy acl groups
 ```
 
 Next we need to grant read and write access to the topic we want to access. Again we will use the
-topic `scratch.example.my-tenant`. In the `aclgroup grant` command we only have to provide the
+topic `scratch.my-topic.my-tenant`. In the `aclgroup grant` command we only have to provide the
 topic name. The `scratch` part and the tenant name are implicit if we use the `--read-topic`
 or `--write-topic` grant command.
 
 ```shell
-> dsh aclgroup grant my-aclgroup --read-topic example
+> dsh aclgroup grant my-aclgroup --read-topic my-topic
 ...
-> dsh aclgroup grant my-aclgroup --write-topic example
+> dsh aclgroup grant my-aclgroup --write-topic my-topic
 ...
 > dsh aclgroups
 list all proxy acl groups
-┌─────────────┬─────────┬───────┬──────────┬──────────┐
-│ acl group   │ stream  │ kind  │ readable │ writable │
-├─────────────┼─────────┼───────┼──────────┼──────────┤
-│ my-aclgroup │ example │ topic │ true     │ true     │
-└─────────────┴─────────┴───────┴──────────┴──────────┘
+┌─────────────┬──────────┬───────┬──────────┬──────────┐
+│ acl group   │ stream   │ kind  │ readable │ writable │
+├─────────────┼──────────┼───────┼──────────┼──────────┤
+│ my-aclgroup │ my-topic │ topic │ true     │ true     │
+└─────────────┴──────────┴───────┴──────────┴──────────┘
 ```
 
 We now have an ACL group called `my-aclgroup` which grants read and write access to the topic
-`scratch.example.my-topic`. If we list the topics to which we have read access again, we can see
+`scratch.my-topic.my-tenant`. If we list the topics to which we have read access again, we can see
 that we succeeded.
 
 ```shell
 (.venv) my-acl-proxy-example-python> python my-acl-proxy-list-topics.py
-scratch.example.greenbox-dev (1)
+scratch.my-topic.my-tenant
 ```
 
 [Platforms specification &#x2192;](platforms-specification.md)

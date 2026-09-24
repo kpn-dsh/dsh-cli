@@ -17,6 +17,7 @@ pub(crate) enum DshCliError {
   Keyring(String),
   Rcgen(String),
   Reqwest(String),
+  RockApi(String),
   SerdeJson(String),
   String(String),
   Time(String),
@@ -150,9 +151,10 @@ impl Debug for DshCliError {
       Self::DshApi(message) => write!(f, "DshCliError(dsh api, {})", message),
       Self::Home(message) => write!(f, "DshCliError(home, {})", message),
       Self::Io(message) => write!(f, "DshCliError(io, {})", message),
-      Self::Keyring(message) => write!(f, "DshCliError(ikeyring, {})", message),
+      Self::Keyring(message) => write!(f, "DshCliError(keyring, {})", message),
       Self::Rcgen(message) => write!(f, "DshCliError(rcgen, {})", message),
       Self::Reqwest(message) => write!(f, "DshCliError(reqwest, {})", message),
+      Self::RockApi(message) => write!(f, "DshCliError(rockapi, {})", message),
       Self::SerdeJson(message) => write!(f, "DshCliError(json, {})", message),
       Self::String(message) => write!(f, "DshCliError({})", message),
       Self::Time(message) => write!(f, "DshCliError(time, {})", message),
@@ -181,6 +183,7 @@ impl Display for DshCliError {
       Self::Keyring(message) => write!(f, "{}", message),
       Self::Rcgen(message) => write!(f, "{}", message),
       Self::Reqwest(message) => write!(f, "{}", message),
+      Self::RockApi(message) => write!(f, "{}", message),
       Self::SerdeJson(message) => write!(f, "{}", message),
       Self::String(message) => write!(f, "{}", message),
       Self::Time(message) => write!(f, "{}", message),
@@ -239,6 +242,12 @@ impl From<keyring::Error> for DshCliError {
 impl From<openidconnect::reqwest::Error> for DshCliError {
   fn from(reqwest_error: openidconnect::reqwest::Error) -> Self {
     Self::Reqwest(reqwest_error.to_string())
+  }
+}
+
+impl From<rock_api::error::RockApiError> for DshCliError {
+  fn from(rockapi_error: rock_api::error::RockApiError) -> Self {
+    Self::RockApi(rockapi_error.to_string())
   }
 }
 

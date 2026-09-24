@@ -247,14 +247,3 @@ impl SubjectFormatter<IssueLabel> for Issue {
     }
   }
 }
-
-const _ALL_ISSUE_LABELS: [IssueLabel; 8] = [
-  IssueLabel::Target,
-  IssueLabel::IssueKind,
-  IssueLabel::IssueDetails,
-  IssueLabel::SubjectKind,
-  IssueLabel::SubjectDescription,
-  IssueLabel::DependencyName,
-  IssueLabel::DependencySubject,
-  IssueLabel::DependencyValue,
-];

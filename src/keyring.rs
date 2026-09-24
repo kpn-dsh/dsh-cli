@@ -318,14 +318,9 @@ fn get_keyring_entry() -> DshCliResult<Option<KeyringEntry>> {
         debug!("entry for dsh tool not found in keyring");
         Ok(None)
       }
-      keyring::Error::PlatformFailure(error) => {
-        if error.to_string() == "User canceled the operation." {
-          debug!("user cancelled keyring authentication");
-          Err(DshCliError::Canceled)
-        } else {
-          error!("keyring returned an error while reading entry ({})", keyring_error);
-          Err(DshCliError::from(keyring_error))
-        }
+      keyring::Error::PlatformFailure(error) if error.to_string() == "User canceled the operation." => {
+        debug!("user cancelled keyring authentication");
+        Err(DshCliError::Canceled)
       }
       _ => {
         error!("keyring returned an error while reading entry ({})", keyring_error);

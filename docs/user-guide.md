@@ -19,8 +19,8 @@ Subjects/commands:
   certificate  Show, manage and list DSH certificates.
   env          Find values used in configurations.
   image        Show image usage.
-  login        Login via single-sign-on
-  logout       Logout from single-sign-on
+  login        Login via single-sign-on.
+  logout       Logout from single-sign-on.
   manifest     Show App Catalog manifests.
   metric       Show metric exports.
   nodepool     Show node pool resources.

@@ -1,14 +1,15 @@
-use crate::err;
 use crate::error::DshCliError;
+use crate::{err, DshCliResult};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(clap::ValueEnum, Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub(crate) enum DshColor {
   /// Displayed in the default terminal color
   #[serde(rename = "normal")]
+  #[default]
   Normal,
   #[serde(rename = "black")]
   Black,
@@ -26,12 +27,6 @@ pub(crate) enum DshColor {
   Yellow,
   #[serde(rename = "white")]
   White,
-}
-
-impl Default for DshColor {
-  fn default() -> Self {
-    Self::Normal
-  }
 }
 
 impl Display for DshColor {
@@ -53,7 +48,7 @@ impl Display for DshColor {
 impl TryFrom<&str> for DshColor {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "normal" => Ok(Self::Normal),
       "black" => Ok(Self::Black),
@@ -69,10 +64,11 @@ impl TryFrom<&str> for DshColor {
   }
 }
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(clap::ValueEnum, Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub(crate) enum DshStyle {
   /// Default terminal font
   #[serde(rename = "normal")]
+  #[default]
   Normal,
   #[serde(rename = "bold")]
   Bold,
@@ -84,12 +80,6 @@ pub(crate) enum DshStyle {
   Underline,
   #[serde(rename = "reverse")]
   Reverse,
-}
-
-impl Default for DshStyle {
-  fn default() -> Self {
-    Self::Normal
-  }
 }
 
 impl Display for DshStyle {
@@ -108,7 +98,7 @@ impl Display for DshStyle {
 impl TryFrom<&str> for DshStyle {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "normal" => Ok(Self::Normal),
       "bold" => Ok(Self::Bold),

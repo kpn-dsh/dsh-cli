@@ -1,12 +1,13 @@
-use crate::err;
 use crate::error::DshCliError;
+use crate::{err, DshCliResult};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(clap::ValueEnum, Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(clap::ValueEnum, Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum Verbosity {
   /// No logging will be printed
   #[serde(rename = "off")]
+  #[default]
   Off = 1,
   /// Lowest verbosity level, only error messages will be printed
   #[serde(rename = "low")]
@@ -19,16 +20,10 @@ pub(crate) enum Verbosity {
   High = 4,
 }
 
-impl Default for Verbosity {
-  fn default() -> Self {
-    Self::Off
-  }
-}
-
 impl TryFrom<&str> for Verbosity {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "off" => Ok(Self::Off),
       "low" => Ok(Self::Low),

@@ -1,19 +1,21 @@
 use crate::capability::CommandExecutor;
 use crate::context::Context;
-use crate::directory::{proxy_certificate_bundle_exists, read_proxy_certificate_bundle};
+use crate::directory::{certificate_bundle_exists, read_proxy_certificate_bundle, BundleKind};
 use crate::error::DshCliError;
 use crate::formatters::ids_formatter::IdsFormatter;
 use crate::formatters::list_formatter::ListFormatter;
 use crate::formatters::unit_formatter::UnitFormatter;
 use crate::formatters::OutputFormat;
 use crate::global_options::get_expiration_days;
-use crate::secret_metadata::{secret_metadata, SecretMetadata};
+use crate::secret_metadata::SecretMetadata;
 use crate::subject::Requirements;
-use crate::subjects::certificate::{CertificateLabel, CERTIFICATE_LABELS_SHOW};
+use crate::subjects::certificate::capabilities::CERTIFICATE_LABELS_SHOW;
+use crate::subjects::certificate::labels::CertificateLabel;
 use crate::subjects::proxy::labels::KafkaProxyLabel;
 use crate::subjects::proxy::PROXY_SUBJECT_TARGET;
-use crate::subjects::secret::SecretLabel;
-use crate::subjects::service::{CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
+use crate::subjects::secret::capabilities::{print_certificate_secret, print_key_secret};
+use crate::subjects::secret::labels::SecretLabel;
+use crate::subjects::service::capabilities::{CPUS_OPTION, INSTANCES_OPTION, MEM_OPTION};
 use crate::target_platform::get_target_platform;
 use crate::target_tenant::get_target_tenant;
 use crate::{cli_error, err, DshCliResult};
@@ -33,18 +35,7 @@ use tokio::time::sleep;
 static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 4] =
   [CertificateLabel::Target, CertificateLabel::CertChainSecret, CertificateLabel::KeySecret, CertificateLabel::PassphraseSecret];
 
-static SECRET_LABELS_SHOW: [SecretLabel; 10] = [
-  SecretLabel::SecretName,
-  SecretLabel::Kind,
-  SecretLabel::FormatKind,
-  SecretLabel::Size,
-  SecretLabel::Description,
-  SecretLabel::NotBefore,
-  SecretLabel::NotAfter,
-  SecretLabel::Subject,
-  SecretLabel::Issuer,
-  SecretLabel::SerialNumber,
-];
+static SECRET_LABELS_SHOW: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::Format, SecretLabel::Size, SecretLabel::Description];
 
 static PROXY_LABELS_SHOW: [KafkaProxyLabel; 11] = [
   KafkaProxyLabel::Target,
@@ -72,14 +63,14 @@ impl CommandExecutor for ProxyDeploy {
     if client.get_kafkaproxy_configuration(&proxy_bundle_id).await.is_ok() {
       return err!("proxy '{}' already exists", proxy_bundle_id);
     }
-    if !proxy_certificate_bundle_exists(&platform, &tenant, &proxy_bundle_id)? {
+    if !certificate_bundle_exists(&platform, &tenant, BundleKind::Proxy, &proxy_bundle_id)? {
       return err!("proxy certificate bundle '{}' does not exist", proxy_bundle_id);
     }
 
-    let proxy_certificate_name = format!("{}-certificate", proxy_bundle_id);
-    let proxy_ca_certificate_secret_name = format!("{}-ca-certificate", proxy_bundle_id);
-    let proxy_private_key_secret_name = format!("{}-private-key", proxy_bundle_id);
-    let proxy_server_certificate_secret_name = format!("{}-server-certificate", proxy_bundle_id);
+    let proxy_certificate_name = format!("{}-cert", proxy_bundle_id);
+    let proxy_ca_certificate_secret_name = format!("{}-ca-cert", proxy_bundle_id);
+    let proxy_private_key_secret_name = format!("{}-key", proxy_bundle_id);
+    let proxy_server_certificate_secret_name = format!("{}-server-cert", proxy_bundle_id);
 
     let (proxy_certificate_result, ca_secret_result, key_secret_result, cert_secret_result) = join!(
       client.get_certificate(&proxy_certificate_name),
@@ -144,9 +135,9 @@ impl CommandExecutor for ProxyDeploy {
 
     UnitFormatter::new(&proxy_bundle_id, &PROXY_LABELS_SHOW, context).print(&kafka_proxy, None)?;
     UnitFormatter::new(&proxy_certificate_name, &GENERATED_CERTIFICATE_LABELS, context).print(&certificate_body, None)?;
-    UnitFormatter::new(&proxy_ca_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_ca_certificate), None), None)?;
-    UnitFormatter::new(&proxy_server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_server_certificate), None), None)?;
-    UnitFormatter::new(&proxy_private_key_secret_name, &SECRET_LABELS_SHOW, context).print(&(secret_metadata(&proxy_private_key), None), None)?;
+    UnitFormatter::new(&proxy_ca_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&SecretMetadata::from(proxy_ca_certificate.as_str()), None)?;
+    UnitFormatter::new(&proxy_server_certificate_secret_name, &SECRET_LABELS_SHOW, context).print(&SecretMetadata::from(proxy_server_certificate.as_str()), None)?;
+    UnitFormatter::new(&proxy_private_key_secret_name, &SECRET_LABELS_SHOW, context).print(&SecretMetadata::from(proxy_private_key.as_str()), None)?;
 
     if !context.confirmed(format!("deploy proxy '{}'?", proxy_bundle_id))? {
       return err!("cancelled, proxy '{}' not deployed", proxy_bundle_id);
@@ -163,9 +154,9 @@ impl CommandExecutor for ProxyDeploy {
         client.post_secret(&private_key_secret),
         client.post_secret(&ca_certificate_secret),
       );
-      context.print_outcome(format!("server certificate secret '{}' created", &server_certificate_secret));
-      context.print_outcome(format!("private key secret '{}' created", &private_key_secret));
-      context.print_outcome(format!("ca certificate secret '{}' created", &ca_certificate_secret));
+      context.print_outcome(format!("server certificate secret '{}' created", server_certificate_secret));
+      context.print_outcome(format!("private key secret '{}' created", private_key_secret));
+      context.print_outcome(format!("ca certificate secret '{}' created", ca_certificate_secret));
 
       if let Err(error) = cert_secret_result {
         context.print_error(format!("error writing certificate secret '{}' ({})", proxy_server_certificate_secret_name, error));
@@ -181,7 +172,7 @@ impl CommandExecutor for ProxyDeploy {
         .put_certificate_configuration(&proxy_certificate_name, &certificate_body)
         .await
         .map_err(|error| cli_error!("error writing certificate configuration '{}' ({})", proxy_certificate_name, error))?;
-      context.print_outcome(format!("certificate '{}' created", &proxy_certificate_name));
+      context.print_outcome(format!("certificate '{}' created", proxy_certificate_name));
 
       client
         .put_kafkaproxy_configuration(&proxy_bundle_id, &kafka_proxy)
@@ -250,9 +241,6 @@ impl CommandExecutor for ProxyListIds {
   }
 }
 
-pub(crate) static SECRET_LABELS_LIST: [SecretLabel; 6] =
-  [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::FormatKind, SecretLabel::Size, SecretLabel::Description, SecretLabel::NotAfter];
-
 pub(crate) struct ProxyShow {}
 
 #[async_trait]
@@ -265,32 +253,28 @@ impl CommandExecutor for ProxyShow {
     match proxy {
       Ok(proxy) => {
         let certificate_status = client.get_certificate(&proxy.certificate).await?;
+
         context.print_allocation_status(&allocation_status, PROXY_SUBJECT_TARGET);
         UnitFormatter::new(proxy_id, &PROXY_LABELS_SHOW, context).print(&proxy, None)?;
-        let mut secret_names: Vec<String> = vec![proxy.secret_name_ca_chain];
+
         if let Some(actual_certificate) = &certificate_status.actual {
-          UnitFormatter::new(proxy.certificate, &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days)), None)?;
-          secret_names.push(actual_certificate.key_secret.clone());
-          secret_names.push(actual_certificate.cert_chain_secret.clone());
-          if let Some(passphrase_secret) = &actual_certificate.passphrase_secret {
-            secret_names.push(passphrase_secret.clone());
-          }
+          let validated_dns = actual_certificate
+            .dns_names
+            .first()
+            .and_then(|first_dns| client.platform().validate_vhost_domain(first_dns).ok());
+          context.print_explanation(format!("certificate '{}'", proxy.certificate));
+          UnitFormatter::new(proxy.certificate.clone(), &CERTIFICATE_LABELS_SHOW, context).print(&(actual_certificate, Some(expiration_days), validated_dns), None)?;
         }
-        secret_names.sort();
-        let secrets = try_join_all(secret_names.iter().map(|secret_id| client.secret_with_status(secret_id))).await?;
-        let mut formatter = ListFormatter::new(&SECRET_LABELS_LIST, context);
-        for (secret_name, (secret_value, _)) in secret_names.iter().zip(&secrets) {
-          formatter.push_target_id_value_owned(secret_name.clone(), (secret_metadata(secret_value), Some(expiration_days)));
-        }
-        formatter.print(None)?;
-        for (secret_name, (secret_value, allocation_status)) in secret_names.iter().zip(secrets) {
-          let secret_metadata = secret_metadata(&secret_value);
-          match secret_metadata {
-            SecretMetadata::Certificate { .. } | SecretMetadata::Pki { .. } => {
-              UnitFormatter::new(secret_name, &SECRET_LABELS_SHOW, context).print(&(None, secret_metadata, Some(expiration_days), Some(allocation_status)), None)?
-            }
-            _ => {}
-          }
+
+        if let Some(actual_certificate) = &certificate_status.actual {
+          context.print_explanation(format!("ca certificate secret '{}'", proxy.secret_name_ca_chain));
+          print_certificate_secret(proxy.secret_name_ca_chain.as_str(), expiration_days, client, context).await?;
+
+          context.print_explanation(format!("cert chain secret '{}'", actual_certificate.cert_chain_secret));
+          print_certificate_secret(actual_certificate.cert_chain_secret.as_str(), expiration_days, client, context).await?;
+
+          context.print_explanation(format!("key secret '{}'", actual_certificate.key_secret));
+          print_key_secret(actual_certificate.key_secret.as_str(), client, context).await?;
         }
         Ok(())
       }
@@ -327,7 +311,7 @@ impl CommandExecutor for ProxyUndeploy {
       } else {
         client.delete_kafkaproxy_configuration(&proxy_id).await?;
         context.print_outcome(format!("proxy '{}' undeployed", proxy_id));
-        if context.confirmed(format!("delete certificate '{}'?", &kafka_proxy.certificate))? {
+        if context.confirmed(format!("delete certificate '{}'?", kafka_proxy.certificate))? {
           if context.dry_run() {
             context.print_warning("dry-run mode, certificate not deleted");
           } else {
@@ -342,7 +326,7 @@ impl CommandExecutor for ProxyUndeploy {
             }
             context.print_error("");
             client.delete_certificate_configuration(&kafka_proxy.certificate).await?;
-            context.print_outcome(format!("certificate '{}' deleted", &kafka_proxy.certificate));
+            context.print_outcome(format!("certificate '{}' deleted", kafka_proxy.certificate));
             if context.confirmed(format!(
               "delete secrets {}?",
               certificate_secrets.iter().map(|secret| format!("'{}'", secret)).join(", ")
@@ -362,7 +346,7 @@ impl CommandExecutor for ProxyUndeploy {
                 context.print_error("");
                 for secret in certificate_secrets {
                   client.delete_secret_configuration(&secret).await?;
-                  context.print_outcome(format!("secret '{}' deleted", &secret));
+                  context.print_outcome(format!("secret '{}' deleted", secret));
                 }
               }
             }

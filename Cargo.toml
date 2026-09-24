@@ -10,7 +10,7 @@ license = "Apache-2.0"
 readme = "docs/README_CRATES_IO.md"
 repository = "https://github.com/kpn-dsh/dsh-cli"
 rust-version = "1.87"
-version = "0.10.0"
+version = "0.10.1"
 
 [lints.clippy]
 manual_range_contains = "allow"
@@ -19,10 +19,6 @@ uninlined_format_args = "allow"
 
 [profile.release]
 opt-level = "s"
-
-[features]
-manage = ["dsh_api/manage"]
-robot = ["dsh_api/robot"]
 
 [dependencies]
 aes-gcm = { version = "0.10" }
@@ -62,7 +58,13 @@ pkcs1 = { version = "0.7", features = ["pem"] }
 pkcs8 = { version = "0.10", features = ["pem"] }
 x509-cert = { version = "0.2", features = ["pem"] }
 
-dsh_api = { version = "0.10.0", path = "../dsh-api/dsh-api", features = ["generic"] }
+dsh_api = { version = "0.11.0", features = ["generic", "manage", "robot"] }
+#dsh_api = { version = "0.11.0", git = "ssh://git@github.com/kpn-dsh/dsh-api.git", branch = "0.10.1", features = ["generic", "manage", "robot"] }
+#dsh_api = { version = "0.11.0", path = "../dsh-api/dsh-api", features = ["generic", "manage", "robot"] }
+
+rock_api = { version = "0.1.0", features = ["log", "rcgen"], registry = "artifactory" }
+#rock_api = { version = "0.1.0", git = "ssh://git@github.com/kpn-dsh/rock-api-rs.git", features = ["log", "rcgen"] }
+#rock_api = { version = "0.1.0", path = "../../kpn/rock-api-rs", features = ["log", "rcgen"] }
 
 [dev-dependencies]
 rdkafka = { version = "0.39", features = ["ssl-vendored"] }

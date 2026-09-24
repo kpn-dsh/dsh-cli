@@ -27,10 +27,11 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use tokio::task::spawn_blocking;
 
-#[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
+#[derive(clap::ValueEnum, Eq, Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) enum AuthenticationMethod {
   /// Use the robot account to authenticate and authorize
   #[serde(rename = "robot")]
+  #[default]
   Robot,
   /// Use single-sign-on to authenticate and authorize
   #[serde(rename = "sso")]
@@ -41,7 +42,7 @@ pub(crate) enum AuthenticationMethod {
 impl TryFrom<&str> for AuthenticationMethod {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "robot" => Ok(Self::Robot),
       "sso" | "single-sign-on" => Ok(Self::SingleSignOn),
@@ -59,12 +60,6 @@ impl Display for AuthenticationMethod {
   }
 }
 
-impl Default for AuthenticationMethod {
-  fn default() -> Self {
-    Self::Robot
-  }
-}
-
 /// Get access token using stored refresh token
 ///
 /// ## Parameters
@@ -78,7 +73,7 @@ pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Opti
     let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string())?;
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
     let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
-    debug!("provider metadata read from '{}'", &issuer_url);
+    debug!("provider metadata read from '{}'", issuer_url);
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
         let access_token_jwt = DshJwt::from_str(access_token.secret())?;
@@ -104,6 +99,7 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
   spawn_blocking(move || {
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
     let provider_metadata: DeviceProviderMetadata = DeviceProviderMetadata::discover(&issuer_url, &http_client)?;
+    debug!("provider metadata read from '{}'", issuer_url);
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
         let access_token_jwt = DshJwt::from_str(access_token.secret())?;
@@ -189,7 +185,7 @@ fn print_authorizations(context: &Context, access_token_jwt: &DshJwt) {
 /// * `DshJwt` - Permissions for this authentication.
 pub(crate) async fn get_access_tokens() -> DshCliResult<Vec<(DshPlatform, DshJwt)>> {
   try_join_all(
-    DshPlatform::all()
+    DshPlatform::all()?
       .iter()
       .map(|platform| get_access_token(platform.clone()).map(|access_token| access_token.map(|jwt| (platform.clone(), jwt)))),
   )
@@ -231,6 +227,7 @@ fn get_access_token_from_stored_refresh_token(
     Some(stored_refresh_token) => {
       let refresh_jwt = DshJwt::from_str(stored_refresh_token.secret())?;
       if refresh_jwt.expired().is_some_and(|expired| expired) {
+        trace!("refresh token is expired and will be deleted");
         delete_refresh_token(platform)?;
         Ok(None)
       } else {
@@ -243,8 +240,8 @@ fn get_access_token_from_stored_refresh_token(
             Ok(Some(access_token))
           }
           None => {
+            trace!("access and refresh token could not be exchanged and will be deleted");
             delete_refresh_token(platform)?;
-
             Ok(None)
           }
         }
@@ -316,6 +313,7 @@ fn authenticate_and_get_access_and_refresh_tokens(
     .add_scope(Scope::new("openid".to_string()))
     .add_scope(Scope::new(format!("manage:{}", platform.realm())))
     .add_scope(Scope::new("dsh_perms".to_string()));
+  trace!("device authorization request -> {:#?}", device_authorization_request);
   match device_authorization_request.request(http_client) {
     Ok(device_authorization_response) => {
       open_login_page(&device_authorization_response, platform, context);
@@ -395,10 +393,7 @@ pub(crate) fn get_stored_refresh_token(platform: &DshPlatform) -> DshCliResult<O
         err!("error decrypting refresh token for platform '{}', token deleted", platform)
       }
     },
-    None => {
-      debug!("refresh token for platform '{}' not found", platform);
-      Ok(None)
-    }
+    None => Ok(None),
   }
 }
 

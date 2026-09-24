@@ -1,9 +1,7 @@
 # Known issues
 
-## DSH Resource Management API
+### Clear vhost certificate dependencies
 
-DSH Resource Management API OpenAPI specification is at version `1.12.0`.
+Delete vhost certificates when deleting a service or app that uses a vhost.
 
-## Linux build
-
-GitHub action that builds the linux version at release no longer works.
+### Use existing _RoCK_ certificates

@@ -16,11 +16,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rustfmt
-      - name: Run unit tests with default features
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
         run: cargo test --verbose
-      - name: Run clippy with default features
+      - name: Run clippy
         run: cargo clippy
-      - name: Run unit tests with all features enabled
-        run: cargo test --all-features --verbose
-      - name: Run clippy with all features enabled
-        run: cargo clippy --all-features

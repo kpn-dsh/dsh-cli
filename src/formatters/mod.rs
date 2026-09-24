@@ -1,5 +1,5 @@
-use crate::err;
 use crate::error::DshCliError;
+use crate::{err, DshCliResult};
 use chrono::DateTime;
 use dsh_api::error::DshApiResult;
 use itertools::Itertools;
@@ -269,7 +269,7 @@ impl Display for OutputFormat {
 impl TryFrom<&str> for OutputFormat {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "csv" => Ok(Self::Csv),
       "json" => Ok(Self::Json),
@@ -294,7 +294,7 @@ pub(crate) fn hashmap_to_table<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K
     .collect_vec();
   match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => {
-      key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
+      key_value_length_pairs.sort_by_key(|(key, _, _)| *key);
       key_value_length_pairs
         .into_iter()
         .map(|(key, values, key_length)| {
@@ -323,7 +323,7 @@ pub(crate) fn hashmap_to_vec<K: AsRef<str>, V: AsRef<str>>(hashmap: &HashMap<K, 
     .collect_vec();
   match key_value_length_pairs.iter().map(|(_, _, len)| len).max().cloned() {
     Some(first_column_width) => {
-      key_value_length_pairs.sort_by(|(key_a, _, _), (key_b, _, _)| key_a.cmp(key_b));
+      key_value_length_pairs.sort_by_key(|(key, _, _)| *key);
       key_value_length_pairs
         .into_iter()
         .map(|(key, values, key_length)| {

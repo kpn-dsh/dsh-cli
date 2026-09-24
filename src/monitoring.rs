@@ -124,7 +124,7 @@ fn expr(service_id: impl Display, containerd: impl Display) -> String {
   )
 }
 
-fn encode_path(pc: &str) -> PercentEncode {
+fn encode_path(pc: &str) -> PercentEncode<'_> {
   {
     const PATH_SET: &AsciiSet = &CONTROLS
       .add(b' ')

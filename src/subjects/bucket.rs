@@ -67,23 +67,23 @@ impl Subject for BucketSubject {
 }
 
 lazy_static! {
-  static ref BUCKET_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref BUCKET_CREATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &BucketCreate {}, "Create new bucket")
       .add_target_argument(bucket_id_argument().required(true))
       .add_extra_arguments(vec![versioned_flag(COMMAND_OPTIONS_HEADING)])
   );
-  static ref BUCKET_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref BUCKET_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &BucketDelete {}, "Delete bucket")
       .set_long_about("Delete a bucket.")
       .add_target_argument(bucket_id_argument().required(true))
   );
-  static ref BUCKET_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref BUCKET_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &BucketList {}, "List buckets")
       .set_long_about("Lists all available buckets.")
       .add_filter_flag(FilterFlagType::Complete, Some("Show all bucket parameters instead of a selection.".to_string()))
       .add_command_executor(FlagType::Ids, &BucketListIds {}, None)
   );
-  static ref BUCKET_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref BUCKET_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &BucketShow {}, "Show bucket configuration")
       .add_command_executor(FlagType::Usage, &BucketShowUsage {}, None)
       .add_target_argument(bucket_id_argument().required(true))

@@ -70,7 +70,7 @@ impl Subject for TopicSubject {
 }
 
 lazy_static! {
-  static ref TOPIC_CREATE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TOPIC_CREATE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(CREATE_COMMAND, Some(CREATE_COMMAND_ALIAS), &TopicCreate {}, "Create new scratch topic")
       .add_target_argument(topic_id_argument().required(true))
       .add_extra_arguments(vec![
@@ -85,12 +85,12 @@ lazy_static! {
         segment_bytes_flag(),
       ])
   );
-  static ref TOPIC_DELETE_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TOPIC_DELETE_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DELETE_COMMAND, Some(DELETE_COMMAND_ALIAS), &TopicDelete {}, "Delete scratch topic")
       .set_long_about("Delete a scratch topic.")
       .add_target_argument(topic_id_argument().required(true))
   );
-  static ref TOPIC_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TOPIC_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &TopicList {}, "List scratch topics")
       .set_long_about("Lists all available scratch topics.")
       .add_command_executors(vec![
@@ -99,7 +99,7 @@ lazy_static! {
         (FlagType::Usage, &TopicListUsage {}, None),
       ])
   );
-  static ref TOPIC_SHOW_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref TOPIC_SHOW_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SHOW_COMMAND, Some(SHOW_COMMAND_ALIAS), &TopicShow {}, "Show scratch topic configuration")
       .add_command_executors(vec![
         (FlagType::AllocationStatus, &TopicShowAllocationStatus {}, None),

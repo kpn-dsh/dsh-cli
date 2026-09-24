@@ -1,5 +1,6 @@
 use crate::argument_parsers::RangedValueParser;
 use crate::authentication::AuthenticationMethod;
+use crate::bundle::CertificateAuthorityId;
 use crate::capability::{Capability, CommandExecutor, DEFAULT_COMMAND, DEFAULT_COMMAND_ALIAS, LIST_COMMAND, LIST_COMMAND_ALIAS, SET_COMMAND, UNSET_COMMAND};
 use crate::capability_builder::CapabilityBuilder;
 use crate::context::{BrowserMethod, Context};
@@ -61,6 +62,7 @@ impl Subject for SettingSubject {
 
 const SETTING_AUTHENTICATION: &str = "authentication";
 const SETTING_BROWSER: &str = "browser";
+const SETTING_CERTIFICATE_AUTHORITY: &str = "certificate-authority";
 const SETTING_CSV_QUOTE: &str = "csv-quote";
 const SETTING_CSV_SEPARATOR: &str = "csv-separator";
 const SETTING_DEFAULT_PLATFORM: &str = "default-platform";
@@ -92,6 +94,7 @@ const SETTING_TARGET_COLOR: &str = "target-color";
 const SETTING_TARGET_STYLE: &str = "target-style";
 const SETTING_TERMINAL_WIDTH: &str = "terminal-width";
 const SETTING_VERBOSITY: &str = "verbosity";
+const SETTING_VHOST_ZONE: &str = "vhost-zone";
 const SETTING_WARNING_COLOR: &str = "warning-color";
 const SETTING_WARNING_STYLE: &str = "warning-style";
 
@@ -113,6 +116,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Specifies whether the tool may try to open a browser"),
+    Command::new(SETTING_CERTIFICATE_AUTHORITY)
+      .arg(
+        Arg::new(SETTING_CERTIFICATE_AUTHORITY)
+          .action(ArgAction::Set)
+          .value_parser(EnumValueParser::<CertificateAuthorityId>::new())
+          .required(required),
+      )
+      .about("Certificate authority"),
     Command::new(SETTING_CSV_QUOTE)
       .arg(
         Arg::new(SETTING_CSV_QUOTE)
@@ -325,6 +336,14 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
           .required(required),
       )
       .about("Default verbosity level"),
+    Command::new(SETTING_VHOST_ZONE)
+      .arg(
+        Arg::new(SETTING_VHOST_ZONE)
+          .action(ArgAction::Set)
+          .value_parser(builder::NonEmptyStringValueParser::new())
+          .required(required),
+      )
+      .about("Default vhost zone, used for vhost and proxy certificates"),
     Command::new(SETTING_WARNING_COLOR)
       .arg(
         Arg::new(SETTING_WARNING_COLOR)
@@ -345,20 +364,20 @@ fn set_unset_commands(required: bool) -> Vec<Command> {
 }
 
 lazy_static! {
-  static ref SETTING_DEFAULT_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SETTING_DEFAULT_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(DEFAULT_COMMAND, Some(DEFAULT_COMMAND_ALIAS), &SettingDefault {}, "Set default platform and tenant")
       .set_long_about("Sets the default target platform and target tenant.")
       .add_target_argument(platform_name_argument())
       .add_target_argument(tenant_name_argument())
   );
-  static ref SETTING_LIST_CAPABILITY: Box<(dyn Capability + Send + Sync)> =
+  static ref SETTING_LIST_CAPABILITY: Box<dyn Capability + Send + Sync> =
     Box::new(CapabilityBuilder::new(LIST_COMMAND, Some(LIST_COMMAND_ALIAS), &SettingList {}, "List settings").set_long_about("Lists all dsh settings."));
-  static ref SETTING_SETTING_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SETTING_SETTING_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(SET_COMMAND, None, &SettingSet {}, "Set setting")
       .set_long_about("Set value to persistent storage.")
       .add_subcommands(set_unset_commands(true))
   );
-  static ref SETTING_UNSETTING_CAPABILITY: Box<(dyn Capability + Send + Sync)> = Box::new(
+  static ref SETTING_UNSETTING_CAPABILITY: Box<dyn Capability + Send + Sync> = Box::new(
     CapabilityBuilder::new(UNSET_COMMAND, None, &SettingUnset {}, "Unset setting")
       .set_long_about("Unset value from persistent storage.")
       .add_subcommands(set_unset_commands(false))
@@ -388,9 +407,10 @@ impl CommandExecutor for SettingDefault {
 }
 
 static ENVIRONMENT_VARIABLE_LABELS: [EnvironmentVariableLabel; 2] = [EnvironmentVariableLabel::Variable, EnvironmentVariableLabel::Value];
-static SETTING_LABELS: [SettingLabel; 37] = [
+static SETTING_LABELS: [SettingLabel; 39] = [
   SettingLabel::Authentication,
   SettingLabel::Browser,
+  SettingLabel::CertificateAuthority,
   SettingLabel::CsvQuote,
   SettingLabel::CsvSeparator,
   SettingLabel::DefaultPlatform,
@@ -424,6 +444,7 @@ static SETTING_LABELS: [SettingLabel; 37] = [
   SettingLabel::TargetStyle,
   SettingLabel::TerminalWidth,
   SettingLabel::Verbosity,
+  SettingLabel::VhostZone,
   SettingLabel::WarningColor,
   SettingLabel::WarningStyle,
 ];
@@ -465,7 +486,7 @@ where
   match matches.get_one::<T>(setting) {
     Some(one) => {
       let cloned = one.clone();
-      context.print_outcome(format!("{} set to {}", setting, &cloned));
+      context.print_outcome(format!("{} set to {}", setting, cloned));
       Ok(Some(cloned))
     }
     None => err!("{}", setting),
@@ -484,6 +505,9 @@ impl CommandExecutor for SettingSet {
       }
       SETTING_BROWSER => {
         upsert_settings(move |settings| Ok(Settings { browser: get_some(SETTING_BROWSER, matches, context)?, ..settings }))?;
+      }
+      SETTING_CERTIFICATE_AUTHORITY => {
+        upsert_settings(move |settings| Ok(Settings { certificate_authority: get_some(SETTING_CERTIFICATE_AUTHORITY, matches, context)?, ..settings }))?;
       }
       SETTING_CSV_QUOTE => match matches.get_one::<String>(SETTING_CSV_QUOTE) {
         Some(csv_quote_argument) => {
@@ -567,7 +591,7 @@ impl CommandExecutor for SettingSet {
         let output_directory = match matches.get_one::<PathBuf>(SETTING_OUTPUT_DIRECTORY) {
           Some(one) => {
             let cloned = one.clone();
-            context.print_outcome(format!("{} set to {}", SETTING_OUTPUT_DIRECTORY, &cloned.display()));
+            context.print_outcome(format!("{} set to {}", SETTING_OUTPUT_DIRECTORY, cloned.display()));
             Ok(Some(cloned))
           }
           None => err!("{}", SETTING_OUTPUT_DIRECTORY),
@@ -619,6 +643,9 @@ impl CommandExecutor for SettingSet {
       SETTING_VERBOSITY => {
         upsert_settings(move |settings| Ok(Settings { verbosity: get_some(SETTING_VERBOSITY, matches, context)?, ..settings }))?;
       }
+      SETTING_VHOST_ZONE => {
+        upsert_settings(move |settings| Ok(Settings { vhost_zone: get_some(SETTING_VHOST_ZONE, matches, context)?, ..settings }))?;
+      }
       SETTING_WARNING_COLOR => {
         upsert_settings(move |settings| Ok(Settings { warning_color: get_some(SETTING_WARNING_COLOR, matches, context)?, ..settings }))?;
       }
@@ -649,6 +676,10 @@ impl CommandExecutor for SettingUnset {
       SETTING_BROWSER => {
         upsert_settings(|settings| Ok(Settings { browser: None, ..settings }))?;
         context.print_outcome("browser method unset");
+      }
+      SETTING_CERTIFICATE_AUTHORITY => {
+        upsert_settings(|settings| Ok(Settings { certificate_authority: None, ..settings }))?;
+        context.print_outcome("certificate authority unset");
       }
       SETTING_CSV_QUOTE => {
         upsert_settings(|settings| Ok(Settings { csv_quote: None, ..settings }))?;
@@ -774,6 +805,10 @@ impl CommandExecutor for SettingUnset {
         upsert_settings(|settings| Ok(Settings { verbosity: None, ..settings }))?;
         context.print_outcome("verbosity level unset");
       }
+      SETTING_VHOST_ZONE => {
+        upsert_settings(|settings| Ok(Settings { vhost_zone: None, ..settings }))?;
+        context.print_outcome("vhost zone unset");
+      }
       SETTING_WARNING_COLOR => {
         upsert_settings(|settings| Ok(Settings { warning_color: None, ..settings }))?;
         context.print_outcome("warning color unset");
@@ -796,6 +831,7 @@ impl CommandExecutor for SettingUnset {
 enum SettingLabel {
   Authentication,
   Browser,
+  CertificateAuthority,
   CsvQuote,
   CsvSeparator,
   DefaultPlatform,
@@ -829,6 +865,7 @@ enum SettingLabel {
   TargetStyle,
   TerminalWidth,
   Verbosity,
+  VhostZone,
   WarningColor,
   WarningStyle,
 }
@@ -838,6 +875,7 @@ impl Label for SettingLabel {
     match self {
       Self::Authentication => SETTING_AUTHENTICATION,
       Self::Browser => SETTING_BROWSER,
+      Self::CertificateAuthority => SETTING_CERTIFICATE_AUTHORITY,
       Self::CsvQuote => SETTING_CSV_QUOTE,
       Self::CsvSeparator => SETTING_CSV_SEPARATOR,
       Self::DefaultPlatform => SETTING_DEFAULT_PLATFORM,
@@ -871,6 +909,7 @@ impl Label for SettingLabel {
       Self::TargetStyle => SETTING_TARGET_STYLE,
       Self::TerminalWidth => SETTING_TERMINAL_WIDTH,
       Self::Verbosity => SETTING_VERBOSITY,
+      Self::VhostZone => SETTING_VHOST_ZONE,
       Self::WarningColor => SETTING_WARNING_COLOR,
       Self::WarningStyle => SETTING_WARNING_STYLE,
     }
@@ -886,6 +925,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
     match label {
       SettingLabel::Authentication => Value::some_or_empty(self.authentication.as_ref()),
       SettingLabel::Browser => Value::some_or_empty(self.browser.as_ref()),
+      SettingLabel::CertificateAuthority => Value::some_or_empty(self.certificate_authority.as_ref()),
       SettingLabel::CsvQuote => Value::some_or_empty(self.csv_quote),
       SettingLabel::CsvSeparator => Value::some_or_empty(self.csv_separator.clone()),
       SettingLabel::DefaultPlatform => match self.default_platform.clone().map(|platform| DshPlatform::try_from(platform.as_str())) {
@@ -922,6 +962,7 @@ impl SubjectFormatter<SettingLabel> for Settings {
       SettingLabel::TargetStyle => Value::some_or_empty(self.target_style.as_ref()),
       SettingLabel::TerminalWidth => Value::some_or_empty(self.terminal_width),
       SettingLabel::Verbosity => Value::some_or_empty(self.verbosity.as_ref()),
+      SettingLabel::VhostZone => Value::some_or_empty(self.vhost_zone.as_ref()),
       SettingLabel::WarningColor => Value::some_or_empty(self.warning_color.as_ref()),
       SettingLabel::WarningStyle => Value::some_or_empty(self.warning_style.as_ref()),
     }

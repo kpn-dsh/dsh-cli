@@ -22,39 +22,35 @@ Some of the capabilities of the `dsh` tool are:
 * Reversed lookup functions. For example find all services that use a given secret or volume,
   or contain an environment value with a given value in their configuration.
 
-## Features
-
-By enabling/disabling the features described below you have some control over what's included
-in the `dsh` tool and what's not. The features are disabled by default.
-The following features are defined:
-
-* `manage` - Enables the manage methods. Enabling this feature is only useful
-  if your tenant is authorized for management capabilities.
-* `robot` - Enables the robot operation.
-
 ## Installation
-
-### Cargo install
-
-If you have the Rust tool-chain installed, the `dsh` tool can be installed on your local machine
-directly from `crates.io`, by executing the following command:
-
-```shell
-> cargo install dsh --all-features --locked
-```
-
-This will install the `dsh` tool with all features enabled in `$HOME/.cargo/bin/dsh`.
 
 ### Pre-built binaries
 
-For some platforms a pre-built binary is available at the `GitHub` release page:
-[`https://github.com/kpn-dsh/dsh-cli/releases`](https://github.com/kpn-dsh/dsh-cli/releases).
-You can download this file to your workstation. Make sure that the directory where you store
-the executable is included in your `PATH` variable and that you set the execute flag:
+For macOS and Linux pre-built binaries are available via the projects `GitHub`
+[release page](https://github.com/kpn-dsh/dsh-cli/releases).
+The installation for macOS and Linux is the same:
+
+* Download the binary for your OS.
+* Rename the downloaded binary to `dsh`.
+* Make the `dsh` binary executable (`chmod u+x dsh`).
+* Move the binary to a directory that is included in your `PATH` variable (`/usr/local/bin` or
+  `/usr/bin` or similar).
+
+### Cargo install
+
+Older versions of the `dsh` tool could be installed directly from `crates.io`, but since the
+current version has a dependency on the `rock_api` crate which is on KPN `artifactory`, this is
+currently not possible. However, if you have access to `artifactory` and you have the Rust
+tool-chain installed, the `dsh` tool can be installed from `GitHub`, by executing the following
+commands:
 
 ```shell
-> chmod $DIR/dsh u+x
+> git clone git@github.com:kpn-dsh/dsh-cli.git
+> mv dsh-cli
+> cargo install --path .
 ```
+
+This will install the `dsh` tool in the directory `$HOME/.cargo/bin/dsh`.
 
 ## Next steps
 
@@ -69,4 +65,6 @@ the executable is included in your `PATH` variable and that you set the execute 
 * [Developers](docs/developers.md)
 * [Publish](docs/publish.md)
 * [Release](docs/release.md)
+* [Make](docs/make.md)
 * [Codesign and notarize for macOS](docs/code-signing-macos.md)
+* [Certificate signing](docs/certificate-signing.md)

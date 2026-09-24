@@ -16,6 +16,8 @@ SETTING_COMMANDS=(
   "dsh setting set authentication sso"
   "dsh setting set browser instruct"
   "dsh setting set browser open"
+  "dsh setting set certificate-authority kpn-ca"
+  "dsh setting set certificate-authority kpn-digic-rsdv"
   "dsh setting set csv-quote \"'\""
   "dsh setting set csv-separator \"|\""
   "dsh setting set default-platform $PLATFORM"
@@ -58,6 +60,7 @@ SETTING_COMMANDS=(
 UNSETTING_COMMANDS=(
   "dsh setting unset authentication"
   "dsh setting unset browser"
+  "dsh setting unset certificate-authority"
   "dsh setting unset csv-quote"
   "dsh setting unset csv-separator"
   "dsh setting unset default-platform"

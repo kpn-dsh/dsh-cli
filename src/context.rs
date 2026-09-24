@@ -39,10 +39,11 @@ use std::time::Instant;
 use terminal_size::{terminal_size, Height, Width};
 use OutputFormat::Csv;
 
-#[derive(clap::ValueEnum, Eq, Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
+#[derive(clap::ValueEnum, Eq, Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) enum BrowserMethod {
   /// User will be instructed to open the browser
   #[serde(rename = "instruct")]
+  #[default]
   Instruct,
   /// Tool will try to open the browser automatically
   #[serde(rename = "open")]
@@ -52,7 +53,7 @@ pub(crate) enum BrowserMethod {
 impl TryFrom<&str> for BrowserMethod {
   type Error = DshCliError;
 
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
+  fn try_from(value: &str) -> DshCliResult<Self> {
     match value {
       "instruct" => Ok(Self::Instruct),
       "open" => Ok(Self::Open),
@@ -67,12 +68,6 @@ impl Display for BrowserMethod {
       Self::Instruct => write!(f, "instruct"),
       Self::Open => write!(f, "open"),
     }
-  }
-}
-
-impl Default for BrowserMethod {
-  fn default() -> Self {
-    Self::Instruct
   }
 }
 
@@ -130,7 +125,7 @@ fn style_to_string(style: &Style) -> String {
 
 impl Debug for Context {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut builder = f.debug_struct("Settings");
+    let mut builder = f.debug_struct("Context");
     builder.field("authentication_method", &self.authentication_method);
     builder.field("browser_method", &self.browser_method);
 
@@ -396,6 +391,55 @@ impl Context {
           _ => {
             eprintln!();
             Ok(false)
+          }
+        },
+        Err(error) => err!("\nerror getting key event ({})", error),
+      }
+    } else {
+      Ok(false)
+    }
+  }
+
+  /// Ask a yes or no question
+  ///
+  /// 1. If run from a terminal the user will be prompted for confirmation.
+  /// 1. When not run from a terminal `default` will be returned.
+  ///
+  /// Note that it does not matter whether or not `force` is enabled.
+  ///
+  /// # Parameters
+  /// * `question` - Question prompt.
+  /// * `default` - Default value, if `true` the default is yes.
+  ///
+  /// # Returns
+  /// * If the user entered `n` or `N`: `false`.
+  /// * If the user entered `y` or `Y`: `true`.
+  /// * If the user entered anything else: `default`.
+  pub(crate) fn yes_or_no(&self, question: impl Display, default: bool) -> DshCliResult<bool> {
+    if self.stdin_is_terminal {
+      if default {
+        self.print(format!("{} [Y/n]", question));
+      } else {
+        self.print(format!("{} [y/N]", question));
+      }
+      let _ = stdout().lock().flush();
+      match Getch::new().getch() {
+        Ok(key) => match key {
+          Key::Char('n') | Key::Char('N') => {
+            eprintln!();
+            Ok(false)
+          }
+          Key::Char('y') | Key::Char('Y') => {
+            eprintln!();
+            Ok(true)
+          }
+          Key::Ctrl('c') => {
+            eprintln!("{}", apply_default_warning_style("\ninterrupted"));
+            process::exit(0);
+          }
+          _ => {
+            eprintln!();
+            Ok(default)
           }
         },
         Err(error) => err!("\nerror getting key event ({})", error),
@@ -711,7 +755,7 @@ impl Context {
   /// Open the provided url in the system browser
   pub(crate) fn open_url(&self, url: impl AsRef<OsStr> + Display, opening_target: impl Display) {
     if self.dry_run() {
-      self.print_warning(format!("dry-run mode, opening '{}' canceled", opening_target));
+      self.print_warning(format!("dry-run mode, opening {} canceled", opening_target));
       self.print_warning(format!("{}", url));
     } else {
       match self.browser_method() {
@@ -934,10 +978,8 @@ impl Context {
         Err(error) => {
           debug!("could not get allocation status for {} ({})", subject, error);
           match self.verbosity {
-            Verbosity::Low | Verbosity::Medium | Verbosity::High => {
-              if self.verbosity == Verbosity::High {
-                self.eprintln_warning(format!("could not get allocation status for {}", subject));
-              }
+            Verbosity::Low | Verbosity::Medium | Verbosity::High if self.verbosity == Verbosity::High => {
+              self.eprintln_warning(format!("could not get allocation status for {}", subject));
             }
             _ => {}
           }

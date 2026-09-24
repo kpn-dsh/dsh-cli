@@ -4,9 +4,7 @@ pub(crate) const ACL_GROUP_NAME_ARGUMENT: &str = "acl-group-name-argument";
 pub(crate) const APP_ID_ARGUMENT: &str = "app-id-argument";
 pub(crate) const BUCKET_ID_ARGUMENT: &str = "bucket-id-argument";
 pub(crate) const CERTIFICATE_ID_ARGUMENT: &str = "certificate-id-argument";
-#[cfg(feature = "manage")]
 pub(crate) const MANAGED_STREAM_ARGUMENT: &str = "managed-stream-argument";
-#[cfg(feature = "manage")]
 pub(crate) const MANAGED_TENANT_NAME_ARGUMENT: &str = "managed-tenant-name-argument";
 pub(crate) const MANIFEST_ID_ARGUMENT: &str = "manifest-id-argument";
 pub(crate) const NODEPOOL_ID_ARGUMENT: &str = "node-pool-id-argument";
@@ -18,7 +16,7 @@ pub(crate) const TASK_ID_ARGUMENT: &str = "task-id-argument";
 pub(crate) const TOPIC_ID_ARGUMENT: &str = "topic-id-argument";
 pub(crate) const VENDOR_NAME_ARGUMENT: &str = "vendor-name-argument";
 pub(crate) const MANIFEST_VERSION_ARGUMENT: &str = "version-argument";
-pub(crate) const VHOST_ID_ARGUMENT: &str = "vhost-id-argument";
+pub(crate) const VHOST_SUBDOMAIN_ARGUMENT: &str = "vhost-id-argument";
 pub(crate) const VOLUME_ID_ARGUMENT: &str = "volume-id-argument";
 
 pub(crate) fn acl_group_name_argument() -> Arg {
@@ -57,7 +55,6 @@ pub(crate) fn certificate_id_argument() -> Arg {
     .long_help("Identifies a certificate on the DSH.")
 }
 
-#[cfg(feature = "manage")]
 pub(crate) fn managed_stream_argument() -> Arg {
   Arg::new(MANAGED_STREAM_ARGUMENT)
     .action(ArgAction::Set)
@@ -67,7 +64,6 @@ pub(crate) fn managed_stream_argument() -> Arg {
     .long_help("Identifies a managed stream on the DSH.")
 }
 
-#[cfg(feature = "manage")]
 pub(crate) fn managed_tenant_argument() -> Arg {
   Arg::new(MANAGED_TENANT_NAME_ARGUMENT)
     .action(ArgAction::Set)
@@ -170,13 +166,13 @@ pub(crate) fn vendor_name_argument() -> Arg {
     .long_help("This option specifies the name of an app vendor. Allowed values are \"kpn\".")
 }
 
-pub(crate) fn vhost_id_argument() -> Arg {
-  Arg::new(VHOST_ID_ARGUMENT)
+pub(crate) fn vhost_subdomain_argument() -> Arg {
+  Arg::new(VHOST_SUBDOMAIN_ARGUMENT)
     .action(ArgAction::Set)
     .value_parser(builder::NonEmptyStringValueParser::new())
     .value_name("VHOST")
-    .help("Vhost identifier")
-    .long_help("Identifies a vhost configured on the DSH.")
+    .help("Vhost subdomain")
+    .long_help("Identifies a vhost subdomain.")
 }
 
 pub(crate) fn volume_id_argument() -> Arg {

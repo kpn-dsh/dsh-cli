@@ -24,12 +24,12 @@ export SYSTEM_SECRET_ID_UNDER_TEST="\!rest-api-client"
 export SYSTEM_SECRET_NAME_UNDER_TEST=system/rest-api-client
 export SERVICE_NON_EXISTING=non-existing-service
 export SERVICE_UNDER_TEST=keyring-dev
-export SERVICE_TASK_UNDER_TEST=58b9fc6c48-z9t46-00000000
+export SERVICE_TASK_UNDER_TEST=58b9fc6c48-kk58t-00000000
 export TENANT_UNDER_TEST=greenbox-dev
 export TOPIC_NON_EXISTING=non-existing-topic
 export TOPIC_UNDER_TEST=cli-test
 export VENDOR_UNDER_TEST=kpn
-export VHOST_UNDER_TEST=greenbox-dev
+export VHOST_UNDER_TEST=eavesdropper
 export VOLUME_NON_EXISTING=non-existing-volume
 export VOLUME_UNDER_TEST=cli-test
 
@@ -174,18 +174,27 @@ export SAFE_COMMANDS=(
   "platform show --app $APP_UNDER_TEST --vendor $VENDOR_UNDER_TEST"
   "platform show --app $APP_UNDER_TEST"
   "platform show --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
+  "platform show --proxy $PROXY_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --service $SERVICE_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --service $SERVICE_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST --platform $PLATFORM_UNDER_TEST --tenant $TENANT_UNDER_TEST"
   "platform show --vhost $VHOST_UNDER_TEST"
+
+  "platform show --app my-app --bucket my-bucket --proxy my-proxy --service my-service --topic my-topic --vendor my-vendor --vhost my-vhost"
+  "platform show --app my-app --bucket my-bucket --proxy my-proxy --service my-service --topic my-topic --vendor my-vendor --vhost my-vhost -p prodaz"
+
   "platform show"
   "platforms"
   "ps"
 
+
+  "proxy code $PROXY_UNDER_TEST --configuration"
+  "proxy code $PROXY_UNDER_TEST json --force --dry-run"
   "proxy code $PROXY_UNDER_TEST python --force --dry-run"
   "proxy code $PROXY_UNDER_TEST rust --force --dry-run"
-  "proxy create $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
-  "proxy c $PROXY_NON_EXISTING --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
+  "proxy create $PROXY_NON_EXISTING --attach-ca-chain true --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --self-signed --dry-run"
+  "proxy create $PROXY_NON_EXISTING --certificate-authority kpn-ca --attach-ca-chain false --acl-group-name acl --enable-schema-store true --vhost-zone private --force --dry-run"
+  "proxy c $PROXY_NON_EXISTING --certificate-authority kpn-ca --attach-ca-chain true --acl-group-name acl --ca-common-name ca --enable-schema-store false --number-of-dns-records 10 --vhost-zone private --dry-run"
   "proxy delete $PROXY_UNDER_TEST --force --dry-run"
   "proxy d $PROXY_UNDER_TEST --force --dry-run"
   "proxy list --bundle"
@@ -214,8 +223,10 @@ export SAFE_COMMANDS=(
   "secret d $SECRET_NAME_UNDER_TEST --force --dry-run"
   "secret list"
   "secret l"
+  "s l"
   "secret list --certificates"
   "secret list --certificates --expiration 200"
+  "secret list --certificate"
   "secret list --errors"
   "secret list --ids"
   "secret list --issues"
@@ -242,6 +253,7 @@ export SAFE_COMMANDS=(
   "secret show kda-test"
   "secret update $SECRET_NAME_UNDER_TEST --dry-run --authentication sso < /dev/null"
   "secrets"
+  "ss"
 
   "service delete $SERVICE_UNDER_TEST --force --dry-run"
   "service d $SERVICE_UNDER_TEST --force --dry-run"
@@ -262,7 +274,6 @@ export SAFE_COMMANDS=(
   "service stop $SERVICE_UNDER_TEST --force --dry-run"
   "service update $SERVICE_UNDER_TEST --cpus 1 --instances 1 --mem 32 --force --dry-run"
   "services"
-  "ss"
 
   "setting list"
   "setting l"
@@ -274,7 +285,7 @@ export SAFE_COMMANDS=(
   "task l $SERVICE_UNDER_TEST"
   "task show $SERVICE_UNDER_TEST"
   "task s $SERVICE_UNDER_TEST"
-  "task show $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
+  #  "task show $SERVICE_UNDER_TEST $SERVICE_TASK_UNDER_TEST"
 
   "token copy --dry-run"
   "token fetch"
@@ -311,10 +322,12 @@ export SAFE_COMMANDS=(
 
   "vhost list"
   "vhost l"
+  "vhost list --apps"
   "vhost list --started"
   "vhost list --stopped"
   "vhost list --started --stopped"
   "vhost list --usage"
+  "vhost open $VHOST_UNDER_TEST --dry-run"
   "vhosts"
   "vs"
 

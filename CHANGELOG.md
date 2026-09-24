@@ -4,6 +4,42 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-24
+
+### Added
+
+* Capability to generate and deploy certificates for vhosts.
+    * Signed via _RoCK API_ or self-signed.
+    * Add `technium` CA certificate.
+* Proxy capabilities
+    * Sign certificates via _RoCK API_.
+    * Show generic Kafka client properties.
+    * Create JSON file with generic Kafka client properties.
+    * Proxy example code generation for JavaScript.
+    * List _RoCK API_ certificates.
+    * List _RoCK API_ domains.
+    * Setting and environment variable to configure vhost zone.
+    * Setting and environment variable to configure certificate authority.
+* Pre-built Linux versions on GitHub releases page.
+* Added `Makefile`.
+* Improved `vhost` list and show capabilities.
+* Added `vhost` open capability.
+
+### Changed
+
+* Removed separate features. All capabilities will now be included.
+* Shortcut `s` is now an alias for subject `secret` (was `service`).
+* Some filenames for generated code examples.
+* Added warning with managed tenants creation.
+* Added certificate type and dns names to certificate listing.
+* Secret that contain multiple certificates properly shown.
+* Check that acl groups and schema store cannot be enabled at the same time.
+
+### Fixes
+
+* Fixed bug that occurred when a user is not authorized for any tenant on a platform.
+* Fixed bug when platforms file could not be found.
+
 ## [0.10.0] - 2026-05-29
 
 ### Added

@@ -32,6 +32,7 @@ use clap::builder::{styling, Styles};
 use clap::error::{Error as ClapError, ErrorKind};
 use clap::{ArgMatches, Command};
 use context::Context;
+use dsh_api::platform::DshPlatform;
 use dsh_api::version::Version;
 use dsh_api::{crate_version, openapi_version};
 use filter_flags::FilterFlagType;
@@ -70,9 +71,7 @@ use subjects::robot::ROBOT_SUBJECT;
 use subjects::secret::SECRET_SUBJECT;
 use subjects::service::SERVICE_SUBJECT;
 use subjects::setting::SETTING_SUBJECT;
-#[cfg(feature = "manage")]
 use subjects::stream::STREAM_SUBJECT;
-#[cfg(feature = "manage")]
 use subjects::tenant::TENANT_SUBJECT;
 use subjects::token::TOKEN_SUBJECT;
 use subjects::topic::TOPIC_SUBJECT;
@@ -83,6 +82,7 @@ mod argument_parsers;
 mod arguments;
 mod authentication;
 mod autocomplete;
+mod bundle;
 mod capability;
 mod capability_builder;
 mod cipher;
@@ -98,12 +98,10 @@ mod formatters;
 mod global_options;
 mod issues;
 mod keyring;
-#[cfg(feature = "manage")]
 mod limits_options;
 mod log_level;
 mod modifier_flags;
 mod monitoring;
-mod proxy_bundles;
 mod releases;
 mod robot_arguments;
 mod secret_metadata;
@@ -140,7 +138,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.0").unwrap());
+static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.1").unwrap());
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
 const OUTPUT_OPTIONS_HEADING: &str = "Output options";
@@ -234,6 +232,10 @@ async fn main() -> DshCliExit {
 }
 
 async fn inner_main() -> DshCliExit {
+  if let Err(error) = DshPlatform::all() {
+    return DshCliExit::Err(error.to_string());
+  }
+
   let _ = ctrlc::set_handler(move || {
     eprintln!("{}", apply_default_warning_style("interrupted"));
     process::exit(0);
@@ -259,10 +261,8 @@ async fn inner_main() -> DshCliExit {
     ROBOT_SUBJECT.as_ref(),
     SECRET_SUBJECT.as_ref(),
     SERVICE_SUBJECT.as_ref(),
-    #[cfg(feature = "manage")]
     STREAM_SUBJECT.as_ref(),
     TASK_SUBJECT.as_ref(),
-    #[cfg(feature = "manage")]
     TENANT_SUBJECT.as_ref(),
     TOKEN_SUBJECT.as_ref(),
     TOPIC_SUBJECT.as_ref(),
@@ -480,7 +480,7 @@ async fn inner_main() -> DshCliExit {
 
 fn login_command() -> Command {
   Command::new("login")
-    .about("Login via single-sign-on")
+    .about("Login via single-sign-on.")
     .long_about(
       "Login via single-sign-on. You will be directed to the login page for the currently \
         selected platform where you must sign in using your credentials (using two-factor \
@@ -492,7 +492,7 @@ fn login_command() -> Command {
 
 fn logout_command() -> Command {
   Command::new("logout")
-    .about("Logout from single-sign-on")
+    .about("Logout from single-sign-on.")
     .long_about(
       "Logout from single-sign-on. You will be directed to the logout page for the currently \
         selected platform where you must confirm.",
@@ -501,14 +501,10 @@ fn logout_command() -> Command {
 }
 
 async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Command {
-  let long_about = match enabled_features() {
-    Some(enabled_features) => format!("{} Enabled features: {}.", LONG_ABOUT, enabled_features.join(", ")),
-    None => LONG_ABOUT.to_string(),
-  };
   let mut command = Command::new(APPLICATION_NAME)
     .about(ABOUT)
     .author(AUTHOR)
-    .long_about(long_about)
+    .long_about(LONG_ABOUT)
     .disable_help_subcommand(true)
     .subcommands(clap_commands)
     .args(vec![
@@ -555,13 +551,15 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
 
   let environment_variables: Vec<(&str, String)> = get_configured_environment_variables();
   if !environment_variables.is_empty() {
-    let environment_variables_table = to_help_items("Environment variables:", environment_variables);
-    after_help.push(environment_variables_table);
+    if let Some(environment_variables_table) = to_help_items("Environment variables:", environment_variables) {
+      after_help.push(environment_variables_table);
+    }
   }
   let non_empty_settings = settings.non_empty_attributes().unwrap_or_else(|error| unreachable!("{}", error));
   if !non_empty_settings.is_empty() {
-    let settings_table = to_help_items("Settings:", non_empty_settings.iter().map(|(a, b)| (a.as_str(), b.to_string())).collect_vec());
-    after_help.push(settings_table);
+    if let Some(settings_table) = to_help_items("Settings:", non_empty_settings.iter().map(|(a, b)| (a.as_str(), b.to_string())).collect_vec()) {
+      after_help.push(settings_table);
+    }
   }
 
   if let Ok(access_tokens) = get_access_tokens().await {
@@ -573,7 +571,7 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
             (platform.name(), {
               tenant_permissions
                 .iter()
-                .map(|permission| permission.tenant.to_string())
+                .filter_map(|permission| if permission.tenant == "dsh" { None } else { Some(permission.tenant.to_string()) })
                 .collect_vec()
                 .chunks(6)
                 .collect_vec()
@@ -586,8 +584,9 @@ async fn create_command(clap_commands: &Vec<Command>, settings: &Settings) -> Co
           })
         })
         .collect_vec();
-      let authorizations = to_help_items("Authorizations:", access_tokens);
-      after_help.push(authorizations);
+      if let Some(authorizations) = to_help_items("Authorizations:", access_tokens) {
+        after_help.push(authorizations);
+      }
     }
   }
   command = command.after_help(after_help.join("\n\n"));
@@ -623,7 +622,7 @@ where
       Ok(deserialized_toml) => Ok(Some(deserialized_toml)),
       Err(de_error) => {
         let message = format!("could not deserialize file '{}' ({})", toml_file.as_ref().display(), de_error.message());
-        error!("{}", &message);
+        error!("{}", message);
         Err(DshCliError::from(message))
       }
     },
@@ -631,7 +630,7 @@ where
       NotFound => Ok(None),
       _ => {
         let message = format!("could not read file '{}'", toml_file.as_ref().display());
-        error!("{}", &message);
+        error!("{}", message);
         Err(DshCliError::from(message))
       }
     },
@@ -647,13 +646,13 @@ where
       Ok(_) => Ok(()),
       Err(io_error) => {
         let message = format!("could not write file '{}' ({})", toml_file.as_ref().display(), io_error);
-        error!("{}", &message);
+        error!("{}", message);
         Err(DshCliError::from(message))
       }
     },
     Err(ser_error) => {
       let message = format!("could not serialize data ({})", ser_error);
-      error!("{}", &message);
+      error!("{}", message);
       Err(DshCliError::from(message))
     }
   }
@@ -701,39 +700,30 @@ where
   }
 }
 
-// Method will panic if rows vector is empty
-fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> String {
-  let bold_green = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-  let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
-  let key_value_length_pairs: Vec<(&str, &str, usize)> = rows.iter().map(|(key, value)| (*key, value.as_ref(), key.len())).collect_vec();
-  let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap_or_else(|| unreachable!()).clone();
-  let mut pairs = vec![];
-  for (key, value, len) in key_value_length_pairs {
-    let values = value.split("\n").collect_vec().iter().map(|s| s.to_string()).collect_vec();
-    pairs.push(format!(
-      "  {bold_blue}{}{bold_blue:#}{}  {}",
-      key,
-      " ".repeat(first_column_width - len),
-      values.first().map(|s| s.to_string()).unwrap_or_default()
-    ));
-    for v in values[1..].iter() {
-      pairs.push(format!("  {}  {}", " ".repeat(*first_column_width), v));
-    }
-  }
-  format!("{bold_green}{}{bold_green:#}\n{}", header, pairs.join("\n"))
-}
-
-fn enabled_features() -> Option<Vec<&'static str>> {
-  #[allow(unused_mut)]
-  let mut enabled_features = vec![];
-  #[cfg(feature = "manage")]
-  enabled_features.push("manage");
-  #[cfg(feature = "robot")]
-  enabled_features.push("robot");
-  if enabled_features.is_empty() {
+fn to_help_items(header: &str, rows: Vec<(&str, String)>) -> Option<String> {
+  if rows.is_empty() {
     None
   } else {
-    Some(enabled_features)
+    let bold_green = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+    let bold_blue = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Blue)));
+    let key_value_length_pairs: Vec<(&str, &str, usize)> = rows.iter().map(|(key, value)| (*key, value.as_ref(), key.len())).collect_vec();
+
+    let first_column_width = &key_value_length_pairs.iter().map(|(_, _, len)| len).max().unwrap_or_else(|| unreachable!()).clone();
+
+    let mut pairs = vec![];
+    for (key, value, len) in key_value_length_pairs {
+      let values = value.split("\n").collect_vec().iter().map(|s| s.to_string()).collect_vec();
+      pairs.push(format!(
+        "  {bold_blue}{}{bold_blue:#}{}  {}",
+        key,
+        " ".repeat(first_column_width - len),
+        values.first().map(|s| s.to_string()).unwrap_or_default()
+      ));
+      for v in values[1..].iter() {
+        pairs.push(format!("  {}  {}", " ".repeat(*first_column_width), v));
+      }
+    }
+    Some(format!("{bold_green}{}{bold_green:#}\n{}", header, pairs.join("\n")))
   }
 }
 
@@ -778,10 +768,10 @@ pub(crate) static RELEASE_LABELS: [ReleaseLabel; 5] = [ReleaseLabel::Release, Re
 
 #[test]
 fn test_open_api_version() {
-  assert_eq!(openapi_version(), &Version::new(1, 11, 1, None));
+  assert_eq!(openapi_version(), &Version::new(1, 13, 0, None));
 }
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), &Version::new(0, 9, 0, None));
+  assert_eq!(crate_version(), &Version::new(0, 11, 0, None));
 }

@@ -14,10 +14,8 @@ pub(crate) mod robot;
 pub(crate) mod secret;
 pub(crate) mod service;
 pub(crate) mod setting;
-#[cfg(feature = "manage")]
 pub(crate) mod stream;
 pub(crate) mod task;
-#[cfg(feature = "manage")]
 pub(crate) mod tenant;
 pub(crate) mod token;
 pub(crate) mod topic;
@@ -138,7 +136,7 @@ impl SubjectFormatter<DependantLabel> for DependantApp {
       DependantLabel::Dependencies => Value::plain(self.resources.iter().map(|resource| resource.to_string()).join("\n")),
       DependantLabel::Resources => Value::plain(self.resources.iter().map(|resource| resource.to_string()).join("\n")),
       DependantLabel::Target => Value::target(target_id),
-      _ => Value::hide(),
+      DependantLabel::Injections | DependantLabel::Instances => Value::hide(),
     }
   }
 }
@@ -147,10 +145,10 @@ impl SubjectFormatter<DependantLabel> for DependantCertificate {
   fn value(&self, label: &DependantLabel, target_id: &str) -> Value {
     match label {
       DependantLabel::DependantId => Value::target(&self.certificate_id),
-      DependantLabel::DependantKind => Value::plain("certificate"),
+      DependantLabel::DependantKind => Value::plain("cert"),
       DependantLabel::Dependencies => Value::plain(self.secret_kind.to_string()),
       DependantLabel::Target => Value::target(target_id),
-      _ => Value::hide(),
+      DependantLabel::Injections | DependantLabel::Instances | DependantLabel::Resources => Value::hide(),
     }
   }
 }
@@ -162,7 +160,7 @@ impl SubjectFormatter<DependantLabel> for DependantProxy {
       DependantLabel::DependantKind => Value::plain("proxy"),
       DependantLabel::Instances => Value::plain(self.instances),
       DependantLabel::Target => Value::target(target_id),
-      _ => Value::hide(),
+      DependantLabel::Dependencies | DependantLabel::Injections | DependantLabel::Resources => Value::hide(),
     }
   }
 }
