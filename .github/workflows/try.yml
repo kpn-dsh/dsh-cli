@@ -1,0 +1,37 @@
+name: Try
+
+on: 
+  workflow_dispatch:
+    inputs:
+      manage:
+        description: 'Enable manage feature'
+        required: true
+        type: boolean
+
+jobs:
+  install-and-run-dsh:
+    environment: try
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install and run with manage feature enabled
+        if: ${{ inputs.manage }}
+        env:
+          DSH_CLI_PLATFORM: np-aws-lz-dsh
+          DSH_CLI_TENANT: ajuc
+          DSH_CLI_PASSWORD: ${{ secrets.NP_AWS_LZ_DSH_AJUC }}
+        run: |
+          wget https://github.com/kpn-dsh/dsh-cli/releases/download/v0.7.3/dsh-manage-v0.7.3-x86_64-unknown-linux-gnu.tar.gz
+          gzip -d dsh-manage-v0.7.3-x86_64-unknown-linux-gnu.tar.gz
+          tar x -f dsh-manage-v0.7.3-x86_64-unknown-linux-gnu.tar
+          ./dsh stream list
+      - name: Install and run with manage feature disabled
+        if: ${{ !inputs.manage }}
+        env:
+          DSH_CLI_PLATFORM: np-aws-lz-dsh
+          DSH_CLI_TENANT: greenbox-dev
+          DSH_CLI_PASSWORD: ${{ secrets.NP_AWS_LZ_DSH_GREENBOX_DEV }}
+        run: |
+          wget https://github.com/kpn-dsh/dsh-cli/releases/download/v0.7.3/dsh-v0.7.3-x86_64-unknown-linux-gnu.tar.gz
+          gzip -d dsh-v0.7.3-x86_64-unknown-linux-gnu.tar.gz
+          tar x -f dsh-v0.7.3-x86_64-unknown-linux-gnu.tar
+          ./dsh service export cmd
