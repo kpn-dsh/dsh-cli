@@ -122,26 +122,14 @@ impl SubjectFormatter<SecretLabel> for SecretWithMetadata {
         _ => Value::hide(),
       },
       SecretLabel::Provisioned => match &self.allocation_status {
-        Some(allocation_status) => {
-          if allocation_status.provisioned {
-            Value::plain("yes")
-          } else {
-            Value::plain("no")
-          }
-        }
+        Some(allocation_status) => Value::yes_no(allocation_status.provisioned),
         None => Value::hide(),
       },
       SecretLabel::SecretId => match &self.id {
         Some(secret_id) => Value::target(secret_id),
         None => Value::hide(),
       },
-      SecretLabel::System => {
-        if self.id.is_some() {
-          Value::plain("yes")
-        } else {
-          Value::plain("no")
-        }
-      }
+      SecretLabel::System => Value::yes_no(self.id.is_some()),
       _ => self.metadata.clone().value(label, target_id),
     }
   }
