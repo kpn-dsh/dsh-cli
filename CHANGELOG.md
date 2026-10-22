@@ -4,6 +4,16 @@ All notable changes to the `dsh` tool project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.10.2] - YYYY-MM-DD
+
+### Added
+
+* Capability to generate Kafka proxy example code for `sacala3`.
+
+### Fixed
+
+* Fixed bug with `audience` attribute in `DshJwt`.
+
 ## [0.10.1] - 2026-09-24
 
 ### Added
