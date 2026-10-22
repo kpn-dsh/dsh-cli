@@ -15,6 +15,7 @@ use tokio::task::spawn_blocking;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Release {
+  pub(crate) latest_check: Option<SystemTime>,
   pub(crate) html_url: String,
   pub(crate) id: u64,
   pub(crate) tag_name: String,
@@ -38,7 +39,7 @@ pub(crate) struct ReleaseAsset {
   pub(crate) content_type: String,
   pub(crate) state: String,
   pub(crate) size: u64,
-  pub(crate) download_count: u64,
+  pub(crate) download_count: Option<u64>,
   pub(crate) created_at: String,
   pub(crate) updated_at: String,
   pub(crate) browser_download_url: String,
@@ -122,14 +123,6 @@ async fn latest_release() -> DshCliResult<(Version, Release, bool)> {
 
 const LATEST_RELEASE_FILENAME: &str = "latest-release.toml";
 
-/// Store latest release
-fn write_latest_release_to_file(latest_release: &Release) -> DshCliResult<()> {
-  if let Some(pathbuf) = dsh_directory_pathbuf(LATEST_RELEASE_FILENAME)? {
-    serialize_and_write_to_toml_file(&pathbuf, latest_release)?;
-  }
-  Ok(())
-}
-
 /// Get stored latest release
 ///
 /// ## Returns
@@ -145,6 +138,14 @@ fn latest_release_from_file() -> DshCliResult<Option<(Release, SystemTime)>> {
   } else {
     Ok(None)
   }
+}
+
+/// Store latest release
+fn write_latest_release_to_file(latest_release: &Release) -> DshCliResult<()> {
+  if let Some(pathbuf) = dsh_directory_pathbuf(LATEST_RELEASE_FILENAME)? {
+    serialize_and_write_to_toml_file(&pathbuf, latest_release)?;
+  }
+  Ok(())
 }
 
 /// Get latest release from `GitHub`
