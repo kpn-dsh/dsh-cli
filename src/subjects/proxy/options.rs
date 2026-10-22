@@ -1,4 +1,4 @@
-use crate::code::{LANGUAGE_JAVASCRIPT, LANGUAGE_JSON, LANGUAGE_PYTHON, LANGUAGE_RUST};
+use crate::code::{LANGUAGE_JAVASCRIPT, LANGUAGE_JSON, LANGUAGE_PYTHON, LANGUAGE_RUST, LANGUAGE_SCALA3};
 use crate::context::Context;
 use crate::environment_variables::{environment_variable, ENV_VAR_DSH_CLI_VHOST_ZONE};
 use crate::{err, DshCliResult};
@@ -148,6 +148,7 @@ pub(crate) fn language_argument() -> Arg {
       PossibleValue::new(LANGUAGE_JSON),
       PossibleValue::new(LANGUAGE_PYTHON),
       PossibleValue::new(LANGUAGE_RUST),
+      PossibleValue::new(LANGUAGE_SCALA3),
     ]))
     .value_name("LANGUAGE")
     .help("Programming language")

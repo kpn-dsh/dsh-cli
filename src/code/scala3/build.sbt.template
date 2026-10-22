@@ -1,0 +1,10 @@
+ThisBuild / scalaVersion := "3.3.6"
+
+ThisBuild / scalacOptions ++= Seq("-release", "21")
+
+lazy val root = (project in file(".")).settings(name := "{{proxy-name}}")
+
+libraryDependencies ++= Seq(
+  "org.apache.kafka" % "kafka-clients" % "4.4.0",
+  "org.slf4j" % "slf4j-nop" % "2.0.20"
+)

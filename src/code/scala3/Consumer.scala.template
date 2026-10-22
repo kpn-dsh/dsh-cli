@@ -1,0 +1,32 @@
+package org.kpn.dsh.proxy.{{proxy-name-underscore}}
+
+import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
+import org.kpn.dsh.proxy.{{proxy-name-underscore}}
+
+import java.time.Duration
+import scala.jdk.CollectionConverters.*
+
+object Consumer:
+
+  def main(args: Array[String]): Unit =
+    if (args.length < 1)
+      println("missing topic argument")
+      System.exit(1)
+    val topic = args(0)
+
+    val properties = commonClientProperties
+    properties.put(ConsumerConfig.GROUP_ID_CONFIG, GroupId)
+    properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer")
+    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer")
+
+    val consumer = new KafkaConsumer[String, String](properties.asJava)
+
+    consumer.subscribe(List(topic).asJava)
+
+    while true
+    do
+      consumer
+        .poll(Duration.ofSeconds(5))
+        .records(topic)
+        .asScala
+        .foreach(record => println(record.key.trim))

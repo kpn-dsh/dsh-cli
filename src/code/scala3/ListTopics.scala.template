@@ -1,0 +1,22 @@
+package org.kpn.dsh.proxy.{{proxy-name-underscore}}
+
+import org.apache.kafka.clients.admin.AdminClient
+import org.kpn.dsh.proxy.{{proxy-name-underscore}}
+
+import scala.jdk.CollectionConverters.*
+
+object ListTopics:
+
+  def main(args: Array[String]): Unit =
+    val properties = commonClientProperties
+
+    val admin_client = AdminClient.create(properties.asJava)
+
+    admin_client
+      .listTopics
+      .names
+      .get
+      .asScala
+      .toList
+      .sorted
+      .foreach(println)
