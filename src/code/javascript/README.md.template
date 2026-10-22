@@ -1,0 +1,46 @@
+# `JavaScript` code example
+
+It is assumed that you have a recent version of `node.js` and its `npm` package manager
+installed. The generated code has a dependency on
+[Confluent JavaScript Client for Apache Kafka](https://docs.confluent.io/kafka-clients/javascript/current/overview.html).
+
+To run the example scripts, first install the `@confluentinc/kafka-javascript` client library 
+(if it is not already installed):
+
+```shell
+> cd {{proxy-name}}-example-javascript
+> npm install "@confluentinc/kafka-javascript"
+...
+```
+
+List all Kafka topics that you have read access to.
+
+```shell
+> node list-topics
+scratch.my-topic.{{tenant}}
+...
+```
+
+Send some messages to Kafka topic `scratch.my-topic.{{tenant}}`. Use `ctrl-c` to stop the program.
+
+```shell
+> node producer scratch.my-topic.{{tenant}}
+{{proxy-name}}-producer-javascript: 1782301678
+{{proxy-name}}-producer-javascript: 1782301679
+{{proxy-name}}-producer-javascript: 1782301680
+{{proxy-name}}-producer-javascript: 1782301681
+{{proxy-name}}-producer-javascript: 1782301682
+^CSIGINT
+```
+
+Consume records from the same topic. Again, use `ctrl-c` to stop the program.
+
+```shell
+> node consumer scratch.my-topic.{{tenant}}
+0:3099 {{proxy-name}}-producer-javascript: 1782301678
+0:3100 {{proxy-name}}-producer-javascript: 1782301679
+0:3101 {{proxy-name}}-producer-javascript: 1782301680
+0:3102 {{proxy-name}}-producer-javascript: 1782301681
+0:3103 {{proxy-name}}-producer-javascript: 1782301682
+^CSIGINT
+```

@@ -25,7 +25,7 @@ As is shown in the output, the properties are written to a `JSON` file named
     "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
     "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
   ],
-  "bundle-directory": "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy",
+  "bundle-directory": "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy",
   "ca-file": "ca.pem",
   "client-certificate-file": "client.pem",
   "client-key-file": "client.key"

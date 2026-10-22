@@ -1,0 +1,42 @@
+use rdkafka::config::ClientConfig;
+use rdkafka::consumer::{BaseConsumer, Consumer};
+use std::time::Duration;
+
+const PKI_DIRECTORY: &str = "{{bundle-directory}}";
+const CLIENT_ID: &str = "{{client-id}}";
+const GROUP_ID: &str = "{{group-id}}";
+const BROKERS: [&str; 3] = [
+{{brokers}}
+];
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let mut kafka_client_config = ClientConfig::new();
+  kafka_client_config
+    .set("auto.offset.reset", "latest")
+    .set("bootstrap.servers", BROKERS.join(","))
+    .set("client.id", CLIENT_ID)
+    .set("group.id", GROUP_ID)
+    .set("security.protocol", "ssl")
+    .set("ssl.ca.location", format!("{PKI_DIRECTORY}/ca.pem"))
+    .set("ssl.certificate.location", format!("{PKI_DIRECTORY}/client.pem"))
+    .set("ssl.key.location", format!("{PKI_DIRECTORY}/client.key"));
+
+  let consumer: BaseConsumer = kafka_client_config
+    .create()
+    .map_err(|error| format!("failed to create consumer: {error}"))?;
+
+  let metadata = consumer.fetch_metadata(None, Duration::from_millis(2000)).unwrap();
+  let mut topics = metadata
+    .topics()
+    .iter()
+    .map(|topic| (topic.name(), topic.partitions().len()))
+    .collect::<Vec<_>>();
+
+  topics.sort_by(|(topic_a, _), (topic_b, _)| topic_a.to_string().cmp(&topic_b.to_string()));
+  for (topic, partitions) in topics {
+    println!("{} ({})", topic, partitions);
+  }
+
+  consumer.unsubscribe();
+  Ok(())
+}

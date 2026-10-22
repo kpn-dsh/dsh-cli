@@ -1,9 +1,8 @@
 # `Python` code example
 
-> It is assumed that you have a recent version of `Python` and its `pip` package manager
-> installed.   
-> The generated code has a dependency on the
-> [Confluent Python Client for Apache Kafka](https://docs.confluent.io/kafka-clients/python/current/overview.html).
+It is assumed that you have a recent version of `Python` and its `pip` package manager installed.   
+The generated code has a dependency on the
+[Confluent Python Client for Apache Kafka](https://docs.confluent.io/kafka-clients/python/current/overview.html).
 
 We will create the example code for the `Python` programming language with the following command:
 
@@ -11,6 +10,7 @@ We will create the example code for the `Python` programming language with the f
 > dsh proxy code my-proxy python
 generating python example for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
 created directory 'my-proxy-example-python'
+created file 'my-proxy-example-python/README.md'
 created file 'my-proxy-example-python/consumer.py'
 created file 'my-proxy-example-python/list-topics.py'
 created file 'my-proxy-example-python/producer.py'
@@ -18,8 +18,56 @@ python code for bundle 'my-proxy' generated in directory 'my-proxy-example-pytho
 ```
 
 As is shown in the output, the example is generated in a newly created directory which contains
-three `Python` scripts named `consumer.py`, `list-topics.py` and `producer.py`. Click below to
-see the generated code.
+three `Python` scripts named `consumer.py`, `list-topics.py` and `producer.py` and a `README.md`
+file. Click below to see the generated code.
+
+<details>
+<summary><code>README.md</code></summary>
+
+```markdown
+# `Python` code example
+
+It is assumed that you have a recent version of `Python` and its `pip` package manager installed.
+The generated code has a dependency on the
+[Confluent Python Client for Apache Kafka](https://docs.confluent.io/kafka-clients/python/current/overview.html).
+
+To run the example scripts, we first change to the created directory, create a virtual environment
+and install the `confluent_kafka` client library.
+
+> cd rguc-proxy-example-python
+> python -m venv .venv
+> . .venv/bin/activate
+(.venv) rguc-proxy-example-python> python -m pip install confluent_kafka
+
+Now we can list all Kafka topics that we have read access to.
+
+> python list-topics.py
+...
+scratch.my-topic.rguc
+...
+
+Produce some records to the topic `scratch.my-topic.rguc`. Use `ctrl-c` to stop the program.
+
+(.venv) rguc-proxy-example-python> python producer.py scratch.my-topic.rguc
+rguc-proxy-producer-python: 1780045672
+rguc-proxy-producer-python: 1780045674
+rguc-proxy-producer-python: 1780045675
+rguc-proxy-producer-python: 1780045676
+rguc-proxy-producer-python: 1780045677
+^Cinterrupted
+
+Consume records from the same topic. Again, use `ctrl-c` to stop the program.
+
+(.venv) rguc-proxy-example-python> python consumer.py scratch.my-topic.rguc
+0:2729 rguc-proxy-producer-python: 1780045672
+0:2730 rguc-proxy-producer-python: 1780045674
+0:2731 rguc-proxy-producer-python: 1780045675
+0:2732 rguc-proxy-producer-python: 1780045676
+0:2733 rguc-proxy-producer-python: 1780045677
+^Cinterrupted
+```
+
+</details>
 
 <details>
 <summary><code>consumer.py</code></summary>
@@ -28,14 +76,13 @@ see the generated code.
 from confluent_kafka import Consumer
 import sys
 
-PKI_DIRECTORY = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy"
-
+PKI_DIRECTORY = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy"
 CLIENT_ID = "my-tenant"
 GROUP_ID = "my-tenant_my-proxy_1"
 BROKERS = [
     "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
     "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
-    "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+    "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ]
 
 
@@ -88,12 +135,12 @@ if __name__ == "__main__":
 ```python
 from confluent_kafka.admin import AdminClient
 
-PKI_DIRECTORY = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy"
+PKI_DIRECTORY = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy"
 CLIENT_ID = "my-tenant"
 BROKERS = [
     "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
     "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
-    "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+    "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ]
 
 
@@ -129,12 +176,12 @@ import math
 import sys
 import time
 
-PKI_DIRECTORY = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy"
+PKI_DIRECTORY = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy"
 CLIENT_ID = "my-tenant"
 BROKERS = [
     "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
     "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
-    "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+    "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ]
 
 
@@ -157,7 +204,7 @@ def main():
 
     try:
         while True:
-            key = f"my-proxy-producer-python: {math.floor(datetime.now().timestamp())}"
+            key = f"rguc-proxy-producer-python: {math.floor(datetime.now().timestamp())}"
             producer.produce(topic=topic, key=key)
             producer.flush()
             print(key)

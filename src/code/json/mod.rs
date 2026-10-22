@@ -5,11 +5,14 @@ use crate::DshCliResult;
 use std::fs;
 use std::fs::{exists, remove_file};
 
+const CONFIGURATION_JSON_TEMPLATE: &str = include_str!("configuration.json.template");
+const CONFIGURATION_WITH_SCHEMA_JSON_TEMPLATE: &str = include_str!("configuration-with-schema.json.template");
+
 pub(crate) fn generate_json_configuration(bundle_configuration: &ProxyCertificateBundleConfig, bundle_directory: &str, context: &Context) -> DshCliResult<Option<String>> {
   let json = if bundle_configuration.enable_schema_store {
-    apply_template(JSON_TEMPLATE_WITH_SCHEMA_STORE_ENDPOINT, "", bundle_configuration, bundle_directory, "        ")?
+    apply_template(CONFIGURATION_WITH_SCHEMA_JSON_TEMPLATE, "", bundle_configuration, bundle_directory, "        ")?
   } else {
-    apply_template(JSON_TEMPLATE, "", bundle_configuration, bundle_directory, "        ")?
+    apply_template(CONFIGURATION_JSON_TEMPLATE, "", bundle_configuration, bundle_directory, "        ")?
   };
   let json_filename = json_configuration_filename(bundle_configuration, context);
   fs::write(&json_filename, &json)?;
@@ -34,30 +37,3 @@ fn json_configuration_filename(bundle_configuration: &ProxyCertificateBundleConf
     None => format!("{}-configuration.json", bundle_configuration.proxy_name),
   }
 }
-
-const JSON_TEMPLATE: &str = r#"{
-    "client-id": "{{client-id}}",
-    "group-id": "{{group-id}}",
-    "bootstrap-servers": [
-{{brokers}}
-    ],
-    "bundle-directory": "{{bundle-directory}}",
-    "ca-file": "ca.pem",
-    "client-certificate-file": "client.pem",
-    "client-key-file": "client.key"
-}
-"#;
-
-const JSON_TEMPLATE_WITH_SCHEMA_STORE_ENDPOINT: &str = r#"{
-    "client-id": "{{client-id}}",
-    "group-id": "{{group-id}}",
-    "bootstrap-servers": [
-{{brokers}}
-    ],
-    "schema-store-endpoint": "{{schema-store-endpoint}}",
-    "bundle-directory": "{{bundle-directory}}",
-    "ca-file": "ca.pem",
-    "client-certificate-file": "client.pem",
-    "client-key-file": "client.key"
-}
-"#;

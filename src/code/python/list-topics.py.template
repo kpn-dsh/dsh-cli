@@ -1,0 +1,27 @@
+from confluent_kafka.admin import AdminClient
+
+PKI_DIRECTORY = "{{bundle-directory}}"
+CLIENT_ID = "{{client-id}}"
+BROKERS = [
+{{brokers}}
+]
+
+
+def main():
+    kafka_config = {
+        "bootstrap.servers": ",".join(BROKERS),
+        "client.id": CLIENT_ID,
+        "security.protocol": "ssl",
+        "ssl.ca.location": f"{PKI_DIRECTORY}/ca.pem",
+        "ssl.certificate.location": f"{PKI_DIRECTORY}/client.pem",
+        "ssl.key.location": f"{PKI_DIRECTORY}/client.key"
+    }
+
+    kafka_admin = AdminClient(kafka_config)
+    topics = sorted(kafka_admin.list_topics().topics.values(), key=lambda kv: kv.topic)
+    for topic in topics:
+        print(f"{topic.topic} ({len(topic.partitions)})")
+
+
+if __name__ == "__main__":
+    main()

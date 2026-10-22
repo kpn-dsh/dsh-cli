@@ -1,8 +1,7 @@
 # `Rust` code example
 
-> It is assumed that you have a recent version of `Rust` and its `cargo` package manager
-> installed.  
-> The generated code has a dependency on the [rust-rdkafka](https://crates.io/crates/rdkafka) crate.
+It is assumed that you have a recent version of `Rust` and its `cargo` package manager installed.  
+The generated code has a dependency on the [rust-rdkafka](https://crates.io/crates/rdkafka) crate.
 
 For this example we will create example code for the `Rust` programming language:
 
@@ -12,6 +11,7 @@ generating rust example for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
 created directory 'my-proxy-example-rust'
 created directory 'my-proxy-example-rust/src'
 created directory 'my-proxy-example-rust/src/bin'
+created file 'my-proxy-example-rust/README.md'
 created file 'my-proxy-example-rust/Cargo.toml'
 created file 'my-proxy-example-rust/src/main.rs'
 created file 'my-proxy-example-rust/src/bin/consumer.rs'
@@ -20,8 +20,56 @@ rust code for bundle 'my-proxy' generated in directory 'my-proxy-example-rust'
 ```
 
 As is shown in the output of the command, the example is generated in a newly created directory
-which contains a `Cargo.toml` manifest, a `src/main.rs` binary module and two additional binaries
-`src/bin/consumer.rs` and `src/bin/producer.rs`. Click below to see the generated code.
+which contains a `README.md` file, a `Cargo.toml` manifest, a `src/main.rs` binary module and
+two additional binaries `src/bin/consumer.rs` and `src/bin/producer.rs`.
+Click below to see the generated code.
+
+<details>
+<summary><code>README.md</code></summary>
+
+```markdown
+# `Rust` code example
+
+It is assumed that you have a recent version of `Rust` and its `cargo` package manager installed.
+The generated code has a dependency on the [rust-rdkafka](https://crates.io/crates/rdkafka) crate.
+
+To run the examples we first use `cargo build` to build the executables. This will take a few
+minutes due to
+the dependency on `rdkafka`, which depends on `openssl`. The executables will be written to the
+`target/debug` directory.
+
+> cd my-proxy-example-rust
+> cargo build
+
+Now we are able to run the executables. First we will list all Kafka topics that we have
+read access to.
+
+> target/debug/list-topics
+...
+scratch.my-topic.my-tenant
+...
+
+Then we will send messages to a Kafka topic. In the example below we use topic
+`scratch.my-topic.my-tenant`. Use `ctrl-c` to stop the program.
+
+> target/debug/producer scratch.my-topic.my-tenant
+my-proxy-producer-rust: 1780047895
+my-proxy-producer-rust: 1780047896
+my-proxy-producer-rust: 1780047897
+my-proxy-producer-rust: 1780047898
+^C
+
+Next we will consume records from the same topic. Again, use `ctrl-c` to stop the program.
+
+> target/debug/consumer scratch.my-topic.my-tenant
+0:2808 my-proxy-producer-rust: 1780047895
+0:2809 my-proxy-producer-rust: 1780047896
+0:2810 my-proxy-producer-rust: 1780047897
+0:2811 my-proxy-producer-rust: 1780047898
+^C
+```
+
+</details>
 
 <details>
 <summary><code>Cargo.toml</code></summary>
@@ -47,13 +95,13 @@ use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use std::time::Duration;
 
-const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
+const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy";
 const CLIENT_ID: &str = "my-tenant";
 const GROUP_ID: &str = "my-tenant_my-proxy_1";
 const BROKERS: [&str; 3] = [
   "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
   "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -103,13 +151,13 @@ use std::env::args;
 use std::time::Duration;
 use std::{process, thread};
 
-const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
+const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy";
 const CLIENT_ID: &str = "my-tenant";
 const GROUP_ID: &str = "my-tenant_my-proxy_1";
 const BROKERS: [&str; 3] = [
   "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
   "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -130,10 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set("ssl.certificate.location", format!("{PKI_DIRECTORY}/client.pem"))
     .set("ssl.key.location", format!("{PKI_DIRECTORY}/client.key"));
 
-  let consumer: BaseConsumer =
-    kafka_client_config
-      .create()
-      .map_err(|error| format!("failed to create consumer: {error}"))?;
+  let consumer: BaseConsumer = kafka_client_config.create().map_err(|error| format!("failed to create consumer: {error}"))?;
 
   consumer
     .subscribe(&[topic])
@@ -141,12 +186,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   loop {
     match consumer.poll(Duration::ZERO) {
-      Some(Ok(message)) => println!(
-        "{}:{} {}",
-        message.partition(),
-        message.offset(),
-        String::from_utf8_lossy(message.key().unwrap())
-      ),
+      Some(Ok(message)) => println!("{}:{} {}", message.partition(), message.offset(), String::from_utf8_lossy(message.key().unwrap())),
       Some(Err(error)) => println!("error: {error}"),
       None => {}
     }
@@ -168,12 +208,12 @@ use std::env::args;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{process, thread};
 
-const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/my-proxy";
+const PKI_DIRECTORY: &str = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy";
 const CLIENT_ID: &str = "my-tenant";
 const BROKERS: [&str; 3] = [
   "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
   "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -194,13 +234,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set("ssl.certificate.location", format!("{PKI_DIRECTORY}/client.pem"))
     .set("ssl.key.location", format!("{PKI_DIRECTORY}/client.key"));
 
-  let producer: BaseProducer =
-    kafka_client_config
-      .create()
-      .map_err(|error| format!("failed to create producer: {error}"))?;
-
+  let producer: BaseProducer = kafka_client_config.create().map_err(|error| format!("failed to create producer: {error}"))?;
   loop {
-    let key = format!("my-proxy-producer-rust: {}", SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
+    let key = format!("rguc-proxy-producer-rust: {}", SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
     let record = BaseRecord::to(topic).key(&key).payload("payload");
     match producer.send(record) {
       Ok(_) => println!("{}", key),

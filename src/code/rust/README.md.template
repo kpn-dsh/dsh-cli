@@ -1,0 +1,46 @@
+# `Rust` code example
+
+It is assumed that you have a recent version of `Rust` and its `cargo` package manager installed.
+The generated code has a dependency on the [rust-rdkafka](https://crates.io/crates/rdkafka) crate.
+
+To run the examples we first use `cargo build` to build the executables. This will take a few minutes due to
+the dependency on `rdkafka`, which depends on `openssl`. The executables will be written to the
+`target/debug` directory.
+
+```shell
+> cd {{proxy-name}}-example-rust
+> cargo build
+```
+
+Now we are able to run the executables. First we will list all Kafka topics that we have
+read access to.
+
+```shell
+> target/debug/list-topics
+...
+scratch.my-topic.{{tenant}}
+...
+```
+
+Then we will send messages to a Kafka topic. In the example below we use topic
+`scratch.my-topic.{{tenant}}`. Use `ctrl-c` to stop the program.
+
+```shell
+> target/debug/producer scratch.my-topic.{{tenant}}
+{{proxy-name}}-producer-rust: 1780047895
+{{proxy-name}}-producer-rust: 1780047896
+{{proxy-name}}-producer-rust: 1780047897
+{{proxy-name}}-producer-rust: 1780047898
+^C
+```
+
+Next we will consume records from the same topic. Again, use `ctrl-c` to stop the program.
+
+```shell
+> target/debug/consumer scratch.my-topic.{{tenant}}
+0:2808 {{proxy-name}}-producer-rust: 1780047895
+0:2809 {{proxy-name}}-producer-rust: 1780047896
+0:2810 {{proxy-name}}-producer-rust: 1780047897
+0:2811 {{proxy-name}}-producer-rust: 1780047898
+^C
+```
