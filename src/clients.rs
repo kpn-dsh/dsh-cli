@@ -223,8 +223,8 @@ async fn create_clients_for_tenants(target_platform: DshPlatform, target_tenant_
 /// * `Ok(None)` - User needs to log in.
 async fn create_clients_for_all_authorized_tenants(target_platform: DshPlatform) -> DshCliResult<Option<Vec<DshApiClient>>> {
   debug!("create client with static access token for all tenants at platform '{}'", target_platform);
-  match get_access_token(target_platform.clone()).await {
-    Ok(Some((access_token, jwt))) => match jwt.authorized_tenants() {
+  match get_access_token(target_platform.clone()).await? {
+    Some((access_token, jwt)) => match jwt.authorized_tenants() {
       Some(authorized_tenants) => {
         let dsh_api_platform_client_factory = DshApiPlatformClientFactory::create_from_static_token(target_platform, access_token)?;
         let clients = try_join_all(
@@ -238,7 +238,6 @@ async fn create_clients_for_all_authorized_tenants(target_platform: DshPlatform)
       }
       None => err!("json web token does not provide authorized tenants"),
     },
-    Ok(None) => Ok(None),
-    Err(error) => Err(error),
+    None => Ok(None),
   }
 }
