@@ -138,7 +138,7 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using the 'list' subcommand, e.g. using 'dsh apps' will be the same \
    as using 'dsh app list'.";
 
-static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.1").unwrap());
+static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.2").unwrap());
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
 const OUTPUT_OPTIONS_HEADING: &str = "Output options";
@@ -757,7 +757,7 @@ impl SubjectFormatter<ReleaseLabel> for ReleaseAsset {
     match label {
       ReleaseLabel::Release => Value::target(target_id),
       ReleaseLabel::Asset => Value::plain(&self.name),
-      ReleaseLabel::NumberOfDownloads => Value::plain(self.download_count),
+      ReleaseLabel::NumberOfDownloads => Value::some_or_hide(self.download_count),
       ReleaseLabel::CreatedAt => Value::plain(&self.created_at),
       ReleaseLabel::Size => Value::plain(self.size),
     }
@@ -773,5 +773,5 @@ fn test_open_api_version() {
 
 #[test]
 fn test_dsh_api_version() {
-  assert_eq!(crate_version(), &Version::new(0, 11, 0, None));
+  assert_eq!(crate_version(), &Version::new(0, 11, 1, None));
 }

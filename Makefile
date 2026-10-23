@@ -1,6 +1,6 @@
 #@formatter:off
 
-DSH_CLI_VERSION ?= 0.10.1
+DSH_CLI_VERSION ?= 0.10.2
 
 RELEASE_DIR := releases
 
