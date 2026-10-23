@@ -26,4 +26,9 @@ object Producer:
       val record = new ProducerRecord[String, String](topic, key, "payload")
       println(key)
       producer.send(record)
-      Thread.sleep(1000)
+      try Thread.sleep(1000)
+      catch {
+        case e: Throwable =>
+          println("interrupted")
+          System.exit(0)
+      }
