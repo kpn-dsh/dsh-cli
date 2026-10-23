@@ -76,7 +76,7 @@ struct NodepoolList {}
 #[async_trait]
 impl CommandExecutor for NodepoolList {
   async fn execute_with_client(&self, _: Option<String>, _: Option<String>, _: &ArgMatches, client: &DshApiClient, context: &Context) -> DshCliResult<()> {
-    context.print_explanation("list all node pools with theit parameters");
+    context.print_explanation("list all node pools with their parameters");
     let start_instant = context.now();
     let nodepools: Vec<(String, NodepoolActual)> = client.nodepools().await?;
     context.print_execution_time(start_instant);
