@@ -1,17 +1,17 @@
 # `JavaScript` code example
 
-> It is assumed that you have a recent version of `node.js` and its `npm` package manager
-> installed.   
-> The generated code has a dependency on
-> [Confluent JavaScript Client for Apache Kafka](https://docs.confluent.io/kafka-clients/javascript/current/overview.html).
+It is assumed that you have a recent version of `node.js` and its `npm` package manager installed.
+The generated code has a dependency on
+[Confluent JavaScript Client for Apache Kafka](https://docs.confluent.io/kafka-clients/javascript/current/overview.html).
 
 We will create the example code for the `JavaScript` programming language with the following
 command:
 
 ```shell
 > dsh proxy code my-proxy javascript
-generating javascript example for bundle 'my-proxy' for 'np-aws-lz-dsh@greenbox-dev'
+generating javascript example for bundle 'my-proxy' for 'np-aws-lz-dsh@my-tenant'
 created directory 'my-proxy-example-javascript'
+created file 'my-proxy-example-javascript/README.md'
 created file 'my-proxy-example-javascript/package.json'
 created file 'my-proxy-example-javascript/consumer.js'
 created file 'my-proxy-example-javascript/list-topics.js'
@@ -20,9 +20,55 @@ javascript code for bundle 'my-proxy' generated in directory 'my-proxy-example-j
 ```
 
 As is shown in the output, the example is generated in a newly created directory which contains
-three `JavaScript` scripts named `consumer.js`, `list-topics.js` and `producer.js` and an `npm`
-configuration file named `package.json` (which contains information about the dependencies).
-Click below to see the generated code.
+three `JavaScript` scripts named `consumer.js`, `list-topics.js` and `producer.js`, an `npm`
+configuration file named `package.json` (which contains information about the dependencies) and a
+`README.md` file. Click below to see the generated code.
+
+<details>
+<summary><code>README.md</code></summary>
+
+```markdown
+# `JavaScript` code example
+
+It is assumed that you have a recent version of `node.js` and its `npm` package manager installed.
+The generated code has a dependency on
+[Confluent JavaScript Client for Apache Kafka](https://docs.confluent.io/kafka-clients/javascript/current/overview.html).
+
+To run the example scripts, first install the `@confluentinc/kafka-javascript` client library
+(if it is not already installed):
+
+> cd rguc-proxy-example-javascript
+> npm install "@confluentinc/kafka-javascript"
+...
+
+List all Kafka topics that you have read access to.
+
+> node list-topics
+scratch.my-topic.rguc
+...
+
+Send some messages to Kafka topic `scratch.my-topic.rguc`. Use `ctrl-c` to stop the program.
+
+> node producer scratch.my-topic.rguc
+rguc-proxy-producer-javascript: 1782301678
+rguc-proxy-producer-javascript: 1782301679
+rguc-proxy-producer-javascript: 1782301680
+rguc-proxy-producer-javascript: 1782301681
+rguc-proxy-producer-javascript: 1782301682
+^CSIGINT
+
+Consume records from the same topic. Again, use `ctrl-c` to stop the program.
+
+> node consumer scratch.my-topic.rguc
+0:3099 rguc-proxy-producer-javascript: 1782301678
+0:3100 rguc-proxy-producer-javascript: 1782301679
+0:3101 rguc-proxy-producer-javascript: 1782301680
+0:3102 rguc-proxy-producer-javascript: 1782301681
+0:3103 rguc-proxy-producer-javascript: 1782301682
+^CSIGINT
+```
+
+</details>
 
 <details>
 <summary><code>package.json</code></summary>
@@ -46,13 +92,13 @@ Click below to see the generated code.
 const {Kafka, logLevel} = require('@confluentinc/kafka-javascript').KafkaJS;
 const process = require('process');
 
-const pkiDirectory = "/Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/greenbox-dev/bundles/my-proxy";
-const clientId = "greenbox-dev";
-const groupId = "greenbox-dev_my-proxy_1";
+const pkiDirectory = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy";
+const clientId = "my-tenant";
+const groupId = "my-tenant_my-proxy_1";
 const brokers = [
-  "my-proxy-0.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-1.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-2.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091"
+  "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ];
 
 async function main() {
@@ -79,11 +125,7 @@ async function main() {
 
   const kafka = new Kafka(kafkaConfig);
   let consumer = kafka.consumer({
-    kafkaJS: {
-      groupId,
-      sessionTimeout: 30000,
-      heartbeatInterval: 3000,
-    }
+    kafkaJS: { groupId }
   });
   await consumer.connect();
   await consumer.subscribe({topic: topic});
@@ -116,13 +158,13 @@ if (require.main === module) {
 const {Kafka, logLevel} = require('@confluentinc/kafka-javascript').KafkaJS;
 const process = require('process');
 
-const pkiDirectory = "/Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/greenbox-dev/bundles/my-proxy";
-const clientId = "greenbox-dev";
-const groupId = "greenbox-dev_my-proxy_1";
+const pkiDirectory = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-topic/bundles/proxy/my-proxy";
+const clientId = "my-tenant";
+const groupId = "my-tenant_my-proxy_1";
 const brokers = [
-  "my-proxy-0.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-1.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-2.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091"
+  "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ];
 
 async function main() {
@@ -140,11 +182,7 @@ async function main() {
 
   const kafka = new Kafka(kafkaConfig);
   let consumer = kafka.consumer({
-    kafkaJS: {
-      groupId,
-      sessionTimeout: 30000,
-      heartbeatInterval: 3000,
-    }
+    kafkaJS: { groupId }
   });
   await consumer.connect();
   let admin = consumer.dependentAdmin();
@@ -156,7 +194,7 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch(console.error);
+    main().catch(console.error);
 }
 ```
 
@@ -170,12 +208,12 @@ if (require.main === module) {
 const {Kafka, logLevel} = require('@confluentinc/kafka-javascript').KafkaJS;
 const process = require('process');
 
-const pkiDirectory = "/Users/wilbert/.dsh_cli/targets/np-aws-lz-dsh/greenbox-dev/bundles/my-proxy";
-const clientId = "greenbox-dev";
+const pkiDirectory = "/Users/username/.dsh_cli/targets/np-aws-lz-dsh/my-tenant/bundles/proxy/my-proxy";
+const clientId = "my-tenant";
 const brokers = [
-  "my-proxy-0.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-1.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091",
-  "my-proxy-2.kafka.greenbox-dev.dsh-dev.dsh.np.aws.kpn.org:9091"
+  "my-proxy-0.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-1.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091",
+  "my-proxy-2.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org:9091"
 ];
 
 let producerInterval = 0;
@@ -209,11 +247,11 @@ async function main() {
   await producer.connect();
 
   producerInterval = setInterval(async () => {
-    const key = "my-proxy-producer-javascript: " + Math.round(new Date().getTime() / 1000);
+    const key = "rguc-proxy-producer-javascript: " + Math.round(new Date().getTime() / 1000);
     const message = {
       key,
       value: "payload",
-    };    
+    };
     await producer.send({
       topic,
       messages: [message],
@@ -223,11 +261,11 @@ async function main() {
 }
 
 function handle_termination(signal) {
-    console.log(signal);
-    if (producerInterval) {
-      learInterval(producerInterval);
-    }
-    process.exit();
+  console.log(signal);
+  if (producerInterval) {
+    clearInterval(producerInterval);
+  }
+  process.exit();
 }
 
 if (require.main === module) {
@@ -271,7 +309,7 @@ my-proxy-producer-javascript: 1782301682
 Next we will consume records from the topic. Again, use `ctrl-c` to stop the program.
 
 ```shell
-> node consumer scratch.example.greenbox-dev
+> node consumer scratch.example.my-tenant
 0:3099 my-proxy-producer-javascript: 1782301678
 0:3100 my-proxy-producer-javascript: 1782301679
 0:3101 my-proxy-producer-javascript: 1782301680

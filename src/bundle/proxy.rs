@@ -4,7 +4,7 @@ use crate::DshCliResult;
 use dsh_api::platform::{deserialize_platform, serialize_platform};
 use dsh_api::platform::{DshPlatform, VhostZone};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 /// Contains configuration for certificate bundle.
 ///
@@ -17,24 +17,30 @@ use std::fmt::{Debug, Formatter};
 /// * `proxy_name` - Proxy name.
 /// * `tenant: String` - Tenant.
 /// * `vhost_zone` - Public or private.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct ProxyCertificateBundleConfig {
   #[serde(rename = "acl-group-name", skip_serializing_if = "Option::is_none")]
   pub(crate) acl_group_name: Option<String>,
   #[serde(default, rename = "attach-ca-chain")]
   pub(crate) attach_ca_chain: bool,
+  #[serde(rename = "bootstrap-servers", skip_serializing_if = "Option::is_none")]
+  pub(crate) bootstrap_servers: Option<String>,
   #[serde(rename = "ca-common-name", skip_serializing_if = "Option::is_none")]
   pub(crate) ca_common_name: Option<String>,
   #[serde(rename = "ca-id", skip_serializing_if = "Option::is_none")]
   pub(crate) certificate_authority_id: Option<CertificateAuthorityId>,
   #[serde(rename = "enable-schema-store")]
   pub(crate) enable_schema_store: bool,
+  #[serde(rename = "group-id", skip_serializing_if = "Option::is_none")]
+  pub(crate) group_id: Option<String>,
   #[serde(rename = "number_of_dns_records")]
   pub(crate) number_of_dns_records: usize,
   #[serde(deserialize_with = "deserialize_platform", serialize_with = "serialize_platform")]
   pub(crate) platform: DshPlatform,
   #[serde(rename = "proxy-name")]
   pub(crate) proxy_name: String,
+  #[serde(rename = "schema-store-endpoint", skip_serializing_if = "Option::is_none")]
+  pub(crate) schema_store_endpoint: Option<String>,
   pub(crate) tenant: String,
   #[serde(rename = "vhost-zone")]
   pub(crate) vhost_zone: VhostZone,
@@ -82,27 +88,5 @@ impl ProxyCertificateBundleConfig {
     } else {
       self.number_of_dns_records
     }
-  }
-
-  pub(crate) fn group_id(&self, index: usize) -> String {
-    match &self.acl_group_name {
-      Some(acl_group_name) => self.platform.proxy_consumer_group_acl(&self.tenant, &self.proxy_name, acl_group_name, index),
-      None => self.platform.proxy_consumer_group(&self.tenant, &self.proxy_name, index),
-    }
-  }
-}
-
-impl Debug for ProxyCertificateBundleConfig {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    let mut builder = f.debug_struct("ProxyCertificateBundleConfig");
-    builder.field("acl_group_name", &self.acl_group_name);
-    builder.field("ca_common_name", &self.ca_common_name);
-    builder.field("enable_schema_store", &self.enable_schema_store);
-    builder.field("number_of_dns_records", &self.number_of_dns_records);
-    builder.field("platform", &self.platform.name());
-    builder.field("proxy_name", &self.proxy_name);
-    builder.field("tenant", &self.tenant);
-    builder.field("vhost_zone", &self.vhost_zone);
-    builder.finish()
   }
 }

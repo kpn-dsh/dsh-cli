@@ -32,10 +32,11 @@ use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
-use std::io::{stderr, stdin, stdout, IsTerminal, Write};
+use std::io::{stderr, stdin, stdout, Write};
 use std::path::PathBuf;
 use std::process;
 use std::time::Instant;
+use termimad::crossterm::tty::IsTty;
 use terminal_size::{terminal_size, Height, Width};
 use OutputFormat::Csv;
 
@@ -170,9 +171,9 @@ impl Debug for Context {
 
 impl Context {
   pub(crate) fn create(matches: &ArgMatches, settings: Settings) -> DshCliResult<Context> {
-    let stderr_is_terminal = stderr().is_terminal();
-    let stdin_is_terminal = stdin().is_terminal();
-    let stdout_is_terminal = stdout().is_terminal();
+    let stderr_is_terminal = stderr().is_tty();
+    let stdin_is_terminal = stdin().is_tty();
+    let stdout_is_terminal = stdout().is_tty();
     let csv_quote = Self::get_csv_quote(matches, &settings)?;
     let csv_separator = Self::get_csv_separator(matches, &settings)?;
     if let Some(quote) = csv_quote {
@@ -719,7 +720,7 @@ impl Context {
         None => match settings.terminal_width {
           Some(terminal_width_from_settings) => Ok(Some(terminal_width_from_settings)),
           None => {
-            if stdout().is_terminal() {
+            if stdout().is_tty() {
               match terminal_size() {
                 Some((Width(width), Height(_))) => Ok(Some(width as usize)),
                 None => Ok(None),

@@ -2,7 +2,18 @@
 
 All notable changes to the `dsh` tool project will be documented in this file.
 
-## [Unreleased]
+## [0.10.2] - 2026-10-27
+
+### Added
+
+* Capability to generate Kafka proxy example code for `scala3`.
+* Checks for new version once per day.
+* Logs contain build timestamp.
+
+### Fixed
+
+* Fixed bug with _RoCK API_.
+* Fixed bug with `audience` attribute in `DshJwt`.
 
 ## [0.10.1] - 2026-09-24
 

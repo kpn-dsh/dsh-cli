@@ -139,6 +139,18 @@ impl Value {
     Self::Empty
   }
 
+  /// Create `Value` representing an enabled value.
+  ///
+  /// # Returns
+  /// * `Value::Plain`
+  pub(crate) fn enabled(enabled: bool) -> Self {
+    if enabled {
+      Value::plain("enabled")
+    } else {
+      Value::plain("disabled")
+    }
+  }
+
   /// Create `Value` representing an error.
   ///
   /// # Returns
@@ -466,6 +478,21 @@ impl Value {
     T: ToString,
   {
     Self::Warn(value.to_string())
+  }
+
+  /// Create `Value` representing yes/no.
+  ///
+  /// # Parameters
+  /// * `yes` - True if yes.
+  ///
+  /// # Returns
+  /// * `Value::Plain` - Represents the value.
+  pub(crate) fn yes_no(yes: bool) -> Self {
+    if yes {
+      Value::plain("yes")
+    } else {
+      Value::plain("no")
+    }
   }
 
   const REDACTED_SECRET: &'static str = "[redacted]";

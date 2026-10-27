@@ -1,0 +1,54 @@
+const {Kafka, logLevel} = require('@confluentinc/kafka-javascript').KafkaJS;
+const process = require('process');
+
+const pkiDirectory = "{{bundle-directory}}";
+const clientId = "{{client-id}}";
+const groupId = "{{group-id}}";
+const brokers = [
+{{brokers}}
+];
+
+async function main() {
+  // Allow handling of ctrl-c
+  process.on('SIGTERM', () => handle_termination('SIGTERM'));
+  process.on('SIGINT', () => handle_termination('SIGINT'));
+
+  let topic = process.argv[2];
+  if (!topic) {
+    console.error("missing topic argument");
+  }
+
+  const kafkaConfig = {
+    kafkaJS: {
+      clientId,
+      brokers,
+      ssl: true,
+      logLevel: logLevel.ERROR
+    },
+    "ssl.ca.location": pkiDirectory + "/ca.pem",
+    "ssl.certificate.location": pkiDirectory + "/client.pem",
+    "ssl.key.location": pkiDirectory + "/client.key"
+  };
+
+  const kafka = new Kafka(kafkaConfig);
+  let consumer = kafka.consumer({
+    kafkaJS: { groupId }
+  });
+  await consumer.connect();
+  await consumer.subscribe({topic: topic});
+
+  await consumer.run({
+    eachMessage: async ({_, partition, message}) => {
+      console.log(partition + ':' + message.offset + ' ' + message.key.toString());
+    },
+  });
+}
+
+function handle_termination(signal) {
+  console.log(signal);
+  process.exit();
+}
+
+if (require.main === module) {
+  main().catch(console.error);
+}

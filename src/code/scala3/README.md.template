@@ -1,0 +1,37 @@
+# `Scala3` code example
+
+It is assumed that you have a recent version of `scala3`, its `sbt` package manager and a `jvm`
+installed. The generated code has a dependency on the Apache Kafka client jar.
+
+We run the examples directly via `sbt`. First we will list all Kafka topics that we have access to.
+
+```shell
+> cd {{proxy-name}}-example-scala3
+> sbt "runMain org.kpn.dsh.proxy.{{proxy-name-underscore}}.ListTopics"
+...
+scratch.my-topic.{{tenant}}
+...
+```
+
+Then we will send messages to a Kafka topic. In the example below we use topic
+`scratch.my-topic.{{tenant}}`. Use `ctrl-c` to stop the program.
+
+```shell
+> sbt "runMain org.kpn.dsh.proxy.{{proxy-name-underscore}}.Producer scratch.my-topic.{{tenant}}"
+{{proxy-name}}-producer-scala3: 1780047895
+{{proxy-name}}-producer-scala3: 1780047896
+{{proxy-name}}-producer-scala3: 1780047897
+{{proxy-name}}-producer-scala3: 1780047898
+^C
+```
+
+Next we will consume records from the same topic. Again, use `ctrl-c` to stop the program.
+
+```shell
+> sbt "runMain org.kpn.dsh.proxy.{{proxy-name-underscore}}.Consumer scratch.my-topic.{{tenant}}"
+0:2808 {{proxy-name}}-producer-scala3: 1780047895
+0:2809 {{proxy-name}}-producer-scala3: 1780047896
+0:2810 {{proxy-name}}-producer-scala3: 1780047897
+0:2811 {{proxy-name}}-producer-scala3: 1780047898
+^C
+```

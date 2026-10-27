@@ -90,7 +90,7 @@ static BUNDLE_LABELS_CODE_CONFIGURATION: [ProxyBundleLabel; 8] = [
   ProxyBundleLabel::PkiCaCertificateFilename,
   ProxyBundleLabel::PkiClientCertificateFilename,
   ProxyBundleLabel::PkiClientKeyFilename,
-  ProxyBundleLabel::Brokers,
+  ProxyBundleLabel::BootstrapServers,
   ProxyBundleLabel::SchemaStoreEndpoint,
 ];
 
@@ -127,21 +127,6 @@ static GENERATED_CERTIFICATE_LABELS: [CertificateLabel; 6] = [
   CertificateLabel::SerialNumber,
 ];
 
-static PROXY_BUNDLE_LABELS_CREATE: [ProxyBundleLabel; 12] = [
-  ProxyBundleLabel::Platform,
-  ProxyBundleLabel::Tenant,
-  ProxyBundleLabel::ProxyName,
-  ProxyBundleLabel::BundleName,
-  ProxyBundleLabel::GroupId,
-  ProxyBundleLabel::CaCommonName,
-  ProxyBundleLabel::CaId,
-  ProxyBundleLabel::SchemaStore,
-  ProxyBundleLabel::VhostZone,
-  ProxyBundleLabel::AclGroupEnabled,
-  ProxyBundleLabel::AclGroupName,
-  ProxyBundleLabel::NumberOfDsnRecords,
-];
-
 pub(crate) struct BundleCreateCaSigned {}
 
 #[async_trait]
@@ -166,6 +151,13 @@ impl CommandExecutor for BundleCreateCaSigned {
       None => context.yes_or_no("attach ca chain to certificates?", false)?,
     };
     let acl_group_name = get_acl_group_name(matches, context)?;
+    let bootstrap_servers = platform.tenant_proxy_bootstrap_servers(&tenant, &proxy_bundle_id, vhost_zone.clone(), 3)?.join(",");
+
+    let group_id = match &acl_group_name {
+      Some(acl_group_name) => platform.proxy_consumer_group_acl(&tenant, &proxy_bundle_id, acl_group_name, 1),
+      None => platform.proxy_consumer_group(&tenant, &proxy_bundle_id, 1),
+    };
+
     let enable_schema_store = if acl_group_name.is_some() {
       context.print_warning("schema store will be disabled since acl groups are enabled");
       false
@@ -177,15 +169,20 @@ impl CommandExecutor for BundleCreateCaSigned {
     };
     let number_of_dns_records = get_number_of_dns_records(matches, context)?;
 
+    let schema_store_endpoint = if enable_schema_store { Some(platform.proxy_schema_store_vhost(&tenant, &proxy_bundle_id, vhost_zone.clone())?) } else { None };
+
     let config = ProxyCertificateBundleConfig {
       acl_group_name,
       attach_ca_chain,
+      bootstrap_servers: Some(bootstrap_servers),
       ca_common_name: None,
       certificate_authority_id: Some(certificate_authority_id),
       enable_schema_store,
+      group_id: Some(group_id),
       number_of_dns_records,
       platform: platform.clone(),
       proxy_name: proxy_bundle_id.to_string(),
+      schema_store_endpoint,
       tenant: tenant.to_string(),
       vhost_zone,
     };
@@ -194,7 +191,7 @@ impl CommandExecutor for BundleCreateCaSigned {
         Verbosity::Off | Verbosity::Low => (),
         Verbosity::Medium | Verbosity::High => {
           context.print_explanation("proxy bundle configuration".to_string());
-          UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_CREATE, context).print(&config, None)?
+          UnitFormatter::new(&proxy_bundle_id, &BUNDLE_LABELS_SHOW, context).print(&config, None)?
         }
       }
     }
@@ -243,6 +240,11 @@ impl CommandExecutor for BundleCreateSelfSigned {
 
     let vhost_zone = get_vhost_zone_interactive(matches, context, VhostZone::Private)?;
     let acl_group_name = get_acl_group_name(matches, context)?;
+    let bootstrap_servers = platform.tenant_proxy_bootstrap_servers(&tenant, &proxy_bundle_id, vhost_zone.clone(), 3)?.join(",");
+    let group_id = match &acl_group_name {
+      Some(acl_group_name) => platform.proxy_consumer_group_acl(&tenant, &proxy_bundle_id, acl_group_name, 1),
+      None => platform.proxy_consumer_group(&tenant, &proxy_bundle_id, 1),
+    };
     let enable_schema_store = if acl_group_name.is_some() {
       context.print_warning("schema store will be disabled since acl groups are enabled");
       false
@@ -253,16 +255,20 @@ impl CommandExecutor for BundleCreateSelfSigned {
       }
     };
     let number_of_dns_records = get_number_of_dns_records(matches, context)?;
+    let schema_store_endpoint = if enable_schema_store { Some(platform.proxy_schema_store_vhost(&tenant, &proxy_bundle_id, vhost_zone.clone())?) } else { None };
 
     let config = ProxyCertificateBundleConfig {
       acl_group_name,
       attach_ca_chain: false,
+      bootstrap_servers: Some(bootstrap_servers),
       ca_common_name: Some(ca_common_name),
       certificate_authority_id: None,
+      group_id: Some(group_id),
       enable_schema_store,
       number_of_dns_records,
       platform: platform.clone(),
       proxy_name: proxy_bundle_id.to_string(),
+      schema_store_endpoint,
       tenant: tenant.to_string(),
       vhost_zone,
     };
@@ -271,7 +277,7 @@ impl CommandExecutor for BundleCreateSelfSigned {
         Verbosity::Off | Verbosity::Low => (),
         Verbosity::Medium | Verbosity::High => {
           context.print_explanation("proxy bundle configuration".to_string());
-          UnitFormatter::new(&proxy_bundle_id, &PROXY_BUNDLE_LABELS_CREATE, context).print(&config, None)?
+          UnitFormatter::new(&proxy_bundle_id, &BUNDLE_LABELS_SHOW, context).print(&config, None)?
         }
       }
     }
@@ -376,7 +382,7 @@ static BUNDLE_LABELS_LIST: [ProxyBundleLabel; 8] = [
   ProxyBundleLabel::BundleName,
   ProxyBundleLabel::CaCommonName,
   ProxyBundleLabel::CaId,
-  ProxyBundleLabel::SchemaStore,
+  ProxyBundleLabel::SchemaStoreEnabled,
   ProxyBundleLabel::VhostZone,
   ProxyBundleLabel::NumberOfDsnRecords,
   ProxyBundleLabel::AclGroupName,
@@ -403,16 +409,18 @@ impl CommandExecutor for BundleList {
   }
 
   fn requirements(&self, _: &ArgMatches) -> Requirements {
-    Requirements::standard_without_api()
+    Requirements::new(true, None, false)
   }
 }
 
 static BUNDLE_SECRET_LABELS_SHOW: [SecretLabel; 5] = [SecretLabel::SecretName, SecretLabel::Kind, SecretLabel::Format, SecretLabel::Size, SecretLabel::Description];
 
-static BUNDLE_LABELS_SHOW: [ProxyBundleLabel; 11] = [
+static BUNDLE_LABELS_SHOW: [ProxyBundleLabel; 14] = [
   ProxyBundleLabel::CaCommonName,
   ProxyBundleLabel::CaId,
-  ProxyBundleLabel::SchemaStore,
+  ProxyBundleLabel::AttachCaChain,
+  ProxyBundleLabel::SchemaStoreEnabled,
+  ProxyBundleLabel::SchemaStoreEndpoint,
   ProxyBundleLabel::NumberOfDsnRecords,
   ProxyBundleLabel::Platform,
   ProxyBundleLabel::ProxyName,
@@ -420,7 +428,8 @@ static BUNDLE_LABELS_SHOW: [ProxyBundleLabel; 11] = [
   ProxyBundleLabel::VhostZone,
   ProxyBundleLabel::AclGroupEnabled,
   ProxyBundleLabel::AclGroupName,
-  ProxyBundleLabel::BundleDirectory,
+  ProxyBundleLabel::BootstrapServers,
+  ProxyBundleLabel::GroupId,
 ];
 
 static BUNDLE_DERIVED_LABELS_SHOW: [ProxyBundleLabel; 6] = [

@@ -1,0 +1,20 @@
+package org.kpn.dsh.proxy
+
+import org.apache.kafka.clients.CommonClientConfigs
+
+import scala.collection.mutable
+
+package object {{proxy-name-underscore}} {
+  val BundleDir: String = "{{bundle-directory}}"
+  val ClientId: String = "{{tenant}}"
+  val GroupId: String = "{{group-id}}"
+  val Brokers: List[String] = List(
+{{brokers}}
+  )
+
+  def commonClientProperties: mutable.Map[String, Any] =
+    val properties = DshProxyProperties.fromBundleDir(BundleDir).get
+    properties.put(CommonClientConfigs.CLIENT_ID_CONFIG, ClientId)
+    properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, Brokers.mkString(","))
+    properties
+}

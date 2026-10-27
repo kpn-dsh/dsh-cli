@@ -1,0 +1,39 @@
+const {Kafka, logLevel} = require('@confluentinc/kafka-javascript').KafkaJS;
+const process = require('process');
+
+const pkiDirectory = "{{bundle-directory}}";
+const clientId = "{{client-id}}";
+const groupId = "{{group-id}}";
+const brokers = [
+{{brokers}}
+];
+
+async function main() {
+  const kafkaConfig = {
+    kafkaJS: {
+      clientId,
+      brokers,
+      ssl: true,
+      logLevel: logLevel.ERROR
+    },
+    "ssl.ca.location": pkiDirectory + "/ca.pem",
+    "ssl.certificate.location": pkiDirectory + "/client.pem",
+    "ssl.key.location": pkiDirectory + "/client.key"
+  };
+
+  const kafka = new Kafka(kafkaConfig);
+  let consumer = kafka.consumer({
+    kafkaJS: { groupId }
+  });
+  await consumer.connect();
+  let admin = consumer.dependentAdmin();
+  await admin.connect();
+  let topics = await admin.listTopics();
+  topics.sort();
+  topics.forEach(topic => console.log(topic));
+  process.exit();
+}
+
+if (require.main === module) {
+    main().catch(console.error);
+}

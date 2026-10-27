@@ -356,13 +356,7 @@ impl SubjectFormatter<EnvVarLabel> for (String, Option<String>, &EnvironmentVari
   fn value(&self, label: &EnvVarLabel, _target_id: &str) -> Value {
     let (env_var_endorsed, value, environment_variable) = self;
     match label {
-      EnvVarLabel::ContainsSecret => {
-        if environment_variable.contains_secret {
-          Value::plain("yes")
-        } else {
-          Value::plain("no")
-        }
-      }
+      EnvVarLabel::ContainsSecret => Value::yes_no(environment_variable.contains_secret),
       EnvVarLabel::DefaultValue => Value::some_or_hide(environment_variable.default_value),
       EnvVarLabel::EnvVar => Value::plain(env_var_endorsed),
       EnvVarLabel::LongExplanation => Value::plain(environment_variable.long_explanation),

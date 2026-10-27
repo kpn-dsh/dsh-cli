@@ -1,0 +1,42 @@
+use ctrlc::set_handler;
+use rdkafka::config::ClientConfig;
+use rdkafka::producer::{BaseProducer, BaseRecord};
+use std::env::args;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{process, thread};
+
+const PKI_DIRECTORY: &str = "{{bundle-directory}}";
+const CLIENT_ID: &str = "{{client-id}}";
+const BROKERS: [&str; 3] = [
+{{brokers}}
+];
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  // Allow handling of ctrl-c
+  set_handler(|| process::exit(0))?;
+
+  // Get topic name from command line argument.
+  let args: Vec<String> = args().collect();
+  let topic = args.get(1).ok_or("missing topic argument")?;
+
+  // Set Kafka client configuration
+  let mut kafka_client_config = ClientConfig::new();
+  kafka_client_config
+    .set("bootstrap.servers", BROKERS.join(","))
+    .set("client.id", CLIENT_ID)
+    .set("security.protocol", "ssl")
+    .set("ssl.ca.location", format!("{PKI_DIRECTORY}/ca.pem"))
+    .set("ssl.certificate.location", format!("{PKI_DIRECTORY}/client.pem"))
+    .set("ssl.key.location", format!("{PKI_DIRECTORY}/client.key"));
+
+  let producer: BaseProducer = kafka_client_config.create().map_err(|error| format!("failed to create producer: {error}"))?;
+  loop {
+    let key = format!("{{proxy-name}}-{{example}}-rust: {}", SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
+    let record = BaseRecord::to(topic).key(&key).payload("payload");
+    match producer.send(record) {
+      Ok(_) => println!("{}", key),
+      Err((error, _)) => println!("error: {error}"),
+    }
+    thread::sleep(Duration::from_millis(1000));
+  }
+}

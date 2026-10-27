@@ -1,0 +1,11 @@
+{
+    "client-id": "{{client-id}}",
+    "group-id": "{{group-id}}",
+    "bootstrap-servers": [
+{{brokers}}
+    ],
+    "bundle-directory": "{{bundle-directory}}",
+    "ca-file": "ca.pem",
+    "client-certificate-file": "client.pem",
+    "client-key-file": "client.key"
+}

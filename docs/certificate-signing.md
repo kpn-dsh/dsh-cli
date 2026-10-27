@@ -49,15 +49,15 @@ the following data in your e-mail:
 <table>
   <tr valign="top">
     <th align="left">certificate type</th>
-    <td><code>subdomain certificate</code></td>
+    <td><code>multi-domain certificate</code></td>
   </tr>
   <tr valign="top">
     <th align="left">requested domain(s)</th>
     <td>
-      <code>*.my-tenant.dsh-dev.dsh.np.aws.kpn.org</code><br/>
-      <code>*.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org</code><br/>
-      <code>*.my-tenant.dsh-prod.dsh.prod.aws.kpn.org</code><br/>
-      <code>*.kafka.my-tenant.dsh-prod.dsh.prod.aws.kpn.org</code>
+      <code>$.my-tenant.dsh-dev.dsh.np.aws.kpn.org</code><br/>
+      <code>$.kafka.my-tenant.dsh-dev.dsh.np.aws.kpn.org</code><br/>
+      <code>$.my-tenant.dsh-prod.dsh.prod.aws.kpn.org</code><br/>
+      <code>$.kafka.my-tenant.dsh-prod.dsh.prod.aws.kpn.org</code>
     </td>
   </tr>
   <tr valign="top">

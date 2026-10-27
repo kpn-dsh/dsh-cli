@@ -69,6 +69,7 @@ impl Display for AuthenticationMethod {
 /// * `Ok(Some((access_token, jwt)))` - Access token was successfully obtained.
 /// * `Ok(None)` - User needs to log in.
 pub(crate) async fn get_access_token(platform: DshPlatform) -> DshCliResult<Option<(String, DshJwt)>> {
+  // TODO logging
   spawn_blocking(move || {
     let issuer_url = IssuerUrl::new(platform.issuer_endpoint().to_string())?;
     let http_client = BlockingClientBuilder::new().redirect(Policy::none()).build()?;
@@ -102,9 +103,10 @@ pub(crate) async fn login(platform: DshPlatform, context: Context) -> DshCliResu
     debug!("provider metadata read from '{}'", issuer_url);
     match get_access_token_from_stored_refresh_token(&provider_metadata, &platform, &http_client)? {
       Some(access_token) => {
+        trace!("access token from stored refresh token\n{:#?}", access_token);
         let access_token_jwt = DshJwt::from_str(access_token.secret())?;
-        debug!("get access token from stored refresh token: {}", access_token_jwt);
-        trace!("{:#}", access_token_jwt);
+        debug!("parsed jwt: {}", access_token_jwt);
+        trace!("parsed jwt\n{:#?}", access_token_jwt);
         match &access_token_jwt.payload.preferred_username {
           Some(preferred_username) => context.println(format!("you are already logged in as '{}'", preferred_username)),
           None => context.println("you are already logged in"),

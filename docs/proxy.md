@@ -174,10 +174,11 @@ For each supported programming language there are (will be) three different exam
 
 Select one of the supported programming languages to generate code examples:
 
-* [`JavaScript` code example](code-examples/javascript.md)
-* [`JSON` containing Kafka client properties](code-examples/kafka-client-json.md)
-* [`Python` code example](code-examples/python.md)
-* [`Rust` code example](code-examples/rust.md)
+* [`JavaScript` code example](code-examples/javascript.md),
+* [`JSON` containing Kafka client properties](code-examples/kafka-client-json.md),
+* [`Python` code example](code-examples/python.md),
+* [`Rust` code example](code-examples/rust.md) and
+* [`Scala 3` code example](code-examples/scala3.md).
 
 If you're favorite programming language is not available or if you prefer to write your own code
 you can list the required Kafka client properties by typing:

@@ -1,0 +1,48 @@
+# `Python` code example
+
+It is assumed that you have a recent version of `Python` and its `pip` package manager installed.
+The generated code has a dependency on the
+[Confluent Python Client for Apache Kafka](https://docs.confluent.io/kafka-clients/python/current/overview.html).
+
+To run the example scripts, we first change to the created directory, create a virtual environment
+and install the `confluent_kafka` client library.
+
+```shell
+> cd {{proxy-name}}-example-python
+> python -m venv .venv
+> . .venv/bin/activate
+(.venv) {{proxy-name}}-example-python> python -m pip install confluent_kafka
+```
+
+Now we can list all Kafka topics that we have read access to.
+
+```shell
+> python list-topics.py
+...
+scratch.my-topic.{{tenant}}
+...
+```
+
+Produce some records to the topic `scratch.my-topic.{{tenant}}`. Use `ctrl-c` to stop the program.
+
+```shell
+(.venv) {{proxy-name}}-example-python> python producer.py scratch.my-topic.{{tenant}}
+{{proxy-name}}-producer-python: 1780045672
+{{proxy-name}}-producer-python: 1780045674
+{{proxy-name}}-producer-python: 1780045675
+{{proxy-name}}-producer-python: 1780045676
+{{proxy-name}}-producer-python: 1780045677
+^Cinterrupted
+```
+
+Consume records from the same topic. Again, use `ctrl-c` to stop the program.
+
+```shell
+(.venv) {{proxy-name}}-example-python> python consumer.py scratch.my-topic.{{tenant}}
+0:2729 {{proxy-name}}-producer-python: 1780045672
+0:2730 {{proxy-name}}-producer-python: 1780045674
+0:2731 {{proxy-name}}-producer-python: 1780045675
+0:2732 {{proxy-name}}-producer-python: 1780045676
+0:2733 {{proxy-name}}-producer-python: 1780045677
+^Cinterrupted
+```

@@ -5,3 +5,7 @@
 Delete vhost certificates when deleting a service or app that uses a vhost.
 
 ### Use existing _RoCK_ certificates
+
+### vhosts listing
+
+Listing vhosts does not include Kafka proxy vhosts.

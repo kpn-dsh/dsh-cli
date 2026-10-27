@@ -10,8 +10,9 @@ use log::{LevelFilter, Record};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
+use std::io::stdout;
 use std::io::Write;
-use std::io::{stdout, IsTerminal};
+use termimad::crossterm::tty::IsTty;
 
 #[derive(clap::ValueEnum, Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub(crate) enum LogLevel {
@@ -55,7 +56,7 @@ pub(crate) fn initialize_logger(matches: &ArgMatches, settings: &Settings) -> Ds
       None => settings.log_level_api.clone().unwrap_or_default(),
     },
   };
-  if stdout().is_terminal() {
+  if stdout().is_tty() {
     env_logger::builder()
       .filter_module("dsh", LevelFilter::from(log_level_dsh))
       .filter_module("dsh_api", LevelFilter::from(log_level_dsh_api))
