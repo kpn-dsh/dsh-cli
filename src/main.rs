@@ -15,7 +15,7 @@ use crate::environment_variables::{
 };
 use crate::error::DshCliError;
 use crate::formatters::list_formatter::ListFormatter;
-use crate::formatters::{Label, SubjectFormatter, Value};
+use crate::formatters::{ColumnAlignment, Label, SubjectFormatter, Value};
 use crate::global_options::{
   authentication_option, browser_option, environment_variable_option, log_level_api_option, log_level_option, no_csv_headers_flag, output_directory_option, password_file_option,
   platform_option, releases_flag, tenant_option, tenants_all_flag, tenants_option, RELEASES_FLAG, TENANTS_ALL_FLAG,
@@ -26,6 +26,7 @@ use crate::subjects::aclgroup::ACL_GROUP_SUBJECT;
 use crate::subjects::nodepool::NODE_POOL_SUBJECT;
 use crate::subjects::task::TASK_SUBJECT;
 use crate::target_platform::{get_target_platform, get_target_platform_from_all_sources, platform_name_argument};
+use crate::verbosity::Verbosity;
 use autocomplete::{generate_autocomplete_file, generate_autocomplete_file_argument, AutocompleteShell, AUTOCOMPLETE_ARGUMENT};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{styling, Styles};
@@ -139,6 +140,8 @@ const AFTER_HELP: &str = "For most commands adding an 's' as a postfix will yiel
    as using 'dsh app list'.";
 
 static VERSION: LazyLock<Version> = LazyLock::new(|| Version::from_str("0.10.2").unwrap());
+
+static BUILD_DATE: &str = env!("BUILD_DATE");
 
 const COMMAND_OPTIONS_HEADING: &str = "Command options";
 const OUTPUT_OPTIONS_HEADING: &str = "Output options";
@@ -319,6 +322,14 @@ async fn inner_main() -> DshCliExit {
     Err(error) => return DshCliExit::CliErr(error),
   }
 
+  debug!(
+    "version: {}, dsh-api version: {}, openapi version: {}, build date: {}",
+    *VERSION,
+    crate_version(),
+    openapi_version(),
+    BUILD_DATE
+  );
+
   let context = match Context::create(&matches, settings) {
     Ok(context) => {
       trace!("{:#?}", context);
@@ -330,12 +341,7 @@ async fn inner_main() -> DshCliExit {
   if matches.get_flag(VERSION_FLAG) {
     match newer_release(&VERSION).await {
       Ok(Some(newer_release)) => {
-        context.println(format!(
-          "version: {}\ndsh-api library version: {}\ndsh openapi version: {}",
-          *VERSION,
-          crate_version(),
-          openapi_version()
-        ));
+        print_version(false, &context);
         context.print_warning(format!(
           "newer release {} available at {}",
           newer_release.version.map(|version| version.to_string()).unwrap_or("".to_string()),
@@ -343,16 +349,35 @@ async fn inner_main() -> DshCliExit {
         ));
       }
       Ok(None) => {
-        context.println(format!(
-          "version: {} (latest)\ndsh-api library version: {}\ndsh openapi version: {}",
-          *VERSION,
-          crate_version(),
-          openapi_version()
-        ));
+        print_version(true, &context);
       }
-      Err(error) => return DshCliExit::CliErr(error),
+      Err(error) => {
+        print_version(false, &context);
+        return DshCliExit::CliErr(error);
+      }
     }
     return DshCliExit::Ok;
+  }
+
+  fn print_version(is_latest: bool, context: &Context) {
+    if is_latest {
+      context.println(format!("version: {} (latest)", *VERSION));
+    } else {
+      context.println(format!("version: {}", *VERSION));
+    }
+    context.println(format!("dsh-api library version: {}", crate_version()));
+    context.println(format!("dsh openapi version: {}", openapi_version()));
+    debug!("build date: {}", BUILD_DATE);
+    if *context.verbosity() == Verbosity::High {
+      context.println(format!("build date: {}", BUILD_DATE));
+    }
+  }
+
+  if let Some(newer_release) = newer_release_notification(&VERSION).await {
+    match newer_release.version {
+      Some(version) => context.print_warning(format!("newer release {} available at {}", version, newer_release.html_url)),
+      None => context.print_warning(format!("newer release available at {}", newer_release.html_url)),
+    }
   }
 
   if matches.get_flag(RELEASES_FLAG) {
@@ -371,14 +396,6 @@ async fn inner_main() -> DshCliExit {
       }
       Err(error) => return DshCliExit::CliErr(error),
     }
-  }
-
-  if let Some(newer_release) = newer_release_notification(&VERSION).await {
-    context.print_warning(format!(
-      "newer release {} available at {}",
-      newer_release.version.map(|version| version.to_string()).unwrap_or("".to_string()),
-      newer_release.html_url
-    ));
   }
 
   if let Some(env_var_name) = matches.get_one::<String>(ENV_VAR_ARGUMENT) {
@@ -750,6 +767,13 @@ impl Label for ReleaseLabel {
   fn is_target_label(&self) -> bool {
     matches!(self, Self::Release)
   }
+
+  fn column_alignment(&self) -> ColumnAlignment {
+    match self {
+      Self::NumberOfDownloads | Self::Size => ColumnAlignment::Right,
+      _ => ColumnAlignment::Default,
+    }
+  }
 }
 
 impl SubjectFormatter<ReleaseLabel> for ReleaseAsset {
@@ -765,6 +789,11 @@ impl SubjectFormatter<ReleaseLabel> for ReleaseAsset {
 }
 
 pub(crate) static RELEASE_LABELS: [ReleaseLabel; 5] = [ReleaseLabel::Release, ReleaseLabel::Asset, ReleaseLabel::CreatedAt, ReleaseLabel::Size, ReleaseLabel::NumberOfDownloads];
+
+#[test]
+fn test_version() {
+  assert_eq!(*VERSION, Version::new(0, 10, 2, None));
+}
 
 #[test]
 fn test_open_api_version() {

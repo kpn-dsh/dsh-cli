@@ -1,7 +1,7 @@
 use crate::directory::dsh_directory_pathbuf;
 use crate::{cli_error, err, read_and_deserialize_from_toml_file, serialize_and_write_to_toml_file, DshCliResult};
 use dsh_api::version::Version;
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use openidconnect::reqwest::blocking::ClientBuilder;
 use openidconnect::reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
 use openidconnect::reqwest::redirect::Policy;
@@ -80,12 +80,23 @@ pub(crate) async fn newer_release_notification(current_version: &Version) -> Opt
   match latest_release().await {
     Ok((latest_release_version, latest_release, cached)) => {
       if !cached && current_version < &latest_release_version {
+        debug!(
+          "release file not cached and current version {} < latest release version {}",
+          current_version, latest_release_version
+        );
         Some(latest_release)
       } else {
+        debug!(
+          "release file cached or current version {} >= latest release version {}",
+          current_version, latest_release_version
+        );
         None
       }
     }
-    Err(_) => None,
+    Err(_) => {
+      warn!("could not get latest release");
+      None
+    }
   }
 }
 
@@ -102,13 +113,16 @@ async fn latest_release() -> DshCliResult<(Version, Release, bool)> {
   let (latest_release, cached) = if let Some((latest_release_from_file, modified)) = latest_release_from_file()? {
     if modified.elapsed()?.cmp(&core::time::Duration::from_secs(NUMBER_OF_SECONDS_IN_A_DAY)) == Greater {
       // Latest release file exists but is more than a day old
+      debug!("release file is more than one day old");
       (latest_release_from_github().await?, false)
     } else {
       // Latest release file exists and is less than a day old
+      debug!("release file is less than one day old");
       (Some(latest_release_from_file), true)
     }
   } else {
     // Latest release file does not exist
+    debug!("release file does not exist");
     (latest_release_from_github().await?, false)
   };
   match latest_release {
@@ -132,8 +146,15 @@ const LATEST_RELEASE_FILENAME: &str = "latest-release.toml";
 fn latest_release_from_file() -> DshCliResult<Option<(Release, SystemTime)>> {
   if let Some(pathbuf) = dsh_directory_pathbuf(LATEST_RELEASE_FILENAME)? {
     match read_and_deserialize_from_toml_file::<Release>(&pathbuf)? {
-      Some(release) => Ok(Some((release, pathbuf.metadata()?.modified()?))),
-      None => Ok(None),
+      Some(release) => {
+        trace!("read cached release file '{}'", pathbuf.display());
+        trace!("{:#?}", release);
+        Ok(Some((release, pathbuf.metadata()?.modified()?)))
+      }
+      None => {
+        trace!("could not read cached release file '{}'", pathbuf.display());
+        Ok(None)
+      }
     }
   } else {
     Ok(None)
@@ -143,6 +164,7 @@ fn latest_release_from_file() -> DshCliResult<Option<(Release, SystemTime)>> {
 /// Store latest release
 fn write_latest_release_to_file(latest_release: &Release) -> DshCliResult<()> {
   if let Some(pathbuf) = dsh_directory_pathbuf(LATEST_RELEASE_FILENAME)? {
+    debug!("write release file '{}'", pathbuf.display());
     serialize_and_write_to_toml_file(&pathbuf, latest_release)?;
   }
   Ok(())
@@ -188,6 +210,7 @@ pub(crate) async fn releases_from_github() -> DshCliResult<Vec<Release>> {
     let request = http_client.request(Method::GET, DSH_CLI_RELEASES_ENDPOINT).headers(headers);
     trace!("{:#?}", request);
     let mut response = request.send()?;
+    debug!("received github releases information");
     let mut body = String::new();
     response.read_to_string(&mut body)?;
     let mut releases: Vec<Release> = serde_json::from_str(&body)?;

@@ -68,3 +68,6 @@ rock_api = { version = "0.1.0", features = ["log", "rcgen"], registry = "artifac
 
 [dev-dependencies]
 rdkafka = { version = "0.39", features = ["ssl-vendored"] }
+
+[build-dependencies]
+chrono = "0.4"
