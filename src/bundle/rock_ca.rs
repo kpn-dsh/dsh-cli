@@ -102,12 +102,8 @@ impl CertificateAuthority for RockCertificateAuthority {
   }
 
   async fn existing_certificate(&self, vhost_domain: &str, context: Option<(&Context, u64)>) -> DshCliResult<Option<String>> {
-    let query: HashMap<CertsParameter, String> = HashMap::from([(CertsParameter::Status, "AC".to_string()), (CertsParameter::Domain, vhost_domain.to_string())]);
-    match self
-      .client
-      .certs(&query)
+    match get_certificates(vhost_domain, false, &self.client)
       .await?
-      .results
       .into_iter()
       .find(|certificate| certificate.cn == vhost_domain)
     {
@@ -123,18 +119,19 @@ impl CertificateAuthority for RockCertificateAuthority {
   }
 
   async fn list_certificates(&self, domain: &str, context: &Context, expiration_days: u64) -> DshCliResult<()> {
-    let query_active: HashMap<CertsParameter, String> = HashMap::from([(CertsParameter::Status, "AC".to_string()), (CertsParameter::Domain, domain.to_string())]);
-    let mut certificates = self.client.certs(&query_active).await?.results;
-    let query_revoked: HashMap<CertsParameter, String> = HashMap::from([(CertsParameter::Status, "RE".to_string()), (CertsParameter::Domain, domain.to_string())]);
-    let mut revoked_certificates = self.client.certs(&query_revoked).await?.results;
+    let mut certificates: Vec<Certificate> = get_certificates(domain, false, &self.client).await?;
+    let mut revoked_certificates: Vec<Certificate> = get_certificates(domain, true, &self.client).await?;
     certificates.append(&mut revoked_certificates);
-    certificates.sort_by(|cert_a, cert_b| cert_a.cn.cmp(&cert_b.cn));
-    let mut formatter = ListFormatter::new(&ROCK_CERTIFICATE_LABELS_LIST, context);
-    for certificate in &certificates {
-      formatter.push_target_id_value_owned(certificate.cn.clone(), (certificate, Some(expiration_days)));
+    if certificates.is_empty() {
+      context.print_outcome("no certificates found");
+    } else {
+      certificates.sort_by(|cert_a, cert_b| cert_a.cn.cmp(&cert_b.cn));
+      let mut formatter = ListFormatter::new(&ROCK_CERTIFICATE_LABELS_LIST, context);
+      for certificate in &certificates {
+        formatter.push_target_id_value_owned(certificate.cn.clone(), (certificate, Some(expiration_days)));
+      }
+      formatter.print(None)?;
     }
-    formatter.print(None)?;
-
     Ok(())
   }
 
@@ -198,6 +195,28 @@ impl CertificateAuthority for RockCertificateAuthority {
       reloaded_certificate.id.to_string(),
       reloaded_certificate.cert.ok_or_else(|| DshCliError::from("missing certificate"))?,
     ))
+  }
+}
+
+/// Get list of RoCK certificates
+async fn get_certificates(domain: &str, revoked: bool, client: &RockApiClient) -> DshCliResult<Vec<Certificate>> {
+  let query: HashMap<CertsParameter, String> =
+    HashMap::from([(CertsParameter::Status, if revoked { "RE".to_string() } else { "AC".to_string() }), (CertsParameter::Domain, domain.to_string())]);
+  match client.certs(&query).await {
+    Ok(mut certificates) => {
+      certificates.results.sort_by(|cert_a, cert_b| cert_a.cn.cmp(&cert_b.cn));
+      Ok(certificates.results)
+    }
+    Err(error) => match &error {
+      RockApiError::BadRequest { message } => {
+        if message == "no certificates found" {
+          Ok(vec![])
+        } else {
+          Err(DshCliError::from(error))
+        }
+      }
+      _ => Err(DshCliError::from(error)),
+    },
   }
 }
 
